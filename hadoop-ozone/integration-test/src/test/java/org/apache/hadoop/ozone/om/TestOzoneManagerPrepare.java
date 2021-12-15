@@ -48,9 +48,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +84,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * Make sure OM is out of Prepare state before executing individual tests.
    * @throws Exception
    */
-  @Before
+  @BeforeEach
   public void initOM() throws Exception {
     setup();
     submitCancelPrepareRequest();
@@ -204,7 +204,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertClusterPrepared(prepareIndex);
   }
 
-  @Ignore("Saving on CI time since this is a pessimistic test. We should not " +
+  @Flaky("Saving on CI time since this is a pessimistic test. We should not " +
       "be able to do anything with 2 OMs down.")
   @Test
   public void testPrepareFailsWhenTwoOmsAreDown() throws Exception {

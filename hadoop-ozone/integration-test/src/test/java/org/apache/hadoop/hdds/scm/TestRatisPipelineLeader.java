@@ -35,6 +35,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.client.GrpcClientProtocolService;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
@@ -43,14 +44,13 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test pipeline leader information is correctly used.
  */
-@Ignore("HDDS-3265")
+@Flaky("HDDS-3265")
 public class TestRatisPipelineLeader {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

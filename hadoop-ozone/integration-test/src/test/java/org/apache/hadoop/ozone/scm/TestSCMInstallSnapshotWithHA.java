@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.junit.Assert.assertTrue;
@@ -156,6 +157,7 @@ public class TestSCMInstallSnapshotWithHA {
   }
 
   @Test
+  @Flaky("HDDS-5631")
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
