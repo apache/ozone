@@ -212,7 +212,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(
-              createErrorOMResponse(omResponse, exception));
+              createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
