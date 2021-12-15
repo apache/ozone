@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -126,14 +124,6 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean checksumVerify = true;
 
-  @Config(key = "checksum.combine.mode",
-      defaultValue = "MD5MD5CRC",
-      description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
-          + "determines which algorithm would be used to compute checksum for "
-          + "file checksum. Default checksum type is MD5MD5CRC.",
-      tags = ConfigTag.CLIENT)
-  private String checksumCombineMode = Options.ChecksumCombineMode.MD5MD5CRC.name();
-
   @PostConstruct
   private void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -236,16 +226,5 @@ public class OzoneClientConfig {
 
   public int getBufferIncrement() {
     return bufferIncrement;
-  }
-
-  public Options.ChecksumCombineMode getChecksumCombineMode() {
-    try {
-      return Options.ChecksumCombineMode.valueOf(checksumCombineMode);
-    } catch(IllegalArgumentException iae) {
-      LOG.warn("Bad checksum combine mode: {}. Using default {}", checksumCombineMode,
-          Options.ChecksumCombineMode.MD5MD5CRC.name());
-      return Options.ChecksumCombineMode.valueOf(
-          Options.ChecksumCombineMode.MD5MD5CRC.name());
-    }
   }
 }
