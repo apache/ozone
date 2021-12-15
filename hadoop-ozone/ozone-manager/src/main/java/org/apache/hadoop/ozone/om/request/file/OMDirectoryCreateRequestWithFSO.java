@@ -169,7 +169,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =
             new OMDirectoryCreateResponseWithFSO(omResponse.build(), dirInfo,
-                missingParentInfos, result);
+                missingParentInfos, result, getBucketLayout());
       } else {
         result = Result.DIRECTORY_ALREADY_EXISTS;
         omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);

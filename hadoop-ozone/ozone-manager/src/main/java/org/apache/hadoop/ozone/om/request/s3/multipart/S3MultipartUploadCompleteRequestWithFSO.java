@@ -143,7 +143,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
       IOException exception) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(
-        createErrorOMResponse(omResponse, exception));
+        createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
   @Override
@@ -153,7 +153,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
       List<OmKeyInfo> unUsedParts) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
-        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts);
+        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout());
   }
 
   private long getParentId(OMMetadataManager omMetadataManager,

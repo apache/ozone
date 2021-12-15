@@ -61,15 +61,10 @@ public class S3MultipartUploadCommitPartResponseWithFSO
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, multipartKey, openKey, omMultipartKeyInfo,
             oldPartKeyInfo, openPartKeyInfoToBeDeleted, isRatisEnabled,
-            omBucketInfo);
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+            omBucketInfo, bucketLayout);
   }
 }

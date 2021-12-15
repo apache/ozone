@@ -62,7 +62,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
         multipartKeyInfo.getUploadID());
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>());
+        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>(),
+        getBucketLayout());
   }
 
   @Override
@@ -71,7 +72,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3MultipartUploadAbortResponseWithFSO(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo);
+        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        getBucketLayout());
   }
 
   @Override
