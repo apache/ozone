@@ -886,7 +886,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setS3SecretManager(s3SecretManager)
         .setCertificateClient(certClient)
         .setOmServiceId(omNodeDetails.getServiceId())
-        .setOMMultiTenantManager(multiTenantManagr)
         .build();
   }
 

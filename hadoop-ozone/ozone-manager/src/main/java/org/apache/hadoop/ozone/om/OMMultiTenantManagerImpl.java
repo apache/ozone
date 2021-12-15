@@ -356,8 +356,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public String getUserSecret(String accessID)
-      throws IOException {
+  public String getUserSecret(String accessID) throws IOException {
     return "";
   }
 
