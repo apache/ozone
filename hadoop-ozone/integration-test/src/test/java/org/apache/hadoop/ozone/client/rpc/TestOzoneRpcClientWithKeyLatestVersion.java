@@ -5,7 +5,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -14,9 +13,9 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.junit.AfterClass;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -24,6 +23,7 @@ import org.junit.runners.Parameterized;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -39,11 +39,13 @@ import static org.junit.Assert.fail;
 @RunWith(Parameterized.class)
 public class TestOzoneRpcClientWithKeyLatestVersion {
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
 
-  private static ObjectStore objectStore;
+  private ObjectStore objectStore;
 
-  private static OzoneClient ozClient;
+  private OzoneClient ozClient;
+
+  private boolean getLatestVersion;
 
 
   @Parameterized.Parameters
@@ -60,10 +62,11 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
   }
 
 
-  public static void setup(boolean getLatestVersion) throws Exception {
+  public void setup(boolean latestVersion) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    conf.setBoolean(OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION, getLatestVersion);
+    conf.setBoolean(OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION, latestVersion);
+    this.getLatestVersion = latestVersion;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setScmId(UUID.randomUUID().toString())
@@ -74,8 +77,8 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
     objectStore = ozClient.getObjectStore();
   }
 
-  @AfterClass
-  public static void tearDown() throws Exception {
+  @After
+  public void tearDown() throws Exception {
     if(ozClient != null) {
       ozClient.close();
     }
@@ -95,10 +98,13 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
     // Test checks key override and read are working with
     // bucket versioning false.
     String value = "sample value";
-    createRequiredForVersioningTest(volumeName, bucketName, keyName, false, value);
+    createRequiredForVersioningTest(volumeName, bucketName, keyName,
+        false, value);
 
     // read key and test
     testReadKey(volumeName, bucketName, keyName, value);
+
+    testListStatus(volumeName, bucketName, keyName, false);
 
 
     // Versioning turned on
@@ -108,14 +114,19 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
 
     // Test checks key override and read are working with
     // bucket versioning true.
-    createRequiredForVersioningTest(volumeName, bucketName, keyName, true, value);
+    createRequiredForVersioningTest(volumeName, bucketName, keyName,
+        true, value);
 
     // read key and test
     testReadKey(volumeName, bucketName, keyName, value);
+
+
+    testListStatus(volumeName, bucketName, keyName, true);
   }
 
   private void createRequiredForVersioningTest(String volumeName,
-      String bucketName, String keyName, boolean versioning, String value) throws Exception {
+      String bucketName, String keyName, boolean versioning,
+      String value) throws Exception {
 
     ReplicationConfig replicationConfig = ReplicationConfig
         .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
@@ -148,5 +159,22 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
     byte[] fileContent = new byte[value.getBytes(UTF_8).length];
     is.read(fileContent);
     Assert.assertEquals(value, new String(fileContent, UTF_8));
+  }
+
+  private void testListStatus(String volumeName, String bucketName,
+      String keyName, boolean versioning) throws Exception{
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    OzoneBucket ozoneBucket = volume.getBucket(bucketName);
+    List<OzoneFileStatus> ozoneFileStatusList = ozoneBucket.listStatus(keyName,
+        false, "", 1);
+    Assert.assertNotNull(ozoneFileStatusList);
+    Assert.assertTrue(ozoneFileStatusList.size() == 1);
+    if (!getLatestVersion && versioning) {
+      Assert.assertEquals(2, ozoneFileStatusList.get(0).getKeyInfo()
+          .getKeyLocationVersions().size());
+    } else {
+      Assert.assertEquals(1, ozoneFileStatusList.get(0).getKeyInfo()
+          .getKeyLocationVersions().size());
+    }
   }
 }
