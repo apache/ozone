@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,13 +36,20 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.function.Function;
 
 /**
@@ -104,6 +113,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
   private boolean initialized = false;
 
+  private ExecutorService executor;
+
   public ECBlockReconstructedStripeInputStream(ECReplicationConfig repConfig,
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
        XceiverClientFactory xceiverClientFactory, Function<BlockID,
@@ -118,6 +129,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     // The EC decoder needs an array data+parity long, with missing or not
     // needed indexes set to null.
     decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
+
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(
+        "ec-reader-for-" + blockInfo.getBlockID() + "-TID-%d").build();
+    executor = Executors.newFixedThreadPool(repConfig.getData(), threadFactory);
   }
 
   /**
@@ -271,6 +286,9 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         for (ByteBuffer b : bufs) {
           b.position(0);
         }
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted waiting for reads to complete", ie);
       }
     }
     if (missingIndexes.length > 0) {
@@ -438,33 +456,69 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
-  protected void loadDataBuffersFromStream() throws IOException {
+  protected void loadDataBuffersFromStream()
+      throws IOException, InterruptedException {
+    Queue<ImmutablePair<Integer, Future<Void>>> pendingReads
+        = new ArrayDeque<>();
     for (int i : dataIndexes) {
+      pendingReads.add(new ImmutablePair<>(i, executor.submit(() -> {
+        readIntoBuffer(i, decoderInputBuffers[i]);
+        return null;
+      })));
+    }
+    boolean exceptionOccurred = false;
+    while(!pendingReads.isEmpty()) {
+      int index = -1;
       try {
-        BlockExtendedInputStream stream = getOrOpenStream(i);
-        seekStreamIfNecessary(stream, 0);
-        ByteBuffer b = decoderInputBuffers[i];
-        while (b.hasRemaining()) {
-          int read = stream.read(b);
-          if (read == EOF) {
-            // We should not reach EOF, as the block should have enough data to
-            // fill the buffer. If the block does not, then it indicates the
-            // block is not as long as it should be, based on the block length
-            // stored in OM. Therefore if there is any remaining space in the
-            // buffer, we should throw an exception.
-            if (b.hasRemaining()) {
-              throw new IOException("Expected to read " + b.remaining() +
-                  " bytes from block " + getBlockID() + " EC index " + (i + 1) +
-                  " but reached EOF");
-            }
-            break;
-          }
-        }
-      } catch (IOException e) {
+        ImmutablePair<Integer, Future<Void>> pair = pendingReads.poll();
+        index = pair.getKey();
+        // Should this future.get() have a timeout? At the end of the call chain
+        // we eventually call a grpc or ratis client to read the block data. Its
+        // the call to the DNs which could potentially block. There is a timeout
+        // on that call controlled by:
+        //     OZONE_CLIENT_READ_TIMEOUT = "ozone.client.read.timeout";
+        // Which defaults to 30s. So if there is a DN communication problem, it
+        // should timeout in the client which should propagate up the stack as
+        // an IOException.
+        pair.getValue().get();
+      } catch (ExecutionException ee) {
         LOG.warn("Failed to read from block {} EC index {}. Excluding the " +
-                "block", getBlockID(), i + 1, e);
-        failedDataIndexes.add(i);
-        throw e;
+            "block", getBlockID(), index + 1, ee.getCause());
+        failedDataIndexes.add(index);
+        exceptionOccurred = true;
+      } catch (InterruptedException ie) {
+        // Catch each InterruptedException to ensure all the futures have been
+        // handled, and then throw the exception later
+        LOG.debug("Interrupted while waiting for reads to complete", ie);
+        Thread.currentThread().interrupt();
+      }
+    }
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException(
+          "Interrupted while waiting for reads to complete");
+    }
+    if (exceptionOccurred) {
+      throw new IOException("One or more errors occurred reading blocks");
+    }
+  }
+
+  private void readIntoBuffer(int ind, ByteBuffer buf) throws IOException {
+    BlockExtendedInputStream stream = getOrOpenStream(ind);
+    seekStreamIfNecessary(stream, 0);
+    while (buf.hasRemaining()) {
+      int read = stream.read(buf);
+      if (read == EOF) {
+        // We should not reach EOF, as the block should have enough data to
+        // fill the buffer. If the block does not, then it indicates the
+        // block is not as long as it should be, based on the block length
+        // stored in OM. Therefore if there is any remaining space in the
+        // buffer, we should throw an exception.
+        if (buf.hasRemaining()) {
+          throw new IOException("Expected to read " + buf.remaining() +
+              " bytes from block " + getBlockID() + " EC index " + (ind + 1) +
+              " but reached EOF");
+        }
+        break;
       }
     }
   }
@@ -518,6 +572,12 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   protected int readWithStrategy(ByteReaderStrategy strategy) {
     throw new NotImplementedException("readWithStrategy is not implemented. " +
         "Use readStripe() instead");
+  }
+
+  @Override
+  public synchronized void close() {
+    super.close();
+    executor.shutdownNow();
   }
 
   @Override

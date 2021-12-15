@@ -57,6 +57,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private BlockExtendedInputStream blockReader;
   private boolean reconstructionReader = false;
   private List<DatanodeDetails> failedLocations = new ArrayList<>();
+  private boolean closed = false;
 
   /**
    * Given the ECReplicationConfig and the block length, calculate how many
@@ -142,6 +143,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
 
   @Override
   public synchronized int read(ByteBuffer buf) throws IOException {
+    ensureNotClosed();
     if (blockReader.getRemaining() == 0) {
       return EOF;
     }
@@ -208,6 +210,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+    ensureNotClosed();
     try {
       blockReader.seek(pos);
     } catch (IOException e) {
@@ -215,6 +218,20 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         throw e;
       }
       failoverToReconstructionRead(null, pos);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (blockReader != null) {
+      blockReader.close();
+    }
+    closed = true;
+  }
+
+  private void ensureNotClosed() throws IOException {
+    if (closed) {
+      throw new IOException("The stream is closed");
     }
   }
 }

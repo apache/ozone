@@ -33,7 +33,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -74,11 +73,9 @@ public class TestECBlockReconstructedStripeInputStream {
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
       Assert.assertTrue(ecb.hasSufficientLocations());
     }
-
-    Map<DatanodeDetails, Integer> dnMap = new HashMap<>();
-
     // Two Chunks, but missing data block 2.
-    dnMap = ECStreamTestUtil.createIndexMap(1, 4, 5);
+    Map<DatanodeDetails, Integer> dnMap
+        = ECStreamTestUtil.createIndexMap(1, 4, 5);
     keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB * 2, dnMap);
     try (ECBlockInputStream ecb =
         new ECBlockReconstructedStripeInputStream(repConfig,
