@@ -516,9 +516,7 @@ public class TestOzoneECClient {
       throws IOException {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
-    con.setInt(
-        OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES,
-        3);
+    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
 
     int[] nodesIndexesToMarkFailure = new int[4];
     nodesIndexesToMarkFailure[0] = 0;

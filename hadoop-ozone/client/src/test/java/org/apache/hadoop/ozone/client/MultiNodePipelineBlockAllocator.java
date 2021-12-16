@@ -111,8 +111,8 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
     return results;
   }
 
-  private void addMembers(HddsProtos.Pipeline.Builder builder,
-      int nodesNeeded, Set<DatanodeDetails> datanodes,
+  private void addMembers(HddsProtos.Pipeline.Builder builder, int nodesNeeded,
+      Set<DatanodeDetails> excludedDataNodes,
       OzoneManagerProtocolProtos.KeyArgs keyArgs) {
     int clusterSize = clusterDns.size();
     int counter = nodesNeeded;
@@ -121,7 +121,7 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
           clusterDns.get(start % clusterSize);
       start++;
-      if (datanodes
+      if (excludedDataNodes
           .contains(DatanodeDetails.getFromProtoBuf(datanodeDetailsProto))) {
         continue;
       } else {

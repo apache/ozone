@@ -115,11 +115,10 @@ public final class OzoneConfigKeys {
       "ozone.scm.block.size";
   public static final String OZONE_SCM_BLOCK_SIZE_DEFAULT = "256MB";
 
-  public static final String
-      OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES =
+  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
       "ozone.client.max.ec.stripe.write.retries";
-  public static final String
-      OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURES_DEFAULT = "10";
+  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
+      "10";
 
   /**
    * Ozone administrator users delimited by comma.
