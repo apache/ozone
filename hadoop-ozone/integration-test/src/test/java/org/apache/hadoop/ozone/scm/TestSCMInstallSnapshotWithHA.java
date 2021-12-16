@@ -61,6 +61,7 @@ import org.slf4j.event.Level;
  * Tests the Ratis snapshot feature in SCM.
  */
 @Timeout(500)
+@Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -157,7 +158,6 @@ public class TestSCMInstallSnapshotWithHA {
   }
 
   @Test
-  @Flaky("HDDS-5631")
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
