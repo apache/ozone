@@ -84,6 +84,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
@@ -99,6 +100,7 @@ import org.slf4j.LoggerFactory;
  * Test SCM and DataNode Upgrade sequence.
  */
 @Timeout(11000)
+@Flaky({"HDDS-6028","HDDS-6049"})
 public class TestHDDSUpgrade {
 
   /**

@@ -31,5 +31,5 @@ public @interface Flaky {
   /**
    * The issue tracking the flaky test.
    */
-  String value() default "";
+  String[] value() default "";
 }

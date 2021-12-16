@@ -85,6 +85,7 @@ import static org.junit.Assert.fail;
 /**
  * Test from the scmclient for decommission and maintenance.
  */
+@Flaky({"HDDS-6028","HDDS-6049"})
 public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
@@ -155,7 +156,6 @@ public class TestDecommissionAndMaintenance {
   }
 
   @Test
-  @Flaky("HDDS-6049")
   // Decommissioning a node with open pipelines should close the pipelines
   // and hence the open containers and then the containers should be replicated
   // by the replication manager. After the node completes decommission, it can
