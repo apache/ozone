@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -87,12 +88,12 @@ import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import static org.hamcrest.core.Is.is;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.AfterClass;
 import org.junit.Assert;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 
 /**
@@ -115,7 +116,7 @@ public class TestContainerStateMachineFailures {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
 
@@ -182,7 +183,7 @@ public class TestContainerStateMachineFailures {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -482,6 +483,7 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
+  @Flaky("HDDS-6115")
   public void testApplyTransactionIdempotencyWithClosedContainer()
           throws Exception {
     OzoneOutputStream key =
