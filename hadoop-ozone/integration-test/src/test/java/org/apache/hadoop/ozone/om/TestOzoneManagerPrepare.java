@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Slow;
 import org.junit.Assert;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +58,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test OM prepare against actual mini cluster.
  */
+@Flaky("HDDS-5990")
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final String BUCKET = "bucket";
   private static final String VOLUME = "volume";
@@ -204,7 +206,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertClusterPrepared(prepareIndex);
   }
 
-  @Flaky("Saving on CI time since this is a pessimistic test. We should not " +
+  @Slow("Saving on CI time since this is a pessimistic test. We should not " +
       "be able to do anything with 2 OMs down.")
   @Test
   public void testPrepareFailsWhenTwoOmsAreDown() throws Exception {
