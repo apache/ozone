@@ -583,22 +583,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   public synchronized void close() {
     super.close();
     executor.shutdownNow();
-  }
-
-  @Override
-  public synchronized void seek(long pos) throws IOException {
-    if (pos % getStripeSize() != 0) {
-      // As this reader can only return full stripes, we only seek to the start
-      // stripe offsets
-      throw new IOException("Requested position " + pos
-          + " does not align with a stripe offset");
-    }
-    super.seek(pos);
-  }
-
-  @Override
-  public void close() {
-    super.close();
     // Inside this class, we only allocate buffers to read parity into. Data
     // is reconstructed or read into a set of buffers passed in from the calling
     // class. Therefore we only need to ensure we free the parity buffers here.
@@ -610,6 +594,17 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         decoderInputBuffers[i] = null;
       }
     }
+  }
+
+  @Override
+  public synchronized void seek(long pos) throws IOException {
+    if (pos % getStripeSize() != 0) {
+      // As this reader can only return full stripes, we only seek to the start
+      // stripe offsets
+      throw new IOException("Requested position " + pos
+          + " does not align with a stripe offset");
+    }
+    super.seek(pos);
   }
 
 }
