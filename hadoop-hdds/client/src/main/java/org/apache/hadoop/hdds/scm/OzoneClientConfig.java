@@ -124,6 +124,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean checksumVerify = true;
 
+  @Config(key = "max.ec.stripe.write.retries",
+      defaultValue = "10",
+      description = "Ozone EC client to retry stripe to new block group on" +
+          " failures.",
+      tags = ConfigTag.CLIENT)
+  private int maxECStripeWriteRetries = 10;
+
   @PostConstruct
   private void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -222,6 +229,10 @@ public class OzoneClientConfig {
 
   public void setChecksumVerify(boolean checksumVerify) {
     this.checksumVerify = checksumVerify;
+  }
+
+  public int getMaxECStripeWriteRetries() {
+    return this.maxECStripeWriteRetries;
   }
 
   public int getBufferIncrement() {

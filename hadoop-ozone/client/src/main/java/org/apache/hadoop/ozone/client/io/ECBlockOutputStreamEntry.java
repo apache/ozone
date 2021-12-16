@@ -290,6 +290,14 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     return blockOutputStreams[0].getBlockID();
   }
 
+  public List<ECBlockOutputStream> streamsWithWriteFailure() {
+    return getFailedStreams(false);
+  }
+
+  public List<ECBlockOutputStream> streamsWithPutBlockFailure() {
+    return getFailedStreams(true);
+  }
+
   /**
    * In EC, we will do async write calls for writing data in the scope of a
    * stripe. After every stripe write finishes, use this method to validate the
@@ -300,7 +308,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
    *                   futures if false.
    * @return
    */
-  public List<ECBlockOutputStream> getFailedStreams(boolean forPutBlock) {
+  private List<ECBlockOutputStream> getFailedStreams(boolean forPutBlock) {
     final Iterator<ECBlockOutputStream> iter = blockStreams().iterator();
     List<ECBlockOutputStream> failedStreams = new ArrayList<>();
     while (iter.hasNext()) {

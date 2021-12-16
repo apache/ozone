@@ -198,8 +198,8 @@ public class TestOzoneClient {
     int data = 3;
     int parity = 2;
     int chunkSize = 1024;
-    createNewClient(config, new MultiNodePipelineBlockAllocator(
-        config, data + parity));
+    createNewClient(config,
+        new MultiNodePipelineBlockAllocator(config, data + parity, 15));
     String value = new String(new byte[chunkSize], UTF_8);
     OzoneBucket bucket = getOzoneBucket();
 

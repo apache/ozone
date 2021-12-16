@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Port;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UUID;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
@@ -49,8 +50,8 @@ public class SinglePipelineBlockAllocator
   }
 
   @Override
-  public Iterable<? extends KeyLocation> allocateBlock(
-      KeyArgs keyArgs) {
+  public Iterable<? extends KeyLocation> allocateBlock(KeyArgs keyArgs,
+      ExcludeList excludeList) {
 
     if (pipeline == null) {
       Pipeline.Builder bldr = Pipeline.newBuilder()
