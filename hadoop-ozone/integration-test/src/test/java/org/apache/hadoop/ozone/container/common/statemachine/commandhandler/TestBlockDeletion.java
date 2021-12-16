@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
@@ -176,7 +175,6 @@ public class TestBlockDeletion {
   }
 
   @Test
-  @Flaky("HDDS-5605")
   public void testBlockDeletion() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
