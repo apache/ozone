@@ -895,7 +895,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
-    return createOutputStream(openKey, requestId, replicationConfig);
+    return createOutputStream(openKey, requestId);
   }
 
   private KeyProvider.KeyVersion getDEK(FileEncryptionInfo feInfo)
@@ -1356,8 +1356,7 @@ public class RpcClient implements ClientProtocol {
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
-    return createOutputStream(keySession, UUID.randomUUID().toString(),
-        replicationConfig);
+    return createOutputStream(keySession, UUID.randomUUID().toString());
   }
 
   @Override
@@ -1487,8 +1486,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
-      String requestId, ReplicationConfig replicationConfig)
-      throws IOException {
+      String requestId) throws IOException {
     KeyOutputStream keyOutputStream = null;
 
     if (openKey.getKeyInfo().getReplicationConfig()
@@ -1499,7 +1497,9 @@ public class RpcClient implements ClientProtocol {
           .setReplicationConfig(
               (ECReplicationConfig)openKey.getKeyInfo().getReplicationConfig())
           .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-          .setConfig(clientConfig).build();
+          .setConfig(clientConfig)
+          .setByteBufferPool(byteBufferPool)
+          .build();
     } else {
       keyOutputStream = new KeyOutputStream.Builder().setHandler(openKey)
           .setXceiverClientManager(xceiverClientManager)
