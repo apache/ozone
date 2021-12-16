@@ -39,7 +39,6 @@ import java.util.function.Function;
 public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
 
   private ECBlockInputStreamFactory ecBlockStreamFactory;
-  private ByteBufferPool byteBufferPool;
 
   public static BlockInputStreamFactory getInstance(
       ByteBufferPool byteBufferPool) {
@@ -51,7 +50,6 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
   }
 
   public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool) {
-    this.byteBufferPool = byteBufferPool;
     this.ecBlockStreamFactory =
         ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool);
   }
