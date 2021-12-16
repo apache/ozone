@@ -1178,6 +1178,7 @@
       Supported values: RATIS, STAND_ALONE, CHAINED and EC.
     </description>
   </property>
+
   <property>
     <name>hdds.container.close.threshold</name>
     <value>0.9f</value>
@@ -3042,6 +3043,18 @@
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.max.ec.stripe.write.retries</name>
+    <value>10</value>
+    <tag>CLIENT</tag>
+    <description>
+      When EC stripe write failed, client will request to allocate new block group and write the failed stripe into new
+      block group. If the same stripe failure continued in newly acquired block group also, then it will retry by
+      requesting to allocate new block group again. This configuration is used to limit these number of retries. By
+      default the number of retries are 10.
     </description>
   </property>
 </configuration>

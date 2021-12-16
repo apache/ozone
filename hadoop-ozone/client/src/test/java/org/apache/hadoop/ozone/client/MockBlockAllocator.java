@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 
@@ -27,7 +28,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLoca
  */
 public interface MockBlockAllocator {
 
-  Iterable<? extends KeyLocation> allocateBlock(
-      KeyArgs createKeyRequest);
+  Iterable<? extends KeyLocation> allocateBlock(KeyArgs createKeyRequest,
+      ExcludeList excludeList);
 
 }
