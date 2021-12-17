@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +38,11 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.server.leader.FollowerInfo;
@@ -56,25 +61,27 @@ import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
 /**
  * Test for OM bootstrap process.
  */
-public class TestOzoneManagerBootstrap {
+public class TestAddRemoveOzoneManager {
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
 
   @Rule
-  public Timeout timeout = new Timeout(500_000);
+  public Timeout timeout = new Timeout(5000_000);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private final String clusterId = UUID.randomUUID().toString();
   private final String scmId = UUID.randomUUID().toString();
+  private long lastTransactionIndex;
+  private UserGroupInformation user;
 
-  private static final String OM_SERVICE_ID = "om-bootstrap";
+  private static final String OM_SERVICE_ID = "om-add-remove";
   private static final String VOLUME_NAME;
   private static final String BUCKET_NAME;
-
-  private long lastTransactionIndex;
+  private static final String DECOMM_NODES_CONFIG_KEY =
+      "ozone.om.decommissioned.nodes." + OM_SERVICE_ID;
 
   static {
     VOLUME_NAME = "volume" + RandomStringUtils.randomNumeric(5);
@@ -118,12 +125,12 @@ public class TestOzoneManagerBootstrap {
     // server's peer list
     for (OzoneManager om : cluster.getOzoneManagersList()) {
       Assert.assertTrue("New OM node " + nodeId + " not present in Peer list " +
-              "of OM " + om.getOMNodeId(), om.doesPeerExist(nodeId));
+          "of OM " + om.getOMNodeId(), om.doesPeerExist(nodeId));
       Assert.assertTrue("New OM node " + nodeId + " not present in Peer list " +
-          "of OM " + om.getOMNodeId() + " RatisServer",
+              "of OM " + om.getOMNodeId() + " RatisServer",
           om.getOmRatisServer().doesPeerExist(nodeId));
       Assert.assertTrue("New OM node " + nodeId + " not present in " +
-          "OM " + om.getOMNodeId() + "RatisServer's RaftConf",
+              "OM " + om.getOMNodeId() + "RatisServer's RaftConf",
           om.getOmRatisServer().getCurrentPeersFromRaftConf().contains(nodeId));
     }
 
@@ -164,8 +171,8 @@ public class TestOzoneManagerBootstrap {
 
   /**
    * 1. Add 2 new OMs to an existing 1 node OM cluster.
-   * 2. Verify that one of the new OMs must becomes the leader by stopping
-   * the old OM.
+   * 2. Verify that one of the new OMs becomes the leader by stopping the old
+   * OM.
    */
   @Test
   public void testBootstrap() throws Exception {
@@ -332,5 +339,85 @@ public class TestOzoneManagerBootstrap {
 
     // Verify that the newly bootstrapped OM is running
     Assert.assertTrue(newOM.isRunning());
+  }
+
+  /**
+   * Decommissioning Tests:
+   * 1. Stop an OM and decommission it from a 3 node cluster
+   * 2. Decommission another OM without stopping it.
+   * 3.
+   */
+  @Test
+  public void testDecommission() throws Exception {
+    setupCluster(3);
+    user = UserGroupInformation.getCurrentUser();
+
+    // Stop the 3rd OM and decommission it
+    String omNodeId3 = cluster.getOzoneManager(2).getOMNodeId();
+    cluster.stopOzoneManager(omNodeId3);
+    decommissionOM(omNodeId3);
+
+    // Decommission the non leader OM and then stop it. Stopping OM before will
+    // lead to no quorum and there will not be a elected leader OM to process
+    // the decommission request.
+    String omNodeId2;
+    if (cluster.getOMLeader().getOMNodeId().equals(
+        cluster.getOzoneManager(1).getOMNodeId())) {
+      omNodeId2 = cluster.getOzoneManager(0).getOMNodeId();
+    } else {
+      omNodeId2 = cluster.getOzoneManager(1).getOMNodeId();
+    }
+    decommissionOM(omNodeId2);
+    cluster.stopOzoneManager(omNodeId2);
+
+    // Verify that we can read/ write to the cluster with only 1 OM.
+    OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
+    OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
+    String key = createKey(bucket);
+
+    Assert.assertNotNull(bucket.getKey(key));
+
+  }
+
+  /**
+   * Decommission given OM and verify that the other OM's peer nodes are
+   * updated after decommissioning.
+   */
+  private void decommissionOM(String decommNodeId) throws Exception {
+    Collection<String> decommNodes = conf.getTrimmedStringCollection(
+        DECOMM_NODES_CONFIG_KEY);
+    decommNodes.add(decommNodeId);
+    conf.set(DECOMM_NODES_CONFIG_KEY, StringUtils.join(",", decommNodes));
+    List<OzoneManager> activeOMs = new ArrayList<>();
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      String omNodeId = om.getOMNodeId();
+      if (cluster.isOMActive(omNodeId)) {
+        om.setConfiguration(conf);
+        activeOMs.add(om);
+      }
+    }
+
+    // Create OMAdmin protocol client to send decommission request
+    OMAdminProtocolClientSideImpl omAdminProtocolClient =
+        OMAdminProtocolClientSideImpl.createProxyForOMHA(conf, user,
+            OM_SERVICE_ID);
+    OMNodeDetails decommNodeDetails = new OMNodeDetails.Builder()
+        .setOMNodeId(decommNodeId)
+        .setHostAddress("localhost")
+        .build();
+    omAdminProtocolClient.decommission(decommNodeDetails);
+
+    // Verify decomm node is removed from the HA ring
+    GenericTestUtils.waitFor(() -> {
+      for (OzoneManager om : activeOMs) {
+        if (om.getPeerNodes().contains(decommNodeId)) {
+          return false;
+        }
+      }
+      return true;
+    }, 100, 100000);
+
+    // Wait for new leader election if required
+    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null, 500, 30000);
   }
 }
