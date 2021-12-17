@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -59,7 +60,8 @@ public class FindTargetGreedyByNetworkTopology
    * network topology.
    * @param source the specified source datanode
    */
-  protected void sortTargetForSource(DatanodeDetails source) {
+  @VisibleForTesting
+  public void sortTargetForSource(DatanodeDetails source) {
     Collections.sort(potentialTargets,
         (DatanodeUsageInfo da, DatanodeUsageInfo db) -> {
         DatanodeDetails a = da.getDatanodeDetails();

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -71,15 +72,6 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
 
   private void setUpperLimit(Double upperLimit){
     this.upperLimit = upperLimit;
-  }
-
-  private void setPotentialTargets(
-      List<DatanodeUsageInfo> potentialTargetDataNodes) {
-    sizeEnteringNode.clear();
-    potentialTargetDataNodes.forEach(
-        p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
-    potentialTargets.clear();
-    potentialTargets.addAll(potentialTargetDataNodes);
   }
 
   protected int compareByUsage(DatanodeUsageInfo a, DatanodeUsageInfo b) {
@@ -231,7 +223,16 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
                            Double upLimit) {
     setConfiguration(conf);
     setUpperLimit(upLimit);
-    setPotentialTargets(potentialDataNodes);
+    sizeEnteringNode.clear();
+    potentialDataNodes.forEach(
+        p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
+    potentialTargets.clear();
+    potentialTargets.addAll(potentialDataNodes);
+  }
+
+  @VisibleForTesting
+  public Collection<DatanodeUsageInfo> getPotentialTargets() {
+    return potentialTargets;
   }
 
   /**
@@ -239,5 +240,6 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    * network topology if enabled.
    * @param source the specified source datanode
    */
-  protected abstract void sortTargetForSource(DatanodeDetails source);
+  @VisibleForTesting
+  public abstract void sortTargetForSource(DatanodeDetails source);
 }

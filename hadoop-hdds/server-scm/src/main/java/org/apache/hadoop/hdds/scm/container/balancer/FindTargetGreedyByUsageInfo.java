@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -43,7 +44,9 @@ public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
   /**
    * do nothing , since TreeSet is ordered itself.
    */
-  protected void sortTargetForSource(DatanodeDetails source) {
+  @VisibleForTesting
+  public void sortTargetForSource(DatanodeDetails source) {
+    //noop, Treeset is naturally sorted.
     return;
   }
 }
