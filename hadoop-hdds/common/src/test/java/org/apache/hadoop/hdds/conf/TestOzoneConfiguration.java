@@ -206,14 +206,16 @@ public class TestOzoneConfiguration {
       appendProperty(out, key, val);
       endConfig(out);
     }
-    configuration.addResource(new URL("file:///" + ozoneSite.getAbsolutePath()));
+    configuration
+        .addResource(new URL("file:///" + ozoneSite.getAbsolutePath()));
 
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration(configuration);
+    OzoneConfiguration ozoneConfiguration =
+        new OzoneConfiguration(configuration);
     // ozoneConfig value matches input config value for the corresponding key
     Assert.assertEquals(val, ozoneConfiguration.get(key));
     Assert.assertEquals(val, configuration.get(key));
 
-    Assert.assertNotEquals(new OzoneConfiguration().get(key), val);
+    Assert.assertNotEquals(val, new OzoneConfiguration().get(key));
   }
 
   @Test
