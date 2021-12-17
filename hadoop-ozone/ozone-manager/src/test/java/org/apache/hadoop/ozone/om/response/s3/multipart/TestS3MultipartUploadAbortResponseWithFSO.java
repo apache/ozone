@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
@@ -41,6 +42,11 @@ public class TestS3MultipartUploadAbortResponseWithFSO
   @Override
   protected String getKeyName() {
     return dirName + UUID.randomUUID().toString();
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   @Override
@@ -64,6 +70,16 @@ public class TestS3MultipartUploadAbortResponseWithFSO
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
         multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>(),
         getBucketLayout());
+  }
+
+  @Override
+  protected S3InitiateMultipartUploadResponse
+      getS3InitiateMultipartUploadResponse(
+      String volumeName, String bucketName, String keyName,
+      String multipartUploadID) {
+    return createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+        keyName,
+        multipartUploadID, new ArrayList<>());
   }
 
   @Override
