@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
 
@@ -151,11 +152,12 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   byte[] getBlockChecksumFromChunkChecksums(OmKeyLocationInfo keyLocationInfo,
       List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
+    AbstractBlockChecksumComputer blockChecksumComputer =
+        new ReplicatedBlockChecksumComputer(chunkInfoList);
     // TODO: support composite CRC
-    final int lenOfZeroBytes = 32;
-    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
-    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-    return fileMD5.getDigest();
+    blockChecksumComputer.compute();
+
+    return blockChecksumComputer.getOutBytes();
   }
 
   /**
