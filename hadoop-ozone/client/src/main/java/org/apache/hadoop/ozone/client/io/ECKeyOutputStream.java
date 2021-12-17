@@ -259,7 +259,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     newBlockGroupStreamEntry
         .updateBlockGroupToAckedPosition(failedStripeDataSize);
-    ecChunkBufferCache.clear(chunkSize);
+    ecChunkBufferCache.clear();
+    ecChunkBufferCache.release();
 
     if (newBlockGroupStreamEntry.getRemaining() <= 0) {
       // In most cases this should not happen except in the case stripe size and
@@ -316,7 +317,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     if (hasPutBlockFailure()) {
       return StripeWriteStatus.FAILED;
     }
-    ecChunkBufferCache.clear(parityCellSize);
+    ecChunkBufferCache.clear();
 
     if (streamEntry.getRemaining() <= 0) {
       streamEntry.close();
@@ -711,7 +712,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       dataBuffers = new ByteBuffer[numData];
       parityBuffers = new ByteBuffer[numParity];
       this.byteBufferPool = byteBufferPool;
-      allocateBuffers(dataBuffers);
+      allocateBuffers(dataBuffers, this.cellSize);
     }
 
     private ByteBuffer[] getDataBuffers() {
@@ -723,7 +724,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     public void allocateParityBuffers(int size){
-      allocateBuffers(parityBuffers);
+      allocateBuffers(parityBuffers, size);
     }
 
     private int addToDataBuffer(int i, byte[] b, int off, int len) {
@@ -735,7 +736,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       return pos;
     }
 
-    private void clear(int size) {
+    private void clear() {
       clearBuffers(dataBuffers);
       clearBuffers(parityBuffers);
     }
@@ -745,10 +746,10 @@ public class ECKeyOutputStream extends KeyOutputStream {
       releaseBuffers(parityBuffers);
     }
 
-    private void allocateBuffers(ByteBuffer[] buffers) {
+    private void allocateBuffers(ByteBuffer[] buffers, int bufferSize) {
       for (int i = 0; i < buffers.length; i++) {
         buffers[i] = byteBufferPool.getBuffer(false, cellSize);
-        buffers[i].limit(cellSize);
+        buffers[i].limit(bufferSize);
       }
     }
 
