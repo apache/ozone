@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -69,6 +70,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
+  // The number of containers for each of under replicated and unhealthy
+  // that will be logged in detail each time a node is checked.
+  private static final int CONTAINER_DETAILS_LOGGING_LIMIT = 5;
 
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
@@ -290,11 +294,21 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (LOG.isDebugEnabled()) {
             underReplicatedIDs.add(cid);
           }
+          if (underReplicated < CONTAINER_DETAILS_LOGGING_LIMIT
+              || LOG.isDebugEnabled()) {
+            LOG.info("Under Replicated Container {} {}; {}}",
+                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+          }
           underReplicated++;
         }
         if (!replicaSet.isHealthy()) {
           if (LOG.isDebugEnabled()) {
             unhealthyIDs.add(cid);
+          }
+          if (unhealthy < CONTAINER_DETAILS_LOGGING_LIMIT
+              || LOG.isDebugEnabled()) {
+            LOG.info("Unhealthy Container {} {}; {}}",
+                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
           }
           unhealthy++;
         }
@@ -316,6 +330,16 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
               Object::toString).collect(Collectors.joining(", ")));
     }
     return underReplicated == 0 && unhealthy == 0;
+  }
+
+  private String replicaDetails(Set<ContainerReplica> replicas) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Replicas{");
+    sb.append(replicas.stream()
+        .map(Object::toString)
+        .collect(Collectors.joining(",")));
+    sb.append("}");
+    return sb.toString();
   }
 
   private void completeDecommission(DatanodeDetails dn)
