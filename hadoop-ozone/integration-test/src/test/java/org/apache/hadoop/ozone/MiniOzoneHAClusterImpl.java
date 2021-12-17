@@ -47,7 +47,6 @@ import java.net.BindException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -75,7 +74,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
-  private static final Random RANDOM = new Random();
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
   private static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
@@ -464,12 +462,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       List<OzoneManager> omList = Lists.newArrayList();
 
       int retryCount = 0;
-      int basePort;
 
       while (true) {
         try {
-          basePort = 10000 + RANDOM.nextInt(1000) * 4;
-          initOMHAConfig(basePort);
+          initOMHAConfig();
 
           for (int i = 1; i<= numOfOMs; i++) {
             // Set nodeId
@@ -534,12 +530,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       List<StorageContainerManager> scmList = Lists.newArrayList();
 
       int retryCount = 0;
-      int basePort = 12000;
 
       while (true) {
         try {
-          basePort = 12000 + RANDOM.nextInt(1000) * 4;
-          initSCMHAConfig(basePort);
+          initSCMHAConfig();
 
           for (int i = 1; i<= numOfSCMs; i++) {
             // Set nodeId
@@ -604,7 +598,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     /**
      * Initialize HA related configurations.
      */
-    private void initSCMHAConfig(int basePort) throws IOException {
+    private void initSCMHAConfig() {
       // Set configurations required for starting OM HA service, because that
       // is the serviceID being passed to start Ozone HA cluster.
       // Here setting internal service and OZONE_OM_SERVICE_IDS_KEY, in this
@@ -616,9 +610,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       StringBuilder scmNodesKeyValue = new StringBuilder();
       StringBuilder scmNames = new StringBuilder();
 
-      int port = basePort;
+      List<Integer> ports = getFreePortList(7 * numOfSCMs);
 
-      for (int i = 1; i <= numOfSCMs; i++, port+=10) {
+      for (int i = 1, port = 0; i <= numOfSCMs; i++) {
         String scmNodeId = SCM_NODE_ID_PREFIX + i;
         scmNodesKeyValue.append(",").append(scmNodeId);
         String scmAddrKey = ConfUtils.addKeySuffixes(
@@ -642,17 +636,24 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, scmServiceId, scmNodeId);
 
         conf.set(scmAddrKey, "127.0.0.1");
-        conf.set(scmHttpAddrKey, "127.0.0.1:" + (port + 2));
-        conf.set(scmHttpsAddrKey, "127.0.0.1:" + (port + 3));
-        conf.setInt(scmRatisPortKey, port + 4);
-        //conf.setInt("ozone.scm.ha.ratis.bind.port", port + 4);
-        conf.set(dnPortKey, "127.0.0.1:" + (port + 5));
-        conf.set(blockClientKey, "127.0.0.1:" + (port + 6));
-        conf.set(ssClientKey, "127.0.0.1:" + (port + 7));
-        conf.setInt(scmGrpcPortKey, port + 8);
-        scmNames.append(",").append("localhost:" + (port + 5));
-        conf.set(ScmConfigKeys.
-            OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:" + (port + 6));
+        conf.set(scmHttpAddrKey, "127.0.0.1:" + ports.get(port++));
+        conf.set(scmHttpsAddrKey, "127.0.0.1:" + ports.get(port++));
+
+        int ratisPort = ports.get(port++);
+        conf.setInt(scmRatisPortKey, ratisPort);
+        //conf.setInt("ozone.scm.ha.ratis.bind.port", ratisPort);
+
+        int dnPort = ports.get(port++);
+        conf.set(dnPortKey, "127.0.0.1:" + dnPort);
+        scmNames.append(",localhost:").append(dnPort);
+
+        conf.set(ssClientKey, "127.0.0.1:" + ports.get(port++));
+        conf.setInt(scmGrpcPortKey, ports.get(port++));
+
+        int blockPort = ports.get(port++);
+        conf.set(blockClientKey, "127.0.0.1:" + blockPort);
+        conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+            "127.0.0.1:" + blockPort);
       }
 
       conf.set(scmNodesKey, scmNodesKeyValue.substring(1));
@@ -662,7 +663,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     /**
      * Initialize HA related configurations.
      */
-    private void initOMHAConfig(int basePort) throws IOException {
+    private void initOMHAConfig() {
       // Set configurations required for starting OM HA service, because that
       // is the serviceID being passed to start Ozone HA cluster.
       // Here setting internal service and OZONE_OM_SERVICE_IDS_KEY, in this
@@ -673,9 +674,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
       List<String> omNodeIds = new ArrayList<>();
 
-      int port = basePort;
+      List<Integer> ports = getFreePortList(4 * numOfOMs);
 
-      for (int i = 1; i <= numOfOMs; i++, port+=6) {
+      for (int i = 1, port = 0; i <= numOfOMs; i++) {
         String omNodeId = OM_NODE_ID_PREFIX + i;
         omNodeIds.add(omNodeId);
 
@@ -688,10 +689,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         String omRatisPortKey = ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
-        conf.set(omAddrKey, "127.0.0.1:" + port);
-        conf.set(omHttpAddrKey, "127.0.0.1:" + (port + 2));
-        conf.set(omHttpsAddrKey, "127.0.0.1:" + (port + 3));
-        conf.setInt(omRatisPortKey, port + 4);
+        conf.set(omAddrKey, "127.0.0.1:" + ports.get(port++));
+        conf.set(omHttpAddrKey, "127.0.0.1:" + ports.get(port++));
+        conf.set(omHttpsAddrKey, "127.0.0.1:" + ports.get(port++));
+        conf.setInt(omRatisPortKey, ports.get(port++));
       }
 
       conf.set(omNodesKey, String.join(",", omNodeIds));
@@ -1022,7 +1023,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return getStorageContainerManagers().get(0);
   }
 
-  private List<Integer> getFreePortList(int size) {
+  private static List<Integer> getFreePortList(int size) {
     return org.apache.ratis.util.NetUtils.createLocalServerAddress(size)
         .stream()
         .map(inetSocketAddress -> inetSocketAddress.getPort())
