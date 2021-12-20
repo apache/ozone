@@ -37,3 +37,21 @@ markup:
   goldmark:
     renderer:
       unsafe: true
+security:
+  enableInlineShortcodes: false
+  exec:
+    allow:
+      - ^dart-sass-embedded$
+      - ^go$
+      - ^npx$
+      - ^postcss$
+    osEnv:
+      - (?i)^(PATH|PATHEXT|APPDATA|TMP|TEMP|TERM)$
+  funcs:
+    getenv:
+      - ^HUGO_|^OZONE_VERSION$
+  http:
+    methods:
+      - (?i)GET|POST
+    urls:
+      - .*
