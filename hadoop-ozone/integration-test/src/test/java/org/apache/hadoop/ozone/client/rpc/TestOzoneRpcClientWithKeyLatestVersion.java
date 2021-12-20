@@ -72,7 +72,6 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
         .setClusterId(UUID.randomUUID().toString())
         .build();
     cluster.waitForClusterToBeReady();
-    System.out.println("done");
   }
 
   @AfterClass
