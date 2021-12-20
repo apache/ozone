@@ -51,8 +51,3 @@ security:
     getenv:
       - ^HUGO_
       - ^OZONE_VERSION$
-  http:
-    methods:
-      - (?i)GET|POST
-    urls:
-      - .*
