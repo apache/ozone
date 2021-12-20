@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.jooq.meta.derby.sys.Sys;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -88,17 +87,20 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
 
   @Test
   public void testWithGetLatestVersion() throws Exception {
+    getLatestVersion = false;
+    setupClient();
+    testOverrideAndReadKey();
+
+    getLatestVersion = true;
+    setupClient();
+    testOverrideAndReadKey();
+  }
+
+  private void setupClient() throws Exception {
     OzoneConfiguration conf = cluster.getConf();
     conf.setBoolean(OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION, getLatestVersion);
     ozClient = OzoneClientFactory.getRpcClient(conf);
     objectStore = ozClient.getObjectStore();
-    testOverrideAndReadKey();
-
-    conf = cluster.getConf();
-    getLatestVersion = true;
-    ozClient = OzoneClientFactory.getRpcClient(conf);
-    objectStore = ozClient.getObjectStore();
-    testOverrideAndReadKey();
   }
 
   public void testOverrideAndReadKey() throws Exception {
