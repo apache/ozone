@@ -105,7 +105,6 @@ public class TestContainerBalancer {
 
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
-    balancerConfiguration.initialize(conf);
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setIdleIteration(1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
@@ -492,7 +491,6 @@ public class TestContainerBalancer {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ContainerBalancerConfiguration cbc = ozoneConfiguration.
         getObject(ContainerBalancerConfiguration.class);
-    cbc.initialize(ozoneConfiguration);
     containerBalancer.start(cbc);
 
     // waiting for balance completed.
@@ -604,11 +602,10 @@ public class TestContainerBalancer {
 
     ContainerBalancerConfiguration cbConf =
         ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
-    cbConf.initialize(ozoneConfiguration);
     Assert.assertEquals(cbConf.getThreshold(), 0.01d, DELTA);
 
     Assert.assertEquals(cbConf.getMaxSizeLeavingSource(),
-        6 * 1024 * 1024 * 1024L);
+        26 * 1024 * 1024 * 1024L);
 
     Assert.assertEquals(cbConf.getMoveTimeout().toMillis(), 30 * 60 * 1000);
   }
