@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -760,25 +759,23 @@ public class ContainerBalancer {
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES) +
-        OzoneConsts.GB;
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
-    if (conf.getMaxSizeEnteringTarget() < size) {
+    if (conf.getMaxSizeEnteringTarget() <= size) {
       LOG.info("MaxSizeEnteringTarget should be larger than " +
           "ozone.scm.container.size");
     }
-    if (conf.getMaxSizeLeavingSource() < size) {
+    if (conf.getMaxSizeLeavingSource() <= size) {
       LOG.info("MaxSizeLeavingSource should be larger than " +
           "ozone.scm.container.size");
     }
 
     // balancing interval should be greater than DUFactory refresh period
     DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
-    long balancingInterval = duConf.getRefreshPeriod().toMillis() +
-        Duration.ofMinutes(10).toMillis();
-    if (conf.getBalancingInterval().toMillis() < balancingInterval) {
-      LOG.info("balancing.iteration.interval should be at lease 10 minutes " +
-          "larger than hdds.datanode.du.refresh.period.");
+    long balancingInterval = duConf.getRefreshPeriod().toMillis();
+    if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
+      LOG.info("balancing.iteration.interval should be larger than " +
+          "hdds.datanode.du.refresh.period.");
     }
   }
 

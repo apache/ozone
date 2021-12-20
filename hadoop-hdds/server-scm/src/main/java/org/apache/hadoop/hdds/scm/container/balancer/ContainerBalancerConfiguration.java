@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -117,8 +116,6 @@ public final class ContainerBalancerConfiguration {
       " in this list are excluded from balancing. This configuration is empty" +
       " by default.")
   private String excludeNodes = "";
-
-  private DUFactory.Conf duConf;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -268,12 +265,7 @@ public final class ContainerBalancerConfiguration {
   }
 
   public void setBalancingInterval(Duration balancingInterval) {
-    if (balancingInterval.toMillis() > duConf.getRefreshPeriod().toMillis()) {
-      this.balancingInterval = balancingInterval.toMillis();
-    } else {
-      LOG.warn("Balancing interval duration must be greater than du refresh " +
-          "period, {} milliseconds", duConf.getRefreshPeriod().toMillis());
-    }
+    this.balancingInterval = balancingInterval.toMillis();
   }
 
   /**
