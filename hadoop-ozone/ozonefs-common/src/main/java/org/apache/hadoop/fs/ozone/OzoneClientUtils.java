@@ -16,9 +16,16 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.checksum.ReplicatedFileChecksumHelper;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
@@ -63,5 +70,20 @@ public final class OzoneClientUtils {
       }
     }
     return bucket.getBucketLayout();
+  }
+
+  public static FileChecksum getFileChecksumWithCombineMode(OzoneVolume volume,
+      OzoneBucket bucket, String keyName, long length,
+      Options.ChecksumCombineMode combineMode, ClientProtocol rpcClient)
+      throws IOException {
+    Preconditions.checkArgument(length >= 0);
+
+    if (keyName.length() == 0) {
+      return null;
+    }
+    BaseFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
+        volume, bucket, keyName, length, rpcClient);
+    helper.compute();
+    return helper.getFileChecksum();
   }
 }

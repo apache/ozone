@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -78,4 +79,6 @@ public interface OzoneClientAdapter {
       Path qualifiedPath, String userName) throws IOException;
 
   boolean isFSOptimizedBucket();
+
+  FileChecksum getFileChecksum(Path f, long length) throws IOException;
 }

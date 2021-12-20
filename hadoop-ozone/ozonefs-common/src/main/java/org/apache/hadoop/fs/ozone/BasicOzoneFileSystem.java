@@ -800,7 +800,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
-    return super.getFileChecksum(f, length);
+    return adapter.getFileChecksum(f, length);
   }
 
   @Override

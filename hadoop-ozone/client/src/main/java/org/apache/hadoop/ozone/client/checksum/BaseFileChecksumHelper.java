@@ -50,8 +50,8 @@ public abstract class BaseFileChecksumHelper {
   private final long length;
   private ClientProtocol rpcClient;
 
-  private XceiverClientFactory xceiverClientFactory;
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
+  private XceiverClientFactory xceiverClientFactory;
   private FileChecksum fileChecksum;
   private List<OmKeyLocationInfo> keyLocationInfos;
   private long remaining = 0L;

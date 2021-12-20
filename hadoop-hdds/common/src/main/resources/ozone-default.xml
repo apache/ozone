@@ -3023,4 +3023,19 @@
       will create intermediate directories.
     </description>
   </property>
+
+  <property>
+    <name>ozone.client.checksum.combine.mode</name>
+    <value>MD5MD5CRC</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The combined checksum type [MD5MD5CRC / COMPOSITE_CRC].
+      determines which algorithm would be used to compute file checksum.
+      COMPOSITE_CRC calculates the combined CRC of the whole file, where the
+      lower-level chunk/block checksums are combined into file-level checksum.
+
+      MD5MD5CRC calculates the MD5 of MD5 of checksums of individual chunks.
+      Default checksum type is MD5MD5CRC.
+    </description>
+  </property>
 </configuration>
