@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -125,7 +127,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
   private final long syncSize = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
-
+  private StreamBuffer currentBuffer;
+  private XceiverClientMetrics metrics;
   /**
    * Creates a new BlockDataStreamOutput.
    *
@@ -172,6 +175,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+    metrics = XceiverClientManager.getXceiverClientMetrics();
   }
 
   private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
@@ -257,18 +261,38 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (len == 0) {
       return;
     }
-    int curLen = len;
-    // set limit on the number of bytes that a ByteBuffer(StreamBuffer) can hold
-    int maxBufferLen = config.getDataStreamMaxBufferSize();
-    while (curLen > 0) {
-      int writeLen = Math.min(curLen, maxBufferLen);
+    while (len > 0) {
+      allocateNewBufferIfNeeded();
+      int writeLen = Math.min(len, currentBuffer.length());
       final StreamBuffer buf = new StreamBuffer(b, off, writeLen);
+      currentBuffer.put(buf);
+      writeChunkIfNeeded();
       off += writeLen;
-      bufferList.add(buf);
-      writeChunkToContainer(buf.duplicate());
-      curLen -= writeLen;
       writtenDataLength += writeLen;
+      len -= writeLen;
       doFlushIfNeeded();
+    }
+  }
+
+  private void writeChunkIfNeeded() throws IOException {
+    if (currentBuffer.length()==0) {
+      writeChunk(currentBuffer);
+      currentBuffer = null;
+    }
+  }
+
+  private void writeChunk(StreamBuffer sb) throws IOException {
+    bufferList.add(sb);
+    ByteBuffer dup = sb.duplicate();
+    dup.position(0);
+    dup.limit(sb.position());
+    writeChunkToContainer(dup);
+  }
+
+  private void allocateNewBufferIfNeeded() {
+    if (currentBuffer==null) {
+      currentBuffer =
+          StreamBuffer.allocate(config.getDataStreamMinPacketSize());
     }
   }
 
@@ -277,7 +301,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         .getDataStreamMaxBufferSize());
     long boundary = config.getDataStreamBufferFlushSize() / config
         .getDataStreamMaxBufferSize();
-    if (bufferList.size() % boundary == 0) {
+    if (!bufferList.isEmpty() && bufferList.size() % boundary == 0) {
       updateFlushLength();
       executePutBlock(false, false);
     }
@@ -308,11 +332,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     int count = 0;
     while (len > 0) {
       final StreamBuffer buf = bufferList.get(count);
-      final long writeLen = Math.min(buf.length(), len);
+      final long writeLen = Math.min(buf.position(), len);
       final ByteBuffer duplicated = buf.duplicate();
-      if (writeLen != buf.length()) {
-        duplicated.limit(Math.toIntExact(len));
-      }
+      duplicated.position(0);
+      duplicated.limit(buf.position());
       writeChunkToContainer(duplicated);
       len -= writeLen;
       count++;
@@ -449,6 +472,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       // This can be a partially filled chunk. Since we are flushing the buffer
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
+
+      if (currentBuffer!=null) {
+        writeChunk(currentBuffer);
+        currentBuffer = null;
+      }
       updateFlushLength();
       executePutBlock(close, false);
     } else if (close) {
@@ -584,6 +612,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         .setLen(effectiveChunkSize)
         .setChecksumData(checksumData.getProtoBufMessage())
         .build();
+    metrics.incrPendingContainerOpsMetrics(ContainerProtos.Type.WriteChunk);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} length {} at offset {}",
