@@ -17,11 +17,10 @@
  */
 package org.apache.hadoop.ozone.s3.commontypes;
 
+import org.apache.hadoop.ozone.s3.util.S3Utils;
+
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 
 
 /**
@@ -29,29 +28,15 @@ import java.nio.charset.StandardCharsets;
  * ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
  */
 public class ObjectKeyNameAdapter extends XmlAdapter<String, String> {
-
-  private static final Charset UTF_8 = StandardCharsets.UTF_8;
-
-  public ObjectKeyNameAdapter() {
-  }
-
   @Override
   public String unmarshal(String s) throws Exception {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public String marshal(String s) throws Exception {
-    return urlEncode(s);
+  public String marshal(String s)
+      throws UnsupportedEncodingException {
+    return S3Utils.urlEncode(s)
+        .replaceAll("%2F", "/");
   }
-
-  private static String urlEncode(String str) {
-    try {
-      return URLEncoder.encode(str, UTF_8.name())
-          .replaceAll("%2F", "/");
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
 }
