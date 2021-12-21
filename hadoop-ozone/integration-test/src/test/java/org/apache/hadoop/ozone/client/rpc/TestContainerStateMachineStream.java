@@ -119,6 +119,7 @@ public class TestContainerStateMachineStream {
     conf.setQuietMode(false);
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).setHbInterval(200)
+            .setDataStreamMinPacketSize(1024)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
