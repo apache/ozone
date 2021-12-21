@@ -81,6 +81,14 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long dataStreamBufferFlushSize = 16 * 1024 * 1024;
 
+  @Config(key = "datastream.min.packet.size",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      description = "The maximum size of the ByteBuffer "
+          + "(used via ratis streaming)",
+      tags = ConfigTag.CLIENT)
+  private int dataStreamMinPacketSize = 1024 * 1024;
+
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
       type = ConfigType.SIZE,
@@ -272,6 +280,14 @@ public class OzoneClientConfig {
 
   public void setStreamBufferMaxSize(long streamBufferMaxSize) {
     this.streamBufferMaxSize = streamBufferMaxSize;
+  }
+
+  public int getDataStreamMinPacketSize() {
+    return dataStreamMinPacketSize;
+  }
+
+  public void setDataStreamMinPacketSize(int dataStreamMinPacketSize) {
+    this.dataStreamMinPacketSize = dataStreamMinPacketSize;
   }
 
   public int getMaxRetryCount() {

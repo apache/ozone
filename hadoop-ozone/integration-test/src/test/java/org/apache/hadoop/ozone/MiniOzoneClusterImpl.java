@@ -660,6 +660,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (!dataStreamMaxBufferSize.isPresent()) {
         dataStreamMaxBufferSize = OptionalInt.of(chunkSize.get());
       }
+      if (!dataStreamMinPacketSize.isPresent()) {
+        dataStreamMinPacketSize = OptionalInt.of(chunkSize.get()/4);
+      }
       if (!blockSize.isPresent()) {
         blockSize = Optional.of(2 * streamBufferMaxSize.get());
       }
@@ -681,6 +684,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       clientConfig.setDataStreamMaxBufferSize((int) Math.round(
           streamBufferSizeUnit.get()
               .toBytes(dataStreamMaxBufferSize.getAsInt())));
+      clientConfig.setDataStreamMinPacketSize((int) Math.round(
+          streamBufferSizeUnit.get()
+              .toBytes(dataStreamMinPacketSize.getAsInt())));
       conf.setFromObject(clientConfig);
 
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
