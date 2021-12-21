@@ -29,7 +29,7 @@ import java.io.UnsupportedEncodingException;
  */
 public class ObjectKeyNameAdapter extends XmlAdapter<String, String> {
   @Override
-  public String unmarshal(String s) throws Exception {
+  public String unmarshal(String s) {
     throw new UnsupportedOperationException();
   }
 
