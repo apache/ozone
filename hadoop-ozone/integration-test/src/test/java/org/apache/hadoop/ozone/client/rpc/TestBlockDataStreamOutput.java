@@ -107,6 +107,7 @@ public class TestBlockDataStreamOutput {
         .setDataStreamBufferFlushize(maxFlushSize)
         .setDataStreamBufferMaxSize(chunkSize)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .setDataStreamMinPacketSize(2*chunkSize/5)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -193,7 +194,7 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testPutBlockAtBoundary() throws Exception {
-    int dataLength = 500;
+    int dataLength = 200;
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -211,8 +212,8 @@ public class TestBlockDataStreamOutput {
         metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             <= pendingPutBlockCount + 1);
     key.close();
-    // Since data length is 500 , first putBlock will be at 400(flush boundary)
-    // and the other at 500
+    // Since data length is 200 , first putBlock will be at 160(flush boundary)
+    // and the other at 200
     Assert.assertTrue(
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             == putBlockCount + 2);
@@ -228,6 +229,31 @@ public class TestBlockDataStreamOutput {
   private void validateData(String keyName, byte[] data) throws Exception {
     TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
+  }
+
+
+  @Test
+  public void testMinPacketSize() throws Exception {
+    String keyName = getKeyName();
+    XceiverClientMetrics metrics =
+        XceiverClientManager.getXceiverClientMetrics();
+    OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
+    long writeChunkCount =
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 5)
+            .getBytes(UTF_8);
+    key.write(ByteBuffer.wrap(data));
+    // minPacketSize= 40, so first write of 20 wont trigger a writeChunk
+    Assert.assertEquals(writeChunkCount,
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+    key.write(ByteBuffer.wrap(data));
+    Assert.assertEquals(writeChunkCount + 1,
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+    // now close the stream, It will update the key length.
+    key.close();
+    String dataString = new String(data, UTF_8);
+    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
 }
