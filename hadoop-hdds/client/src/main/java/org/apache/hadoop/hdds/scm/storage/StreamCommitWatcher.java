@@ -178,7 +178,7 @@ public class StreamCommitWatcher {
       Preconditions.checkState(commitIndexMap.containsKey(index));
       final List<StreamBuffer> buffers = commitIndexMap.remove(index);
       final long length =
-          buffers.stream().mapToLong(StreamBuffer::length).sum();
+          buffers.stream().mapToLong(StreamBuffer::position).sum();
       totalAckDataLength += length;
       // clear the future object from the future Map
       final CompletableFuture<ContainerCommandResponseProto> remove =
