@@ -52,9 +52,10 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   protected void checksumBlocks() throws IOException {
     long currentLength = 0;
     for (blockIdx = 0;
-         blockIdx < keyLocationInfos.size() && getRemaining() >= 0;
+         blockIdx < getKeyLocationInfoList().size() && getRemaining() >= 0;
          blockIdx++) {
-      OmKeyLocationInfo keyLocationInfo = keyLocationInfos.get(blockIdx);
+      OmKeyLocationInfo keyLocationInfo =
+          getKeyLocationInfoList().get(blockIdx);
       currentLength += keyLocationInfo.getLength();
       if (currentLength > getLength()) {
         return;

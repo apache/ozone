@@ -49,9 +49,9 @@ public abstract class BaseFileChecksumHelper {
   private ClientProtocol rpcClient;
 
   private XceiverClientFactory xceiverClientFactory;
-  protected final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
+  private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
   private FileChecksum fileChecksum;
-  protected List<OmKeyLocationInfo> keyLocationInfos;
+  private List<OmKeyLocationInfo> keyLocationInfos;
   private long remaining = 0L;
   private int bytesPerCRC = -1;
   private long crcPerBlock = 0;
@@ -89,6 +89,10 @@ public abstract class BaseFileChecksumHelper {
 
   protected DataOutputBuffer getBlockChecksumBuf() {
     return blockChecksumBuf;
+  }
+
+  protected List<OmKeyLocationInfo> getKeyLocationInfoList() {
+    return keyLocationInfos;
   }
 
   protected long getRemaining() {
@@ -180,9 +184,9 @@ public abstract class BaseFileChecksumHelper {
   private FileChecksum makeMd5CrcResult() {
     // TODO: support CRC32C
     //compute file MD5
-    final MD5Hash fileMD5 = MD5Hash.digest(blockChecksumBuf.getData());
+    final MD5Hash fileMD5 = MD5Hash.digest(getBlockChecksumBuf().getData());
     // assume CRC32 for now
-    return new MD5MD5CRC32GzipFileChecksum(bytesPerCRC,
+    return new MD5MD5CRC32GzipFileChecksum(getBytesPerCRC(),
         crcPerBlock, fileMD5);
   }
 
