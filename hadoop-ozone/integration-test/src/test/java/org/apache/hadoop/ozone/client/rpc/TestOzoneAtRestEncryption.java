@@ -118,7 +118,7 @@ public class TestOzoneAtRestEncryption {
   private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
   // (this is the default Crypto Buffer size as determined by the config
   // hadoop.security.crypto.buffer.size)
-  private static BucketLayout bucketLayout;
+  private final BucketLayout bucketLayout;
 
   public TestOzoneAtRestEncryption(BucketLayout layout) {
     bucketLayout = layout;
