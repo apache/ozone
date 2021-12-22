@@ -138,7 +138,7 @@ public abstract class Handler {
       throws IOException;
 
   /**
-   * Marks the container Unhealthy. Moves the container to UHEALTHY state.
+   * Marks the container Unhealthy. Moves the container to UNHEALTHY state.
    *
    * @param container container to update
    * @throws IOException in case of exception

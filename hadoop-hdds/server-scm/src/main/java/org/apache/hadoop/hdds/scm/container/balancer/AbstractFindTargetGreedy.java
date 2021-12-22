@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -29,32 +30,29 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Find a target giving preference to more under-utilized nodes.
+ * Find a target for a source datanode with greedy strategy.
  */
-public class FindTargetGreedy implements FindTargetStrategy {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(FindTargetGreedy.class);
-
+public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
+  private Logger logger;
   private ContainerManager containerManager;
   private PlacementPolicy placementPolicy;
   private Map<DatanodeDetails, Long> sizeEnteringNode;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double upperLimit;
-  private TreeSet<DatanodeUsageInfo> potentialTargets;
+  private Collection<DatanodeUsageInfo> potentialTargets;
 
-  public FindTargetGreedy(
+  protected AbstractFindTargetGreedy(
       ContainerManager containerManager,
       PlacementPolicy placementPolicy,
       NodeManager nodeManager) {
@@ -62,37 +60,36 @@ public class FindTargetGreedy implements FindTargetStrategy {
     this.containerManager = containerManager;
     this.placementPolicy = placementPolicy;
     this.nodeManager = nodeManager;
+  }
 
-    potentialTargets = new TreeSet<>((a, b) -> {
-      double currentUsageOfA = a.calculateUtilization(
-          sizeEnteringNode.get(a.getDatanodeDetails()));
-      double currentUsageOfB = b.calculateUtilization(
-          sizeEnteringNode.get(b.getDatanodeDetails()));
-      int ret = Double.compare(currentUsageOfA, currentUsageOfB);
-      if (ret != 0) {
-        return ret;
-      }
-      UUID uuidA = a.getDatanodeDetails().getUuid();
-      UUID uuidB = b.getDatanodeDetails().getUuid();
-      return uuidA.compareTo(uuidB);
-    });
+  protected void setLogger(Logger log) {
+    logger = log;
+  }
+
+  protected void setPotentialTargets(Collection<DatanodeUsageInfo> pt) {
+    potentialTargets = pt;
   }
 
   private void setUpperLimit(Double upperLimit){
     this.upperLimit = upperLimit;
   }
 
-  private void setPotentialTargets(
-      List<DatanodeUsageInfo> potentialTargetDataNodes) {
-    sizeEnteringNode.clear();
-    potentialTargetDataNodes.forEach(
-        p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
-    potentialTargets.clear();
-    potentialTargets.addAll(potentialTargetDataNodes);
+  protected int compareByUsage(DatanodeUsageInfo a, DatanodeUsageInfo b) {
+    double currentUsageOfA = a.calculateUtilization(
+        sizeEnteringNode.get(a.getDatanodeDetails()));
+    double currentUsageOfB = b.calculateUtilization(
+        sizeEnteringNode.get(b.getDatanodeDetails()));
+    int ret = Double.compare(currentUsageOfA, currentUsageOfB);
+    if (ret != 0) {
+      return ret;
+    }
+    UUID uuidA = a.getDatanodeDetails().getUuid();
+    UUID uuidB = b.getDatanodeDetails().getUuid();
+    return uuidA.compareTo(uuidB);
   }
 
   private void setConfiguration(ContainerBalancerConfiguration conf) {
-    this.config = conf;
+    config = conf;
   }
 
   /**
@@ -109,6 +106,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
       DatanodeDetails source, Set<ContainerID> candidateContainers) {
+    sortTargetForSource(source);
     for (DatanodeUsageInfo targetInfo : potentialTargets) {
       DatanodeDetails target = targetInfo.getDatanodeDetails();
       for (ContainerID container : candidateContainers) {
@@ -118,7 +116,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
           replicas = containerManager.getContainerReplicas(container);
           containerInfo = containerManager.getContainer(container);
         } catch (ContainerNotFoundException e) {
-          LOG.warn("Could not get Container {} from Container Manager for " +
+          logger.warn("Could not get Container {} from Container Manager for " +
               "obtaining replicas in Container Balancer.", container, e);
           continue;
         }
@@ -132,8 +130,8 @@ public class FindTargetGreedy implements FindTargetStrategy {
         }
       }
     }
-    LOG.info("Container Balancer could not find a target for source datanode " +
-        "{}", source.getUuidString());
+    logger.info("Container Balancer could not find a target for " +
+        "source datanode {}", source.getUuidString());
     return null;
   }
 
@@ -153,7 +151,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
     try {
       containerInfo = containerManager.getContainer(containerID);
     } catch (ContainerNotFoundException e) {
-      LOG.warn("Could not get Container {} from Container Manager while " +
+      logger.warn("Could not get Container {} from Container Manager while " +
           "checking if container move satisfies placement policy in " +
           "Container Balancer.", containerID.toString(), e);
       return false;
@@ -212,7 +210,7 @@ public class FindTargetGreedy implements FindTargetStrategy {
       }
       return;
     }
-    LOG.warn("Cannot find {} in the candidates target nodes",
+    logger.warn("Cannot find {} in the candidates target nodes",
         target.getUuid());
   }
 
@@ -225,6 +223,23 @@ public class FindTargetGreedy implements FindTargetStrategy {
                            Double upLimit) {
     setConfiguration(conf);
     setUpperLimit(upLimit);
-    setPotentialTargets(potentialDataNodes);
+    sizeEnteringNode.clear();
+    potentialDataNodes.forEach(
+        p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
+    potentialTargets.clear();
+    potentialTargets.addAll(potentialDataNodes);
   }
+
+  @VisibleForTesting
+  public Collection<DatanodeUsageInfo> getPotentialTargets() {
+    return potentialTargets;
+  }
+
+  /**
+   * sort potentialTargets for specified source datanode according to
+   * network topology if enabled.
+   * @param source the specified source datanode
+   */
+  @VisibleForTesting
+  public abstract void sortTargetForSource(DatanodeDetails source);
 }

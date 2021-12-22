@@ -458,6 +458,10 @@
       EXAMPLEOMSERVICEID). The OM service ID should be the value (one of the
       values if there are multiple) set for the parameter ozone.om.service.ids.
 
+      Decommissioned nodes (represented by node Ids in
+      ozone.om.decommissioned.nodes config list) will be ignored and not
+      included in the OM HA setup even if added to this list.
+
       Unique identifiers for each OM Node, delimited by commas. This will be
       used by OzoneManagers in HA setup to determine all the OzoneManagers
       belonging to the same OMservice in the cluster. For example, if you
@@ -465,6 +469,15 @@
       use “om1”, “om2” and "om3" as the individual IDs of the OzoneManagers,
       you would configure a property ozone.om.nodes.omService1, and its value
       "om1,om2,om3".
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.decommissioned.nodes.EXAMPLEOMSERVICEID</name>
+    <value/>
+    <tag>OM, HA</tag>
+    <description>
+      Comma-separated list of OM node Ids which have been decommissioned. OMs
+      present in this list will not be included in the OM HA ring.
     </description>
   </property>
   <property>
@@ -545,20 +558,6 @@
       The actual address the OM web server will bind to using HTTPS.
       If this optional address is set, it overrides only the hostname portion of
       ozone.om.https-address.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OM, PERFORMANCE</tag>
-    <description>
-      The size of OM DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Ozone at scale.
-
-      A large value for this key allows a proportionally larger amount of OM
-      metadata to be cached in memory. This makes OM operations faster.
     </description>
   </property>
   <property>
@@ -928,18 +927,6 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The port number of the Ozone SCM service.
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OZONE, PERFORMANCE</tag>
-    <description>SCM keeps track of the Containers in the cluster. This DB holds
-      the container metadata. This value is set to a small value to make the
-      unit
-      testing runs smooth. In production, we recommend a value of 16GB or
-      higher. This allows SCM to avoid disk I/O's while looking up the container
-      location.
     </description>
   </property>
   <property>
@@ -2329,7 +2316,7 @@
     <tag>OM, MANAGEMENT</tag>
     <description>
       Expert only. The maximum number of retries for Ozone Manager Admin
-      protocol.
+      protocol on each OM.
     </description>
   </property>
   <property>
@@ -2465,21 +2452,6 @@
     <tag>S3G, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.container.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>RECON, PERFORMANCE</tag>
-    <description>
-      The size of Recon DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Recon at scale.
-
-      A large value for this key allows a proportionally larger amount of Recon
-      container DB to be cached in memory. This makes Recon Container-Key
-      operations faster.
     </description>
   </property>
   <property>

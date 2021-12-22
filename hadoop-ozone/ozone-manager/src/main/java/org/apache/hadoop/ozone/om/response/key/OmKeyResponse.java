@@ -19,14 +19,8 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 /**
  * OmKeyResponse.
@@ -34,9 +28,6 @@ import java.io.IOException;
 public abstract class OmKeyResponse extends OMClientResponse {
 
   private BucketLayout bucketLayout;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmKeyResponse.class);
 
   public OmKeyResponse(OzoneManagerProtocolProtos.OMResponse omResponse,
       BucketLayout bucketLayoutArg) {
@@ -51,21 +42,5 @@ public abstract class OmKeyResponse extends OMClientResponse {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
-  }
-
-  protected BucketLayout getBucketLayout(OMMetadataManager omMetadataManager,
-      String volName, String buckName) {
-    if (omMetadataManager == null) {
-      return BucketLayout.DEFAULT;
-    }
-    String buckKey = omMetadataManager.getBucketKey(volName, buckName);
-    try {
-      OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
-      return buckInfo.getBucketLayout();
-    } catch (IOException e) {
-      LOG.error("Cannot find the key: " + buckKey, e);
-      // Todo: Handle Exception
-    }
-    return BucketLayout.DEFAULT;
   }
 }
