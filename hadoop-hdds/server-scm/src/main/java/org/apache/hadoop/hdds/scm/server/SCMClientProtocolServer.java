@@ -754,8 +754,8 @@ public class SCMClientProtocolServer implements
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     if (threshold.isPresent()) {
       double tsd = threshold.get();
-      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
-          "threshold should to be specified in range [0.0, 1.0).");
+      Preconditions.checkState(tsd >= 0.0D && tsd < 100.0D,
+          "threshold should to be specified in range [0.0, 1.000).");
       cbc.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {

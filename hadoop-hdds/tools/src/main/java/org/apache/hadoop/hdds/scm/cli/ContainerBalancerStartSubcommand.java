@@ -36,33 +36,37 @@ import java.util.Optional;
 public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Option(names = {"-t", "--threshold"},
-      description = "Threshold target whether the cluster is balanced")
+      description = "Percentage deviation from average utilization of " +
+          "the cluster after which a datanode will be rebalanced (for " +
+          "example, '10' for 10%).")
   private Optional<Double> threshold;
 
   @Option(names = {"-i", "--iterations"},
       description = "Maximum consecutive iterations that" +
-          " balancer will run for")
+          " balancer will run for.")
   private Optional<Integer> iterations;
 
   @Option(names = {"-d", "--maxDatanodesPercentageToInvolvePerIteration"},
-      description = "The max percentage of healthy, in service datanodes " +
-          "that can be involved in balancing in one iteration.")
+      description = "Max percentage of healthy, in service datanodes " +
+          "that can be involved in balancing in one iteration (for example, " +
+          "'20' for 20%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
-
   @Option(names = {"-s", "--maxSizeToMovePerIterationInGB"},
-      description = "Maximum size to move per iteration of balancing in GB, " +
-          "for 10GB it should be set as 10")
+      description = "Maximum size that can be moved per iteration of " +
+          "balancing (for example, '500' for 500GB).")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
-  @Option(names = {"-e", "--maxSizeEnteringTarget"},
-      description = "the maximum size that can enter a target datanode while " +
-          "balancing in GB. This is the sum of data from multiple sources.")
+  @Option(names = {"-e", "--maxSizeEnteringTargetInGB"},
+      description = "Maximum size that can enter a target datanode while " +
+          "balancing. This is the sum of data from multiple sources (for " +
+          "example, '26' for 26GB).")
   private Optional<Long> maxSizeEnteringTargetInGB;
 
-  @Option(names = {"-l", "--maxSizeLeavingSource"},
-      description = "maximum size that can leave a source datanode while " +
-          "balancing in GB, it is the sum of data moving to multiple targets.")
+  @Option(names = {"-l", "--maxSizeLeavingSourceInGB"},
+      description = "Maximum size that can leave a source datanode while " +
+          "balancing. This is the sum of data moving to multiple targets " +
+          "(for example, '26' for 26GB).")
   private Optional<Long> maxSizeLeavingSourceInGB;
 
   @Override
@@ -72,10 +76,10 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB);
     if (result) {
-      System.out.println("Starting ContainerBalancer Successfully.");
+      System.out.println("Container Balancer started successfully.");
       return;
     }
-    System.out.println("ContainerBalancer is already running, " +
+    System.out.println("Container Balancer is already running. " +
         "Please stop it first.");
   }
 }

@@ -43,13 +43,13 @@ public final class ContainerBalancerConfiguration {
       LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
 
   @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
-      "0.1", tags = {ConfigTag.BALANCER},
-      description = "Threshold is a fraction in the range of 0 to 1. A " +
+      "10", tags = {ConfigTag.BALANCER},
+      description = "Threshold is a percentage in the range of 0 to 100. A " +
           "cluster is considered balanced if for each datanode, the " +
           "utilization of the datanode (used space to capacity ratio) differs" +
           " from the utilization of the cluster (used space to capacity ratio" +
-          " of the entire cluster) no more than the threshold value.")
-  private String threshold = "0.1";
+          " of the entire cluster) no more than the threshold.")
+  private String threshold = "10";
 
   @Config(key = "datanodes.involved.max.percentage.per.iteration", type =
       ConfigType.INT, defaultValue = "20", tags = {ConfigTag.BALANCER},
@@ -126,21 +126,25 @@ public final class ContainerBalancerConfiguration {
   /**
    * Gets the threshold value for Container Balancer.
    *
-   * @return a fraction in the range 0 to 1
+   * @return percentage value in the range 0 to 100
    */
   public double getThreshold() {
     return Double.parseDouble(threshold);
   }
 
+  public double getThresholdAsRatio() {
+    return Double.parseDouble(threshold) / 100;
+  }
+
   /**
    * Sets the threshold value for Container Balancer.
    *
-   * @param threshold a fraction in the range 0 to 1
+   * @param threshold a percentage value in the range 0 to 100
    */
   public void setThreshold(double threshold) {
-    if (threshold < 0 || threshold > 1) {
+    if (threshold < 0d || threshold >= 100d) {
       throw new IllegalArgumentException(
-          "Threshold must be a fraction in the range 0 to 1.");
+          "Threshold must be a percentage(double) in the range 0 to 100.");
     }
     this.threshold = String.valueOf(threshold);
   }

@@ -245,7 +245,7 @@ public class ContainerBalancer {
       }
       return false;
     }
-    this.threshold = config.getThreshold();
+    this.threshold = config.getThresholdAsRatio();
     this.maxDatanodesRatioToInvolvePerIteration =
         config.getMaxDatanodesRatioToInvolvePerIteration();
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
