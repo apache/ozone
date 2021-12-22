@@ -139,7 +139,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       success = true;
     } finally {
       if (!success && xceiverClientSpi != null) {
-        getXceiverClientFactory().releaseClientForReadData(xceiverClientSpi, false);
+        getXceiverClientFactory().releaseClientForReadData(
+            xceiverClientSpi, false);
       }
     }
 
