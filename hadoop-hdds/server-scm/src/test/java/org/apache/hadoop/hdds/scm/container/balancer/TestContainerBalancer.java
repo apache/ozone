@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -145,7 +146,8 @@ public class TestContainerBalancer {
         .thenReturn(new ArrayList<>(cidToInfoMap.values()));
 
     containerBalancer = new ContainerBalancer(mockNodeManager, containerManager,
-        replicationManager, conf, SCMContext.emptyContext(), placementPolicy);
+        replicationManager, conf, SCMContext.emptyContext(),
+        new NetworkTopologyImpl(conf), placementPolicy);
   }
 
   @Test

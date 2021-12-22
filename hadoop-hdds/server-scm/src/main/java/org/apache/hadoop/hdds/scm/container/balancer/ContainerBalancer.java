@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -85,6 +86,8 @@ public class ContainerBalancer {
   private long clusterUsed;
   private long clusterRemaining;
   private double clusterAvgUtilisation;
+  private PlacementPolicy placementPolicy;
+  private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
   private volatile boolean balancerRunning;
@@ -115,6 +118,7 @@ public class ContainerBalancer {
       ReplicationManager replicationManager,
       OzoneConfiguration ozoneConfiguration,
       final SCMContext scmContext,
+      NetworkTopology networkTopology,
       PlacementPolicy placementPolicy) {
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
@@ -129,10 +133,10 @@ public class ContainerBalancer {
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
+    this.placementPolicy = placementPolicy;
+    this.networkTopology = networkTopology;
 
     this.lock = new ReentrantLock();
-    findTargetStrategy = new FindTargetGreedy(
-        containerManager, placementPolicy, nodeManager);
     findSourceStrategy = new FindSourceGreedy(nodeManager);
   }
 
@@ -179,6 +183,13 @@ public class ContainerBalancer {
     this.maxDatanodesRatioToInvolvePerIteration =
         config.getMaxDatanodesRatioToInvolvePerIteration();
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
+    if (config.getNetworkTopologyEnable()) {
+      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
+          containerManager, placementPolicy, nodeManager, networkTopology);
+    } else {
+      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
+          placementPolicy, nodeManager);
+    }
     for (int i = 0; i < idleIteration && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
@@ -367,11 +378,6 @@ public class ContainerBalancer {
     try {
       // match each overUtilized node with a target
       while (true) {
-        DatanodeDetails source =
-            findSourceStrategy.getNextCandidateSourceDataNode();
-        if (source == null) {
-          break;
-        }
         if (!isBalancerRunning()) {
           return IterationResult.ITERATION_INTERRUPTED;
         }
@@ -379,6 +385,12 @@ public class ContainerBalancer {
         IterationResult result = checkConditionsForBalancing();
         if (result != null) {
           return result;
+        }
+
+        DatanodeDetails source =
+            findSourceStrategy.getNextCandidateSourceDataNode();
+        if (source == null) {
+          break;
         }
 
         ContainerMoveSelection moveSelection = matchSourceWithTarget(source);

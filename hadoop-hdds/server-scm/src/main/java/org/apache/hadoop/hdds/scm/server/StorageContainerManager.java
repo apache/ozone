@@ -380,8 +380,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     initializeEventHandlers();
 
-    containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration, scmContext,
+    containerBalancer = new ContainerBalancer(scmNodeManager, containerManager,
+        replicationManager, configuration, scmContext, clusterMap,
         ContainerPlacementPolicyFactory
             .getPolicy(conf, scmNodeManager, clusterMap, true,
                 placementMetrics));
