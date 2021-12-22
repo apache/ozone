@@ -81,6 +81,7 @@ public class ContainerHealthTask extends ReconScmTask {
   public synchronized void run() {
     try {
       while (canRun()) {
+        wait(interval);
         long start = Time.monotonicNow();
         long currentTime = System.currentTimeMillis();
         long existingCount = processExistingDBRecords(currentTime);
@@ -97,7 +98,6 @@ public class ContainerHealthTask extends ReconScmTask {
                 " processing {} containers.", Time.monotonicNow() - start,
             containers.size());
         processedContainers.clear();
-        wait(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);

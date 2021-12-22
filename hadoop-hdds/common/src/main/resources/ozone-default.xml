@@ -2547,6 +2547,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scm.connection.request.timeout</name>
+    <value>5s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Connection request timeout in milliseconds for HTTP call made by Recon to
+      request SCM DB snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.connection.timeout</name>
+    <value>5s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Connection timeout for HTTP call in milliseconds made by Recon to request
+      SCM snapshot.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
@@ -2577,6 +2595,23 @@
     <tag>OZONE, RECON, OM</tag>
     <description>
       Request to flush the OM DB before taking checkpoint snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.container.threshold</name>
+    <value>100</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Threshold value for the difference in number of containers
+      in SCM and RECON.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.snapshot.enabled</name>
+    <value>false</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      If enabled, SCM DB Snapshot is taken by Recon.
     </description>
   </property>
   <property>

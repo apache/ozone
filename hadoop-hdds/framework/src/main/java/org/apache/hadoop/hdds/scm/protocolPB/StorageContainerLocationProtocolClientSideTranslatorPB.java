@@ -52,6 +52,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSCMContainersCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSCMContainersCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -929,6 +931,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setContainerTokenRequest(request))
         .getContainerTokenResponse();
     return OzonePBHelper.tokenFromProto(response.getToken());
+  }
+
+  @Override
+  public long getSCMContainersCount() throws IOException {
+    GetSCMContainersCountRequestProto request =
+        GetSCMContainersCountRequestProto.newBuilder().build();
+
+    GetSCMContainersCountResponseProto response =
+        submitRequest(Type.GetSCMContainersCount,
+          builder -> builder.setGetSCMContainersCountRequest(request))
+        .getGetSCMContainersCountResponse();
+    return response.getContainerCount();
   }
 
   @Override

@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 
 /**
  * Interface to access SCM endpoints.
@@ -66,4 +67,7 @@ public interface StorageContainerServiceProvider {
    */
   List<HddsProtos.Node> getNodes() throws IOException;
 
+  long getSCMContainersCount() throws IOException;
+
+  DBCheckpoint getSCMDBSnapshot();
 }

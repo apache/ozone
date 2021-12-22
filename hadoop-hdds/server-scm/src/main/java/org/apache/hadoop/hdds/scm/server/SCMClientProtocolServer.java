@@ -945,6 +945,11 @@ public class SCMClientProtocolServer implements
         .generateToken(remoteUser.getUserName(), containerID);
   }
 
+  @Override
+  public long getSCMContainersCount() throws IOException {
+    return scm.getContainerManager().getContainers().size();
+  }
+
   /**
    * Queries a list of Node that match a set of statuses.
    *
