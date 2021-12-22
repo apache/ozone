@@ -55,6 +55,9 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests for ReplicatedFileChecksumHelper class.
+ */
 public class TestReplicatedFileChecksumHelper {
 
   @Test

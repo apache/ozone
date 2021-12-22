@@ -66,7 +66,8 @@ public abstract class BaseFileChecksumHelper {
     this.keyName = keyName;
     this.length = length;
     this.rpcClient = rpcClient;
-    this.xceiverClientFactory = ((RpcClient)rpcClient).getXceiverClientManager();
+    this.xceiverClientFactory =
+        ((RpcClient)rpcClient).getXceiverClientManager();
     refetchBlocks();
   }
 
