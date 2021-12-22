@@ -426,25 +426,24 @@ public class TestOzoneECClient {
   @Test
   public void testWriteShouldFailIfMoreThanParityNodesFail()
       throws IOException {
-    testNodeFailuresWhileWriting(3, 3);
+    testNodeFailuresWhileWriting(3, 3, 2);
   }
 
   @Test
   public void testWriteShouldSuccessIfLessThanParityNodesFail()
       throws IOException {
-    testNodeFailuresWhileWriting(1, 2);
+    testNodeFailuresWhileWriting(1, 2, 2);
   }
 
   @Test
-  public void testWriteShouldSuccessIf4NodesFailed()
-      throws IOException {
-    testNodeFailuresWhileWriting(4, 1);
+  public void testWriteShouldSuccessIf4NodesFailed() throws IOException {
+    testNodeFailuresWhileWriting(4, 1, 2);
   }
 
   @Test
-  public void testWriteShouldSuccessIfAllNodesFailed()
+  public void testWriteShouldSuccessWithAdditional1BlockGroupAfterFailure()
       throws IOException {
-    testNodeFailuresWhileWriting(4, 1);
+    testNodeFailuresWhileWriting(4, 10, 3);
   }
 
   @Test
@@ -602,7 +601,8 @@ public class TestOzoneECClient {
   }
 
   public void testNodeFailuresWhileWriting(int numFailureToInject,
-      int numChunksToWriteAfterFailure) throws IOException {
+      int numChunksToWriteAfterFailure, int numExpectedBlockGrps)
+      throws IOException {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -628,15 +628,16 @@ public class TestOzoneECClient {
       ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
 
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
-        out.write(inputChunks[i]);
+        out.write(inputChunks[i % dataBlocks]);
       }
     }
     final OzoneKeyDetails key = bucket.getKey(keyName);
     // Data supposed to store in single block group. Since we introduced the
     // failures after first stripe, the second stripe data should have been
-    // written into new blockgroup. So, we should have 2 block groups. That
-    // means two keyLocations.
-    Assert.assertEquals(2, key.getOzoneKeyLocations().size());
+    // written into new block group. So, we should have numExpectedBlockGrps.
+    // That means two keyLocations.
+    Assert
+        .assertEquals(numExpectedBlockGrps, key.getOzoneKeyLocations().size());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < dataBlocks; i++) {
@@ -646,10 +647,11 @@ public class TestOzoneECClient {
             Arrays.equals(inputChunks[i], fileContent));
       }
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
-        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
-        Assert.assertTrue("Expected: " + new String(inputChunks[i],
+        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+            is.read(fileContent));
+        Assert.assertTrue("Expected: " + new String(inputChunks[i % dataBlocks],
                 UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i], fileContent));
+            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
       }
     }
   }

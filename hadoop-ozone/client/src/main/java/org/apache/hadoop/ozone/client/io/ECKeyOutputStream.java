@@ -260,7 +260,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     newBlockGroupStreamEntry
         .updateBlockGroupToAckedPosition(failedStripeDataSize);
     ecChunkBufferCache.clear(chunkSize);
-    ecChunkBufferCache.release();
 
     if (newBlockGroupStreamEntry.getRemaining() <= 0) {
       // In most cases this should not happen except in the case stripe size and
