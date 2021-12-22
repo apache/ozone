@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.Collection;
 
 import com.google.common.cache.Cache;
 import org.apache.hadoop.conf.StorageUnit;
@@ -68,6 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -78,12 +80,22 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
+@RunWith(Parameterized.class)
 public class TestOzoneAtRestEncryption {
+
+  @Parameterized.Parameters
+  public static Collection<BucketLayout> data() {
+    return Arrays.asList(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        BucketLayout.OBJECT_STORE);
+  }
 
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;
@@ -106,6 +118,11 @@ public class TestOzoneAtRestEncryption {
   private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
   // (this is the default Crypto Buffer size as determined by the config
   // hadoop.security.crypto.buffer.size)
+  private static BucketLayout bucketLayout;
+
+  public TestOzoneAtRestEncryption(BucketLayout layout) {
+    bucketLayout = layout;
+  }
 
   @BeforeClass
   public static void init() throws Exception {
@@ -186,6 +203,7 @@ public class TestOzoneAtRestEncryption {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(bucketLayout)
         .setBucketEncryptionKey(TEST_KEY).build();
     volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -253,7 +271,8 @@ public class TestOzoneAtRestEncryption {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setBucketEncryptionKey(TEST_KEY).build();
+        .setBucketEncryptionKey(TEST_KEY)
+        .setBucketLayout(bucketLayout).build();
     volume.createBucket(bucketName, bucketArgs);
     return volume.getBucket(bucketName);
   }
@@ -263,7 +282,8 @@ public class TestOzoneAtRestEncryption {
     store.createVolume(linkVol);
     OzoneVolume linkVolume = store.getVolume(linkVol);
     BucketArgs linkBucketArgs = BucketArgs.newBuilder()
-        .setSourceVolume(sourceVol).setSourceBucket(sourceBucket).build();
+        .setSourceVolume(sourceVol).setSourceBucket(sourceBucket)
+        .setBucketLayout(bucketLayout).build();
     linkVolume.createBucket(linkBucket, linkBucketArgs);
     return linkVolume.getBucket(linkBucket);
   }
@@ -288,7 +308,8 @@ public class TestOzoneAtRestEncryption {
     //Bucket with Encryption & GDPR enforced
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setBucketEncryptionKey(TEST_KEY)
-        .addMetadata(OzoneConsts.GDPR_FLAG, "true").build();
+        .addMetadata(OzoneConsts.GDPR_FLAG, "true")
+        .setBucketLayout(bucketLayout).build();
     volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());

@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.key;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -28,6 +30,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Iterator;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -467,11 +470,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+
+        // Get the DB key name for looking up keyInfo in OpenKeyTable with
+        // resolved volume/bucket.
+        String dbMultipartOpenKey =
+            getDBMultipartOpenKey(resolvedBucket.realVolume(),
+                resolvedBucket.realBucket(), keyArgs.getKeyName(),
+                keyArgs.getMultipartUploadID(), omMetadataManager);
+
         OmKeyInfo omKeyInfo =
-            omMetadataManager.getOpenKeyTable(getBucketLayout()).get(
-                omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
-                    resolvedBucket.realBucket(), keyArgs.getKeyName(),
-                    keyArgs.getMultipartUploadID()));
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
+                .get(dbMultipartOpenKey);
+
         if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
@@ -483,6 +493,31 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       }
     }
+  }
+
+  /**
+   * Get parent ID for the user given keyName.
+   *
+   * @param omMetadataManager
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @return
+   * @throws IOException
+   */
+  protected long getParentId(OMMetadataManager omMetadataManager,
+                             String volumeName, String bucketName,
+                             String keyName)
+      throws IOException {
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+
+    long bucketId = omBucketInfo.getObjectID();
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    return OMFileRequest
+        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
   }
 
   /**
@@ -742,5 +777,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID);
+  }
+
+  /**
+   * Returns the DB key name of a multipart open key in OM metadata store.
+   *
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @param uploadID          - Multi part upload ID for this key.
+   * @param omMetadataManager
+   * @return
+   * @throws IOException
+   */
+  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
+                                         String keyName, String uploadID,
+                                         OMMetadataManager omMetadataManager)
+      throws IOException {
+
+    return omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, uploadID);
   }
 }

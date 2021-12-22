@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -231,5 +232,34 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             numKeysCreated);
 
     return omClientResponse;
+  }
+
+  /**
+   * Returns the DB key name of a multipart open key in OM metadata store.
+   *
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @param uploadID          - Multi part upload ID for this key.
+   * @param omMetadataManager
+   * @return
+   * @throws IOException
+   */
+  @Override
+  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
+                                         String keyName, String uploadID,
+                                         OMMetadataManager omMetadataManager)
+      throws IOException {
+
+    long parentId =
+        getParentId(omMetadataManager, volumeName, bucketName, keyName);
+
+    String fileName = keyName;
+    Path filePath = Paths.get(keyName).getFileName();
+    if (filePath != null) {
+      fileName = filePath.toString();
+    }
+
+    return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
   }
 }
