@@ -18,8 +18,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -68,7 +66,7 @@ public class RepeatedOmKeyInfo {
    * @return
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
-    List<KeyInfo> list = new CopyOnWriteArrayList<>();
+    List<KeyInfo> list = new ArrayList<>();
     for(OmKeyInfo k : omKeyInfoList) {
       list.add(k.getProtobuf(compact, clientVersion));
     }
@@ -94,5 +92,9 @@ public class RepeatedOmKeyInfo {
     public RepeatedOmKeyInfo build() {
       return new RepeatedOmKeyInfo(omKeyInfos);
     }
+  }
+
+  public RepeatedOmKeyInfo copyObject() {
+    return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList));
   }
 }
