@@ -21,9 +21,9 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -45,44 +45,65 @@ public abstract class BaseFileChecksumHelper {
   private OzoneVolume volume;
   private OzoneBucket bucket;
   private String keyName;
-
   private final long length;
-  protected RpcClient rpcClient;
-  protected XceiverClientFactory xceiverClientFactory;
+  private ClientProtocol rpcClient;
 
-  //private final Options.ChecksumCombineMode combineMode;
-  //private final BlockChecksumType blockChecksumType;
+  private XceiverClientFactory xceiverClientFactory;
   protected final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
-
   private FileChecksum fileChecksum;
   protected List<OmKeyLocationInfo> keyLocationInfos;
-
+  private long remaining = 0L;
   private int bytesPerCRC = -1;
-  //private DataChecksum.Type crcType = DataChecksum.Type.DEFAULT;
   private long crcPerBlock = 0;
 
   // initialization
   BaseFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName,
-      long length,
-      //Options.ChecksumCombineMode checksumCombineMode,
-      RpcClient rpcClient,
-      XceiverClientSpi xceiverClientGrpc) throws IOException {
+      long length, ClientProtocol rpcClient) throws IOException {
 
     this.volume = volume;
     this.bucket = bucket;
     this.keyName = keyName;
     this.length = length;
     this.rpcClient = rpcClient;
-    this.xceiverClientFactory = rpcClient.getXeiverClientManager();
+    this.xceiverClientFactory = ((RpcClient)rpcClient).getXceiverClientManager();
     refetchBlocks();
+  }
+
+  protected String getSrc() {
+    return "Volume: " + volume.getName() + " Bucket: " + bucket.getName() + " "
+        + keyName;
+  }
+
+  protected long getLength() {
+    return length;
+  }
+
+  protected ClientProtocol getRpcClient() {
+    return rpcClient;
+  }
+
+  protected XceiverClientFactory getXceiverClientFactory() {
+    return xceiverClientFactory;
+  }
+
+  protected DataOutputBuffer getBlockChecksumBuf() {
+    return blockChecksumBuf;
+  }
+
+  protected long getRemaining() {
+    return remaining;
+  }
+
+  protected void setRemaining(long remaining) {
+    this.remaining = remaining;
   }
 
   int getBytesPerCRC() {
     return bytesPerCRC;
   }
 
-  void setBytesPerCRC(int bytesPerCRC) {
+  protected void setBytesPerCRC(int bytesPerCRC) {
     this.bytesPerCRC = bytesPerCRC;
   }
 
@@ -91,8 +112,9 @@ public abstract class BaseFileChecksumHelper {
    *
    * @throws IOException
    */
-  void refetchBlocks() throws IOException {
-    OzoneManagerProtocol ozoneManagerClient = rpcClient.getOzoneManagerClient();
+  private void refetchBlocks() throws IOException {
+    OzoneManagerProtocol ozoneManagerClient =
+        getRpcClient().getOzoneManagerClient();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volume.getName())
         .setBucketName(bucket.getName())
@@ -144,18 +166,18 @@ public abstract class BaseFileChecksumHelper {
    *
    * @throws IOException
    */
-  abstract void checksumBlocks() throws IOException;
+  protected abstract void checksumBlocks() throws IOException;
 
   /**
    * Make final file checksum result given the per-block or per-block-group
    * checksums collected into getBlockChecksumBuf().
    */
-  FileChecksum makeFinalResult() throws IOException {
+  private FileChecksum makeFinalResult() throws IOException {
     // TODO: support composite CRC
     return makeMd5CrcResult();
   }
 
-  FileChecksum makeMd5CrcResult() {
+  private FileChecksum makeMd5CrcResult() {
     // TODO: support CRC32C
     //compute file MD5
     final MD5Hash fileMD5 = MD5Hash.digest(blockChecksumBuf.getData());

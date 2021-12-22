@@ -280,7 +280,7 @@ public class RpcClient implements ClientProtocol {
         }).build();
   }
 
-  public XceiverClientFactory getXeiverClientManager() {
+  public XceiverClientFactory getXceiverClientManager() {
     return xceiverClientManager;
   }
 

@@ -38,8 +38,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -52,25 +50,17 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 public class TestReplicatedFileChecksumHelper {
 
-  @Before
-  public void setUp() throws Exception {
-  }
-
-  @After
-  public void tearDown() throws Exception {
-  }
-
   @Test
   public void testEmptyBlock() throws IOException {
     // test the file checksum of a file with an empty block.
     RpcClient rpcClient = Mockito.mock(RpcClient.class);
-    XceiverClientGrpc xceiverClientGrpc = Mockito.mock(XceiverClientGrpc.class);
 
     OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
     when(rpcClient.getOzoneManagerClient()).thenReturn(om);
@@ -98,7 +88,7 @@ public class TestReplicatedFileChecksumHelper {
     when(bucket.getName()).thenReturn("bucket1");
 
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, "dummy", 10, rpcClient, xceiverClientGrpc);
+        volume, bucket, "dummy", 10, rpcClient);
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
@@ -135,7 +125,7 @@ public class TestReplicatedFileChecksumHelper {
     XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
     when(factory.acquireClientForReadData(any())).thenReturn(client);
 
-    when(rpcClient.getXeiverClientManager()).thenReturn(factory);
+    when(rpcClient.getXceiverClientManager()).thenReturn(factory);
 
     OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
     when(rpcClient.getOzoneManagerClient()).thenReturn(om);
@@ -172,7 +162,7 @@ public class TestReplicatedFileChecksumHelper {
     when(bucket.getName()).thenReturn("bucket1");
 
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, "dummy", 10, rpcClient, client);
+        volume, bucket, "dummy", 10, rpcClient);
 
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();

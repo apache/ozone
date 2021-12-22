@@ -17,9 +17,11 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -30,36 +32,71 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * The helper class to compute file checksum for replicated files.
+ */
 public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
+  private int blockIdx;
+
   ReplicatedFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
-      /*Options.ChecksumCombineMode checksumCombineMode, */RpcClient rpcClient,
-      XceiverClientSpi xceiverClientSpi) throws IOException {
-    super(volume, bucket, keyName, length, /*checksumCombineMode, */rpcClient, xceiverClientSpi);
+      RpcClient rpcClient) throws IOException {
+    super(volume, bucket, keyName, length, rpcClient);
   }
 
   @Override
-  void checksumBlocks() throws IOException {
-    for (OmKeyLocationInfo keyLocationInfo : keyLocationInfos) {
-      // for each block, send request
-      // TODO: retry multiple times with different replicas
+  protected void checksumBlocks() throws IOException {
+    long currentLength = 0;
+    for (blockIdx = 0;
+         blockIdx < keyLocationInfos.size() && getRemaining() >= 0;
+         blockIdx++) {
+      OmKeyLocationInfo keyLocationInfo = keyLocationInfos.get(blockIdx);
+      currentLength += keyLocationInfo.getLength();
+      if (currentLength > getLength()) {
+        return;
+      }
 
-      List<ContainerProtos.ChunkInfo> chunkInfos =
-          getChunkInfos(keyLocationInfo);
-      ContainerProtos.ChecksumData checksumData =
-          chunkInfos.get(0).getChecksumData();
-      int bytesPerChecksum = checksumData.getBytesPerChecksum();
-      setBytesPerCRC(bytesPerChecksum);
-      List<ByteString> checksums = checksumData.getChecksumsList();
-
-      byte[] blockChecksum = getBlockChecksumFromChunkChecksums(checksums);
-      populateBlockChecksumBuf(blockChecksum);
+      if (!checksumBlock(keyLocationInfo)) {
+        throw new PathIOException(
+            getSrc(), "Fail to get block MD5 for " + keyLocationInfo);
+      }
     }
+  }
+
+  /**
+   * Return true when sounds good to continue or retry, false when severe
+   * condition or totally failed.
+   */
+  private boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
+      throws IOException {
+
+    long blockNumBytes = keyLocationInfo.getLength();
+
+    if (getRemaining() < blockNumBytes) {
+      blockNumBytes = getRemaining();
+    }
+    setRemaining(getRemaining() - blockNumBytes);
+    // for each block, send request
+    List<ContainerProtos.ChunkInfo> chunkInfos =
+        getChunkInfos(keyLocationInfo);
+    ContainerProtos.ChecksumData checksumData =
+        chunkInfos.get(0).getChecksumData();
+    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    setBytesPerCRC(bytesPerChecksum);
+
+    byte[] blockChecksum = getBlockChecksumFromChunkChecksums(
+        keyLocationInfo, chunkInfos);
+    String blockChecksumForDebug = populateBlockChecksumBuf(blockChecksum);
+
+    LOG.debug("got reply from pipeline {} for block {}: blockChecksum={}, " +
+            "blockChecksumType={}",
+        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
+        blockChecksumForDebug, checksumData.getType());
+    return true;
   }
 
   // copied from BlockInputStream
@@ -91,7 +128,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
             blockID.getContainerID());
       }
       xceiverClientSpi =
-          xceiverClientFactory.acquireClientForReadData(pipeline);
+          getXceiverClientFactory().acquireClientForReadData(pipeline);
 
       ContainerProtos.DatanodeBlockID datanodeBlockID = blockID
           .getDatanodeBlockIDProtobuf();
@@ -102,7 +139,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       success = true;
     } finally {
       if (!success && xceiverClientSpi != null) {
-        xceiverClientFactory.releaseClientForReadData(xceiverClientSpi, false);
+        getXceiverClientFactory().releaseClientForReadData(xceiverClientSpi, false);
       }
     }
 
@@ -110,7 +147,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   // TODO: copy BlockChecksumHelper here
-  byte[] getBlockChecksumFromChunkChecksums(List<ByteString> checksums)
+  byte[] getBlockChecksumFromChunkChecksums(OmKeyLocationInfo keyLocationInfo,
+      List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
     // TODO: support composite CRC
     final int lenOfZeroBytes = 32;
@@ -132,7 +170,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     String blockChecksumForDebug = null;
     //read md5
     final MD5Hash md5 = new MD5Hash(checksumData);
-    md5.write(blockChecksumBuf);
+    md5.write(getBlockChecksumBuf());
     if (LOG.isDebugEnabled()) {
       blockChecksumForDebug = md5.toString();
     }
