@@ -61,6 +61,23 @@ public enum BucketLayout {
     }
   }
 
+  public boolean isFileSystemOptimized() {
+    return this.equals(FILE_SYSTEM_OPTIMIZED);
+  }
+
+  public boolean shouldNormalizePaths(boolean enableFileSystemPaths) {
+    switch (this) {
+    case OBJECT_STORE:
+      return false;
+    case FILE_SYSTEM_OPTIMIZED:
+      return true;
+    case LEGACY:
+      return enableFileSystemPaths;
+    default:
+      throw new IllegalArgumentException("Invalid Bucket Layout:" + this);
+    }
+  }
+
   public static BucketLayout fromString(String value) {
     // This will never be null in production but can be null in mocked
     // unit test cases.

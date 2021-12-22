@@ -178,8 +178,8 @@ public class TestOzoneManagerStarter {
     }
 
     @Override
-    public void bootstrap(OzoneConfiguration conf) throws IOException,
-        AuthenticationException {
+    public void bootstrap(OzoneConfiguration conf, boolean force)
+        throws IOException, AuthenticationException {
       //TODO: Add test for bootstrap
     }
 

@@ -52,6 +52,9 @@ public class DatanodeConfiguration {
   public static final String DISK_CHECK_TIMEOUT_KEY =
       "hdds.datanode.disk.check.timeout";
 
+  public static final String WAIT_ON_ALL_FOLLOWERS =
+      "hdds.datanode.wait.on.all.followers";
+
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
   static final int REPLICATION_MAX_STREAMS_DEFAULT = 12;
@@ -59,6 +62,8 @@ public class DatanodeConfiguration {
   static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
+
+  static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
   static final long DISK_CHECK_MIN_GAP_DEFAULT =
       Duration.ofMinutes(15).toMillis();
@@ -90,6 +95,18 @@ public class DatanodeConfiguration {
           "replication"
   )
   private int replicationQueueLimit = 4096;
+
+  /**
+   * Number of threads per volume that Datanode will use for chunk read.
+   */
+  @Config(key = "read.chunk.threads.per.volume",
+      type = ConfigType.INT,
+      defaultValue = "10",
+      tags = {DATANODE},
+      description = "Number of threads per volume that Datanode will use for " +
+          "reading replicated chunks."
+  )
+  private int numReadThreadPerVolume = 10;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
@@ -238,6 +255,25 @@ public class DatanodeConfiguration {
   private boolean isChunkDataValidationCheck =
       CHUNK_DATA_VALIDATION_CHECK_DEFAULT;
 
+  @Config(key = "wait.on.all.followers",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Defines whether the leader datanode will wait for both"
+          + "followers to catch up before removing the stateMachineData from "
+          + "the cache."
+  )
+
+  private boolean waitOnAllFollowers = WAIT_ON_ALL_FOLLOWERS_DEFAULT;
+
+  public boolean waitOnAllFollowers() {
+    return waitOnAllFollowers;
+  }
+
+  public void setWaitOnAllFollowers(boolean val) {
+    this.waitOnAllFollowers = val;
+  }
+
   @PostConstruct
   public void validate() {
     if (replicationMaxStreams < 1) {
@@ -381,4 +417,11 @@ public class DatanodeConfiguration {
     isChunkDataValidationCheck = writeChunkValidationCheck;
   }
 
+  public void setNumReadThreadPerVolume(int threads) {
+    this.numReadThreadPerVolume = threads;
+  }
+
+  public int getNumReadThreadPerVolume() {
+    return numReadThreadPerVolume;
+  }
 }

@@ -55,6 +55,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
   private static final Logger LOG = LoggerFactory
       .getLogger(OMKeyAclRequest.class);
 
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
   public OMKeyAclRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -95,7 +97,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
               bucket);
 
       String dbKey = omMetadataManager.getOzoneKey(volume, bucket, key);
-      omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout(ozoneManager))
+      omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .get(dbKey);
 
       if (omKeyInfo == null) {
@@ -121,7 +123,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       omKeyInfo.setModificationTime(modificationTime);
 
       // update cache.
-      omMetadataManager.getKeyTable(getBucketLayout(ozoneManager))
+      omMetadataManager.getKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(dbKey),
               new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
@@ -154,9 +156,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    */
   abstract String getPath();
 
-  public BucketLayout getBucketLayout(OzoneManager ozoneManager) {
-    BucketLayout bucketLayout = BucketLayout.LEGACY;
-    OmBucketInfo buckInfo = null;
+  public void initializeBucketLayout(OzoneManager ozoneManager) {
+    OmBucketInfo buckInfo;
     try {
       ObjectParser objectParser = new ObjectParser(getPath(),
           OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
@@ -172,7 +173,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
             ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
         if (buckInfo == null) {
           LOG.error("Bucket not found: {}/{} ", volume, bucket);
-          return BucketLayout.LEGACY;
+          // defaulting to BucketLayout.DEFAULT
+          return;
         }
         bucketLayout = buckInfo.getBucketLayout();
       } catch (IOException e) {
@@ -181,8 +183,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
     } catch (OMException ome) {
       LOG.error("Invalid Path: " + getPath(), ome);
       // Handle exception
+      // defaulting to BucketLayout.DEFAULT
+      return;
     }
-    return bucketLayout;
   }
 
   /**
@@ -218,7 +221,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    */
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception));
+    return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception),
+        getBucketLayout());
   }
 
   /**
@@ -238,5 +242,13 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @param trxnLogIndex
    */
   abstract boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex);
+
+  public void setBucketLayout(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
+  }
 }
 

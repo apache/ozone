@@ -40,21 +40,17 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
 
   public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omKeyInfo, clientID, omBucketInfo);
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, omKeyInfo, clientID, omBucketInfo, bucketLayout);
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
+                                        @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override

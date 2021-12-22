@@ -104,8 +104,9 @@ public class SCMUpgradeFinalizer extends
     boolean hasPipeline = false;
     while (!hasPipeline) {
       ReplicationConfig ratisThree =
-          ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          ReplicationConfig.fromProtoTypeAndFactor(
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE);
       int pipelineCount =
           pipelineManager.getPipelines(ratisThree, Pipeline.PipelineState.OPEN)
               .size();

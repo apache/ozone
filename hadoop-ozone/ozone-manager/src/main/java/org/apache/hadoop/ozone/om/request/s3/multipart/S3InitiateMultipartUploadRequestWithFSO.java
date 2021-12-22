@@ -61,8 +61,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 public class S3InitiateMultipartUploadRequestWithFSO
         extends S3InitiateMultipartUploadRequest {
 
-  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -162,7 +163,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
       final ReplicationConfig replicationConfig =
-              ReplicationConfig.fromTypeAndFactor(
+              ReplicationConfig.fromProtoTypeAndFactor(
                       keyArgs.getType(), keyArgs.getFactor());
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
@@ -213,14 +214,14 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo, multipartKey,
-              missingParentInfos);
+              missingParentInfos, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponseWithFSO(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
@@ -248,10 +249,5 @@ public class S3InitiateMultipartUploadRequestWithFSO
       throw new OMException("Can not write to directory: " + keyName,
               OMException.ResultCodes.NOT_A_FILE);
     }
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

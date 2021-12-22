@@ -592,7 +592,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())
         .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
+                .fromProtoTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
@@ -699,6 +699,14 @@ public final class OmKeyInfo extends WithParentObjectId {
    */
   public void clearFileEncryptionInfo() {
     this.encInfo = null;
+  }
+
+  /**
+   * Set the file encryption info.
+   * @param fileEncryptionInfo
+   */
+  public void setFileEncryptionInfo(FileEncryptionInfo fileEncryptionInfo) {
+    this.encInfo = fileEncryptionInfo;
   }
 
   public String getPath() {

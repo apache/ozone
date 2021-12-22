@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -103,6 +105,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   public OMDirectoryCreateRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMDirectoryCreateRequest(OMRequest omRequest,
+                                  BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -208,7 +215,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             Optional.of(missingParentInfos), trxnLogIndex);
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos, result);
+            dirKeyInfo, missingParentInfos, result, getBucketLayout());
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         result = Result.DIRECTORY_ALREADY_EXISTS;
@@ -358,7 +365,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setModificationTime(keyArgs.getModificationTime())
         .setDataSize(0)
         .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
+                .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
         .setObjectID(objectId)
         .setUpdateID(objectId);
   }
@@ -367,7 +374,16 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     return MAX_NUM_OF_RECURSIVE_DIRS;
   }
 
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+  public static OMDirectoryCreateRequest getInstance(
+      KeyArgs keyArgs, OMRequest omRequest, OzoneManager ozoneManager)
+      throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMDirectoryCreateRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMDirectoryCreateRequest(omRequest, bucketLayout);
   }
 }

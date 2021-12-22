@@ -175,14 +175,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     implements OzoneManagerClientProtocol {
 
   private final String clientID;
-
   private OmTransport transport;
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
+
+  private boolean s3AuthCheck;
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
     this.clientID = clientId;
     this.transport = omTransport;
+    this.s3AuthCheck = false;
   }
 
   /**
@@ -236,6 +238,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
               .setAccessId(
                   threadLocalS3Auth.get().getAccessID())
               .build());
+    }
+    if (s3AuthCheck && getThreadLocalS3Auth() == null) {
+      throw new IllegalArgumentException("S3 Auth expected to " +
+          "be set but is null " + omRequest.toString());
     }
     OMResponse response =
         transport.submitRequest(
@@ -1047,7 +1053,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OmMultipartUploadListParts omMultipartUploadListParts =
         new OmMultipartUploadListParts(
-                ReplicationConfig.fromTypeAndFactor(response.getType(),
+                ReplicationConfig.fromProtoTypeAndFactor(response.getType(),
                 response.getFactor()),
             response.getNextPartNumberMarker(), response.getIsTruncated());
     omMultipartUploadListParts.addProtoPartList(response.getPartsListList());
@@ -1083,7 +1089,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 proto.getKeyName(),
                 proto.getUploadId(),
                 Instant.ofEpochMilli(proto.getCreationTime()),
-                ReplicationConfig.fromTypeAndFactor(proto.getType(),
+                ReplicationConfig.fromProtoTypeAndFactor(proto.getType(),
                         proto.getFactor())
             ))
             .collect(Collectors.toList());
@@ -1670,5 +1676,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @VisibleForTesting
   public OmTransport getTransport() {
     return transport;
+  }
+
+  public boolean isS3AuthCheck() {
+    return s3AuthCheck;
+  }
+
+  public void setS3AuthCheck(boolean s3AuthCheck) {
+    this.s3AuthCheck = s3AuthCheck;
   }
 }

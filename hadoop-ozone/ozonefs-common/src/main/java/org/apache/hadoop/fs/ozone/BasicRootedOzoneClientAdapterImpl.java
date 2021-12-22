@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -101,6 +103,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private boolean securityEnabled;
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
+  private OzoneConfiguration config;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -191,6 +194,7 @@ public class BasicRootedOzoneClientAdapterImpl
       this.defaultOFSBucketLayout = BucketLayout.fromString(
           conf.get(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
               OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
+      config = conf;
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
@@ -226,6 +230,13 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+
+      // resolve the bucket layout in case of Link Bucket
+      BucketLayout resolvedBucketLayout =
+          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+              new HashSet<>());
+
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
     } catch (OMException ex) {
       if (createIfNotExist) {
         // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
@@ -233,7 +244,7 @@ public class BasicRootedOzoneClientAdapterImpl
         // when ACL is disabled. Both exceptions need to be handled.
         switch (ex.getResult()) {
         case VOLUME_NOT_FOUND:
-        case BUCKET_NOT_FOUND:
+          // Create the volume first when the volume doesn't exist
           try {
             objectStore.createVolume(volumeStr);
           } catch (OMException newVolEx) {
@@ -242,7 +253,11 @@ public class BasicRootedOzoneClientAdapterImpl
               throw newVolEx;
             }
           }
-
+          // No break here. Proceed to create the bucket
+        case BUCKET_NOT_FOUND:
+          // When BUCKET_NOT_FOUND is thrown, we expect the parent volume
+          // exists, so that we don't call create volume and incur
+          // unnecessary ACL checks which could lead to unwanted behavior.
           OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {
@@ -321,7 +336,8 @@ public class BasicRootedOzoneClientAdapterImpl
           || replication == ReplicationFactor.THREE.getValue()) {
 
         ozoneOutputStream = bucket.createFile(key, 0,
-            ReplicationConfig.adjustReplication(replicationConfig, replication),
+            ReplicationConfig.adjustReplication(
+                replicationConfig, replication, config),
             overWrite, recursive);
       } else {
         ozoneOutputStream =

@@ -24,6 +24,7 @@ public class S3Auth {
   private String stringToSign;
   private String signature;
   private String accessID;
+  public static final String S3_AUTH_CHECK = "ozone.s3.auth.check";
 
   public S3Auth(final String stringToSign,
                 final String signature, final String accessID) {

@@ -545,6 +545,7 @@ message BucketInfo {
     optional int64 quotaInNamespace = 16 [default = -2];
     optional uint64 usedNamespace = 17;
     optional BucketLayoutProto bucketLayout = 18;
+    optional string owner = 19;
 }
 
 enum StorageTypeProto {
@@ -1188,6 +1189,7 @@ message ServiceInfo {
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
+    optional string OMProtocolVersion = 5;
 }
 
 message MultipartInfoInitiateRequest {

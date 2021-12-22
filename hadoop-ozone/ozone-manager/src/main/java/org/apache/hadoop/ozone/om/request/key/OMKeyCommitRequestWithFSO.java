@@ -58,8 +58,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
-  public OMKeyCommitRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCommitRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -192,7 +193,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyCommitResponseWithFSO(createErrorOMResponse(
-              omResponse, exception));
+              omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
@@ -210,10 +211,5 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             exception, omKeyInfo, result);
 
     return omClientResponse;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

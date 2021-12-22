@@ -94,13 +94,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
+  public OMKeyRequest(OMRequest omRequest, BucketLayout bucketLayoutArg) {
+    super(omRequest);
+    this.bucketLayout = bucketLayoutArg;
+  }
+
   public BucketLayout getBucketLayout() {
-    // Returning Bucket.default since this is a non fso code path.
-    return BucketLayout.DEFAULT;
+    return bucketLayout;
   }
 
   protected KeyArgs resolveBucketLink(
@@ -134,7 +140,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient().allocateBlock(scmBlockSize,
-          numBlocks, ReplicationConfig.fromTypeAndFactor(replicationType,
+          numBlocks, ReplicationConfig.fromProtoTypeAndFactor(replicationType,
               replicationFactor),
           omID, excludeList);
     } catch (SCMException ex) {
@@ -341,8 +347,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneObj.ResourceType resourceType, String volumeOwner)
       throws IOException {
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
-          volume, bucket, key, volumeOwner);
+      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE,
+          aclType, volume, bucket, key, volumeOwner,
+          ozoneManager.getBucketOwner(volume, bucket, aclType, resourceType));
     }
   }
 
@@ -641,7 +648,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
     return createFileInfo(keyArgs, locations,
-            ReplicationConfig.fromTypeAndFactor(
+            ReplicationConfig.fromProtoTypeAndFactor(
                     keyArgs.getType(), keyArgs.getFactor()),
             keyArgs.getDataSize(), encInfo, prefixManager,
             omBucketInfo, omPathInfo, transactionLogIndex, objectID);

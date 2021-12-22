@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -41,6 +40,8 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 
@@ -60,9 +61,6 @@ public class OzoneClientProducer {
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
-
-  @Inject
-  private Text omService;
 
   @Inject
   private String omServiceID;
@@ -112,6 +110,11 @@ public class OzoneClientProducer {
   @NotNull
   @VisibleForTesting
   OzoneClient createOzoneClient() throws IOException {
+    // S3 Gateway should always set the S3 Auth.
+    ozoneConfiguration.setBoolean(S3Auth.S3_AUTH_CHECK, true);
+    // Set the expected OM version if not set via config.
+    ozoneConfiguration.setIfUnset(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
+        OZONE_OM_CLIENT_PROTOCOL_VERSION);
     if (omServiceID == null) {
       return OzoneClientFactory.getRpcClient(ozoneConfiguration);
     } else {

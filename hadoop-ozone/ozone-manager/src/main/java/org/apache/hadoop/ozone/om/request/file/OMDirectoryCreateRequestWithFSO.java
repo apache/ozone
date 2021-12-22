@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -71,8 +72,9 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateRequestWithFSO.class);
 
-  public OMDirectoryCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMDirectoryCreateRequestWithFSO(OMRequest omRequest,
+                                         BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -167,7 +169,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =
             new OMDirectoryCreateResponseWithFSO(omResponse.build(), dirInfo,
-                missingParentInfos, result);
+                missingParentInfos, result, getBucketLayout());
       } else {
         result = Result.DIRECTORY_ALREADY_EXISTS;
         omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);

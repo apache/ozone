@@ -216,7 +216,7 @@ public class TestContainerPlacement {
 
       ContainerInfo container = containerManager
           .allocateContainer(
-              ReplicationConfig.fromTypeAndFactor(
+              ReplicationConfig.fromProtoTypeAndFactor(
                   SCMTestUtils.getReplicationType(conf),
                   SCMTestUtils.getReplicationFactor(conf)),
               OzoneConsts.OZONE);

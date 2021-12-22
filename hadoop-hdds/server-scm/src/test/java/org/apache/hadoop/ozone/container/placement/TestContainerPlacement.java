@@ -85,8 +85,8 @@ public class TestContainerPlacement {
         null, true, null);
 
     for (int x = 0; x < opsCount; x++) {
-      long containerSize = random.nextInt(100) * OzoneConsts.GB;
-      long metadataSize = random.nextInt(100) * OzoneConsts.GB;
+      long containerSize = random.nextInt(10) * OzoneConsts.GB;
+      long metadataSize = random.nextInt(10) * OzoneConsts.GB;
       List<DatanodeDetails> nodesCapacity =
           capacityPlacer.chooseDatanodes(new ArrayList<>(), null, nodesRequired,
               metadataSize, containerSize);

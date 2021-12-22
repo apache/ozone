@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
 
 import com.google.common.base.Optional;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -61,8 +63,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyDeleteRequest.class);
 
-  public OMKeyDeleteRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -72,10 +74,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
 
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(validateAndNormalizeKey(
-                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+        keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
@@ -174,7 +178,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
-          new OMKeyDeleteResponse(createErrorOMResponse(omResponse, exception));
+          new OMKeyDeleteResponse(createErrorOMResponse(omResponse, exception),
+              getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -207,4 +212,16 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  public static OMKeyDeleteRequest getInstance(
+      OzoneManagerProtocolProtos.KeyArgs keyArgs, OMRequest omRequest,
+      OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMKeyDeleteRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMKeyDeleteRequest(omRequest, bucketLayout);
+  }
 }

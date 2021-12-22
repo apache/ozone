@@ -90,8 +90,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
             folder.newFolder().getAbsolutePath());
-    TestOMRequestUtils.configureFSOptimizedPaths(ozoneConfiguration,
-            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    TestOMRequestUtils.configureFSOptimizedPaths(ozoneConfiguration, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -121,7 +120,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirectoryCreateRequestWithFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmRequest =
             omDirectoryCreateRequestWithFSO.preExecute(ozoneManager);
@@ -149,13 +149,15 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq =
         omDirCreateRequestFSO.preExecute(ozoneManager);
 
     omDirCreateRequestFSO =
-        new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+        new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
             omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
@@ -176,13 +178,15 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmRequest =
         omDirCreateRequestFSO.preExecute(ozoneManager);
 
     omDirCreateRequestFSO =
-        new OMDirectoryCreateRequestWithFSO(modifiedOmRequest);
+        new OMDirectoryCreateRequestWithFSO(modifiedOmRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
             omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
@@ -207,11 +211,13 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq = omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse =
@@ -259,11 +265,13 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq = omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
@@ -312,11 +320,13 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq = omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
@@ -385,12 +395,14 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq =
             omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
@@ -457,12 +469,14 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq =
             omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
@@ -502,11 +516,13 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq = omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     Assert.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
@@ -535,11 +551,13 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq = omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     Assert.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
@@ -573,11 +591,13 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
-            new OMDirectoryCreateRequestWithFSO(omRequest);
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedOmReq = omDirCreateReqFSO.preExecute(ozoneManager);
 
-    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq);
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     Assert.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =

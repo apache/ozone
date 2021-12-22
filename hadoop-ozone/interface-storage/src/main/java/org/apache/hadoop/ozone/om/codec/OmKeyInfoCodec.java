@@ -34,9 +34,8 @@ import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
  * Codec to encode OmKeyInfo as byte array.
  *
  * <p>
- * If the layout "ozone.om.metadata.layout" is PREFIX and
- * "ozone.om.enable.filesystem.paths" is TRUE. Then, DB stores only the leaf
- * node name into the 'keyName' field.
+ * If the bucket layout is FileSystem Optimized.
+ * Then, DB stores only the leaf node name into the 'keyName' field.
  * <p>
  * For example, the user given key path is '/a/b/c/d/e/file1', then in DB
  * 'keyName' field stores only the leaf node name, which is 'file1'.

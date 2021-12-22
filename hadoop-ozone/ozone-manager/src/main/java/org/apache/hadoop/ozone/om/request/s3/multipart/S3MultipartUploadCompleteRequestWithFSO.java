@@ -51,8 +51,9 @@ public class S3MultipartUploadCompleteRequestWithFSO
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
-  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -142,7 +143,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
       IOException exception) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(
-        createErrorOMResponse(omResponse, exception));
+        createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
   @Override
@@ -152,7 +153,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
       List<OmKeyInfo> unUsedParts) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
-        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts);
+        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout());
   }
 
   private long getParentId(OMMetadataManager omMetadataManager,
@@ -165,11 +167,6 @@ public class S3MultipartUploadCompleteRequestWithFSO
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
     return OMFileRequest
         .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
 

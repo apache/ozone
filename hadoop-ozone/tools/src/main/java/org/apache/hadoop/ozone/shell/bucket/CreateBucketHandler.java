@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -51,10 +52,15 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
+  @Option(names = {"--user", "-u"},
+          description = "Owner of the bucket. Defaults to current" +
+              " user if not specified")
+  private String ownerName;
+
   enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
 
-  @Option(names = { "--type", "-t" },
-      description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
+  @Option(names = { "--layout", "-l" },
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
       defaultValue = "OBJECT_STORE")
   private AllowedBucketLayouts allowedBucketLayout;
 
@@ -68,12 +74,16 @@ public class CreateBucketHandler extends BucketHandler {
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
+    if (ownerName == null) {
+      ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
+    }
+
     BucketArgs.Builder bb;
     BucketLayout bucketLayout =
         BucketLayout.valueOf(allowedBucketLayout.toString());
     bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-        .setVersioning(false).setBucketLayout(bucketLayout);
-
+        .setVersioning(false).setBucketLayout(bucketLayout)
+        .setOwner(ownerName);
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {

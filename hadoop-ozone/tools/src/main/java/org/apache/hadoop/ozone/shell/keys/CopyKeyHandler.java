@@ -25,7 +25,6 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -39,10 +38,6 @@ import org.apache.hadoop.ozone.shell.bucket.BucketHandler;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -85,19 +80,8 @@ public class CopyKeyHandler extends BucketHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
 
-    if (replicationType == null) {
-      replicationType = ReplicationType.valueOf(
-          getConf()
-              .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
-    }
-
-    if (replication == null) {
-      replication = getConf().get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
-    }
-
     ReplicationConfig replicationConfig =
-        getConf().getObject(ReplicationConfigValidator.class).validate(
-            ReplicationConfig.fromTypeAndString(replicationType, replication));
+        ReplicationConfig.parse(replicationType, replication, getConf());
 
     OzoneKeyDetails keyDetail = bucket.getKey(fromKey);
     Map<String, String> keyMetadata = new HashMap<>(keyDetail.getMetadata());
