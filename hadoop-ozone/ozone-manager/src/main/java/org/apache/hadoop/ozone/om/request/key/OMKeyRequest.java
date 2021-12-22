@@ -21,8 +21,6 @@ package org.apache.hadoop.ozone.om.request.key;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -30,7 +28,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Iterator;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -493,31 +490,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       }
     }
-  }
-
-  /**
-   * Get parent ID for the user given keyName.
-   *
-   * @param omMetadataManager
-   * @param volumeName        - volume name.
-   * @param bucketName        - bucket name.
-   * @param keyName           - key name.
-   * @return
-   * @throws IOException
-   */
-  protected long getParentId(OMMetadataManager omMetadataManager,
-                             String volumeName, String bucketName,
-                             String keyName)
-      throws IOException {
-
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-
-    long bucketId = omBucketInfo.getObjectID();
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    return OMFileRequest
-        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
   }
 
   /**
