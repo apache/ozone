@@ -929,6 +929,41 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testSetECReplicationConfigOnBucket() throws Exception {
+    final String volumeName = "volume110";
+    getVolume(volumeName);
+    String bucketPath = "/volume110/bucket0";
+    String[] args = new String[] {"bucket", "create", bucketPath};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("myNonECKey", 1024)) {
+      Assert.assertFalse(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+
+    args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
+        "EC", "-r", "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+    bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("newECKey", 1024)) {
+      Assert.assertTrue(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+
+    args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
+        "STAND_ALONE", "-r", "ONE"};
+    execute(ozoneShell, args);
+    bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
+      Assert.assertFalse(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+  }
+
+  @Test
   public void testCreateBucketWithECReplicationConfigWithoutReplicationParam() {
     getVolume("volume102");
     String[] args =
