@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.client.rpc;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -32,17 +31,24 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION;
 
 
@@ -51,20 +57,30 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_LATEST_VE
  * set/unset key create/read works properly or not for buckets
  * with/with out versioning.
  */
+@RunWith(Parameterized.class)
 public class TestOzoneRpcClientWithKeyLatestVersion {
 
   private static MiniOzoneCluster cluster;
 
-  private static ObjectStore objectStore;
+  private ObjectStore objectStore;
 
-  private static OzoneClient ozClient;
+  private OzoneClient ozClient;
 
-  private boolean getLatestVersion;
+  private final boolean getLatestVersion;
+
+  @Parameterized.Parameters
+  public static Collection<Object> data() {
+    return Arrays.asList(true, false);
+  }
+
+  public TestOzoneRpcClientWithKeyLatestVersion(boolean latestVersion) {
+    getLatestVersion = latestVersion;
+  }
 
   @BeforeClass
   public static void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.setInt(OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setScmId(UUID.randomUUID().toString())
@@ -75,33 +91,33 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
 
   @AfterClass
   public static void tearDown() throws Exception {
-    if(ozClient != null) {
-      ozClient.close();
-    }
-
     if (cluster != null) {
       cluster.shutdown();
+    }
+  }
+
+  @Before
+  public void setupClient() throws Exception {
+    OzoneConfiguration conf = cluster.getConf();
+    conf.setBoolean(OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION, getLatestVersion);
+    ozClient = OzoneClientFactory.getRpcClient(conf);
+    objectStore = ozClient.getObjectStore();
+  }
+
+  @After
+  public void closeClient() throws Exception {
+    if (ozClient != null) {
+      ozClient.close();
     }
   }
 
 
   @Test
   public void testWithGetLatestVersion() throws Exception {
-    getLatestVersion = false;
-    setupClient();
-    testOverrideAndReadKey();
-
-    getLatestVersion = true;
-    setupClient();
     testOverrideAndReadKey();
   }
 
-  private void setupClient() throws Exception {
-    OzoneConfiguration conf = cluster.getConf();
-    conf.setBoolean(OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION, getLatestVersion);
-    ozClient = OzoneClientFactory.getRpcClient(conf);
-    objectStore = ozClient.getObjectStore();
-  }
+
 
   public void testOverrideAndReadKey() throws Exception {
     String volumeName = UUID.randomUUID().toString();
