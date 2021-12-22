@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
@@ -204,7 +205,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
             new SimpleContainerDownloader(conf, null),
             new TarContainerPacker());
 
-    supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
+    supervisor = new ReplicationSupervisor(containerSet, replicator,
+        conf.getObject(ReplicationConfig.class));
   }
 
   private void replicateContainer(long counter) throws Exception {

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,8 +38,6 @@ public class DatanodeConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeConfiguration.class);
 
-  static final String REPLICATION_STREAMS_LIMIT_KEY =
-      "hdds.datanode.replication.streams.limit";
   static final String CONTAINER_DELETE_THREADS_MAX_KEY =
       "hdds.datanode.container.delete.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
@@ -57,8 +56,6 @@ public class DatanodeConfiguration {
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
-  static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
-
   static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
@@ -70,19 +67,6 @@ public class DatanodeConfiguration {
 
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
-
-  /**
-   * The maximum number of replication commands a single datanode can execute
-   * simultaneously.
-   */
-  @Config(key = "replication.streams.limit",
-      type = ConfigType.INT,
-      defaultValue = "10",
-      tags = {DATANODE},
-      description = "The maximum number of replication commands a single " +
-          "datanode can execute simultaneously"
-  )
-  private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -264,13 +248,6 @@ public class DatanodeConfiguration {
 
   @PostConstruct
   public void validate() {
-    if (replicationMaxStreams < 1) {
-      LOG.warn(REPLICATION_STREAMS_LIMIT_KEY + " must be greater than zero " +
-              "and was set to {}. Defaulting to {}",
-          replicationMaxStreams, REPLICATION_MAX_STREAMS_DEFAULT);
-      replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
-    }
-
     if (containerDeleteThreads < 1) {
       LOG.warn(CONTAINER_DELETE_THREADS_MAX_KEY + " must be greater than zero" +
               " and was set to {}. Defaulting to {}",
@@ -316,16 +293,8 @@ public class DatanodeConfiguration {
     }
   }
 
-  public void setReplicationMaxStreams(int replicationMaxStreams) {
-    this.replicationMaxStreams = replicationMaxStreams;
-  }
-
   public void setContainerDeleteThreads(int containerDeleteThreads) {
     this.containerDeleteThreads = containerDeleteThreads;
-  }
-
-  public int getReplicationMaxStreams() {
-    return replicationMaxStreams;
   }
 
   public int getContainerDeleteThreads() {

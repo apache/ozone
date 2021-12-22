@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -73,9 +74,11 @@ public class ReplicationSupervisor {
 
   public ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, int poolSize) {
+      ContainerReplicator replicator, ReplicationConfig replicationConfig) {
     this(containerSet, context, replicator, new ThreadPoolExecutor(
-        poolSize, poolSize, 60, TimeUnit.SECONDS,
+        replicationConfig.getReplicationMaxStreams(),
+        replicationConfig.getReplicationMaxStreams(),
+        60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ContainerReplicationThread-%d")
@@ -83,8 +86,8 @@ public class ReplicationSupervisor {
   }
 
   public ReplicationSupervisor(ContainerSet containerSet,
-      ContainerReplicator replicator, int poolSize) {
-    this(containerSet, null, replicator, poolSize);
+      ContainerReplicator replicator, ReplicationConfig replicationConfig) {
+    this(containerSet, null, replicator, replicationConfig);
   }
 
   /**

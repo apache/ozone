@@ -28,8 +28,7 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_MIN_GAP_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_TIMEOUT_KEY;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.REPLICATION_MAX_STREAMS_DEFAULT;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.REPLICATION_STREAMS_LIMIT_KEY;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY;
@@ -70,7 +69,6 @@ public class TestDatanodeConfiguration {
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
     // THEN
-    assertEquals(validReplicationLimit, subject.getReplicationMaxStreams());
     assertEquals(validDeleteThreads, subject.getContainerDeleteThreads());
     assertEquals(validDiskCheckIntervalMinutes,
         subject.getPeriodicDiskCheckIntervalMinutes());
@@ -111,8 +109,6 @@ public class TestDatanodeConfiguration {
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
     // THEN
-    assertEquals(REPLICATION_MAX_STREAMS_DEFAULT,
-        subject.getReplicationMaxStreams());
     assertEquals(CONTAINER_DELETE_THREADS_DEFAULT,
         subject.getContainerDeleteThreads());
     assertEquals(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT,
@@ -136,8 +132,6 @@ public class TestDatanodeConfiguration {
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
     // THEN
-    assertEquals(REPLICATION_MAX_STREAMS_DEFAULT,
-        subject.getReplicationMaxStreams());
     assertEquals(CONTAINER_DELETE_THREADS_DEFAULT,
         subject.getContainerDeleteThreads());
     assertEquals(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT,
