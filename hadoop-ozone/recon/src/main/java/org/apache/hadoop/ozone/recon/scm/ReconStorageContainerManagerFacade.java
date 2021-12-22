@@ -398,7 +398,10 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.NODES.getTable(dbStore));
       File newDb = new File(dbFile.getParent() +
           OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
-      dbFile.renameTo(newDb);
+      boolean success = dbFile.renameTo(newDb);
+      if (success) {
+        LOG.info("SCM snapshot linked to Recon DB.");
+      }
       LOG.info("Created SCM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
