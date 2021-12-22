@@ -1334,7 +1334,7 @@
               },
               {
                 "id": 3,
-                "name": "iterations",
+                "name": "idleiterations",
                 "type": "int32"
               },
               {

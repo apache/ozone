@@ -479,11 +479,14 @@ message GetContainerTokenResponseProto {
 message StartContainerBalancerRequestProto {
   optional string traceID = 1;
   optional double threshold = 2;
-  optional int32 iterations = 3;
-  optional double maxDatanodesRatioToInvolvePerIteration = 4;
+  optional int32 idleiterations = 3 [deprecated = true];
+  optional double maxDatanodesRatioToInvolvePerIteration = 4 [deprecated =
+      true];
   optional int64 maxSizeToMovePerIterationInGB = 5;
   optional int64 maxSizeEnteringTargetInGB = 6;
   optional int64 maxSizeLeavingSourceInGB = 7;
+  optional int32 maxDatanodesPercentageToInvolvePerIteration = 8;
+  optional int32 iterations = 9;
 }
 
 message StartContainerBalancerResponseProto {

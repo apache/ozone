@@ -18,15 +18,10 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.fs.DUFactory;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -37,7 +32,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -47,7 +41,6 @@ import java.util.stream.Collectors;
 public final class ContainerBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
-  private OzoneConfiguration ozoneConfiguration;
 
   @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
       "0.1", tags = {ConfigTag.BALANCER},
@@ -58,34 +51,32 @@ public final class ContainerBalancerConfiguration {
           " of the entire cluster) no more than the threshold value.")
   private String threshold = "0.1";
 
-  @Config(key = "datanodes.involved.max.ratio.per.iteration", type =
-      ConfigType.AUTO,
-      defaultValue = "0.2", tags = {ConfigTag.BALANCER}, description = "The " +
-      "ratio of maximum number of datanodes that should be involved in " +
-      "balancing in one iteration to the total number of healthy, in service " +
-      "nodes known to container balancer.")
-  private String maxDatanodesRatioToInvolvePerIteration = "0.2";
+  @Config(key = "datanodes.involved.max.percentage.per.iteration", type =
+      ConfigType.INT, defaultValue = "20", tags = {ConfigTag.BALANCER},
+      description = "Maximum percentage of healthy, in service datanodes " +
+          "that can be involved in balancing in one iteration.")
+  private int maxDatanodesPercentageToInvolvePerIteration = 20;
 
   @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
-      defaultValue = "30GB", tags = {ConfigTag.BALANCER},
+      defaultValue = "500GB", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in bytes that will be moved " +
           "by Container Balancer in one iteration.")
-  private long maxSizeToMovePerIteration = 30 * OzoneConsts.GB;
+  private long maxSizeToMovePerIteration = 500 * OzoneConsts.GB;
 
   @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
-      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      defaultValue = "26GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can enter a target datanode in each " +
       "iteration while balancing. This is the sum of data from multiple " +
-      "sources. By default, five times the configured (or default) ozone.scm" +
-      ".container.size is allowed.")
+      "sources. The value must be greater than the configured" +
+      " (or default) ozone.scm.container.size.")
   private long maxSizeEnteringTarget;
 
   @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
-      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      defaultValue = "26GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can leave a source datanode in each " +
       "iteration while balancing. This is the sum of data moving to multiple " +
-      "targets. By default, five times the configured (or default) ozone.scm" +
-      ".container.size is allowed.")
+      "targets. The value must be greater than the configured" +
+      " (or default) ozone.scm.container.size.")
   private long maxSizeLeavingSource;
 
   @Config(key = "iterations", type = ConfigType.INT,
@@ -100,16 +91,16 @@ public final class ContainerBalancerConfiguration {
   private String excludeContainers = "";
 
   @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
-      timeUnit = TimeUnit.MINUTES, tags = {ConfigTag.BALANCER}, description =
+      tags = {ConfigTag.BALANCER}, description =
       "The amount of time in minutes to allow a single container to move " +
           "from source to target.")
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "1h", timeUnit = TimeUnit.MINUTES, tags = {
+      defaultValue = "70m", tags = {
       ConfigTag.BALANCER}, description = "The interval period between each " +
       "iteration of Container Balancer.")
-  private long balancingInterval;
+  private long balancingInterval = Duration.ofMinutes(70).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
@@ -124,32 +115,6 @@ public final class ContainerBalancerConfiguration {
       " in this list are excluded from balancing. This configuration is empty" +
       " by default.")
   private String excludeNodes = "";
-
-  private DUFactory.Conf duConf;
-
-  /**
-   * Create configuration with default values.
-   *
-   * @param config Ozone configuration
-   */
-  public ContainerBalancerConfiguration(OzoneConfiguration config) {
-    Preconditions.checkNotNull(config,
-        "OzoneConfiguration should not be null.");
-    this.ozoneConfiguration = config;
-
-    // maxSizeEnteringTarget and maxSizeLeavingSource should by default allow
-    // five containers
-    long size = 5 * (long) ozoneConfiguration.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    maxSizeEnteringTarget = size + OzoneConsts.GB;
-    maxSizeLeavingSource = size + OzoneConsts.GB;
-
-    // balancing interval should be greater than DUFactory refresh period
-    duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
-    balancingInterval = duConf.getRefreshPeriod().toMillis() +
-        Duration.ofMinutes(10).toMillis();
-  }
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -186,7 +151,7 @@ public final class ContainerBalancerConfiguration {
   /**
    * Sets the number of iterations for Container Balancer.
    *
-   * @param count a value greater than 0, or -1
+   * @param count a value greater than 0, or -1 for running balancer infinitely
    */
   public void setIterations(int count) {
     if (count < -1 || 0 == count) {
@@ -198,37 +163,46 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the ratio of maximum number of datanodes that will be involved in
-   * balancing by Container Balancer in one iteration to the total number of
-   * healthy, in-service nodes known to balancer.
+   * Gets the maximum percentage of healthy, in-service datanodes that will be
+   * involved in balancing in one iteration.
    *
-   * @return maximum datanodes to involve divided by total healthy,
-   * in-service nodes
+   * @return percentage as an integer from 0 up to and including 100
    */
-  public double getMaxDatanodesRatioToInvolvePerIteration() {
-    return Double.parseDouble(maxDatanodesRatioToInvolvePerIteration);
+  public int getMaxDatanodesPercentageToInvolvePerIteration() {
+    return maxDatanodesPercentageToInvolvePerIteration;
   }
 
   /**
-   * Sets the ratio of maximum number of datanodes that will be involved in
-   * balancing by Container Balancer in one iteration to the total number of
-   * healthy, in-service nodes known to balancer.
+   * Gets the ratio of maximum datanodes involved in balancing to the total
+   * number of healthy, in-service datanodes known to SCM.
    *
-   * @param maxDatanodesRatioToInvolvePerIteration number of datanodes to
-   *                                               involve divided by total
-   *                                               number of healthy, in
-   *                                               service nodes
+   * @return ratio as a double from 0 up to and including 1
    */
-  public void setMaxDatanodesRatioToInvolvePerIteration(
-      double maxDatanodesRatioToInvolvePerIteration) {
-    if (maxDatanodesRatioToInvolvePerIteration < 0 ||
-        maxDatanodesRatioToInvolvePerIteration > 1) {
-      throw new IllegalArgumentException("Max datanodes to involve ratio must" +
-          " be a double greater than equal to zero and lesser than equal to " +
-          "one.");
+  public double getMaxDatanodesRatioToInvolvePerIteration() {
+    return maxDatanodesPercentageToInvolvePerIteration / 100d;
+  }
+
+  /**
+   * Sets the maximum percentage of healthy, in-service datanodes that will be
+   * involved in balancing in one iteration.
+   *
+   * @param maxDatanodesPercentageToInvolvePerIteration number of datanodes
+   *                                                    to involve divided by
+   *                                                    total number of
+   *                                                    healthy, in-service
+   *                                                    datanodes multiplied
+   *                                                    by 100
+   */
+  public void setMaxDatanodesPercentageToInvolvePerIteration(
+      int maxDatanodesPercentageToInvolvePerIteration) {
+    if (maxDatanodesPercentageToInvolvePerIteration < 0 ||
+        maxDatanodesPercentageToInvolvePerIteration > 100) {
+      throw new IllegalArgumentException(String.format("Argument %d is " +
+              "illegal. Percentage must be from 0 up to and including 100.",
+          maxDatanodesPercentageToInvolvePerIteration));
     }
-    this.maxDatanodesRatioToInvolvePerIteration =
-        String.valueOf(maxDatanodesRatioToInvolvePerIteration);
+    this.maxDatanodesPercentageToInvolvePerIteration =
+        maxDatanodesPercentageToInvolvePerIteration;
   }
 
   /**
@@ -300,12 +274,7 @@ public final class ContainerBalancerConfiguration {
   }
 
   public void setBalancingInterval(Duration balancingInterval) {
-    if (balancingInterval.toMillis() > duConf.getRefreshPeriod().toMillis()) {
-      this.balancingInterval = balancingInterval.toMillis();
-    } else {
-      LOG.warn("Balancing interval duration must be greater than du refresh " +
-          "period, {} milliseconds", duConf.getRefreshPeriod().toMillis());
-    }
+    this.balancingInterval = balancingInterval.toMillis();
   }
 
   /**
@@ -357,26 +326,17 @@ public final class ContainerBalancerConfiguration {
     this.excludeNodes = excludeNodes;
   }
 
-  /**
-   * Gets the {@link OzoneConfiguration} using which this configuration was
-   * constructed.
-   * @return the {@link OzoneConfiguration} being used by this configuration
-   */
-  public OzoneConfiguration getOzoneConfiguration() {
-    return this.ozoneConfiguration;
-  }
-
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
-            "%-50s %s%n" +
+            "%-50s %d%n" +
             "%-50s %dGB%n"+
             "%-50s %dGB%n"+
             "%-50s %dGB%n", "Key", "Value", "Threshold",
-        threshold, "Max Datanodes to Involve per Iteration(ratio)",
-        maxDatanodesRatioToInvolvePerIteration,
+        threshold, "Max Datanodes to Involve per Iteration(percent)",
+        maxDatanodesPercentageToInvolvePerIteration,
         "Max Size to Move per Iteration",
         maxSizeToMovePerIteration / OzoneConsts.GB,
         "Max Size Entering Target per Iteration",

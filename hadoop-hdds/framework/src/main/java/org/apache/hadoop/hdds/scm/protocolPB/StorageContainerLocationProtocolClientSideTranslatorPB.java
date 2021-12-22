@@ -738,7 +738,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public boolean startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
-      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB) throws IOException{
@@ -759,21 +759,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
           "maxSizeToMovePerIterationInGB must be positive.");
       builder.setMaxSizeToMovePerIterationInGB(mstm);
     }
-    if (maxDatanodesRatioToInvolvePerIteration.isPresent()) {
-      double mdti = maxDatanodesRatioToInvolvePerIteration.get();
+    if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
+      int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
       Preconditions.checkState(mdti >= 0,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
               "greater than equal to zero.");
-      Preconditions.checkState(mdti <= 1,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
-              "lesser than equal to one.");
-      builder.setMaxDatanodesRatioToInvolvePerIteration(mdti);
+      Preconditions.checkState(mdti <= 100,
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
+              "lesser than equal to hundred.");
+      builder.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
     }
     if (iterations.isPresent()) {
       int i = iterations.get();
       Preconditions.checkState(i > 0 || i == -1,
-          "iterations must be positive or" +
-              " -1(infinitly run container balancer).");
+          "number of iterations must be positive or" +
+              " -1 (for running container balancer infinitely).");
       builder.setIterations(i);
     }
 
