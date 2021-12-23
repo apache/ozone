@@ -408,39 +408,40 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           putBlockAsync(xceiverClient, blockData, close, token);
       final CompletableFuture<ContainerCommandResponseProto> flushFuture
           = asyncReply.getResponse().thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          throw new CompletionException(sce);
-        }
-        // if the ioException is not set, putBlock is successful
-        if (getIoException() == null && !force) {
-          BlockID responseBlockID = BlockID.getFromProtobuf(
-              e.getPutBlock().getCommittedBlockLength().getBlockID());
-          Preconditions.checkState(blockID.get().getContainerBlockID()
-              .equals(responseBlockID.getContainerBlockID()));
-          // updates the bcsId of the block
-          blockID.set(responseBlockID);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Adding index " + asyncReply.getLogIndex() + " commitMap size "
+            try {
+              validateResponse(e);
+            } catch (IOException sce) {
+              throw new CompletionException(sce);
+            }
+            // if the ioException is not set, putBlock is successful
+            if (getIoException() == null && !force) {
+              BlockID responseBlockID = BlockID.getFromProtobuf(
+                  e.getPutBlock().getCommittedBlockLength().getBlockID());
+              Preconditions.checkState(blockID.get().getContainerBlockID()
+                  .equals(responseBlockID.getContainerBlockID()));
+              // updates the bcsId of the block
+              blockID.set(responseBlockID);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Adding index " + asyncReply.getLogIndex() +
+                    " commitMap size "
                     + commitWatcher.getCommitInfoMapSize() + " flushLength "
                     + flushPos + " blockID " + blockID);
-          }
-          // for standalone protocol, logIndex will always be 0.
-          commitWatcher
-              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
-        }
-        return e;
-      }, responseExecutor).exceptionally(e -> {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("putBlock failed for blockID {} with exception {}",
-              blockID, e.getLocalizedMessage());
-        }
-        CompletionException ce = new CompletionException(e);
-        setIoException(ce);
-        throw ce;
-      });
+              }
+              // for standalone protocol, logIndex will always be 0.
+              commitWatcher
+                  .updateCommitInfoMap(asyncReply.getLogIndex(),
+                      byteBufferList);
+            }
+            return e;
+          }, responseExecutor).exceptionally(e -> {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("putBlock failed for blockID {} with exception {}",
+                  blockID, e.getLocalizedMessage());
+            }
+            CompletionException ce = new CompletionException(e);
+            setIoException(ce);
+            throw ce;
+          });
       putBlockFuture.updateAndGet(f -> f.thenCombine(flushFuture,
           (previous, current) -> current));
     } catch (IOException | ExecutionException e) {
