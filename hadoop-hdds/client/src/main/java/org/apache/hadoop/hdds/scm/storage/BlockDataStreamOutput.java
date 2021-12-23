@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -115,6 +116,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // Also, corresponding to the logIndex, the corresponding list of buffers will
   // be released from the buffer pool.
   private final StreamCommitWatcher commitWatcher;
+  private final AtomicReference<CompletableFuture<
+      ContainerCommandResponseProto>> putBlockFuture
+      = new AtomicReference<>(CompletableFuture.completedFuture(null));
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -381,8 +385,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  private CompletableFuture<ContainerProtos.
-      ContainerCommandResponseProto> executePutBlock(boolean close,
+  private void executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
@@ -399,56 +402,54 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       dataStreamCloseReply = out.closeAsync();
     }
 
-    CompletableFuture<ContainerProtos.
-        ContainerCommandResponseProto> flushFuture = null;
     try {
       BlockData blockData = containerBlockData.build();
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, token);
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-          asyncReply.getResponse();
-      flushFuture = future.thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          throw new CompletionException(sce);
-        }
-        // if the ioException is not set, putBlock is successful
-        if (getIoException() == null && !force) {
-          BlockID responseBlockID = BlockID.getFromProtobuf(
-              e.getPutBlock().getCommittedBlockLength().getBlockID());
-          Preconditions.checkState(blockID.get().getContainerBlockID()
-              .equals(responseBlockID.getContainerBlockID()));
-          // updates the bcsId of the block
-          blockID.set(responseBlockID);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Adding index " + asyncReply.getLogIndex() + " commitMap size "
+      final CompletableFuture<ContainerCommandResponseProto> flushFuture
+          = asyncReply.getResponse().thenApplyAsync(e -> {
+            try {
+              validateResponse(e);
+            } catch (IOException sce) {
+              throw new CompletionException(sce);
+            }
+            // if the ioException is not set, putBlock is successful
+            if (getIoException() == null && !force) {
+              BlockID responseBlockID = BlockID.getFromProtobuf(
+                  e.getPutBlock().getCommittedBlockLength().getBlockID());
+              Preconditions.checkState(blockID.get().getContainerBlockID()
+                  .equals(responseBlockID.getContainerBlockID()));
+              // updates the bcsId of the block
+              blockID.set(responseBlockID);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Adding index " + asyncReply.getLogIndex() +
+                    " commitMap size "
                     + commitWatcher.getCommitInfoMapSize() + " flushLength "
                     + flushPos + " blockID " + blockID);
-          }
-          // for standalone protocol, logIndex will always be 0.
-          commitWatcher
-              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
-        }
-        return e;
-      }, responseExecutor).exceptionally(e -> {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("putBlock failed for blockID {} with exception {}",
-              blockID, e.getLocalizedMessage());
-        }
-        CompletionException ce = new CompletionException(e);
-        setIoException(ce);
-        throw ce;
-      });
+              }
+              // for standalone protocol, logIndex will always be 0.
+              commitWatcher
+                  .updateCommitInfoMap(asyncReply.getLogIndex(),
+                      byteBufferList);
+            }
+            return e;
+          }, responseExecutor).exceptionally(e -> {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("putBlock failed for blockID {} with exception {}",
+                  blockID, e.getLocalizedMessage());
+            }
+            CompletionException ce = new CompletionException(e);
+            setIoException(ce);
+            throw ce;
+          });
+      putBlockFuture.updateAndGet(f -> f.thenCombine(flushFuture,
+          (previous, current) -> current));
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    commitWatcher.getFutureMap().put(flushPos, flushFuture);
-    return flushFuture;
   }
 
   @Override
@@ -484,7 +485,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       // data since latest flush - we need to send the "EOF" flag
       executePutBlock(true, true);
     }
-    waitOnFlushFutures();
+    putBlockFuture.get().get();
     watchForCommit(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
@@ -510,15 +511,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       }
 
     }
-  }
-
-  private void waitOnFlushFutures()
-      throws InterruptedException, ExecutionException {
-    CompletableFuture<Void> combinedFuture = CompletableFuture.allOf(
-        commitWatcher.getFutureMap().values().toArray(
-            new CompletableFuture[commitWatcher.getFutureMap().size()]));
-    // wait for all the transactions to complete
-    combinedFuture.get();
   }
 
   private void validateResponse(
