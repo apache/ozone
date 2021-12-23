@@ -64,8 +64,10 @@ public interface OmTransportFactory {
           .loadClass(
               "org.apache.hadoop.ozone.om.protocolPB"
                   + ".Hadoop3OmTransportFactory")
+
           .asSubclass(OmTransportFactory.class)
           .newInstance();
+
     } catch (Exception ex) {
       throw new IOException(
           "Can't create the default OmTransport implementation", ex);

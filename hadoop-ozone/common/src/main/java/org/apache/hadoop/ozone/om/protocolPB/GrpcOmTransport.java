@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -35,6 +38,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -48,7 +52,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.om.ha.GrpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import io.grpc.ManagedChannel;
+import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
+import io.netty.handler.ssl.SslContextBuilder;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -70,6 +76,9 @@ public class GrpcOmTransport implements OmTransport {
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
   // gRPC specific
+  private ManagedChannel channel;  
+  private static List<X509Certificate> caCerts = null;
+
   private OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub client;
   private Map<String,
       OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
@@ -80,6 +89,11 @@ public class GrpcOmTransport implements OmTransport {
   //private String host = "om";
   private AtomicReference<String> host;
   private int maxSize;
+  private SecurityConfig secConfig;
+
+  public static void setCaCerts(List<X509Certificate> x509Certificates) {
+    caCerts = x509Certificates;
+  }
 
   private List<String> oms;
   private RetryPolicy retryPolicy;
@@ -136,7 +150,26 @@ public class GrpcOmTransport implements OmTransport {
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
+    if (secConfig.isGrpcTlsEnabled()) {
+      try {
+        SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
+        if (caCerts != null) {
+          sslContextBuilder.trustManager(caCerts);
+        } else {
+          LOG.error("x509Certicates empty");
+        }
+        channelBuilder.useTransportSecurity().
+            sslContext(sslContextBuilder.build());
+      } catch (Exception ex) {
+        LOG.error("cannot establish TLS for grpc om transport client");
+      }
+    } else {
+      channelBuilder.usePlaintext();
+    }
+    channel = channelBuilder.build();
+    client = OzoneManagerServiceGrpc.newBlockingStub(channel);
 
+    
     retryPolicy = omFailoverProxyProvider.getRetryPolicy(maxFailovers);
     LOG.info("{}: started", CLIENT_NAME);
   }
