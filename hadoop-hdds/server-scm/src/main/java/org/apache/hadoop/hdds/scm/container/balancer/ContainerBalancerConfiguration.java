@@ -123,6 +123,14 @@ public final class ContainerBalancerConfiguration {
           "This configuration is false by default.")
   private boolean networkTopologyEnable = false;
 
+  @Config(key = "trigger.du.before.move.enable", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "whether to send command to all the data nodes to run du " +
+          "immediately before starting a balance iteration. note that " +
+          "running du is very time consuming , especially when the disk " +
+          "usage rate of a data node is very high")
+  private boolean triggerDuEnable = false;
+
   /**
    * Gets the threshold value for Container Balancer.
    *
@@ -190,6 +198,15 @@ public final class ContainerBalancerConfiguration {
    */
   public Boolean getNetworkTopologyEnable() {
     return networkTopologyEnable;
+  }
+
+  /**
+   * Get the triggerDuEnable value for Container Balancer.
+   *
+   * @return the boolean value of triggerDuEnable
+   */
+  public Boolean getTriggerDuEnable() {
+    return triggerDuEnable;
   }
 
   /**

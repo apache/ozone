@@ -30,12 +30,18 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +59,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 
 /**
  * Container balancer is a service in SCM to move containers between over- and
@@ -99,6 +108,7 @@ public class ContainerBalancer {
   private Set<ContainerID> selectedContainers;
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
+  private final EventPublisher eventPublisher;
   private Map<ContainerMoveSelection,
       CompletableFuture<ReplicationManager.MoveResult>>
       moveSelectionToFutureMap;
@@ -108,35 +118,24 @@ public class ContainerBalancer {
    * new ContainerBalancerConfiguration and ContainerBalancerMetrics.
    * Container Balancer does not start on construction.
    *
-   * @param nodeManager        NodeManager
-   * @param containerManager   ContainerManager
-   * @param replicationManager ReplicationManager
-   * @param ozoneConfiguration OzoneConfiguration
+   * @param scm        the storage container manager
    */
-  public ContainerBalancer(
-      NodeManager nodeManager,
-      ContainerManager containerManager,
-      ReplicationManager replicationManager,
-      OzoneConfiguration ozoneConfiguration,
-      final SCMContext scmContext,
-      NetworkTopology networkTopology,
-      PlacementPolicy placementPolicy) {
-    this.nodeManager = nodeManager;
-    this.containerManager = containerManager;
-    this.replicationManager = replicationManager;
-    this.ozoneConfiguration = ozoneConfiguration;
-    this.config = ozoneConfiguration.
-        getObject(ContainerBalancerConfiguration.class);
+  public ContainerBalancer(StorageContainerManager scm) {
+    this.nodeManager = scm.getScmNodeManager();
+    this.containerManager = scm.getContainerManager();
+    this.replicationManager = scm.getReplicationManager();
+    this.ozoneConfiguration = scm.getConfiguration();
+    this.config = new ContainerBalancerConfiguration();
     this.metrics = ContainerBalancerMetrics.create();
-    this.scmContext = scmContext;
-
+    this.scmContext = scm.getScmContext();
+    this.eventPublisher = scm.getEventQueue();
     this.selectedContainers = new HashSet<>();
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
-    this.placementPolicy = placementPolicy;
-    this.networkTopology = networkTopology;
+    this.placementPolicy = scm.getContainerPlacementPolicy();
+    this.networkTopology = scm.getClusterMap();
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
@@ -184,7 +183,36 @@ public class ContainerBalancer {
       //run balancer infinitely
       this.iterations = Integer.MAX_VALUE;
     }
+
     for (int i = 0; i < iterations && balancerRunning; i++) {
+      if (config.getTriggerDuEnable()) {
+        // before starting a new iteration, we trigger all the datanode
+        // to run `du`. this is an aggressive action, with which we can
+        // get more precise usage info of all datanodes before moving.
+        // this is helpful for container balancer to make more appropriate
+        // decisions. this will increase the disk io load of data nodes, so
+        // please enable it with caution.
+        sendRefreshUsageCommandToAllDNs();
+        synchronized (this) {
+          try {
+            long nodeReportInterval =
+                ozoneConfiguration.getTimeDuration(HDDS_NODE_REPORT_INTERVAL,
+                HDDS_NODE_REPORT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+            // one for sending command , one for running du, and one for
+            // reporting back make it like this for now, a more suitable
+            // value. can be set in the future if needed
+            wait(3 * nodeReportInterval);
+          } catch (InterruptedException e) {
+            LOG.info("Container Balancer was interrupted while waiting for" +
+                "datanodes refreshing volume usage info");
+            return;
+          }
+        }
+        if (!isBalancerRunning()) {
+          return;
+        }
+      }
+
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
         stop();
@@ -902,5 +930,26 @@ public class ContainerBalancer {
     MAX_SIZE_TO_MOVE_REACHED,
     ITERATION_INTERRUPTED,
     CAN_NOT_BALANCE_ANY_MORE
+  }
+
+  /**
+   * Sends refresh usage command to trigger all the datanodes to
+   * refresh disk usage info immediately.
+   */
+  private void sendRefreshUsageCommandToAllDNs() {
+    LOG.info("trigger all the active datanodes to refresh disk usage info");
+    RefreshVolumeUsageCommand refreshVolumeUsageCommand =
+        new RefreshVolumeUsageCommand();
+    try {
+      refreshVolumeUsageCommand.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending refreshVolumeUsage command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
+    nodeManager.getAllNodes().forEach(datanode -> eventPublisher
+        .fireEvent(SCMEvents.DATANODE_COMMAND,
+            new CommandForDatanode<>(datanode.getUuid(),
+                refreshVolumeUsageCommand)));
   }
 }
