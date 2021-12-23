@@ -257,10 +257,6 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
         getParentId(omMetadataManager, volumeName, bucketName, keyName);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    Path filePath = Paths.get(keyName).getFileName();
-    if (filePath != null) {
-      fileName = filePath.toString();
-    }
 
     return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
   }
