@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

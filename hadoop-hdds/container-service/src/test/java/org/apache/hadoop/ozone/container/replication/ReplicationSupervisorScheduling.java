@@ -24,12 +24,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 
-import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -71,8 +69,6 @@ public class ReplicationSupervisorScheduling {
 
     ContainerSet cs = new ContainerSet();
 
-    ReplicationConfig replicationConfig = new OzoneConfiguration()
-        .getObject(ReplicationConfig.class);
     ReplicationSupervisor rs = new ReplicationSupervisor(cs,
 
         //simplified executor emulating the current sequential download +
@@ -111,7 +107,7 @@ public class ReplicationSupervisorScheduling {
             }
           }
 
-        }, replicationConfig);
+        }, 10);
 
     final long start = System.currentTimeMillis();
 

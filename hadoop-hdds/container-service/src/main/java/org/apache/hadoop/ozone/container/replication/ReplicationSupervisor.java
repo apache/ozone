@@ -75,10 +75,15 @@ public class ReplicationSupervisor {
   public ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
       ContainerReplicator replicator, ReplicationConfig replicationConfig) {
+    this(containerSet, context, replicator,
+        replicationConfig.getReplicationMaxStreams());
+  }
+
+  public ReplicationSupervisor(
+      ContainerSet containerSet, StateContext context,
+      ContainerReplicator replicator, int poolSize) {
     this(containerSet, context, replicator, new ThreadPoolExecutor(
-        replicationConfig.getReplicationMaxStreams(),
-        replicationConfig.getReplicationMaxStreams(),
-        60, TimeUnit.SECONDS,
+        poolSize, poolSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ContainerReplicationThread-%d")
@@ -86,8 +91,8 @@ public class ReplicationSupervisor {
   }
 
   public ReplicationSupervisor(ContainerSet containerSet,
-      ContainerReplicator replicator, ReplicationConfig replicationConfig) {
-    this(containerSet, null, replicator, replicationConfig);
+      ContainerReplicator replicator, int poolSize) {
+    this(containerSet, null, replicator, poolSize);
   }
 
   /**
