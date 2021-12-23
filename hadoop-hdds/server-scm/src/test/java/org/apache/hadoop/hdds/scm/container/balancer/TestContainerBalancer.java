@@ -41,6 +41,8 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -63,6 +65,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -77,6 +80,7 @@ public class TestContainerBalancer {
   private ContainerManager containerManager;
   private ContainerBalancer containerBalancer;
   private MockNodeManager mockNodeManager;
+  private StorageContainerManager scm;
   private OzoneConfiguration conf;
   private PlacementPolicy placementPolicy;
   private ContainerBalancerConfiguration balancerConfiguration;
@@ -100,6 +104,7 @@ public class TestContainerBalancer {
   @Before
   public void setup() throws SCMException, NodeNotFoundException {
     conf = new OzoneConfiguration();
+    scm = Mockito.mock(StorageContainerManager.class);
     containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
 
@@ -145,9 +150,16 @@ public class TestContainerBalancer {
     when(containerManager.getContainers())
         .thenReturn(new ArrayList<>(cidToInfoMap.values()));
 
-    containerBalancer = new ContainerBalancer(mockNodeManager, containerManager,
-        replicationManager, conf, SCMContext.emptyContext(),
-        new NetworkTopologyImpl(conf), placementPolicy);
+    when(scm.getScmNodeManager()).thenReturn(mockNodeManager);
+    when(scm.getContainerPlacementPolicy()).thenReturn(placementPolicy);
+    when(scm.getContainerManager()).thenReturn(containerManager);
+    when(scm.getReplicationManager()).thenReturn(replicationManager);
+    when(scm.getScmContext()).thenReturn(SCMContext.emptyContext());
+    when(scm.getClusterMap()).thenReturn(null);
+    when(scm.getEventQueue()).thenReturn(mock(EventPublisher.class));
+    when(scm.getConfiguration()).thenReturn(conf);
+
+    containerBalancer = new ContainerBalancer(scm);
   }
 
   @Test
