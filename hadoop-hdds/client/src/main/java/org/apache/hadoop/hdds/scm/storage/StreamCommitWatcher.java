@@ -25,7 +25,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.slf4j.Logger;
@@ -35,9 +34,6 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -59,18 +55,12 @@ public class StreamCommitWatcher {
   // by all servers
   private long totalAckDataLength;
 
-  // future Map to hold up all putBlock futures
-  private ConcurrentHashMap<Long,
-      CompletableFuture<ContainerCommandResponseProto>>
-      futureMap;
-
   private XceiverClientSpi xceiverClient;
 
   public StreamCommitWatcher(XceiverClientSpi xceiverClient,
       List<StreamBuffer> bufferList) {
     this.xceiverClient = xceiverClient;
     commitIndexMap = new ConcurrentSkipListMap<>();
-    futureMap = new ConcurrentHashMap<>();
     this.bufferList = bufferList;
     totalAckDataLength = 0;
   }
@@ -180,15 +170,6 @@ public class StreamCommitWatcher {
       final long length =
           buffers.stream().mapToLong(StreamBuffer::position).sum();
       totalAckDataLength += length;
-      // clear the future object from the future Map
-      final CompletableFuture<ContainerCommandResponseProto> remove =
-          futureMap.remove(totalAckDataLength);
-      if (remove == null) {
-        LOG.error("Couldn't find required future for " + totalAckDataLength);
-        for (Long key : futureMap.keySet()) {
-          LOG.error("Existing acknowledged data: " + key);
-        }
-      }
       for (StreamBuffer byteBuffer : buffers) {
         bufferList.remove(byteBuffer);
       }
@@ -209,18 +190,9 @@ public class StreamCommitWatcher {
     return ioException;
   }
 
-  public ConcurrentMap<Long,
-        CompletableFuture<
-            ContainerCommandResponseProto>> getFutureMap() {
-    return futureMap;
-  }
-
   public void cleanup() {
     if (commitIndexMap != null) {
       commitIndexMap.clear();
-    }
-    if (futureMap != null) {
-      futureMap.clear();
     }
     commitIndexMap = null;
   }
