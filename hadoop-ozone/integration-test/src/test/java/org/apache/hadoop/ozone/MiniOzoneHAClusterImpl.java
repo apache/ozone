@@ -84,7 +84,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
-  private static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
+  public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
    * Creates a new MiniOzoneCluster.
