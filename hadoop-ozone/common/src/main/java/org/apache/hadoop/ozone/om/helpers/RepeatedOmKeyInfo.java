@@ -93,4 +93,8 @@ public class RepeatedOmKeyInfo {
       return new RepeatedOmKeyInfo(omKeyInfos);
     }
   }
+
+  public RepeatedOmKeyInfo copyObject() {
+    return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList));
+  }
 }
