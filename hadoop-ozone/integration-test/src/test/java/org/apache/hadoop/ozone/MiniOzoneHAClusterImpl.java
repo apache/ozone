@@ -446,7 +446,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      */
     protected OMHAService createOMService() throws IOException,
         AuthenticationException {
-      if (numOfOMs == 1) {
+      if (omServiceId == null) {
         OzoneManager om = createOM();
         om.start();
         return new OMHAService(singletonList(om), null, null, null);
