@@ -39,21 +39,30 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.BindException;
+import java.net.ServerSocket;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.PrimitiveIterator;
+import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.OzoneTestUtils.reservePorts;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 
 /**
@@ -82,40 +91,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    *
    * @throws IOException if there is an I/O error
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
-      List<OzoneManager> activeOMList,
-      List<OzoneManager> inactiveOMList,
-      List<StorageContainerManager> activeSCMList,
-      List<StorageContainerManager> inactiveSCMList,
+      OMHAService omhaService,
+      SCMHAService scmhaService,
       List<HddsDatanodeService> hddsDatanodes,
-      String omServiceId,
-      String scmServiceId,
       String clusterPath,
       ReconServer reconServer) {
     super(conf, hddsDatanodes, reconServer);
-    omhaService =
-        new OMHAService(activeOMList, inactiveOMList, omServiceId);
-    scmhaService =
-        new SCMHAService(activeSCMList, inactiveSCMList, scmServiceId);
+    this.omhaService = omhaService;
+    this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;
-  }
-
-  /**
-   * Creates a new MiniOzoneCluster with all OMs active.
-   * This is used by MiniOzoneChaosCluster.
-   */
-  protected MiniOzoneHAClusterImpl(
-      OzoneConfiguration conf,
-      List<OzoneManager> omList,
-      List<StorageContainerManager> scmList,
-      List<HddsDatanodeService> hddsDatanodes,
-      String omServiceId,
-      String scmServiceId,
-      String clusterPath) {
-    this(conf, omList, null, scmList, null, hddsDatanodes,
-        omServiceId, scmServiceId, clusterPath, null);
   }
 
   @Override
@@ -308,6 +294,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   @Override
+  public void shutdown() {
+    super.shutdown();
+    omhaService.releasePorts();
+    scmhaService.releasePorts();
+  }
+
+  @Override
   public void stop() {
     for (OzoneManager ozoneManager : this.omhaService.getServices()) {
       if (ozoneManager != null) {
@@ -353,6 +346,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private static final String SCM_NODE_ID_PREFIX = "scmNode-";
     private List<StorageContainerManager> activeSCMs = new ArrayList<>();
     private List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
+    private final ReservedPorts omPorts = new ReservedPorts(4);
+    private final ReservedPorts scmPorts = new ReservedPorts(7);
 
     /**
      * Creates a new Builder.
@@ -361,14 +356,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      */
     public Builder(OzoneConfiguration conf) {
       super(conf);
-    }
-
-    public List<OzoneManager> getActiveOMs() {
-      return activeOMs;
-    }
-
-    public List<OzoneManager> getInactiveOMs() {
-      return inactiveOMs;
     }
 
     @Override
@@ -396,11 +383,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
       initOMRatisConf();
-      StorageContainerManager scm;
+      SCMHAService scmService;
+      OMHAService omService;
       ReconServer reconServer = null;
       try {
-        createSCMService();
-        createOMService();
+        scmService = createSCMService();
+        omService = createOMService();
         if (includeRecon) {
           configureRecon();
           reconServer = new ReconServer();
@@ -411,11 +399,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       }
 
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          activeSCMs, reconServer);
+          scmService.getActiveServices(), reconServer);
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
-          activeOMs, inactiveOMs, activeSCMs, inactiveSCMs,
-          hddsDatanodes, omServiceId, scmServiceId, path, reconServer);
+          omService, scmService, hddsDatanodes, path, reconServer);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
@@ -456,8 +443,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     /**
      * Start OM service with multiple OMs.
      */
-    protected List<OzoneManager> createOMService() throws IOException,
+    protected OMHAService createOMService() throws IOException,
         AuthenticationException {
+      if (numOfOMs == 1) {
+        OzoneManager om = createOM();
+        om.start();
+        return new OMHAService(singletonList(om), null, null, null);
+      }
 
       List<OzoneManager> omList = Lists.newArrayList();
 
@@ -494,6 +486,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             omList.add(om);
 
             if (i <= numOfActiveOMs) {
+              omPorts.release(nodeId);
               om.start();
               activeOMs.add(om);
               LOG.info("Started OzoneManager {} RPC server at {}", nodeId,
@@ -519,14 +512,20 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
               retryCount);
         }
       }
-      return omList;
+      return new OMHAService(activeOMs, inactiveOMs, omServiceId, omPorts);
     }
 
     /**
      * Start OM service with multiple OMs.
      */
-    protected List<StorageContainerManager> createSCMService()
+    protected SCMHAService createSCMService()
         throws IOException, AuthenticationException {
+      if (numOfSCMs == 1) {
+        StorageContainerManager scm = createSCM();
+        scm.start();
+        return new SCMHAService(singletonList(scm), null, null, null);
+      }
+
       List<StorageContainerManager> scmList = Lists.newArrayList();
 
       int retryCount = 0;
@@ -566,6 +565,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmList.add(scm);
 
             if (i <= numOfActiveSCMs) {
+              scmPorts.release(nodeId);
               scm.start();
               activeSCMs.add(scm);
               LOG.info("Started SCM RPC server at {}",
@@ -592,7 +592,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
               retryCount);
         }
       }
-      return scmList;
+
+      return new SCMHAService(activeSCMs, inactiveSCMs, scmServiceId, scmPorts);
     }
 
     /**
@@ -610,11 +611,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       StringBuilder scmNodesKeyValue = new StringBuilder();
       StringBuilder scmNames = new StringBuilder();
 
-      List<Integer> ports = getFreePortList(7 * numOfSCMs);
+      scmPorts.reserve(numOfSCMs);
 
-      for (int i = 1, port = 0; i <= numOfSCMs; i++) {
+      for (int i = 1; i <= numOfSCMs; i++) {
         String scmNodeId = SCM_NODE_ID_PREFIX + i;
         scmNodesKeyValue.append(",").append(scmNodeId);
+
         String scmAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
         String scmHttpAddrKey = ConfUtils.addKeySuffixes(
@@ -635,22 +637,23 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         String scmGrpcPortKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, scmServiceId, scmNodeId);
 
+        PrimitiveIterator.OfInt nodePorts = scmPorts.assign(scmNodeId);
         conf.set(scmAddrKey, "127.0.0.1");
-        conf.set(scmHttpAddrKey, "127.0.0.1:" + ports.get(port++));
-        conf.set(scmHttpsAddrKey, "127.0.0.1:" + ports.get(port++));
+        conf.set(scmHttpAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.set(scmHttpsAddrKey, "127.0.0.1:" + nodePorts.nextInt());
 
-        int ratisPort = ports.get(port++);
+        int ratisPort = nodePorts.nextInt();
         conf.setInt(scmRatisPortKey, ratisPort);
         //conf.setInt("ozone.scm.ha.ratis.bind.port", ratisPort);
 
-        int dnPort = ports.get(port++);
+        int dnPort = nodePorts.nextInt();
         conf.set(dnPortKey, "127.0.0.1:" + dnPort);
         scmNames.append(",localhost:").append(dnPort);
 
-        conf.set(ssClientKey, "127.0.0.1:" + ports.get(port++));
-        conf.setInt(scmGrpcPortKey, ports.get(port++));
+        conf.set(ssClientKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.setInt(scmGrpcPortKey, nodePorts.nextInt());
 
-        int blockPort = ports.get(port++);
+        int blockPort = nodePorts.nextInt();
         conf.set(blockClientKey, "127.0.0.1:" + blockPort);
         conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             "127.0.0.1:" + blockPort);
@@ -674,9 +677,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
       List<String> omNodeIds = new ArrayList<>();
 
-      List<Integer> ports = getFreePortList(4 * numOfOMs);
+      omPorts.reserve(numOfOMs);
 
-      for (int i = 1, port = 0; i <= numOfOMs; i++) {
+      for (int i = 1; i <= numOfOMs; i++) {
         String omNodeId = OM_NODE_ID_PREFIX + i;
         omNodeIds.add(omNodeId);
 
@@ -689,10 +692,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         String omRatisPortKey = ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
-        conf.set(omAddrKey, "127.0.0.1:" + ports.get(port++));
-        conf.set(omHttpAddrKey, "127.0.0.1:" + ports.get(port++));
-        conf.set(omHttpsAddrKey, "127.0.0.1:" + ports.get(port++));
-        conf.setInt(omRatisPortKey, ports.get(port++));
+        PrimitiveIterator.OfInt nodePorts = omPorts.assign(omNodeId);
+        conf.set(omAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.set(omHttpAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.set(omHttpsAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.setInt(omRatisPortKey, nodePorts.nextInt());
       }
 
       conf.set(omNodesKey, String.join(",", omNodeIds));
@@ -903,6 +907,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private List<Type> services;
     private String serviceId;
     private String serviceName;
+    private final ReservedPorts ports;
 
     // Active services s denote OM/SCM services which are up and running
     private List<Type> activeServices;
@@ -912,9 +917,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private Function<Type, String> serviceIdProvider;
 
     MiniOzoneHAService(String name, List<Type> activeList,
-                       List<Type> inactiveList, String serviceId,
-                       Function<Type, String> idProvider) {
+        List<Type> inactiveList, String serviceId,
+        ReservedPorts ports, Function<Type, String> idProvider) {
       this.serviceName = name;
+      this.ports = ports != null ? ports : new ReservedPorts(0);
       this.serviceMap = Maps.newHashMap();
       this.serviceIdProvider = idProvider;
       if (activeList != null) {
@@ -944,6 +950,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     public List<Type> getServices() {
       return services;
+    }
+
+    public void releasePorts() {
+      ports.releaseAll();
     }
 
     public List<Type> getActiveServices() {
@@ -990,6 +1000,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       if (!inactiveServices.contains(service)) {
         throw new IOException(serviceName + " is already active.");
       } else {
+        ports.release(id);
         serviceStarter.execute(service);
         activeServices.add(service);
         inactiveServices.remove(service);
@@ -999,8 +1010,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   static class OMHAService extends MiniOzoneHAService<OzoneManager> {
     OMHAService(List<OzoneManager> activeList, List<OzoneManager> inactiveList,
-                String serviceId) {
-      super("OM", activeList, inactiveList, serviceId,
+        String serviceId, ReservedPorts omPorts) {
+      super("OM", activeList, inactiveList, serviceId, omPorts,
           OzoneManager::getOMNodeId);
     }
   }
@@ -1008,10 +1019,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   static class SCMHAService extends
       MiniOzoneHAService<StorageContainerManager> {
     SCMHAService(List<StorageContainerManager> activeList,
-                 List<StorageContainerManager> inactiveList,
-                 String serviceId) {
+        List<StorageContainerManager> inactiveList,
+        String serviceId, ReservedPorts scmPorts) {
       super("SCM", activeList, inactiveList, serviceId,
-          StorageContainerManager::getScmId);
+          scmPorts, StorageContainerManager::getScmId);
     }
   }
 
@@ -1054,6 +1065,53 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       LOG.error(omNodeId + " - System Exit: " + message);
       cluster.stopOzoneManager(omNodeId);
       throw new IOException(message);
+    }
+  }
+
+  /**
+   * Reserves a number of ports for services.
+   */
+  private static class ReservedPorts {
+
+    private final Queue<ServerSocket> allPorts = new LinkedList<>();
+    private final Map<String, List<ServerSocket>> assignedPorts =
+        new HashMap<>();
+    private final int portsPerNode;
+
+    ReservedPorts(int portsPerNode) {
+      this.portsPerNode = portsPerNode;
+    }
+
+    public void reserve(int nodes) {
+      Preconditions.checkState(allPorts.isEmpty());
+      allPorts.addAll(reservePorts(portsPerNode * nodes));
+    }
+
+    public PrimitiveIterator.OfInt assign(String id) {
+      Preconditions.checkState(allPorts.size() >= portsPerNode);
+      List<ServerSocket> nodePorts = new LinkedList<>();
+      for (int i = 0; i < portsPerNode; i++) {
+        nodePorts.add(allPorts.remove());
+      }
+      assignedPorts.put(id, nodePorts);
+
+      return nodePorts.stream().mapToInt(ServerSocket::getLocalPort).iterator();
+    }
+
+    public void release(String id) {
+      List<ServerSocket> ports = assignedPorts.remove(id);
+      if (ports != null) {
+        IOUtils.cleanup(null, ports.toArray(new Closeable[0]));
+      }
+    }
+
+    public void releaseAll() {
+      IOUtils.cleanup(null, allPorts.toArray(new Closeable[0]));
+      allPorts.clear();
+
+      for (String id : new ArrayList<>(assignedPorts.keySet())) {
+        release(id);
+      }
     }
   }
 }

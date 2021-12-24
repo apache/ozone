@@ -21,13 +21,13 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Collections;
+
+import static java.util.Collections.singletonList;
 
 /**
  * MiniOzoneOMHAClusterImpl creates a complete in-process Ozone cluster
@@ -39,27 +39,23 @@ public final class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
 
   /**
    * Creates a new MiniOzoneOMHACluster.
-   *
-   * @throws IOException if there is an I/O error
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
   private MiniOzoneOMHAClusterImpl(
       OzoneConfiguration conf,
-      List<OzoneManager> activeOMList,
-      List<OzoneManager> inactiveOMList,
-      StorageContainerManager scm,
-      List<HddsDatanodeService> hddsDatanodes,
-      String omServiceId,
+      OMHAService omhaService,
+      SCMHAService scmhaService,
+      List<HddsDatanodeService> datanodes,
       String metaPath,
       ReconServer reconServer) {
-    super(conf, activeOMList, inactiveOMList, Collections.singletonList(scm),
-        null, hddsDatanodes, omServiceId, null, metaPath, reconServer);
+    super(conf, omhaService, scmhaService, datanodes, metaPath, reconServer);
   }
 
   /**
    * Builder for configuring the MiniOzoneCluster to run.
    */
   public static class Builder extends MiniOzoneHAClusterImpl.Builder {
+
+    private StorageContainerManager scm;
 
     /**
      * Creates a new Builder.
@@ -85,12 +81,12 @@ public final class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
       initOMRatisConf();
-      StorageContainerManager scm;
+      SCMHAService scmService;
+      OMHAService omService;
       ReconServer reconServer = null;
       try {
-        scm = createSCM();
-        scm.start();
-        createOMService();
+        scmService = createSCMService();
+        omService = createOMService();
         if (includeRecon) {
           configureRecon();
           reconServer = new ReconServer();
@@ -101,16 +97,20 @@ public final class MiniOzoneOMHAClusterImpl extends MiniOzoneHAClusterImpl {
       }
 
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          Collections.singletonList(scm), reconServer);
+          scmService.getActiveServices(), reconServer);
 
       MiniOzoneClusterImpl cluster = new MiniOzoneOMHAClusterImpl(conf,
-          getActiveOMs(), getInactiveOMs(), scm, hddsDatanodes,
-          omServiceId, path, reconServer);
+          omService, scmService, hddsDatanodes, path, reconServer);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
       return cluster;
+    }
+
+    @Override
+    protected SCMHAService createSCMHAService() {
+      return new SCMHAService(singletonList(scm), null, null, null);
     }
   }
 }
