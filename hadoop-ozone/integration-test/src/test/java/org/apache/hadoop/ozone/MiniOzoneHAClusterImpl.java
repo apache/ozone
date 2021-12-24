@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PrimitiveIterator;
 import java.util.Queue;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -521,7 +522,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      */
     protected SCMHAService createSCMService()
         throws IOException, AuthenticationException {
-      if (numOfSCMs == 1) {
+      if (scmServiceId == null) {
         StorageContainerManager scm = createSCM();
         scm.start();
         return new SCMHAService(singletonList(scm), null, null, null);
@@ -549,6 +550,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
                     String.valueOf(integer)));
 
             configureSCM();
+            for (Map.Entry<String, String> e : new TreeMap<>(scmConfig.getPropsWithPrefix("ozone.scm")).entrySet()) {
+              LOG.info("ZZZ " + i + " " + e.getKey() + " -> " + e.getValue().trim());
+            }
             if (i == 1) {
               StorageContainerManager.scmInit(scmConfig, clusterId);
             } else {
@@ -570,11 +574,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
               scm.start();
               activeSCMs.add(scm);
               LOG.info("Started SCM RPC server at {}",
-                  scm.getClientProtocolServer());
+                  scm.getClientRpcAddress());
             } else {
               inactiveSCMs.add(scm);
-              LOG.info("Intialized SCM at {}. This SCM is currently "
-                  + "inactive (not running).", scm.getClientProtocolServer());
+              LOG.info("Initialized SCM at {}. This SCM is currently "
+                  + "inactive (not running).", scm.getClientRpcAddress());
             }
           }
 
@@ -1103,6 +1107,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     public void release(String id) {
       List<ServerSocket> ports = assignedPorts.remove(id);
       if (ports != null) {
+        LOG.info("ZZZ releasing ports for {}: {}", id, ports);
         IOUtils.cleanup(null, ports.toArray(new Closeable[0]));
       }
     }
