@@ -17,33 +17,26 @@
  */
 package org.apache.hadoop.ozone.s3.commontypes;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
+
+import javax.xml.bind.annotation.adapters.XmlAdapter;
+import java.io.UnsupportedEncodingException;
+
 
 /**
- * Directory name ("key prefix") in case of listing.
+ * A converter to convert raw-String to S3 compliant object key name.
+ * ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
  */
-@XmlAccessorType(XmlAccessType.FIELD)
-public class CommonPrefix {
-
-  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
-  @XmlElement(name = "Prefix")
-  private String prefix;
-
-  public CommonPrefix(String prefix) {
-    this.prefix = prefix;
+public class ObjectKeyNameAdapter extends XmlAdapter<String, String> {
+  @Override
+  public String unmarshal(String s) {
+    throw new UnsupportedOperationException();
   }
 
-  public CommonPrefix() {
-  }
-
-  public String getPrefix() {
-    return prefix;
-  }
-
-  public void setPrefix(String prefix) {
-    this.prefix = prefix;
+  @Override
+  public String marshal(String s)
+      throws UnsupportedEncodingException {
+    return S3Utils.urlEncode(s)
+        .replaceAll("%2F", "/");
   }
 }
