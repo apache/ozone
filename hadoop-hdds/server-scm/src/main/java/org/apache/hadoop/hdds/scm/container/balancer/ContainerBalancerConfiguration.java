@@ -92,7 +92,7 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
       tags = {ConfigTag.BALANCER}, description =
-      "The amount of time in minutes to allow a single container to move " +
+      "The amount of time to allow a single container to move " +
           "from source to target.")
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 

@@ -866,7 +866,7 @@ public class ContainerBalancer {
     return countDatanodesInvolvedPerIteration;
   }
 
-  long getSizeMovedPerIteration() {
+  public long getSizeMovedPerIteration() {
     return sizeMovedPerIteration;
   }
 
