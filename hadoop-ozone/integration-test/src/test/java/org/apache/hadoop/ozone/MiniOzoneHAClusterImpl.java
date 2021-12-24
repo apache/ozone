@@ -49,6 +49,7 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -346,7 +347,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private static final String SCM_NODE_ID_PREFIX = "scmNode-";
     private List<StorageContainerManager> activeSCMs = new ArrayList<>();
     private List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
-    private final ReservedPorts omPorts = new ReservedPorts(4);
+    private final ReservedPorts omPorts = new ReservedPorts(3);
     private final ReservedPorts scmPorts = new ReservedPorts(7);
 
     /**
@@ -509,7 +510,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           omList.clear();
           ++retryCount;
           LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
-              retryCount);
+              retryCount, e);
         }
       }
       return new OMHAService(activeOMs, inactiveOMs, omServiceId, omPorts);
@@ -589,7 +590,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           scmList.clear();
           ++retryCount;
           LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
-              retryCount);
+              retryCount, e);
         }
       }
 
@@ -678,6 +679,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       List<String> omNodeIds = new ArrayList<>();
 
       omPorts.reserve(numOfOMs);
+      Iterator<Integer> rpcPorts = getFreePortList(numOfOMs).iterator();
 
       for (int i = 1; i <= numOfOMs; i++) {
         String omNodeId = OM_NODE_ID_PREFIX + i;
@@ -693,7 +695,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
         PrimitiveIterator.OfInt nodePorts = omPorts.assign(omNodeId);
-        conf.set(omAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.set(omAddrKey, "127.0.0.1:" + rpcPorts.next());
         conf.set(omHttpAddrKey, "127.0.0.1:" + nodePorts.nextInt());
         conf.set(omHttpsAddrKey, "127.0.0.1:" + nodePorts.nextInt());
         conf.setInt(omRatisPortKey, nodePorts.nextInt());
@@ -760,7 +762,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             e.getCause() instanceof BindException) {
           ++retryCount;
           LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
-              retryCount);
+              retryCount, e);
         } else {
           throw e;
         }
