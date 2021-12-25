@@ -488,7 +488,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             omList.add(om);
 
             if (i <= numOfActiveOMs) {
-              omPorts.release(nodeId);
               om.start();
               activeOMs.add(om);
               LOG.info("Started OzoneManager {} RPC server at {}", nodeId,
@@ -570,7 +569,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmList.add(scm);
 
             if (i <= numOfActiveSCMs) {
-              scmPorts.release(nodeId);
               scm.start();
               activeSCMs.add(scm);
               LOG.info("Started SCM RPC server at {}",
@@ -662,6 +660,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         conf.set(blockClientKey, "127.0.0.1:" + blockPort);
         conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             "127.0.0.1:" + blockPort);
+
+        if (i <= numOfActiveSCMs) {
+          scmPorts.release(scmNodeId);
+        }
       }
 
       conf.set(scmNodesKey, scmNodesKeyValue.substring(1));
@@ -703,6 +705,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         conf.set(omHttpAddrKey, "127.0.0.1:" + nodePorts.nextInt());
         conf.set(omHttpsAddrKey, "127.0.0.1:" + nodePorts.nextInt());
         conf.setInt(omRatisPortKey, nodePorts.nextInt());
+
+        if (i <= numOfActiveOMs) {
+          omPorts.release(omNodeId);
+        }
       }
 
       conf.set(omNodesKey, String.join(",", omNodeIds));
