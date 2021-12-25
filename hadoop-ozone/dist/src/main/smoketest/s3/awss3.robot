@@ -46,3 +46,11 @@ File upload and directory list
                         Should not contain        ${result}         testfile
                         Should not contain        ${result}         dir1
                         Should contain            ${result}         file
+
+File upload with special chars
+                        Execute                   date > /tmp/testfile
+    ${result} =         Execute AWSS3Cli          cp /tmp/testfile s3://${BUCKET}/specialchars/a+b
+                        Should contain            ${result}         upload
+    ${result} =         Execute AWSS3Cli          ls s3://${BUCKET}/specialchars/
+                        Should not contain        ${result}         'a b'
+                        Should contain            ${result}         a+b

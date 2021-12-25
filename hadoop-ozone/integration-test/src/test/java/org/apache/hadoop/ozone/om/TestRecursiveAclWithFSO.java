@@ -255,8 +255,7 @@ public class TestRecursiveAclWithFSO {
     // Note: OM doesn't support live config reloading
     conf.setBoolean(OZONE_ACL_ENABLED, true);
 
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
-        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    TestOMRequestUtils.configureFSOptimizedPaths(conf, true);
 
     cluster =
         MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)

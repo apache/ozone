@@ -111,11 +111,18 @@ public final class ContainerBalancerConfiguration {
   private String includeNodes = "";
 
   @Config(key = "exclude.datanodes", type = ConfigType.STRING, defaultValue =
-      "", tags = ConfigTag.BALANCER, description = "A list of Datanode " +
+      "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
       "hostnames or ip addresses separated by commas. The Datanodes specified" +
       " in this list are excluded from balancing. This configuration is empty" +
       " by default.")
   private String excludeNodes = "";
+
+  @Config(key = "move.networkTopology.enable", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "whether to take network topology into account when " +
+          "selecting a target for a source. " +
+          "This configuration is false by default.")
+  private boolean networkTopologyEnable = false;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -160,6 +167,24 @@ public final class ContainerBalancerConfiguration {
               "-1(for infinitely running).");
     }
     this.idleIterations = count;
+  }
+
+  /**
+   * Get the NetworkTopologyEnable value for Container Balancer.
+   *
+   * @return the boolean value of networkTopologyEnable
+   */
+  public Boolean getNetworkTopologyEnable() {
+    return networkTopologyEnable;
+  }
+
+  /**
+   * Set the NetworkTopologyEnable value for Container Balancer.
+   *
+   * @param enable the boolean value to be set to networkTopologyEnable
+   */
+  public void setNetworkTopologyEnable(Boolean enable) {
+    networkTopologyEnable = enable;
   }
 
   /**

@@ -49,6 +49,8 @@ public final class OMConfigKeys {
       "ozone.om.nodes";
   public static final String OZONE_OM_NODE_ID_KEY =
       "ozone.om.node.id";
+  public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
+      "ozone.om.decommissioned.nodes";
 
   public static final String OZONE_OM_ADDRESS_KEY =
       "ozone.om.address";
@@ -69,11 +71,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
-
-  // LevelDB cache file uses an off-heap cache in LevelDB of 128 MB.
-  public static final String OZONE_OM_DB_CACHE_SIZE_MB =
-      "ozone.om.db.cache.size.mb";
-  public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
 
   public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
       "ozone.om.volume.listall.allowed";
@@ -262,12 +259,6 @@ public final class OMConfigKeys {
 //  ozone.om.enable.filesystem.paths to true then this allows to perform
 //  atomic rename and delete of any directory at any level in the namespace.
 //  Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
-
-  public static final String OZONE_OM_METADATA_LAYOUT =
-          "ozone.om.metadata.layout";
-  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "SIMPLE";
-
-  public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
 
   // Default bucket layout used by Ozone Manager during bucket creation
   // when a client does not specify the bucket layout option.

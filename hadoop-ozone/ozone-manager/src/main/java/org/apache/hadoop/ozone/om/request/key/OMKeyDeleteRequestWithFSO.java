@@ -171,7 +171,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyDeleteResponseWithFSO(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);

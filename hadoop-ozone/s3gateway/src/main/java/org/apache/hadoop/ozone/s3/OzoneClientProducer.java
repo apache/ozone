@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -62,9 +61,6 @@ public class OzoneClientProducer {
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
-
-  @Inject
-  private Text omService;
 
   @Inject
   private String omServiceID;
