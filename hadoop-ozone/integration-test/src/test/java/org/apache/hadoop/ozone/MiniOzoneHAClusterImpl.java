@@ -568,11 +568,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
               scm.start();
               activeSCMs.add(scm);
               LOG.info("Started SCM RPC server at {}",
-                  scm.getClientProtocolServer());
+                  scm.getClientRpcAddress());
             } else {
               inactiveSCMs.add(scm);
               LOG.info("Intialized SCM at {}. This SCM is currently "
-                  + "inactive (not running).", scm.getClientProtocolServer());
+                  + "inactive (not running).", scm.getClientRpcAddress());
             }
           }
 
@@ -583,7 +583,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scm.stop();
             scm.join();
             LOG.info("Stopping StorageContainerManager server at {}",
-                scm.getClientProtocolServer());
+                scm.getClientRpcAddress());
           }
           scmList.clear();
           ++retryCount;
