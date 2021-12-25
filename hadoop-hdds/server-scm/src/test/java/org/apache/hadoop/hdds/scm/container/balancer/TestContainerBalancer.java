@@ -90,7 +90,6 @@ public class TestContainerBalancer {
   private Map<DatanodeUsageInfo, Set<ContainerID>> datanodeToContainersMap =
       new HashMap<>();
   private static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
-  private static final double DELTA = 1e-15;
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -604,7 +603,7 @@ public class TestContainerBalancer {
 
     ContainerBalancerConfiguration cbConf =
         ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
-    Assert.assertEquals(cbConf.getThreshold(), 0.01d, DELTA);
+    Assert.assertEquals(cbConf.getThreshold(), 0.01d, 0.001);
 
     Assert.assertEquals(cbConf.getMaxSizeLeavingSource(),
         26 * 1024 * 1024 * 1024L);
