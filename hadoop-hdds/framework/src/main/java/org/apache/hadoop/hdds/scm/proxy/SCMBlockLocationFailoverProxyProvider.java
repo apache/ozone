@@ -132,8 +132,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
             scmNodeInfo.getServiceId(), scmNodeInfo.getNodeId(),
             scmBlockClientAddress);
         scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
-        LOG.info("ZZZ SCM loadConfigs {}: {}", scmNodeId,
-            scmNodeInfo.getBlockClientAddress());
       }
     }
   }

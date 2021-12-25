@@ -71,9 +71,9 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       String traceId) throws ServiceException {
     Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
     try {
-      if (true || logger.isTraceEnabled()) {
-        logger.info(
-            "ZZZ [service={}] [type={}] request is received: <json>{}</json>",
+      if (logger.isTraceEnabled()) {
+        logger.trace(
+            "[service={}] [type={}] request is received: <json>{}</json>",
             serviceName,
             type,
             escapeNewLines(requestPreprocessor.apply(request)));
@@ -89,9 +89,9 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       protocolMessageMetrics.increment(type,
           System.currentTimeMillis() - startTime);
 
-      if (true || logger.isTraceEnabled()) {
-        logger.info(
-            "ZZZ [service={}] [type={}] request is processed. Response: "
+      if (logger.isTraceEnabled()) {
+        logger.trace(
+            "[service={}] [type={}] request is processed. Response: "
                 + "<json>{}</json>",
             serviceName,
             type,

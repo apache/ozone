@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.commons.logging.Log;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -61,8 +60,6 @@ import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
@@ -80,8 +77,6 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ScmBlockLocationProtocolClientSideTranslatorPB.class);
 
   private final ScmBlockLocationProtocolPB rpcProxy;
   private SCMBlockLocationFailoverProxyProvider failoverProxyProvider;
@@ -254,7 +249,6 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         HddsProtos.GetScmInfoRequestProto.getDefaultInstance();
     HddsProtos.GetScmInfoResponseProto resp;
 
-    LOG.info("ZZZ getScmInfo {}", failoverProxyProvider.getCurrentProxySCMNodeId());
     SCMBlockLocationRequest wrapper = createSCMBlockRequest(
         Type.GetScmInfo)
         .setGetScmInfoRequest(request)
