@@ -263,15 +263,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-18.04
-    timeout-minutes: 150
     if: needs.build-info.outputs.needs-integration-tests == 'true'
-    strategy:
-      matrix:
-        profile:
-          - client
-          - filesystem-hdds
-          - ozone
-      fail-fast: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -279,13 +271,14 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.profile }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+        run: hadoop-ozone/dev-support/checks/integration.sh -Dtest=TestAddRemoveOzoneManager,TestOzoneManagerPrepare
+        env:
+          ITERATIONS: 10
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
         if: always()
@@ -293,7 +286,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: always()
         with:
-          name: it-${{ matrix.profile }}
+          name: integration
           path: target/integration
         continue-on-error: true
       - name: Delete temporary build artifacts before caching
