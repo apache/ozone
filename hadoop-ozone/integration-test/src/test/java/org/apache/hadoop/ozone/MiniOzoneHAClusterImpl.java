@@ -23,6 +23,7 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.ExitManager;
+import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -333,6 +334,29 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     om.stop();
     om.join();
     omhaService.deactivate(om);
+  }
+
+  private static void configureOMPorts(ConfigurationTarget conf,
+      String omServiceId, String omNodeId,
+      ReservedPorts omPorts, ReservedPorts omRpcPorts) {
+
+    String omAddrKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
+    String omHttpAddrKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId);
+    String omHttpsAddrKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId);
+    String omRatisPortKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
+
+    PrimitiveIterator.OfInt nodePorts = omPorts.assign(omNodeId);
+    PrimitiveIterator.OfInt rpcPorts = omRpcPorts.assign(omNodeId);
+    conf.set(omAddrKey, "127.0.0.1:" + rpcPorts.nextInt());
+    conf.set(omHttpAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+    conf.set(omHttpsAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+    conf.setInt(omRatisPortKey, nodePorts.nextInt());
+
+    omRpcPorts.release(omNodeId);
   }
 
   /**
@@ -692,23 +716,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         String omNodeId = OM_NODE_ID_PREFIX + i;
         omNodeIds.add(omNodeId);
 
-        String omAddrKey = ConfUtils.addKeySuffixes(
-            OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
-        String omHttpAddrKey = ConfUtils.addKeySuffixes(
-            OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId);
-        String omHttpsAddrKey = ConfUtils.addKeySuffixes(
-            OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId);
-        String omRatisPortKey = ConfUtils.addKeySuffixes(
-            OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
+        configureOMPorts(conf, omServiceId, omNodeId, omPorts, omRpcPorts);
 
-        PrimitiveIterator.OfInt nodePorts = omPorts.assign(omNodeId);
-        PrimitiveIterator.OfInt rpcPorts = omRpcPorts.assign(omNodeId);
-        conf.set(omAddrKey, "127.0.0.1:" + rpcPorts.nextInt());
-        conf.set(omHttpAddrKey, "127.0.0.1:" + nodePorts.nextInt());
-        conf.set(omHttpsAddrKey, "127.0.0.1:" + nodePorts.nextInt());
-        conf.setInt(omRatisPortKey, nodePorts.nextInt());
-
-        omRpcPorts.release(omNodeId);
         if (i <= numOfActiveOMs) {
           omPorts.release(omNodeId);
         }
@@ -749,9 +758,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     while (true) {
       try {
-        List<Integer> portSet = getFreePortList(4);
         OzoneConfiguration newConf = addNewOMToConfig(getOMServiceId(),
-            omNodeId, portSet);
+            omNodeId);
 
         if (updateConfigs) {
           updateOMConfigs(newConf);
@@ -792,30 +800,19 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * Set the configs for new OMs.
    */
   private OzoneConfiguration addNewOMToConfig(String omServiceId,
-      String omNodeId, List<Integer> portList) {
+      String omNodeId) {
+
+    ReservedPorts omPorts = omhaService.getPorts();
+    omPorts.reserve(1);
+    ReservedPorts omRpcPorts = new ReservedPorts(1);
+    omRpcPorts.reserve(1);
 
     OzoneConfiguration newConf = new OzoneConfiguration(getConf());
+    configureOMPorts(newConf, omServiceId, omNodeId, omPorts, omRpcPorts);
+
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
-    StringBuilder omNodesKeyValue = new StringBuilder();
-    omNodesKeyValue.append(newConf.get(omNodesKey))
-        .append(",").append(omNodeId);
-
-    String omAddrKey = ConfUtils.addKeySuffixes(
-        OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
-    String omHttpAddrKey = ConfUtils.addKeySuffixes(
-        OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId);
-    String omHttpsAddrKey = ConfUtils.addKeySuffixes(
-        OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId);
-    String omRatisPortKey = ConfUtils.addKeySuffixes(
-        OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
-
-    newConf.set(omAddrKey, "127.0.0.1:" + portList.get(0));
-    newConf.set(omHttpAddrKey, "127.0.0.1:" + portList.get(1));
-    newConf.set(omHttpsAddrKey, "127.0.0.1:" + portList.get(2));
-    newConf.setInt(omRatisPortKey, portList.get(3));
-
-    newConf.set(omNodesKey, omNodesKeyValue.toString());
+    newConf.set(omNodesKey, newConf.get(omNodesKey) + "," + omNodeId);
 
     return newConf;
   }
@@ -858,9 +855,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     ExitManagerForOM exitManager = new ExitManagerForOM(this, nodeId);
     om.setExitManagerForTesting(exitManager);
     omhaService.addInstance(om, false);
-
-    om.start();
-    omhaService.activate(om);
+    startInactiveOM(nodeId);
 
     return om;
   }
@@ -984,6 +979,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       serviceMap.put(serviceIdProvider.apply(t), t);
       if (isActive) {
         activeServices.add(t);
+      } else {
+        inactiveServices.add(t);
       }
     }
 
@@ -1024,6 +1021,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         activeServices.add(service);
         inactiveServices.remove(service);
       }
+    }
+
+    public ReservedPorts getPorts() {
+      return ports;
     }
   }
 
@@ -1122,12 +1123,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       List<ServerSocket> ports = assignedPorts.remove(id);
       LOG.debug("release ports for {}: {}", id, ports);
       if (ports != null) {
-        IOUtils.cleanup(null, ports.toArray(new Closeable[0]));
+        IOUtils.cleanup(LOG, ports.toArray(new Closeable[0]));
       }
     }
 
     public void releaseAll() {
-      IOUtils.cleanup(null, allPorts.toArray(new Closeable[0]));
+      IOUtils.cleanup(LOG, allPorts.toArray(new Closeable[0]));
       allPorts.clear();
 
       for (String id : new ArrayList<>(assignedPorts.keySet())) {
