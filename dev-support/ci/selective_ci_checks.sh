@@ -391,6 +391,10 @@ function check_needs_unit_test() {
         "src/..../java"
         "src/..../resources"
     )
+    local ignore_array=(
+        "^hadoop-ozone/integration-test"
+        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
+    )
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
