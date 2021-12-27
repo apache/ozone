@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.freon;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
 /**
@@ -28,8 +27,7 @@ public class TestHadoopDirTreeGeneratorWithFSO
 
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    TestOMRequestUtils.configureFSOptimizedPaths(conf, true);
     return conf;
   }
 

@@ -71,11 +71,11 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -278,11 +278,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmKeyInfo> getKeyTable() {
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+  public Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout) {
+    if (bucketLayout.isFileSystemOptimized()) {
       return fileTable;
     }
     return keyTable;
+  }
+
+  @Override
+  public Table<String, OmKeyInfo> getFileTable() {
+    return fileTable;
   }
 
   @Override
@@ -296,8 +301,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmKeyInfo> getOpenKeyTable() {
-    if (OzoneManagerRatisUtils.isBucketFSOptimized()) {
+  public Table getOpenKeyTable(BucketLayout bucketLayout) {
+    if (bucketLayout.isFileSystemOptimized()) {
       return openFileTable;
     }
     return openKeyTable;
@@ -918,7 +923,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // Get maxKeys from DB if it has.
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyIter = getKeyTable().iterator()) {
+             keyIter = getKeyTable(getBucketLayout()).iterator()) {
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
       // we need to iterate maxKeys + 1 here because if skipStartKey is true,
@@ -1129,18 +1134,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
     List<String> expiredKeys = Lists.newArrayList();
 
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+    try (
+        TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+            keyValueTableIterator = getOpenKeyTable(
+            getBucketLayout()).iterator()) {
 
       while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String openKey = openKeyValue.getKey();
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
-        Duration openKeyAge =
-                Duration.between(
-                        Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
-                        Instant.now());
+        Duration openKeyAge = Duration
+            .between(Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
+                Instant.now());
 
         if (openKeyAge.compareTo(expirationDuration) >= 0) {
           expiredKeys.add(openKey);
@@ -1291,5 +1297,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(uploadId);
     return openKey.toString();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

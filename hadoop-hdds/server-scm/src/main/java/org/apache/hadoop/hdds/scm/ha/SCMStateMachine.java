@@ -33,7 +33,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
-import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -176,6 +176,13 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void notifyLogFailed(Throwable ex,
+      RaftProtos.LogEntryProto failedEntry) {
+    LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
+    ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+  }
+
+  @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     if (!isInitialized) {
       return;
@@ -258,8 +265,8 @@ public class SCMStateMachine extends BaseStateMachine {
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
     Preconditions.checkArgument(
-        deletedBlockLog instanceof DeletedBlockLogImplV2);
-    ((DeletedBlockLogImplV2) deletedBlockLog).onBecomeLeader();
+        deletedBlockLog instanceof DeletedBlockLogImpl);
+    ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
     scm.getScmDecommissionManager().onBecomeLeader();
   }
 

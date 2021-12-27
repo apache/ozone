@@ -240,7 +240,7 @@ const COLUMNS = [
     title: 'Version',
     dataIndex: 'version',
     key: 'version',
-    isVisible: false,
+    isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.version.localeCompare(b.version),
     defaultSortOrder: 'ascend' as const
@@ -249,7 +249,7 @@ const COLUMNS = [
     title: 'SetupTime',
     dataIndex: 'setupTime',
     key: 'setupTime',
-    isVisible: false,
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime,
     render: (uptime: number) => {
       return uptime > 0 ? moment(uptime).format('ll LTS') : 'NA';
@@ -259,7 +259,7 @@ const COLUMNS = [
     title: 'Revision',
     dataIndex: 'revision',
     key: 'revision',
-    isVisible: false,
+    isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.revision.localeCompare(b.revision),
     defaultSortOrder: 'ascend' as const
@@ -268,7 +268,7 @@ const COLUMNS = [
     title: 'BuildDate',
     dataIndex: 'buildDate',
     key: 'buildDate',
-    isVisible: false,
+    isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
     defaultSortOrder: 'ascend' as const

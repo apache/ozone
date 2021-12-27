@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -635,6 +636,7 @@ public interface ClientProtocol {
    *                     invalid arguments
    */
   @SuppressWarnings("checkstyle:parameternumber")
+  @Deprecated
   OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationType type, ReplicationFactor factor,
       boolean overWrite, boolean recursive) throws IOException;
@@ -736,4 +738,38 @@ public interface ClientProtocol {
    */
   void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException;
+
+  /**
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object.
+   *
+   * If Key exists, return returns OzoneKey.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @return OzoneKey which gives basic information about the key.
+   * @throws IOException
+   */
+  OzoneKey headObject(String volumeName, String bucketName,
+      String keyName) throws IOException;
+
+  /**
+   * Sets the S3 Authentication information for the requests executed on behalf
+   * of the S3 API implementation within Ozone.
+   * @param s3Auth authentication information for each S3 API call.
+   */
+  void setTheadLocalS3Auth(S3Auth s3Auth);
+
+  /**
+   * Gets the S3 Authentication information that is attached to the thread.
+   * @return S3 Authentication information.
+   */
+  S3Auth getThreadLocalS3Auth();
+
+  /**
+   * Clears the S3 Authentication information attached to the thread.
+   */
+  void clearTheadLocalS3Auth();
 }

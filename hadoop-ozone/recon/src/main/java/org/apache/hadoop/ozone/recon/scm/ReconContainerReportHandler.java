@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.scm;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -38,7 +38,7 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
       LoggerFactory.getLogger(ReconContainerReportHandler.class);
 
   public ReconContainerReportHandler(NodeManager nodeManager,
-                                     ContainerManagerV2 containerManager) {
+                                     ContainerManager containerManager) {
     super(nodeManager, containerManager);
   }
 

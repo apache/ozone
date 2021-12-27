@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,9 +124,18 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   @Override
   public boolean moveToTrash(Path path) throws IOException {
     this.fs.getFileStatus(path);
+    String key = path.toUri().getPath();
+    // Check to see if bucket is path item to be deleted.
+    // Cannot moveToTrash if bucket is deleted,
+    // return error for this condition
+    OFSPath ofsPath = new OFSPath(key.substring(1));
+    if (path.isRoot() || ofsPath.isBucket()) {
+      throw new IOException("Recursive rm of bucket "
+          + path.toString() + " not permitted");
+    }
+
     Path trashRoot = this.fs.getTrashRoot(path);
 
-    String key = path.toUri().getPath();
     LOG.debug("Key path to moveToTrash: {}", key);
     String trashRootKey = trashRoot.toUri().getPath();
     LOG.debug("TrashrootKey for moveToTrash: {}", trashRootKey);
@@ -192,6 +202,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
             continue;
           }
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           break;                                  // exit on interrupt
         }
 

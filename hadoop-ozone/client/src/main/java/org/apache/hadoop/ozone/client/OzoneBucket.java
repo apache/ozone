@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -135,6 +136,14 @@ public class OzoneBucket extends WithMetadata {
    * Quota of key count allocated for the bucket.
    */
   private long quotaInNamespace;
+  /**
+   * Bucket Layout.
+   */
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+  /**
+   * Bucket Owner.
+   */
+  private String owner;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ClientProtocol proxy) {
@@ -199,6 +208,37 @@ public class OzoneBucket extends WithMetadata {
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket, long usedBytes,
+      long usedNamespace, long quotaInBytes, long quotaInNamespace,
+      BucketLayout bucketLayout) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, modificationTime, metadata, encryptionKeyName,
+        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
+        quotaInNamespace);
+    this.bucketLayout = bucketLayout;
+  }
+
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+       String volumeName, String bucketName, StorageType storageType,
+       Boolean versioning, long creationTime, long modificationTime,
+       Map<String, String> metadata, String encryptionKeyName,
+       String sourceVolume, String sourceBucket, long usedBytes,
+       long usedNamespace, long quotaInBytes, long quotaInNamespace,
+       BucketLayout bucketLayout, String owner) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, modificationTime, metadata, encryptionKeyName,
+        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
+        quotaInNamespace, bucketLayout);
+    this.owner = owner;
   }
 
   /**
@@ -366,6 +406,15 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Returns the owner of the Bucket.
+   *
+   * @return owner
+   */
+  public String getOwner() {
+    return owner;
+  }
+
+  /**
    * Builder for OmBucketInfo.
   /**
    * Adds ACLs to the Bucket.
@@ -529,6 +578,22 @@ public class OzoneBucket extends WithMetadata {
     return proxy.getKeyDetails(volumeName, name, key);
   }
 
+  /**
+   *
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object.
+   *
+   * If Key exists, return returns OzoneKey.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @param key
+   * @return OzoneKey which gives basic information about the key.
+   * @throws IOException
+   */
+  public OzoneKey headObject(String key) throws IOException {
+    return proxy.headObject(volumeName, name, key);
+  }
+
   public long getUsedBytes() {
     return usedBytes;
   }
@@ -560,13 +625,19 @@ public class OzoneBucket extends WithMetadata {
    * @param prevKey Keys will be listed after this key name
    * @return {@code Iterator<OzoneKey>}
    */
-  public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
-      String prevKey) throws IOException {
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix, String prevKey)
+      throws IOException {
 
-    if(OzoneFSUtils.isFSOptimizedBucket(getMetadata())){
-      return new KeyIteratorWithFSO(keyPrefix, prevKey);
-    }
-    return new KeyIterator(keyPrefix, prevKey);
+    return new KeyIteratorFactory()
+        .getKeyIterator(keyPrefix, prevKey, bucketLayout);
+  }
+
+  /**
+   * Checks if the bucket is a Link Bucket.
+   * @return True if bucket is a link, False otherwise.
+   */
+  public boolean isLink() {
+    return sourceVolume != null && sourceBucket != null;
   }
 
   /**
@@ -776,6 +847,7 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Deprecated
   public OzoneOutputStream createFile(String keyName, long size,
       ReplicationType type, ReplicationFactor factor, boolean overWrite,
       boolean recursive) throws IOException {
@@ -1169,5 +1241,20 @@ public class OzoneBucket extends WithMetadata {
       }
     }
 
+  }
+
+  private class KeyIteratorFactory {
+    KeyIterator getKeyIterator(String keyPrefix, String prevKey,
+        BucketLayout bType) throws IOException {
+      if (bType.isFileSystemOptimized()) {
+        return new KeyIteratorWithFSO(keyPrefix, prevKey);
+      } else {
+        return new KeyIterator(keyPrefix, prevKey);
+      }
+    }
+  }
+
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
   }
 }

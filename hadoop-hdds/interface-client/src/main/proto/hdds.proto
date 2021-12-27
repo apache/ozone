@@ -62,6 +62,11 @@ message ExtendedDatanodeDetailsProto {
     optional string buildDate = 5;
 }
 
+message MoveDataNodePairProto {
+    required DatanodeDetailsProto src = 1;
+    required DatanodeDetailsProto tgt = 2;
+}
+
 /**
  Proto message encapsulating information required to uniquely identify a
  OzoneManager.
@@ -361,5 +366,16 @@ message CRLInfoProto {
 message CertInfoProto {
     required string x509Certificate = 1;
     required uint64 timestamp = 2;
+}
+
+message ContainerReplicaHistoryListProto {
+    repeated ContainerReplicaHistoryProto replicaHistory = 1;
+}
+
+message ContainerReplicaHistoryProto {
+    required string uuid = 1;
+    required int64 firstSeenTime = 2;
+    required int64 lastSeenTime = 3;
+    required int64 bcsId = 4;
 }
 

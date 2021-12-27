@@ -104,7 +104,7 @@ public class TestBlockOutputStreamCorrectness {
     config.setChecksumType(ChecksumType.NONE);
     config.setBytesPerChecksum(256 * 1024);
 
-    BlockOutputStream outputStream = new BlockOutputStream(
+    BlockOutputStream outputStream = new RatisBlockOutputStream(
         new BlockID(1L, 1L),
         xcm,
         pipeline,

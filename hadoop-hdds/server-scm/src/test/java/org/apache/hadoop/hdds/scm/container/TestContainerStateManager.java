@@ -17,21 +17,34 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.UUID;
 
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -45,12 +58,51 @@ import static org.mockito.Mockito.when;
 public class TestContainerStateManager {
 
   private ContainerStateManager containerStateManager;
+  private PipelineManager pipelineManager;
+  private SCMHAManager scmhaManager;
+  private File testDir;
+  private DBStore dbStore;
+  private Pipeline pipeline;
 
   @Before
   public void init() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    containerStateManager = new ContainerStateManager(conf);
+    scmhaManager = MockSCMHAManager.getInstance(true);
+    testDir = GenericTestUtils.getTestDir(
+        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(
+        conf, new SCMDBDefinition());
+    pipelineManager = Mockito.mock(PipelineManager.class);
+    pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
+            .setId(PipelineID.randomId())
+            .setReplicationConfig(new StandaloneReplicationConfig(
+                ReplicationFactor.THREE))
+            .setNodes(new ArrayList<>()).build();
+    when(pipelineManager.createPipeline(new StandaloneReplicationConfig(
+        ReplicationFactor.THREE))).thenReturn(pipeline);
+    when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
+        .thenReturn(true);
 
+
+    containerStateManager = ContainerStateManagerImpl.newBuilder()
+        .setConfiguration(conf)
+        .setPipelineManager(pipelineManager)
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    containerStateManager.close();
+    if (dbStore != null) {
+      dbStore.close();
+    }
+
+    FileUtil.fullyDelete(testDir);
   }
 
   @Test
@@ -68,7 +120,7 @@ public class TestContainerStateManager {
 
     //WHEN
     Set<ContainerReplica> replicas = containerStateManager
-        .getContainerReplicas(c1.containerID());
+        .getContainerReplicas(c1.containerID().getProtobuf());
 
     //THEN
     Assert.assertEquals(3, replicas.size());
@@ -88,41 +140,38 @@ public class TestContainerStateManager {
 
     //WHEN
     Set<ContainerReplica> replicas = containerStateManager
-        .getContainerReplicas(c1.containerID());
+        .getContainerReplicas(c1.containerID().getProtobuf());
 
     Assert.assertEquals(2, replicas.size());
     Assert.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
-  private void addReplica(ContainerInfo cont, DatanodeDetails node)
-      throws ContainerNotFoundException {
+  private void addReplica(ContainerInfo cont, DatanodeDetails node) {
     ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(cont.containerID())
         .setContainerState(ContainerReplicaProto.State.CLOSED)
         .setDatanodeDetails(node)
         .build();
     containerStateManager
-        .updateContainerReplica(cont.containerID(), replica);
+        .updateContainerReplica(cont.containerID().getProtobuf(), replica);
   }
 
   private ContainerInfo allocateContainer() throws IOException {
 
-    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
+    final ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setPipelineID(pipeline.getId())
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setStateEnterTime(Time.now())
+        .setOwner("root")
+        .setContainerID(1)
+        .setDeleteTransactionId(0)
+        .setReplicationConfig(pipeline.getReplicationConfig())
+        .build();
 
-    Pipeline pipeline =
-        Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
-            .setId(PipelineID.randomId())
-            .setReplicationConfig(new StandaloneReplicationConfig(
-                ReplicationFactor.THREE))
-            .setNodes(new ArrayList<>()).build();
-
-    when(pipelineManager.createPipeline(new StandaloneReplicationConfig(
-        ReplicationFactor.THREE))).thenReturn(pipeline);
-
-    return containerStateManager.allocateContainer(pipelineManager,
-        new StandaloneReplicationConfig(
-            ReplicationFactor.THREE), "root");
-
+    containerStateManager.addContainer(containerInfo.getProtobuf());
+    return containerInfo;
   }
 
 }

@@ -37,6 +37,7 @@ OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
+OZONE-SITE.XML_hdds.container.report.interval=60s
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

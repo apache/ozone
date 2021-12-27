@@ -25,12 +25,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -59,28 +62,38 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.LambdaTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import static org.hamcrest.core.Is.is;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
 
 /**
  * Tests the containerStateMachine failure handling.
@@ -156,6 +169,16 @@ public class TestContainerStateMachineFailures {
     random = new Random();
   }
 
+  @BeforeEach
+  public void restartDatanode()
+      throws InterruptedException, TimeoutException, AuthenticationException,
+      IOException {
+    for (int i=0; i < cluster.getHddsDatanodes().size(); i++) {
+      cluster.restartHddsDatanode(i, true);
+    }
+    cluster.restartStorageContainerManager(true);
+  }
+
   /**
    * Shutdown MiniDFSCluster.
    */
@@ -164,6 +187,69 @@ public class TestContainerStateMachineFailures {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void testContainerStateMachineCloseOnMissingPipeline()
+      throws Exception {
+    // This integration test is a bit of a hack to see if the highly
+    // improbable event where the Datanode does not have the pipeline
+    // in its Ratis channel but still receives a close container command
+    // for a container that is open or in closing state.
+    // Bugs in code can lead to this sequence of events but for this test
+    // to inject this state, it removes the pipeline by directly calling
+    // the underlying method.
+
+    OzoneOutputStream key =
+        objectStore.getVolume(volumeName).getBucket(bucketName)
+            .createKey("testQuasiClosed1", 1024, ReplicationType.RATIS,
+                ReplicationFactor.THREE, new HashMap<>());
+    key.write("ratis".getBytes(UTF_8));
+    key.flush();
+
+    KeyOutputStream groupOutputStream = (KeyOutputStream) key.
+        getOutputStream();
+    List<OmKeyLocationInfo> locationInfoList =
+        groupOutputStream.getLocationInfoList();
+    Assert.assertEquals(1, locationInfoList.size());
+
+    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+
+    Set<HddsDatanodeService> datanodeSet =
+        TestHelper.getDatanodeServices(cluster,
+            omKeyLocationInfo.getPipeline());
+
+    long containerID = omKeyLocationInfo.getContainerID();
+
+    for (HddsDatanodeService dn : datanodeSet) {
+      XceiverServerRatis wc = (XceiverServerRatis)
+          dn.getDatanodeStateMachine().getContainer().getWriteChannel();
+      if (wc == null) {
+        // Test applicable only for RATIS based channel.
+        return;
+      }
+      wc.notifyGroupRemove(RaftGroupId
+          .valueOf(omKeyLocationInfo.getPipeline().getId().getId()));
+      SCMCommand<?> command = new CloseContainerCommand(
+          containerID, omKeyLocationInfo.getPipeline().getId());
+      command.setTerm(
+          cluster
+              .getStorageContainerManager()
+              .getScmContext()
+              .getTermOfLeader());
+      cluster.getStorageContainerManager().getScmNodeManager()
+          .addDatanodeCommand(dn.getDatanodeDetails().getUuid(), command);
+    }
+
+
+    for (HddsDatanodeService dn : datanodeSet) {
+      LambdaTestUtils.await(20000, 1000,
+          () -> (dn.getDatanodeStateMachine()
+                .getContainer().getContainerSet()
+                .getContainer(containerID)
+                .getContainerState().equals(QUASI_CLOSED)));
+    }
+    key.close();
   }
 
   @Test
@@ -531,9 +617,14 @@ public class TestContainerStateMachineFailures {
     };
     Runnable r2 = () -> {
       try {
-        xceiverClient.sendCommand(ContainerTestHelper
-                .getWriteChunkRequest(pipeline, omKeyLocationInfo.getBlockID(),
-                        1024, random.nextInt(), null));
+        ByteString data = ByteString.copyFromUtf8("hello");
+        ContainerProtos.ContainerCommandRequestProto.Builder writeChunkRequest =
+            ContainerTestHelper.newWriteChunkRequestBuilder(pipeline,
+                omKeyLocationInfo.getBlockID(), data.size(), random.nextInt()
+            );
+        writeChunkRequest.setWriteChunk(writeChunkRequest.getWriteChunkBuilder()
+                .setData(data));
+        xceiverClient.sendCommand(writeChunkRequest.build());
         latch.countDown();
       } catch (IOException e) {
         latch.countDown();
@@ -541,6 +632,11 @@ public class TestContainerStateMachineFailures {
                 .checkForException(e) instanceof ContainerNotOpenException)) {
           failCount.incrementAndGet();
         }
+        String message = e.getMessage();
+        Assert.assertFalse(message,
+            message.contains("hello"));
+        Assert.assertTrue(message,
+            message.contains(HddsUtils.REDACTED.toStringUtf8()));
       }
     };
 
@@ -579,5 +675,6 @@ public class TestContainerStateMachineFailures {
     FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
     Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
 
+    r2.run();
   }
 }

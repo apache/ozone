@@ -31,6 +31,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.TimeoutException;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests to verify ofs with prefix enabled cases.
@@ -45,19 +48,20 @@ public class TestRootedOzoneFileSystemWithFSO
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true},
-        new Object[]{true, false});
+        new Object[]{true, true, false},
+        new Object[]{true, false, false}
+    );
   }
 
   public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis) throws Exception {
-    super(setDefaultFs, enableOMRatis);
+      boolean enableOMRatis, boolean enableAcl) {
+    super(setDefaultFs, enableOMRatis, enableAcl);
   }
 
   @BeforeClass
-  public static void init() throws Exception {
+  public static void init()
+      throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
-    TestRootedOzoneFileSystem.init();
   }
 
   @Override
@@ -85,13 +89,6 @@ public class TestRootedOzoneFileSystemWithFSO
   @Test
   @Ignore("HDDS-2939")
   public void testDeleteEmptyVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testMkdirNonExistentVolumeBucket() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
@@ -137,6 +134,25 @@ public class TestRootedOzoneFileSystemWithFSO
     Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
+  @Test
+  public void testRenameDir() throws Exception {
+    final String dir = "dir1";
+    final Path source = new Path(getBucketPath(), dir);
+    final Path dest = new Path(source.toString() + ".renamed");
+    // Add a sub-dir to the directory to be moved.
+    final Path subdir = new Path(source, "sub_dir1");
+    getFs().mkdirs(subdir);
+    LOG.info("Created dir {}", subdir);
+    LOG.info("Will move {} to {}", source, dest);
+    getFs().rename(source, dest);
+    assertTrue("Directory rename failed", getFs().exists(dest));
+    // Verify that the subdir is also renamed i.e. keys corresponding to the
+    // sub-directories of the renamed directory have also been renamed.
+    assertTrue("Keys under the renamed directory not renamed",
+        getFs().exists(new Path(dest, "sub_dir1")));
+    // cleanup
+    getFs().delete(dest, true);
+  }
   /**
    *  Cannot rename a directory to its own subdirectory.
    */

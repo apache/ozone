@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -110,7 +109,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     ozoneManager.getMetrics().incNumTrashWriteRequests();
     if (ozoneManager.isRatisEnabled()) {
       OMClientRequest omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(omRequest);
+          OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
       omRequest = omClientRequest.preExecute(ozoneManager);
       RaftClientRequest req = getRatisRequest(omRequest);
       ozoneManager.getOmRatisServer().submitRequest(omRequest, req);
@@ -157,7 +156,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath dstPath = new OFSPath(dst);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+    if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return renameFSO(srcPath, dstPath);
     }
     Preconditions.checkArgument(srcPath.getBucketName().
@@ -191,7 +190,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath srcPath = new OFSPath(path);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getMetadata())) {
+    if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return deleteFSO(srcPath);
     }
     DeleteIterator iterator = new DeleteIterator(path, true);

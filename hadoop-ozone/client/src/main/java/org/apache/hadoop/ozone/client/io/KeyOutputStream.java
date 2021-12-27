@@ -27,7 +27,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -40,7 +39,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -78,7 +76,6 @@ public class KeyOutputStream extends OutputStream {
       LoggerFactory.getLogger(KeyOutputStream.class);
 
   private boolean closed;
-  private FileEncryptionInfo feInfo;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   // how much of data is actually written yet to underlying stream
@@ -143,21 +140,17 @@ public class KeyOutputStream extends OutputStream {
       boolean unsafeByteBufferConversion
   ) {
     this.config = config;
-    OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(
             config,
             omClient,
             requestId, replicationConfig,
             uploadID, partNumber,
-            isMultipart, info,
+            isMultipart, handler.getKeyInfo(),
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId());
 
-    // Retrieve the file encryption key info, null if file is not in
-    // encrypted bucket.
-    this.feInfo = info.getFileEncryptionInfo();
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -306,8 +299,7 @@ public class KeyOutputStream extends OutputStream {
     Pipeline pipeline = streamEntry.getPipeline();
     PipelineID pipelineId = pipeline.getId();
     long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
-    //set the correct length for the current stream
-    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
+    streamEntry.resetToAckedPosition();
     long bufferedDataLen = blockOutputStreamEntryPool.computeBufferData();
     if (containerExclusionException) {
       LOG.debug(
@@ -539,10 +531,6 @@ public class KeyOutputStream extends OutputStream {
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
-  }
-
-  public FileEncryptionInfo getFileEncryptionInfo() {
-    return feInfo;
   }
 
   @VisibleForTesting

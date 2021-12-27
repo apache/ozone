@@ -19,9 +19,12 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * Metrics related to Container Balancer running in SCM.
@@ -29,83 +32,107 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 @Metrics(name = "ContainerBalancer Metrics", about = "Metrics related to " +
     "Container Balancer running in SCM", context = "SCM")
 public final class ContainerBalancerMetrics {
+  public static final String NAME =
+      ContainerBalancerMetrics.class.getSimpleName();
+
+  private final MetricsSystem ms;
 
   @Metric(about = "The total amount of used space in GigaBytes that needs to " +
       "be balanced.")
-  private LongMetric dataSizeToBalanceGB;
+  private MutableGaugeLong dataSizeToBalanceGB;
 
   @Metric(about = "The amount of Giga Bytes that have been moved to achieve " +
       "balance.")
-  private LongMetric dataSizeBalancedGB;
+  private MutableGaugeLong dataSizeMovedGB;
 
   @Metric(about = "Number of containers that Container Balancer has moved" +
       " until now.")
-  private LongMetric movedContainersNum;
+  private MutableGaugeLong movedContainersNum;
 
   @Metric(about = "The total number of datanodes that need to be balanced.")
-  private LongMetric datanodesNumToBalance;
+  private MutableGaugeLong datanodesNumToBalance;
 
   @Metric(about = "Number of datanodes that Container Balancer has balanced " +
       "until now.")
-  private LongMetric datanodesNumBalanced;
+  private MutableGaugeLong datanodesNumBalanced;
 
   @Metric(about = "Utilisation value of the current maximum utilised datanode.")
-  private double maxDatanodeUtilizedRatio;
+  private MutableGaugeInt maxDatanodeUtilizedPercentage;
 
   /**
-   * Initialise metrics for ContainerBalancer.
+   * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
+   * for {@link ContainerBalancer}.
+   *
+   * @return {@link ContainerBalancerMetrics}
    */
-  public ContainerBalancerMetrics() {
-    dataSizeToBalanceGB = new LongMetric(0L);
-    dataSizeBalancedGB = new LongMetric(0L);
-    movedContainersNum = new LongMetric(0L);
-    datanodesNumToBalance = new LongMetric(0L);
-    datanodesNumBalanced = new LongMetric(0L);
-    maxDatanodeUtilizedRatio = 0D;
+  public static ContainerBalancerMetrics create() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(NAME, "Container Balancer Metrics",
+        new ContainerBalancerMetrics(ms));
   }
 
-  public LongMetric getDataSizeToBalanceGB() {
-    return dataSizeToBalanceGB;
+  private ContainerBalancerMetrics(MetricsSystem ms) {
+    this.ms = ms;
+  }
+
+  public long getDataSizeToBalanceGB() {
+    return dataSizeToBalanceGB.value();
   }
 
   public void setDataSizeToBalanceGB(long size) {
-    this.dataSizeToBalanceGB = new LongMetric(size);
+    this.dataSizeToBalanceGB.set(size);
   }
 
-  public LongMetric getDataSizeBalancedGB() {
-    return dataSizeBalancedGB;
+  public long getDataSizeMovedGB() {
+    return dataSizeMovedGB.value();
   }
 
-  public void setDataSizeBalancedGB(
-      LongMetric dataSizeBalancedGB) {
-    this.dataSizeBalancedGB = dataSizeBalancedGB;
+  public void setDataSizeMovedGB(long dataSizeMovedGB) {
+    this.dataSizeMovedGB.set(dataSizeMovedGB);
   }
 
-  public LongMetric getMovedContainersNum() {
-    return movedContainersNum;
+  public long incrementDataSizeMovedGB(long valueToAdd) {
+    this.dataSizeMovedGB.incr(valueToAdd);
+    return this.dataSizeMovedGB.value();
   }
 
-  public void setMovedContainersNum(
-      LongMetric movedContainersNum) {
-    this.movedContainersNum = movedContainersNum;
+  public long getMovedContainersNum() {
+    return movedContainersNum.value();
   }
 
-  public LongMetric getDatanodesNumToBalance() {
-    return datanodesNumToBalance;
+  public void setMovedContainersNum(long movedContainersNum) {
+    this.movedContainersNum.set(movedContainersNum);
   }
 
-  public void setDatanodesNumToBalance(
-      LongMetric datanodesNumToBalance) {
-    this.datanodesNumToBalance = datanodesNumToBalance;
+  public long incrementMovedContainersNum(long valueToAdd) {
+    this.movedContainersNum.incr(valueToAdd);
+    return this.movedContainersNum.value();
   }
 
-  public LongMetric getDatanodesNumBalanced() {
-    return datanodesNumBalanced;
+  public long getDatanodesNumToBalance() {
+    return datanodesNumToBalance.value();
   }
 
-  public void setDatanodesNumBalanced(
-      LongMetric datanodesNumBalanced) {
-    this.datanodesNumBalanced = datanodesNumBalanced;
+  public void setDatanodesNumToBalance(long datanodesNumToBalance) {
+    this.datanodesNumToBalance.set(datanodesNumToBalance);
+  }
+
+  /**
+   * Add specified valueToAdd to the number of datanodes that need to be
+   * balanced.
+   *
+   * @param valueToAdd number of datanodes to add
+   */
+  public void incrementDatanodesNumToBalance(long valueToAdd) {
+    this.datanodesNumToBalance.incr(valueToAdd);
+  }
+
+  public long getDatanodesNumBalanced() {
+    return datanodesNumBalanced.value();
+  }
+
+  public void setDatanodesNumBalanced(long datanodesNumBalanced) {
+    this.datanodesNumBalanced.set(datanodesNumBalanced);
   }
 
   /**
@@ -115,16 +142,15 @@ public final class ContainerBalancerMetrics {
    * @return The result after addition.
    */
   public long incrementDatanodesNumBalanced(long valueToAdd) {
-    datanodesNumBalanced.add(valueToAdd);
-    return datanodesNumBalanced.get();
+    datanodesNumBalanced.incr(valueToAdd);
+    return datanodesNumBalanced.value();
   }
 
-  public double getMaxDatanodeUtilizedRatio() {
-    return maxDatanodeUtilizedRatio;
+  public int getMaxDatanodeUtilizedPercentage() {
+    return maxDatanodeUtilizedPercentage.value();
   }
 
-  public void setMaxDatanodeUtilizedRatio(
-      double maxDatanodeUtilizedRatio) {
-    this.maxDatanodeUtilizedRatio = maxDatanodeUtilizedRatio;
+  public void setMaxDatanodeUtilizedPercentage(int percentage) {
+    this.maxDatanodeUtilizedPercentage.set(percentage);
   }
 }

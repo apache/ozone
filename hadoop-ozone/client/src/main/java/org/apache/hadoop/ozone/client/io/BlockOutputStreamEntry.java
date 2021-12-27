@@ -29,15 +29,21 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
 
 /**
- * Helper class used inside {@link BlockOutputStream}.
+ * A BlockOutputStreamEntry manages the data writes into the DataNodes.
+ * It wraps BlockOutputStreams that are connecting to the DataNodes,
+ * and in the meantime accounts the length of data successfully written.
+ *
+ * The base implementation is handling Ratis-3 writes, with a single stream,
+ * but there can be other implementations that are using a different way.
  * */
-public final class BlockOutputStreamEntry extends OutputStream {
+public class BlockOutputStreamEntry extends OutputStream {
 
   private final OzoneClientConfig config;
   private OutputStream outputStream;
@@ -54,7 +60,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private BufferPool bufferPool;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  private BlockOutputStreamEntry(
+  BlockOutputStreamEntry(
       BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
@@ -75,74 +81,93 @@ public final class BlockOutputStreamEntry extends OutputStream {
     this.bufferPool = bufferPool;
   }
 
-  long getLength() {
-    return length;
-  }
-
-  Token<OzoneBlockTokenIdentifier> getToken() {
-    return token;
-  }
-
-  long getRemaining() {
-    return length - currentPosition;
-  }
-
   /**
    * BlockOutputStream is initialized in this function. This makes sure that
    * xceiverClient initialization is not done during preallocation and only
    * done when data is written.
    * @throws IOException if xceiverClient initialization fails
    */
-  private void checkStream() throws IOException {
-    if (this.outputStream == null) {
-      this.outputStream =
-          new BlockOutputStream(blockID, xceiverClientManager,
-              pipeline, bufferPool, config, token);
+  void checkStream() throws IOException {
+    if (!isInitialized()) {
+      createOutputStream();
     }
   }
 
+  /**
+   * Creates the outputStreams that are necessary to start the write.
+   * Implementors can override this to instantiate multiple streams instead.
+   * @throws IOException
+   */
+  void createOutputStream() throws IOException {
+    outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
+        pipeline, bufferPool, config, token);
+  }
 
   @Override
   public void write(int b) throws IOException {
     checkStream();
-    outputStream.write(b);
-    this.currentPosition += 1;
+    getOutputStream().write(b);
+    incCurrentPosition();
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
     checkStream();
-    outputStream.write(b, off, len);
-    this.currentPosition += len;
+    getOutputStream().write(b, off, len);
+    incCurrentPosition(len);
+  }
+
+  void writeOnRetry(long len) throws IOException {
+    checkStream();
+    BlockOutputStream out = (BlockOutputStream) getOutputStream();
+    out.writeOnRetry(len);
+    incCurrentPosition(len);
   }
 
   @Override
   public void flush() throws IOException {
-    if (this.outputStream != null) {
-      this.outputStream.flush();
+    if (isInitialized()) {
+      getOutputStream().flush();
     }
   }
 
   @Override
   public void close() throws IOException {
-    if (this.outputStream != null) {
-      this.outputStream.close();
+    if (isInitialized()) {
+      getOutputStream().close();
       // after closing the chunkOutPutStream, blockId would have been
       // reconstructed with updated bcsId
-      this.blockID = ((BlockOutputStream) outputStream).getBlockID();
+      this.blockID = ((BlockOutputStream) getOutputStream()).getBlockID();
     }
   }
 
   boolean isClosed() {
-    if (outputStream != null) {
-      return  ((BlockOutputStream) outputStream).isClosed();
+    if (isInitialized()) {
+      return  ((BlockOutputStream) getOutputStream()).isClosed();
     }
     return false;
   }
 
+  void cleanup(boolean invalidateClient) throws IOException {
+    checkStream();
+    BlockOutputStream out = (BlockOutputStream) getOutputStream();
+    out.cleanup(invalidateClient);
+  }
+
+  /**
+   * If the underlying BlockOutputStream implements acknowledgement of the
+   * writes, this method returns the total number of bytes acknowledged to be
+   * stored by the DataNode peers.
+   * The default stream implementation returns zero, and if the used stream
+   * does not implement acknowledgement, this method returns zero.
+   *
+   * @return the number of bytes confirmed to by acknowledge by the underlying
+   *    BlockOutputStream, or zero if acknowledgment logic is not implemented,
+   *    or the entry is not initialized.
+   */
   long getTotalAckDataLength() {
-    if (outputStream != null) {
-      BlockOutputStream out = (BlockOutputStream) this.outputStream;
+    if (isInitialized()) {
+      BlockOutputStream out = (BlockOutputStream) getOutputStream();
       blockID = out.getBlockID();
       return out.getTotalAckDataLength();
     } else {
@@ -153,17 +178,13 @@ public final class BlockOutputStreamEntry extends OutputStream {
     }
   }
 
-  Collection<DatanodeDetails> getFailedServers() {
-    if (outputStream != null) {
-      BlockOutputStream out = (BlockOutputStream) this.outputStream;
-      return out.getFailedServers();
-    }
-    return Collections.emptyList();
-  }
-
+  /**
+   * Returns the amount of bytes that were attempted to be sent through towards
+   * the DataNodes, and the write call succeeded without an exception.
+   */
   long getWrittenDataLength() {
-    if (outputStream != null) {
-      BlockOutputStream out = (BlockOutputStream) this.outputStream;
+    if (isInitialized()) {
+      BlockOutputStream out = (BlockOutputStream) getOutputStream();
       return out.getWrittenDataLength();
     } else {
       // For a pre allocated block for which no write has been initiated,
@@ -173,19 +194,127 @@ public final class BlockOutputStreamEntry extends OutputStream {
     }
   }
 
-  void cleanup(boolean invalidateClient) throws IOException {
-    checkStream();
-    BlockOutputStream out = (BlockOutputStream) this.outputStream;
-    out.cleanup(invalidateClient);
-
+  Collection<DatanodeDetails> getFailedServers() {
+    if (isInitialized()) {
+      BlockOutputStream out = (BlockOutputStream) getOutputStream();
+      return out.getFailedServers();
+    }
+    return Collections.emptyList();
   }
 
-  void writeOnRetry(long len) throws IOException {
-    checkStream();
-    BlockOutputStream out = (BlockOutputStream) this.outputStream;
-    out.writeOnRetry(len);
-    this.currentPosition += len;
+  /**
+   * Used to decide if the wrapped output stream is created already or not.
+   * @return true if the wrapped stream is already initialized.
+   */
+  boolean isInitialized() {
+    return getOutputStream() != null;
+  }
 
+  /**
+   * Gets the intended length of the key to be written.
+   * @return the length to be written into the key.
+   */
+  //TODO: this does not belong to here...
+  long getLength() {
+    return this.length;
+  }
+
+  /**
+   * Gets the block token that is used to authenticate during the write.
+   * @return the block token for writing the data
+   */
+  Token<OzoneBlockTokenIdentifier> getToken() {
+    return this.token;
+  }
+
+  /**
+   * Gets the amount of bytes remaining from the full write.
+   * @return the amount of bytes to still be written to the key
+   */
+  //TODO: this does not belong to here...
+  long getRemaining() {
+    return getLength() - getCurrentPosition();
+  }
+
+  /**
+   * Increases current position by the given length. Used in writes.
+   *
+   * @param len the amount of bytes to increase position with.
+   */
+  void incCurrentPosition(long len) {
+    currentPosition += len;
+  }
+
+  /**
+   * Increases current position by one. Used in writes.
+   */
+  void incCurrentPosition(){
+    currentPosition++;
+  }
+
+  /**
+   * In case of a failure this method can be used to reset the position back to
+   * the last position acked by a node before a write failure.
+   */
+  void resetToAckedPosition() {
+    currentPosition = getTotalAckDataLength();
+  }
+
+  @VisibleForTesting
+  public OutputStream getOutputStream() {
+    return this.outputStream;
+  }
+
+  @VisibleForTesting
+  public BlockID getBlockID() {
+    return this.blockID;
+  }
+
+  /**
+   * During writes a block ID might change as BCSID's are increasing.
+   * Implementors might account these changes, and return a different block id
+   * here.
+   * @param id the last know ID of the block.
+   */
+  void updateBlockID(BlockID id) {
+    this.blockID = id;
+  }
+
+  OzoneClientConfig getConf(){
+    return this.config;
+  }
+
+  XceiverClientFactory getXceiverClientManager() {
+    return this.xceiverClientManager;
+  }
+
+  /**
+   * Gets the original Pipeline this entry is initialized with.
+   * @return the original pipeline
+   */
+  @VisibleForTesting
+  public Pipeline getPipeline() {
+    return this.pipeline;
+  }
+
+  /**
+   * Gets the Pipeline based on which the location report can be sent to the OM.
+   * This is necessary, as implementors might use special pipeline information
+   * that can be created during commit, but not during initialization,
+   * and might need to update some Pipeline information returned in
+   * OMKeyLocationInfo.
+   * @return
+   */
+  Pipeline getPipelineForOMLocationReport(){
+    return getPipeline();
+  }
+
+  long getCurrentPosition() {
+    return this.currentPosition;
+  }
+
+  BufferPool getBufferPool() {
+    return this.bufferPool;
   }
 
   /**
@@ -213,8 +342,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
     }
 
     public Builder setXceiverClientManager(
-        XceiverClientFactory
-        xClientManager) {
+        XceiverClientFactory xClientManager) {
       this.xceiverClientManager = xClientManager;
       return this;
     }
@@ -255,39 +383,6 @@ public final class BlockOutputStreamEntry extends OutputStream {
           bufferPool,
           token, config);
     }
-  }
-
-  @VisibleForTesting
-  public OutputStream getOutputStream() {
-    return outputStream;
-  }
-
-  public BlockID getBlockID() {
-    return blockID;
-  }
-
-  public String getKey() {
-    return key;
-  }
-
-  public XceiverClientFactory getXceiverClientManager() {
-    return xceiverClientManager;
-  }
-
-  public Pipeline getPipeline() {
-    return pipeline;
-  }
-
-  public long getCurrentPosition() {
-    return currentPosition;
-  }
-
-  public BufferPool getBufferPool() {
-    return bufferPool;
-  }
-
-  public void setCurrentPosition(long curPosition) {
-    this.currentPosition = curPosition;
   }
 }
 

@@ -43,19 +43,32 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       description = "Maximum consecutive idle iterations")
   private Optional<Integer> idleiterations;
 
-  @Option(names = {"-d", "--maxDatanodesToBalance"},
-      description = "Maximum datanodes to move")
-  private Optional<Integer> maxDatanodesToBalance;
+  @Option(names = {"-d", "--maxDatanodesRatioToInvolvePerIteration"},
+      description = "The ratio of maximum number of datanodes that should be " +
+          "involved in balancing in one iteration to the total number of " +
+          "healthy, in service nodes known to container balancer.")
+  private Optional<Double> maxDatanodesRatioToInvolvePerIteration;
 
-  @Option(names = {"-s", "--maxSizeToMoveInGB"},
-      description = "Maximum size to move in GB, " +
+  @Option(names = {"-s", "--maxSizeToMovePerIterationInGB"},
+      description = "Maximum size to move per iteration of balancing in GB, " +
           "for 10GB it should be set as 10")
-  private Optional<Long> maxSizeToMoveInGB;
+  private Optional<Long> maxSizeToMovePerIterationInGB;
+
+  @Option(names = {"-e", "--maxSizeEnteringTarget"},
+      description = "the maximum size that can enter a target datanode while " +
+          "balancing in GB. This is the sum of data from multiple sources.")
+  private Optional<Long> maxSizeEnteringTargetInGB;
+
+  @Option(names = {"-l", "--maxSizeLeavingSource"},
+      description = "maximum size that can leave a source datanode while " +
+          "balancing in GB, it is the sum of data moving to multiple targets.")
+  private Optional<Long> maxSizeLeavingSourceInGB;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean result = scmClient.startContainerBalancer(threshold, idleiterations,
-        maxDatanodesToBalance, maxSizeToMoveInGB);
+        maxDatanodesRatioToInvolvePerIteration, maxSizeToMovePerIterationInGB,
+        maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB);
     if (result) {
       System.out.println("Starting ContainerBalancer Successfully.");
       return;

@@ -50,7 +50,7 @@ public final class Genesis {
           + "Ex. ozone genesis -benchmark BenchMarkContainerStateMap,"
           + "BenchMarkOMKeyAllocation.\n"
           + "Possible benchmarks which can be used are "
-          + "{BenchMarkContainerStateMap, BenchMarkOMKeyAllocation, "
+          + "{BenchMarkContainerStateMap, "
           + "BenchMarkOzoneManager, BenchMarkOMClient, "
           + "BenchMarkSCM, BenchMarkMetadataStoreReads, "
           + "BenchMarkMetadataStoreWrites, BenchMarkDatanodeDispatcher, "

@@ -96,8 +96,7 @@ public class StorageVolumeChecker {
    */
   private final ScheduledExecutorService diskCheckerservice;
   private final ScheduledFuture<?> periodicDiskChecker;
-
-  private List<MutableVolumeSet> registeredVolumeSets;
+  private final List<VolumeSet> registeredVolumeSets;
 
   /**
    * @param conf  Configuration object.
@@ -146,7 +145,7 @@ public class StorageVolumeChecker {
             TimeUnit.MINUTES);
   }
 
-  public synchronized void registerVolumeSet(MutableVolumeSet volumeSet) {
+  public synchronized void registerVolumeSet(VolumeSet volumeSet) {
     registeredVolumeSets.add(volumeSet);
   }
 
@@ -164,8 +163,8 @@ public class StorageVolumeChecker {
     }
 
     try {
-      for (MutableVolumeSet volSet : registeredVolumeSets) {
-        volSet.checkAllVolumes();
+      for (VolumeSet volSet : registeredVolumeSets) {
+        volSet.checkAllVolumes(this);
       }
 
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
@@ -382,6 +381,7 @@ public class StorageVolumeChecker {
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
     periodicDiskChecker.cancel(true);
     diskCheckerservice.shutdownNow();
+    checkVolumeResultHandlerExecutorService.shutdownNow();
     try {
       delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
     } catch (InterruptedException e) {

@@ -20,12 +20,10 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.util.FakeTimer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -39,6 +37,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.HEALTHY;
+import static org.apache.hadoop.ozone.container.common.volume.TestStorageVolumeChecker.makeVolumes;
 
 /**
  * Test periodic volume checker in StorageVolumeChecker.
@@ -79,40 +81,51 @@ public class TestPeriodicVolumeChecker {
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
-    dnConf.setDiskCheckMinGap(Duration.ofMinutes(2));
-    dnConf.setPeriodicDiskCheckIntervalMinutes(1);
-    conf.setFromObject(dnConf);
+    Duration gap = dnConf.getDiskCheckMinGap();
+    Duration interval = Duration.ofMinutes(
+        dnConf.getPeriodicDiskCheckIntervalMinutes());
 
-    DatanodeDetails datanodeDetails =
-        ContainerTestUtils.createDatanodeDetails();
-    OzoneContainer ozoneContainer =
-        ContainerTestUtils.getOzoneContainer(datanodeDetails, conf);
-    MutableVolumeSet dataVolumeSet = ozoneContainer.getVolumeSet();
+    FakeTimer timer = new FakeTimer();
 
-    StorageVolumeChecker volumeChecker = dataVolumeSet.getVolumeChecker();
-    volumeChecker.setDelegateChecker(
-        new TestStorageVolumeChecker.DummyChecker());
+    StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer);
 
-    // 1 for volumeSet and 1 for metadataVolumeSet
-    // in MutableVolumeSet constructor
-    Assert.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
-    Assert.assertEquals(0, volumeChecker.getNumAllVolumeSetsChecks());
+    try {
+      volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(
+          2, HEALTHY)));
+      volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(
+          1, HEALTHY)));
+      volumeChecker.setDelegateChecker(
+          new TestStorageVolumeChecker.DummyChecker());
 
-    // wait for periodic disk checker start
-    Thread.sleep((60 + 5) * 1000);
+      Assert.assertEquals(0, volumeChecker.getNumAllVolumeChecks());
+      Assert.assertEquals(0, volumeChecker.getNumAllVolumeSetsChecks());
 
-    // first round
-    // 2 for volumeSet and 2 for metadataVolumeSet
-    Assert.assertEquals(4, volumeChecker.getNumAllVolumeChecks());
-    Assert.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
-    Assert.assertEquals(0, volumeChecker.getNumSkippedChecks());
+      // first round
+      timer.advance(gap.toMillis() / 3);
+      volumeChecker.checkAllVolumeSets();
 
-    // wait for periodic disk checker next round
-    Thread.sleep((60 + 5) * 1000);
+      Assert.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
+      Assert.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
+      Assert.assertEquals(0, volumeChecker.getNumSkippedChecks());
 
-    // skipped next round
-    Assert.assertEquals(4, volumeChecker.getNumAllVolumeChecks());
-    Assert.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
-    Assert.assertEquals(1, volumeChecker.getNumSkippedChecks());
+      // periodic disk checker next round within gap
+      timer.advance(gap.toMillis() / 3);
+      volumeChecker.checkAllVolumeSets();
+
+      // skipped next round
+      Assert.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
+      Assert.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
+      Assert.assertEquals(1, volumeChecker.getNumSkippedChecks());
+
+      // periodic disk checker next round
+      timer.advance(interval.toMillis());
+      volumeChecker.checkAllVolumeSets();
+
+      Assert.assertEquals(4, volumeChecker.getNumAllVolumeChecks());
+      Assert.assertEquals(2, volumeChecker.getNumAllVolumeSetsChecks());
+      Assert.assertEquals(1, volumeChecker.getNumSkippedChecks());
+    } finally {
+      volumeChecker.shutdownAndWait(1, TimeUnit.SECONDS);
+    }
   }
 }

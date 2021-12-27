@@ -164,4 +164,8 @@ public class OzoneKey {
     return replicationConfig.getRequiredNodes();
   }
 
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
+  }
+
 }

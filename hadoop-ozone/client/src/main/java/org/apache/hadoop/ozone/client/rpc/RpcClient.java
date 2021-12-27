@@ -25,6 +25,7 @@ import javax.crypto.CipherOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.security.InvalidKeyException;
+import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -104,8 +105,10 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
@@ -127,8 +130,10 @@ import com.google.common.cache.RemovalNotification;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
+import org.apache.hadoop.util.ComparableVersion;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
 import org.jetbrains.annotations.NotNull;
@@ -146,7 +151,7 @@ public class RpcClient implements ClientProtocol {
       LoggerFactory.getLogger(RpcClient.class);
 
   private final ConfigurationSource conf;
-  private final OzoneManagerProtocol ozoneManagerClient;
+  private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
   private final int chunkSize;
   private final UserGroupInformation ugi;
@@ -182,16 +187,36 @@ public class RpcClient implements ClientProtocol {
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
     OmTransport omTransport = createOmTransport(omServiceId);
-
-    this.ozoneManagerClient = TracingUtil.createProxy(
+    OzoneManagerProtocolClientSideTranslatorPB
+        ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
-            clientId.toString()),
-        OzoneManagerProtocol.class, conf
-    );
+        clientId.toString());
+    this.ozoneManagerClient = TracingUtil.createProxy(
+        ozoneManagerProtocolClientSideTranslatorPB,
+        OzoneManagerClientProtocol.class, conf);
     dtService = omTransport.getDelegationTokenService();
-    ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     List<X509Certificate> x509Certificates = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
+      // If the client is authenticating using S3 style auth, all future
+      // requests serviced by this client will need S3 Auth set.
+      boolean isS3 = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false);
+      ozoneManagerProtocolClientSideTranslatorPB.setS3AuthCheck(isS3);
+      if (isS3) {
+        // S3 Auth works differently and needs OM version to be at 2.0.0
+        String omVersion = conf.get(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY);
+        if (!validateOmVersion(omVersion, serviceInfoEx.getServiceInfoList())) {
+          if (LOG.isDebugEnabled()) {
+            for (ServiceInfo s : serviceInfoEx.getServiceInfoList()) {
+              LOG.debug("Node {} version {}", s.getHostname(),
+                  s.getProtobuf().getOMProtocolVersion());
+            }
+          }
+          throw new RuntimeException("OmVersion expected "
+              + omVersion
+              + ", not found in ServiceList");
+        }
+      }
       String caCertPem = null;
       List<String> caCertPems = null;
       caCertPem = serviceInfoEx.getCaCertificate();
@@ -255,6 +280,29 @@ public class RpcClient implements ClientProtocol {
         }).build();
   }
 
+  static boolean validateOmVersion(String expectedVersion,
+                                   List<ServiceInfo> serviceInfoList) {
+    if (expectedVersion == null || expectedVersion.isEmpty()) {
+      // Empty strings assumes client is fine with any OM version.
+      return true;
+    }
+    boolean found = false; // At min one OM should be present.
+    for (ServiceInfo s: serviceInfoList) {
+      if (s.getNodeType() == HddsProtos.NodeType.OM) {
+        ComparableVersion comparableExpectedVersion =
+            new ComparableVersion(expectedVersion);
+        ComparableVersion comparableOMVersion =
+            new ComparableVersion(s.getProtobuf().getOMProtocolVersion());
+        if (comparableOMVersion.compareTo(comparableExpectedVersion) < 0) {
+          return false;
+        } else {
+          found = true;
+        }
+      }
+    }
+    return found;
+  }
+
   @NotNull
   @VisibleForTesting
   protected XceiverClientFactory createXceiverClientFactory(
@@ -301,9 +349,9 @@ public class RpcClient implements ClientProtocol {
     verifySpaceQuota(volArgs.getQuotaInBytes());
 
     String admin = volArgs.getAdmin() == null ?
-        ugi.getUserName() : volArgs.getAdmin();
+        ugi.getShortUserName() : volArgs.getAdmin();
     String owner = volArgs.getOwner() == null ?
-        ugi.getUserName() : volArgs.getOwner();
+        ugi.getShortUserName() : volArgs.getOwner();
     long quotaInNamespace = volArgs.getQuotaInNamespace();
     long quotaInBytes = volArgs.getQuotaInBytes();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
@@ -465,6 +513,8 @@ public class RpcClient implements ClientProtocol {
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
 
+    String owner = bucketArgs.getOwner() == null ?
+            ugi.getShortUserName() : bucketArgs.getOwner();
     Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
         Boolean.FALSE : bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
@@ -491,15 +541,18 @@ public class RpcClient implements ClientProtocol {
         .setSourceBucket(bucketArgs.getSourceBucket())
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
         .setQuotaInNamespace(bucketArgs.getQuotaInNamespace())
-        .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
+        .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
+        .setBucketLayout(bucketArgs.getBucketLayout())
+        .setOwner(owner);
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);
     }
 
-    LOG.info("Creating Bucket: {}/{}, with Versioning {} and " +
-            "Storage Type set to {} and Encryption set to {} ",
-        volumeName, bucketName, isVersionEnabled, storageType, bek != null);
+    LOG.info("Creating Bucket: {}/{}, with {} as owner and Versioning {} and " +
+        "Storage Type set to {} and Encryption set to {} ",
+        volumeName, bucketName, owner, isVersionEnabled,
+        storageType, bek != null);
     ozoneManagerClient.createBucket(builder.build());
   }
 
@@ -541,6 +594,15 @@ public class RpcClient implements ClientProtocol {
    * @return listOfAcls
    * */
   private List<OzoneAcl> getAclList() {
+    if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
+      UserGroupInformation aclUgi =
+          UserGroupInformation.createRemoteUser(
+             ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
+      return OzoneAclUtil.getAclList(
+          aclUgi.getUserName(),
+          aclUgi.getGroupNames(),
+         userRights, groupRights);
+    }
     return OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
         userRights, groupRights);
   }
@@ -714,7 +776,9 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getUsedBytes(),
         bucketInfo.getUsedNamespace(),
         bucketInfo.getQuotaInBytes(),
-        bucketInfo.getQuotaInNamespace()
+        bucketInfo.getQuotaInNamespace(),
+        bucketInfo.getBucketLayout(),
+        bucketInfo.getOwner()
     );
   }
 
@@ -742,7 +806,9 @@ public class RpcClient implements ClientProtocol {
         bucket.getUsedBytes(),
         bucket.getUsedNamespace(),
         bucket.getQuotaInBytes(),
-        bucket.getQuotaInNamespace()))
+        bucket.getQuotaInNamespace(),
+        bucket.getBucketLayout(),
+        bucket.getOwner()))
         .collect(Collectors.toList());
   }
 
@@ -777,8 +843,8 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .addAllMetadata(metadata)
-        .setAcls(getAclList());
-
+        .setAcls(getAclList())
+        .setLatestVersionLocation(getLatestVersionLocation);
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try{
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
@@ -802,9 +868,28 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     // check crypto protocol version
     OzoneKMSUtil.checkCryptoProtocolVersion(feInfo);
-    KeyProvider.KeyVersion decrypted;
-    decrypted = OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
-        getKeyProvider());
+    KeyProvider.KeyVersion decrypted = null;
+    try {
+      // Do proxy thing only when current UGI not matching with login UGI
+      // In this way, proxying is done only for s3g where
+      // s3g can act as proxy to end user.
+      UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+      if (!ugi.getShortUserName().equals(loginUser.getShortUserName())) {
+        UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
+            ugi.getShortUserName(), loginUser);
+        decrypted = proxyUser.doAs(
+            (PrivilegedExceptionAction<KeyProvider.KeyVersion>) () -> {
+              return OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
+                  getKeyProvider());
+            });
+      } else {
+        decrypted = OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
+            getKeyProvider());
+      }
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted during decrypt key", ex);
+    }
     return decrypted;
   }
 
@@ -890,7 +975,6 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     List<OmKeyInfo> keys = ozoneManagerClient.listKeys(
         volumeName, bucketName, prevKey, keyPrefix, maxListResult);
-
     return keys.stream().map(key -> new OzoneKey(
         key.getVolumeName(),
         key.getBucketName(),
@@ -962,6 +1046,7 @@ public class RpcClient implements ClientProtocol {
     keyProviderCache.cleanUp();
   }
 
+  @Deprecated
   @Override
   public OmMultipartInfo initiateMultipartUpload(String volumeName,
       String bucketName, String keyName, ReplicationType type,
@@ -1038,7 +1123,7 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream.addPreallocateBlocks(
         openKey.getKeyInfo().getLatestVersionLocations(),
         openKey.getOpenVersion());
-    FileEncryptionInfo feInfo = keyOutputStream.getFileEncryptionInfo();
+    FileEncryptionInfo feInfo = openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
       KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoOutputStream cryptoOut =
@@ -1185,6 +1270,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationType type, ReplicationFactor factor,
       boolean overWrite, boolean recursive) throws IOException {
@@ -1232,6 +1318,7 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
+        .setLatestVersionLocation(getLatestVersionLocation)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
@@ -1378,7 +1465,8 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
-    final FileEncryptionInfo feInfo = keyOutputStream.getFileEncryptionInfo();
+    final FileEncryptionInfo feInfo =
+        openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
       KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoOutputStream cryptoOut =
@@ -1449,5 +1537,42 @@ public class RpcClient implements ClientProtocol {
   @VisibleForTesting
   public Cache<URI, KeyProvider> getKeyProviderCache() {
     return keyProviderCache;
+  }
+
+  @Override
+  public OzoneKey headObject(String volumeName, String bucketName,
+      String keyName) throws IOException {
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setLatestVersionLocation(true)
+        .setHeadOp(true)
+        .build();
+    OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+
+    return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
+        keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
+        keyInfo.getModificationTime(), keyInfo.getReplicationConfig());
+
+  }
+
+  @Override
+  public void setTheadLocalS3Auth(
+      S3Auth ozoneSharedSecretAuth) {
+    ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
+  }
+
+  @Override
+  public S3Auth getThreadLocalS3Auth() {
+    return ozoneManagerClient.getThreadLocalS3Auth();
+  }
+
+  @Override
+  public void clearTheadLocalS3Auth() {
+    ozoneManagerClient.clearThreadLocalS3Auth();
   }
 }

@@ -309,7 +309,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * datanode.
    */
   private void startRatisForTest() throws IOException {
-    String scmId = "scm-01";
     String clusterId = "clusterId";
     datanodeStateMachine.getContainer().start(clusterId);
     MutableVolumeSet volumeSet =
@@ -319,8 +318,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
       HddsVolume hddsVolume = (HddsVolume) entry.getValue();
-      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
-          clusterId, LOG);
+      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, clusterId,
+          clusterId, conf, LOG);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }

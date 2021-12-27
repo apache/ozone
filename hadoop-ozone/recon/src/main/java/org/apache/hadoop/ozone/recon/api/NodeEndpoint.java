@@ -139,7 +139,7 @@ public class NodeEndpoint {
       }
 
       DatanodeInfo dnInfo = (DatanodeInfo) datanode;
-      datanodes.add(builder.withHostname(hostname)
+      datanodes.add(builder.withHostname(nodeManager.getHostName(datanode))
           .withDatanodeStorageReport(storageReport)
           .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
           .withState(nodeState)
@@ -147,10 +147,10 @@ public class NodeEndpoint {
           .withPipelines(pipelines)
           .withLeaderCount(leaderCount.get())
           .withUUid(datanode.getUuidString())
-          .withVersion(datanode.getVersion())
-          .withSetupTime(datanode.getSetupTime())
-          .withRevision(datanode.getRevision())
-          .withBuildDate(datanode.getBuildDate())
+          .withVersion(nodeManager.getVersion(datanode))
+          .withSetupTime(nodeManager.getSetupTime(datanode))
+          .withRevision(nodeManager.getRevision(datanode))
+          .withBuildDate(nodeManager.getBuildDate(datanode))
           .withLayoutVersion(
               dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
           .build());

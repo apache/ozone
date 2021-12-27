@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.hdds.ExitManager;
@@ -150,7 +151,7 @@ public class TestOMRatisSnapshots {
     TermIndex leaderOMTermIndex =
         TermIndex.valueOf(transactionInfo.getTerm(),
             transactionInfo.getTransactionIndex());
-    long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
     DBCheckpoint leaderDbCheckpoint =
@@ -160,10 +161,17 @@ public class TestOMRatisSnapshots {
     cluster.startInactiveOM(followerNodeId);
 
     // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+          >= leaderOMSnapshotIndex - 1;
+    }, 100, 3000);
+    
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     assertTrue(
-        followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
+        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);    
 
     // Install leader OM's db checkpoint on the lagging OM.
     followerOM.installCheckpoint(leaderOMNodeId, leaderDbCheckpoint);
@@ -173,7 +181,7 @@ public class TestOMRatisSnapshots {
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnaphsotIndex);
+    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
     assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
         .getTerm() >= leaderOMSnapshotTermIndex);
 
@@ -185,8 +193,9 @@ public class TestOMRatisSnapshots {
     Assert.assertNotNull(followerOMMetaMngr.getBucketTable().get(
         followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
-      Assert.assertNotNull(followerOMMetaMngr.getKeyTable().get(
-          followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
+      Assert.assertNotNull(followerOMMetaMngr.getKeyTable(
+          getDefaultBucketLayout())
+          .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
   }
 
@@ -308,6 +317,10 @@ public class TestOMRatisSnapshots {
       logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     }
     return keys;
+  }
+
+  private static BucketLayout getDefaultBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   private static class DummyExitManager extends ExitManager {

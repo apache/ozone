@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.conf.StorageUnit;
@@ -59,6 +60,8 @@ public final class ContainerTestHelper {
 
   public static final long CONTAINER_MAX_SIZE =
       (long) StorageUnit.GB.toBytes(1);
+  public static final String DATANODE_UUID = UUID.randomUUID().toString();
+  private static final long DUMMY_CONTAINER_ID = 9999;
 
   /**
    * Never constructed.
@@ -624,5 +627,77 @@ public final class ContainerTestHelper {
 
   public static String getFixedLengthString(String string, int length) {
     return String.format("%1$" + length + "s", string);
+  }
+
+  /**
+   * Construct fake protobuf messages for various types of requests.
+   * This is tedious, however necessary to test. Protobuf classes are final
+   * and cannot be mocked by Mockito.
+   *
+   * @param cmdType type of the container command.
+   * @return
+   */
+  public static ContainerCommandRequestProto getDummyCommandRequestProto(
+      ContainerProtos.Type cmdType) {
+    final Builder builder =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(cmdType)
+            .setContainerID(DUMMY_CONTAINER_ID)
+            .setDatanodeUuid(DATANODE_UUID);
+
+    final DatanodeBlockID fakeBlockId =
+        DatanodeBlockID.newBuilder()
+            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1)
+            .setBlockCommitSequenceId(101).build();
+
+    final ContainerProtos.ChunkInfo fakeChunkInfo =
+        ContainerProtos.ChunkInfo.newBuilder()
+            .setChunkName("dummy")
+            .setOffset(0)
+            .setLen(100)
+            .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+                .setBytesPerChecksum(1)
+                .setType(ChecksumType.CRC32)
+                .build())
+            .build();
+
+    switch (cmdType) {
+    case ReadContainer:
+      builder.setReadContainer(
+          ContainerProtos.ReadContainerRequestProto.newBuilder().build());
+      break;
+    case GetBlock:
+      builder.setGetBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
+          .setBlockID(fakeBlockId).build());
+      break;
+    case GetCommittedBlockLength:
+      builder.setGetCommittedBlockLength(
+          ContainerProtos.GetCommittedBlockLengthRequestProto.newBuilder()
+              .setBlockID(fakeBlockId).build());
+      break;
+    case ReadChunk:
+      builder.setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
+          .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo)
+          .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1).build());
+      break;
+    case DeleteChunk:
+      builder
+          .setDeleteChunk(ContainerProtos.DeleteChunkRequestProto.newBuilder()
+              .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo).build());
+      break;
+    case GetSmallFile:
+      builder
+          .setGetSmallFile(ContainerProtos.GetSmallFileRequestProto.newBuilder()
+              .setBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
+                  .setBlockID(fakeBlockId)
+                  .build())
+              .build());
+      break;
+
+    default:
+      Assert.fail("Unhandled request type " + cmdType + " in unit test");
+    }
+
+    return builder.build();
   }
 }

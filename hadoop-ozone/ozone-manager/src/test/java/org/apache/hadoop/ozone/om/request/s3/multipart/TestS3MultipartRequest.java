@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.junit.After;
 import org.junit.Assert;
@@ -233,7 +234,8 @@ public class TestS3MultipartRequest {
 
     S3InitiateMultipartUploadRequestWithFSO
         s3InitiateMultipartUploadRequestWithFSO =
-            new S3InitiateMultipartUploadRequestWithFSO(omRequest);
+        new S3InitiateMultipartUploadRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedRequest =
             s3InitiateMultipartUploadRequestWithFSO.preExecute(ozoneManager);
@@ -250,22 +252,29 @@ public class TestS3MultipartRequest {
 
   protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
           OMRequest omRequest) {
-    return new S3MultipartUploadCompleteRequest(omRequest);
+    return new S3MultipartUploadCompleteRequest(omRequest,
+        BucketLayout.DEFAULT);
   }
 
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
           OMRequest omRequest) {
-    return new S3MultipartUploadCommitPartRequest(omRequest);
+    return new S3MultipartUploadCommitPartRequest(omRequest,
+        BucketLayout.DEFAULT);
   }
 
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-          OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequest(initiateMPURequest);
+      OMRequest initiateMPURequest) {
+    return new S3InitiateMultipartUploadRequest(initiateMPURequest,
+        BucketLayout.DEFAULT);
   }
 
   protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(
       OMRequest omRequest) {
-    return new S3MultipartUploadAbortRequest(omRequest);
+    return new S3MultipartUploadAbortRequest(omRequest, BucketLayout.DEFAULT);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
 }

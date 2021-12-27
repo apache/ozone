@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 
 /**
  * A naive implementation of the replication source which creates a tar file
@@ -53,8 +55,10 @@ public class OnDemandContainerReplicationSource
 
     Container container = controller.getContainer(containerId);
 
-    Preconditions.checkNotNull(
-        container, "Container is not found " + containerId);
+    if (container == null) {
+      throw new StorageContainerException("Container " + containerId +
+          " is not found.", CONTAINER_NOT_FOUND);
+    }
 
     controller.exportContainer(
         container.getContainerType(), containerId, destination, packer);

@@ -331,12 +331,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count)
       throws IOException {
-    return listContainer(startContainerID, count, null);
+    return listContainer(startContainerID, count, null, null);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
+    return listContainer(startContainerID, count, state, null);
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,
@@ -348,6 +355,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setTraceID(TracingUtil.exportCurrentSpan());
     if (state != null) {
       builder.setState(state);
+    }
+    if (factor != null) {
+      builder.setFactor(factor);
     }
 
     SCMListContainerRequestProto request = builder.build();
@@ -726,10 +736,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean startContainerBalancer(Optional<Double> threshold,
-                  Optional<Integer> idleiterations,
-                  Optional<Integer> maxDatanodesToBalance,
-                  Optional<Long> maxSizeToMoveInGB) throws IOException{
+  public boolean startContainerBalancer(
+      Optional<Double> threshold, Optional<Integer> idleiterations,
+      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTargetInGB,
+      Optional<Long> maxSizeLeavingSourceInGB) throws IOException{
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -741,17 +753,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
           "threshold should to be specified in range [0.0, 1.0).");
       builder.setThreshold(tsd);
     }
-    if (maxSizeToMoveInGB.isPresent()) {
-      long mstm = maxSizeToMoveInGB.get();
+    if (maxSizeToMovePerIterationInGB.isPresent()) {
+      long mstm = maxSizeToMovePerIterationInGB.get();
       Preconditions.checkState(mstm > 0,
-          "maxSizeToMoveInGB must be positive.");
-      builder.setMaxSizeToMoveInGB(mstm);
+          "maxSizeToMovePerIterationInGB must be positive.");
+      builder.setMaxSizeToMovePerIterationInGB(mstm);
     }
-    if (maxDatanodesToBalance.isPresent()) {
-      int mdtb = maxDatanodesToBalance.get();
-      Preconditions.checkState(mdtb > 0,
-          "maxDatanodesToBalance must be positive.");
-      builder.setMaxDatanodesToBalance(mdtb);
+    if (maxDatanodesRatioToInvolvePerIteration.isPresent()) {
+      double mdti = maxDatanodesRatioToInvolvePerIteration.get();
+      Preconditions.checkState(mdti >= 0,
+          "maxDatanodesRatioToInvolvePerIteration must be " +
+              "greater than equal to zero.");
+      Preconditions.checkState(mdti <= 1,
+          "maxDatanodesRatioToInvolvePerIteration must be " +
+              "lesser than equal to one.");
+      builder.setMaxDatanodesRatioToInvolvePerIteration(mdti);
     }
     if (idleiterations.isPresent()) {
       int idi = idleiterations.get();
@@ -760,6 +776,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
               " -1(infinitly run container balancer).");
       builder.setIdleiterations(idi);
     }
+
+    if (maxSizeEnteringTargetInGB.isPresent()) {
+      long mset = maxSizeEnteringTargetInGB.get();
+      Preconditions.checkState(mset > 0,
+          "maxSizeEnteringTargetInGB must be positive.");
+      builder.setMaxSizeEnteringTargetInGB(mset);
+    }
+
+    if (maxSizeLeavingSourceInGB.isPresent()) {
+      long msls = maxSizeLeavingSourceInGB.get();
+      Preconditions.checkState(msls > 0,
+          "maxSizeLeavingSourceInGB must be positive.");
+      builder.setMaxSizeLeavingSourceInGB(msls);
+    }
+
 
     StartContainerBalancerRequestProto request = builder.build();
     StartContainerBalancerResponseProto response =

@@ -21,14 +21,12 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +37,8 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.DATANODE_UUID;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
@@ -51,9 +51,6 @@ import static org.mockito.Mockito.when;
 public class TestKeyValueHandlerWithUnhealthyContainer {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueHandlerWithUnhealthyContainer.class);
-
-  private static final String DATANODE_UUID = UUID.randomUUID().toString();
-  private static final long DUMMY_CONTAINER_ID = 9999;
 
   @Test
   public void testRead() throws IOException {
@@ -160,75 +157,4 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     return new KeyValueContainer(containerData, new OzoneConfiguration());
   }
 
-  /**
-   * Construct fake protobuf messages for various types of requests.
-   * This is tedious, however necessary to test. Protobuf classes are final
-   * and cannot be mocked by Mockito.
-   *
-   * @param cmdType type of the container command.
-   * @return
-   */
-  private ContainerCommandRequestProto getDummyCommandRequestProto(
-      ContainerProtos.Type cmdType) {
-    final ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto.newBuilder()
-            .setCmdType(cmdType)
-            .setContainerID(DUMMY_CONTAINER_ID)
-            .setDatanodeUuid(DATANODE_UUID);
-
-    final ContainerProtos.DatanodeBlockID fakeBlockId =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1)
-            .setBlockCommitSequenceId(101).build();
-
-    final ContainerProtos.ChunkInfo fakeChunkInfo =
-        ContainerProtos.ChunkInfo.newBuilder()
-            .setChunkName("dummy")
-            .setOffset(0)
-            .setLen(100)
-            .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-                .setBytesPerChecksum(1)
-                .setType(ContainerProtos.ChecksumType.CRC32)
-                .build())
-            .build();
-
-    switch (cmdType) {
-    case ReadContainer:
-      builder.setReadContainer(
-          ContainerProtos.ReadContainerRequestProto.newBuilder().build());
-      break;
-    case GetBlock:
-      builder.setGetBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
-          .setBlockID(fakeBlockId).build());
-      break;
-    case GetCommittedBlockLength:
-      builder.setGetCommittedBlockLength(
-          ContainerProtos.GetCommittedBlockLengthRequestProto.newBuilder()
-              .setBlockID(fakeBlockId).build());
-      break;
-    case ReadChunk:
-      builder.setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
-          .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo)
-          .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1).build());
-      break;
-    case DeleteChunk:
-      builder
-          .setDeleteChunk(ContainerProtos.DeleteChunkRequestProto.newBuilder()
-              .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo).build());
-      break;
-    case GetSmallFile:
-      builder
-          .setGetSmallFile(ContainerProtos.GetSmallFileRequestProto.newBuilder()
-              .setBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
-                  .setBlockID(fakeBlockId)
-                  .build())
-              .build());
-      break;
-
-    default:
-      Assert.fail("Unhandled request type " + cmdType + " in unit test");
-    }
-
-    return builder.build();
-  }
 }

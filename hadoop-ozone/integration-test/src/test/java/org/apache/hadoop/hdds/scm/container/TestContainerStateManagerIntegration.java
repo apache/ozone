@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
@@ -36,7 +35,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -64,11 +62,11 @@ public class TestContainerStateManagerIntegration {
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
-  private XceiverClientManager xceiverClientManager;
   private StorageContainerManager scm;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private int numContainerPerOwnerInPipeline;
+  private  Set<ContainerID> excludedContainerIDS;
 
 
   @Before
@@ -80,11 +78,11 @@ public class TestContainerStateManagerIntegration {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
-    xceiverClientManager = new XceiverClientManager(conf);
     scm = cluster.getStorageContainerManager();
     containerManager = scm.getContainerManager();
-    containerStateManager = ((SCMContainerManager)containerManager)
+    containerStateManager = containerManager
         .getContainerStateManager();
+    excludedContainerIDS = new HashSet<>();
   }
 
   @After
@@ -102,7 +100,7 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline());
+            container1.getPipeline(), excludedContainerIDS);
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
     Assert.assertEquals(OzoneConsts.OZONE, info.getOwner());
@@ -117,14 +115,8 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
-    int numContainers = containerStateManager
-        .getMatchingContainerIDs(OzoneConsts.OZONE,
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
-            HddsProtos.LifeCycleState.OPEN).size();
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
         container2.getContainerInfo().getContainerID());
-    Assert.assertEquals(3, numContainers);
   }
 
   @Test
@@ -136,7 +128,7 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline());
+            container1.getPipeline(), excludedContainerIDS);
     Assert.assertNotNull(info);
 
     String newContainerOwner = "OZONE_NEW";
@@ -145,7 +137,7 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), newContainerOwner);
     ContainerInfo info2 = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, newContainerOwner,
-            container1.getPipeline());
+            container1.getPipeline(), excludedContainerIDS);
     Assert.assertNotNull(info2);
 
     Assert.assertNotEquals(info.containerID(), info2.containerID());
@@ -217,7 +209,7 @@ public class TestContainerStateManagerIntegration {
     for (int i = 1; i < numContainerPerOwnerInPipeline; i++) {
       ContainerInfo info = containerManager
           .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-              container1.getPipeline());
+              container1.getPipeline(), excludedContainerIDS);
       Assert.assertTrue(info.getContainerID() > cid);
       cid = info.getContainerID();
     }
@@ -226,7 +218,7 @@ public class TestContainerStateManagerIntegration {
     // next container should be the same as first container
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline());
+            container1.getPipeline(), excludedContainerIDS);
     Assert.assertEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
   }
@@ -245,7 +237,7 @@ public class TestContainerStateManagerIntegration {
     for (int i = 1; i < numContainerPerOwnerInPipeline; i++) {
       ContainerInfo info = containerManager
           .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-              container1.getPipeline());
+              container1.getPipeline(), excludedContainerIDS);
       Assert.assertTrue(info.getContainerID() > cid);
       cid = info.getContainerID();
     }
@@ -272,7 +264,7 @@ public class TestContainerStateManagerIntegration {
     for (int i = 1; i < numContainerPerOwnerInPipeline; i++) {
       ContainerInfo info = containerManager
           .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-              container1.getPipeline());
+              container1.getPipeline(), excludedContainerIDS);
       Assert.assertTrue(info.getContainerID() > cid);
       cid = info.getContainerID();
     }
@@ -300,7 +292,7 @@ public class TestContainerStateManagerIntegration {
       CompletableFuture.supplyAsync(() -> {
         ContainerInfo info = containerManager
             .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-                container1.getPipeline());
+                container1.getPipeline(), excludedContainerIDS);
         container2MatchedCount
             .compute(info.getContainerID(), (k, v) -> v == null ? 1L : v + 1);
         return null;
@@ -330,11 +322,8 @@ public class TestContainerStateManagerIntegration {
   @Test
   public void testUpdateContainerState() throws IOException,
       InvalidStateTransitionException {
-    NavigableSet<ContainerID> containerList = containerStateManager
-        .getMatchingContainerIDs(OzoneConsts.OZONE,
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
-            HddsProtos.LifeCycleState.OPEN);
+    Set<ContainerID> containerList = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.OPEN);
     int containers = containerList == null ? 0 : containerList.size();
     Assert.assertEquals(0, containers);
 
@@ -344,52 +333,37 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
-    containers = containerStateManager.getMatchingContainerIDs(
-        OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
-        HddsProtos.LifeCycleState.OPEN).size();
-    Assert.assertEquals(1, containers);
+    containerList = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.OPEN);
+    Assert.assertEquals(1, containerList.size());
 
     containerManager
         .updateContainerState(container1.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.FINALIZE);
-    containers = containerStateManager.getMatchingContainerIDs(
-        OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
-        HddsProtos.LifeCycleState.CLOSING).size();
-    Assert.assertEquals(1, containers);
+    containerList = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.CLOSING);
+    Assert.assertEquals(1, containerList.size());
 
     containerManager
         .updateContainerState(container1.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.CLOSE);
-    containers = containerStateManager.getMatchingContainerIDs(
-        OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
-        HddsProtos.LifeCycleState.CLOSED).size();
-    Assert.assertEquals(1, containers);
+    containerList = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.CLOSED);
+    Assert.assertEquals(1, containerList.size());
 
     containerManager
         .updateContainerState(container1.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.DELETE);
-    containers = containerStateManager.getMatchingContainerIDs(
-        OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
-        HddsProtos.LifeCycleState.DELETING).size();
-    Assert.assertEquals(1, containers);
+    containerList = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
+    Assert.assertEquals(1, containerList.size());
 
     containerManager
         .updateContainerState(container1.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containers = containerStateManager.getMatchingContainerIDs(
-        OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
-        HddsProtos.LifeCycleState.DELETED).size();
-    Assert.assertEquals(1, containers);
+    containerList = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assert.assertEquals(1, containerList.size());
 
     // Allocate container1 and update its state from
     // OPEN -> CLOSING -> CLOSED
@@ -403,12 +377,12 @@ public class TestContainerStateManagerIntegration {
     containerManager
         .updateContainerState(container3.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.CLOSE);
-    containers = containerStateManager.getMatchingContainerIDs(
-        OzoneConsts.OZONE,
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf),
-        HddsProtos.LifeCycleState.CLOSED).size();
-    Assert.assertEquals(1, containers);
+    containerManager
+        .updateContainerState(container1.getContainerInfo().containerID(),
+            HddsProtos.LifeCycleEvent.CLOSE);
+    containerList = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.CLOSED);
+    Assert.assertEquals(1, containerList.size());
   }
 
 
@@ -424,12 +398,8 @@ public class TestContainerStateManagerIntegration {
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());
     Set<ContainerReplica> replicaSet;
-    try {
-      containerStateManager.getContainerReplicas(containerID);
-      Assert.fail();
-    } catch (ContainerNotFoundException ex) {
-      // expected.
-    }
+    containerStateManager.getContainerReplicas(containerID.getProtobuf());
+    Assert.fail();
 
     ContainerWithPipeline container = scm.getClientProtocolServer()
         .allocateContainer(
@@ -449,44 +419,44 @@ public class TestContainerStateManagerIntegration {
         .setContainerState(ContainerReplicaProto.State.OPEN)
         .setDatanodeDetails(dn2)
         .build();
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Test 3: Remove one replica node and then test
-    containerStateManager.removeContainerReplica(id, replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
     Assert.assertEquals(1, replicaSet.size());
     Assert.assertFalse(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Test 3: Remove second replica node and then test
-    containerStateManager.removeContainerReplica(id, replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id);
+    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
     Assert.assertEquals(0, replicaSet.size());
     Assert.assertFalse(replicaSet.contains(replicaOne));
     Assert.assertFalse(replicaSet.contains(replicaTwo));
 
     // Test 4: Re-insert dn1
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
     Assert.assertEquals(1, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertFalse(replicaSet.contains(replicaTwo));
 
     // Re-insert dn2
-    containerStateManager.updateContainerReplica(id, replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Re-insert dn1
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id);
+    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));

@@ -129,7 +129,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
         String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(objectKey);
 
         if (omKeyInfo == null) {
           deleteStatus = false;
@@ -160,7 +161,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       // Mark all keys which can be deleted, in cache as deleted.
       for (OmKeyInfo omKeyInfo : omKeyInfoList) {
-        omMetadataManager.getKeyTable().addCacheEntry(
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
             new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
                 omKeyInfo.getKeyName())),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
@@ -194,7 +195,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
           .setStatus(false).setUnDeletedKeys(unDeletedKeys).build()).build();
-      omClientResponse = new OMKeysDeleteResponse(omResponse.build());
+      omClientResponse =
+          new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
 
     } finally {
       if (acquiredLock) {

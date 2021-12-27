@@ -25,7 +25,6 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -34,13 +33,16 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -102,6 +104,7 @@ import org.apache.ratis.server.RaftServerRpc;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
+import org.apache.ratis.util.TraditionalBinaryPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,7 +141,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final ConfigurationSource conf;
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
-  private final Set<RaftGroupId> raftGids = new HashSet<>();
+  private final Set<RaftGroupId> raftGids = ConcurrentHashMap.newKeySet();
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
   private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
@@ -219,7 +222,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     setRaftSegmentAndWriteBufferSize(properties);
 
     // set raft segment pre-allocated size
-    final int raftSegmentPreallocatedSize =
+    final long raftSegmentPreallocatedSize =
         setRaftSegmentPreallocatedSize(properties);
 
     TimeUnit timeUnit;
@@ -264,7 +267,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // Disable the pre vote feature in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        conf.getObject(DatanodeRatisServerConfig.class).isPreVoteEnabled());
 
     // Set the ratis storage directory
     Collection<String> storageDirPaths =
@@ -380,8 +384,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setExpiryTime(properties, retryCacheTimeout);
   }
 
-  private int setRaftSegmentPreallocatedSize(RaftProperties properties) {
-    final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(
+  private long setRaftSegmentPreallocatedSize(RaftProperties properties) {
+    final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
@@ -404,7 +408,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
-    final int raftSegmentSize = (int)conf.getStorageSize(
+    final long raftSegmentSize = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
         StorageUnit.BYTES);
@@ -425,12 +429,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void setPendingRequestsLimits(RaftProperties properties) {
 
-    final int pendingRequestsByteLimit = (int)conf.getStorageSize(
+    long pendingRequestsBytesLimit = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    RaftServerConfigKeys.Write.setByteLimit(properties,
-        SizeInBytes.valueOf(pendingRequestsByteLimit));
+    final int pendingRequestsMegaBytesLimit =
+        HddsUtils.roundupMb(pendingRequestsBytesLimit);
+    RaftServerConfigKeys.Write.setByteLimit(properties, SizeInBytes
+        .valueOf(pendingRequestsMegaBytesLimit, TraditionalBinaryPrefix.MEGA));
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
@@ -566,7 +572,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    RaftClientReply reply;
+    RaftClientReply reply = null;
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
@@ -579,7 +585,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       try {
         reply = server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
-      } catch (Exception e) {
+      } catch (ExecutionException | TimeoutException e) {
+        throw new IOException(e.getMessage(), e);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new IOException(e.getMessage(), e);
       }
       processReply(reply);
@@ -841,7 +850,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return minIndex == null ? -1 : minIndex.longValue();
   }
 
-  void notifyGroupRemove(RaftGroupId gid) {
+  public void notifyGroupRemove(RaftGroupId gid) {
     raftGids.remove(gid);
     // Remove any entries for group leader map
     groupLeaderMap.remove(gid);

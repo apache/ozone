@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -86,9 +86,9 @@ import org.junit.rules.TemporaryFolder;
  */
 public class TestBlockManager {
   private StorageContainerManager scm;
-  private ContainerManagerV2 mapping;
+  private ContainerManager mapping;
   private MockNodeManager nodeManager;
-  private PipelineManagerV2Impl pipelineManager;
+  private PipelineManagerImpl pipelineManager;
   private BlockManagerImpl blockManager;
   private SCMHAManager scmHAManager;
   private SequenceIdGenerator sequenceIdGen;
@@ -136,7 +136,7 @@ public class TestBlockManager {
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+        PipelineManagerImpl.newPipelineManager(
             conf,
             scmHAManager,
             nodeManager,
@@ -150,7 +150,7 @@ public class TestBlockManager {
             pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    ContainerManagerV2 containerManager =
+    ContainerManager containerManager =
         new ContainerManagerImpl(conf,
             scmHAManager,
             sequenceIdGen,
