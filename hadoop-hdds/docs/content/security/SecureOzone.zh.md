@@ -146,12 +146,20 @@ ozone-site.xml 中应进行如下配置：
         </thead>
         <tbody>
           <tr>
-            <td>ozone.s3g.authentication.kerberos.principal</th>
-            <td>S3 网关服务主体，例如：HTTP/_HOST@EXAMPLE.COM</td>
+            <td>ozone.s3g.kerberos.principal</th>
+            <td>S3 网关主体，例如：s3g/_host@REAML</td>
           </tr>
           <tr>
-            <td>ozone.s3g.keytab.file</th>
-            <td>S3 网关使用的 keytab 文件</td>
+            <td>ozone.s3g.kerberos.keytab.file</th>
+            <td>S3 网关使用的密钥表文件，例如：/etc/security/keytabs/s3g.keytab/td>
+          </tr>
+          <tr>
+            <td>ozone.s3g.http.auth.kerberos.principal</th>
+            <td>S3 网关主体，如果 S3 网关 http 服务器启用了 SPNEGO，例如：HTTP/_HOST@EXAMPLE.COM</td>
+          </tr>
+          <tr>
+            <td>ozone.s3g.http.auth.kerberos.keytab</th>
+            <td>S3 网关使用的密钥表文件，如果 S3 网关 http 服务器启用了 SPNEGO。</td>
           </tr>
         </tbody>
       </table>
