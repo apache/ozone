@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
@@ -229,8 +228,6 @@ public class TestNSSummaryEndpoint {
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
-    // enable FSO mode
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
 
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
@@ -619,30 +616,30 @@ public class TestNSSummaryEndpoint {
           throws ContainerNotFoundException {
     ReconStorageContainerManagerFacade reconSCM =
             mock(ReconStorageContainerManagerFacade.class);
-    ContainerManagerV2 containerManagerV2 = mock(ContainerManagerV2.class);
+    ContainerManager containerManager = mock(ContainerManager.class);
 
     // Container 1 is 3-way replicated
     ContainerID containerID1 = new ContainerID(CONTAINER_ONE_ID);
     Set<ContainerReplica> containerReplicas1 = generateMockContainerReplicas(
             THREE, containerID1);
-    when(containerManagerV2.getContainerReplicas(containerID1))
+    when(containerManager.getContainerReplicas(containerID1))
             .thenReturn(containerReplicas1);
 
     // Container 2 is under replicated with 2 replica
     ContainerID containerID2 = new ContainerID(CONTAINER_TWO_ID);
     Set<ContainerReplica> containerReplicas2 = generateMockContainerReplicas(
             TWO, containerID2);
-    when(containerManagerV2.getContainerReplicas(containerID2))
+    when(containerManager.getContainerReplicas(containerID2))
             .thenReturn(containerReplicas2);
 
     // Container 3 is over replicated with 4 replica
     ContainerID containerID3 = new ContainerID(CONTAINER_THREE_ID);
     Set<ContainerReplica> containerReplicas3 = generateMockContainerReplicas(
             FOUR, containerID3);
-    when(containerManagerV2.getContainerReplicas(containerID3))
+    when(containerManager.getContainerReplicas(containerID3))
             .thenReturn(containerReplicas3);
 
-    when(reconSCM.getContainerManager()).thenReturn(containerManagerV2);
+    when(reconSCM.getContainerManager()).thenReturn(containerManager);
     return reconSCM;
   }
 }

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import com.google.common.base.Optional;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -31,7 +30,6 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -141,16 +139,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    String omLayout = ozoneManager.getOMMetadataLayout();
     OmBucketInfo omBucketInfo = null;
     if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
         .equals(BucketLayoutProto.LEGACY)) {
-      BucketLayout defaultType = BucketLayout.LEGACY;
-      if (StringUtils
-          .equalsIgnoreCase(OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX,
-              omLayout)) {
-        defaultType = BucketLayout.FILE_SYSTEM_OPTIMIZED;
-      }
+      // Bucket Layout argument was not passed during bucket creation.
+      String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
+      BucketLayout defaultType = BucketLayout.fromString(omDefaultBucketLayout);
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);

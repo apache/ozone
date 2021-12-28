@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -100,7 +101,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
+    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenReturn(true)
         .thenReturn(true)
@@ -274,7 +275,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
+    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
     when(mockKeyIter.next()).thenReturn(mockKeyValue);
@@ -414,5 +415,9 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     recordToFind.value1("vol2");
     assertEquals(1, fileCountBySizeDao.findById(recordToFind)
         .getCount().longValue());
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

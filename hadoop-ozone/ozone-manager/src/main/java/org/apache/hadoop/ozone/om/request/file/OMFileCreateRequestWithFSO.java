@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -59,8 +60,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileCreateRequestWithFSO.class);
-  public OMFileCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+
+  public OMFileCreateRequestWithFSO(OMRequest omRequest,
+                                    BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -211,7 +214,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // attribute in response object.
       int clientVersion = getOmRequest().getVersion();
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omFileInfo.getProtobuf(keyName, clientVersion))
+          .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
+              keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
@@ -226,7 +230,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseWithFSO(createErrorOMResponse(
-            omResponse, exception));
+            omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -248,7 +252,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("File create failed. Volume:{}, Bucket:{}, Key{}.",
+      LOG.error("File create failed. Volume:{}, Bucket:{}, Key:{}.",
           volumeName, bucketName, keyName, exception);
       break;
     default:

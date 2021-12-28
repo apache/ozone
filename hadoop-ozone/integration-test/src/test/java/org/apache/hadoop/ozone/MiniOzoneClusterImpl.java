@@ -81,6 +81,7 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.STANDALO
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
@@ -90,7 +91,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RA
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
@@ -814,11 +814,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
         List<String> dataDirs = new ArrayList<>();
+        List<String> reservedSpaceList = new ArrayList<>();
         for (int j = 0; j < numDataVolumes; j++) {
           Path dir = Paths.get(datanodeBaseDir, "data-" + j, "containers");
           Files.createDirectories(dir);
           dataDirs.add(dir.toString());
+          datanodeReservedSpace.ifPresent(
+              s -> reservedSpaceList.add(dir + ":" + s));
         }
+        String reservedSpaceString = String.join(",", reservedSpaceList);
         String listOfDirs = String.join(",", dataDirs);
         Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
         Path workDir = Paths.get(datanodeBaseDir, "data", "replication",
@@ -828,6 +832,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         Files.createDirectories(workDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
         dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
+        dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, listOfDirs);
+        dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
+            reservedSpaceString);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,

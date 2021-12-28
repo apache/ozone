@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -106,18 +105,15 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     LOG.info("Starting replication of container {} from {}", containerID,
         sourceDatanodes);
 
-    CompletableFuture<Path> tempTarFile = downloader
-        .getContainerDataFromReplicas(containerID,
-            sourceDatanodes);
-    if (tempTarFile == null) {
+    // Wait for the download. This thread pool is limiting the parallel
+    // downloads, so it's ok to block here and wait for the full download.
+    Path path =
+        downloader.getContainerDataFromReplicas(containerID, sourceDatanodes);
+    if (path == null) {
       task.setStatus(Status.FAILED);
     } else {
       try {
-        // Wait for the download. This thread pool is limiting the parallel
-        // downloads, so it's ok to block here and wait for the full download.
-        Path path = tempTarFile.get();
         long bytes = Files.size(path);
-
         LOG.info("Container {} is downloaded with size {}, starting to import.",
                 containerID, bytes);
         task.setTransferredBytes(bytes);
@@ -125,7 +121,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         importContainer(containerID, path);
         LOG.info("Container {} is replicated successfully", containerID);
         task.setStatus(Status.DONE);
-      } catch (Exception e) {
+      } catch (IOException e) {
         LOG.error("Container {} replication was unsuccessful.", containerID, e);
         task.setStatus(Status.FAILED);
       }

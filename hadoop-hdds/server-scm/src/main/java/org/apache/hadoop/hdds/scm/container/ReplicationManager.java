@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -59,6 +60,7 @@ import static org.apache.hadoop.hdds.protocol.proto.
     SCMRatisProtocol.RequestType.MOVE;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -110,7 +112,7 @@ public class ReplicationManager implements SCMService {
   /**
    * Reference to the ContainerManager.
    */
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
 
   /**
    * PlacementPolicy which is used to identify where a container
@@ -226,6 +228,12 @@ public class ReplicationManager implements SCMService {
   private int minHealthyForMaintenance;
 
   /**
+   * Current container size as a bound for choosing datanodes with
+   * enough space for a replica.
+   */
+  private long currentContainerSize;
+
+  /**
    * SCMService related variables.
    * After leaving safe mode, replicationMonitor needs to wait for a while
    * before really take effect.
@@ -256,7 +264,7 @@ public class ReplicationManager implements SCMService {
    */
   @SuppressWarnings("parameternumber")
   public ReplicationManager(final ConfigurationSource conf,
-             final ContainerManagerV2 containerManager,
+             final ContainerManager containerManager,
              final PlacementPolicy containerPlacement,
              final EventPublisher eventPublisher,
              final SCMContext scmContext,
@@ -283,6 +291,10 @@ public class ReplicationManager implements SCMService {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.currentContainerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
     this.metrics = null;
 
     moveScheduler = new MoveSchedulerImpl.Builder()
@@ -374,6 +386,9 @@ public class ReplicationManager implements SCMService {
     } catch (Throwable t) {
       // When we get runtime exception, we should terminate SCM.
       LOG.error("Exception in Replication Monitor Thread.", t);
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       ExitUtil.terminate(1, t);
     }
   }
@@ -414,8 +429,12 @@ public class ReplicationManager implements SCMService {
          * we have to resend close container command to the datanodes.
          */
         if (state == LifeCycleState.CLOSING) {
-          replicas.forEach(replica -> sendCloseCommand(
-              container, replica.getDatanodeDetails(), false));
+          for (ContainerReplica replica: replicas) {
+            if (replica.getState() != State.UNHEALTHY) {
+              sendCloseCommand(
+                  container, replica.getDatanodeDetails(), false);
+            }
+          }
           return;
         }
 
@@ -440,18 +459,13 @@ public class ReplicationManager implements SCMService {
             action -> replicas.stream()
                 .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
             ()-> metrics.incrNumReplicationCmdsTimeout(),
-            () -> {
-              metrics.incrNumReplicationCmdsCompleted();
-              metrics.incrNumReplicationBytesCompleted(
-                  container.getUsedBytes());
-            });
+            action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
             action -> replicas.stream()
-                .noneMatch(r ->
-                    r.getDatanodeDetails().equals(action.datanode)),
+                .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
             () -> metrics.incrNumDeletionCmdsTimeout(),
-            () -> metrics.incrNumDeletionCmdsCompleted());
+            action -> updateCompletedDeletionMetrics(container, action));
 
         /*
          * If container is under deleting and all it's replicas are deleted,
@@ -527,6 +541,20 @@ public class ReplicationManager implements SCMService {
     }
   }
 
+  private void updateCompletedReplicationMetrics(ContainerInfo container,
+      InflightAction action) {
+    metrics.incrNumReplicationCmdsCompleted();
+    metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
+    metrics.addReplicationTime(clock.millis() - action.time);
+  }
+
+  private void updateCompletedDeletionMetrics(ContainerInfo container,
+      InflightAction action) {
+    metrics.incrNumDeletionCmdsCompleted();
+    metrics.incrNumDeletionBytesCompleted(container.getUsedBytes());
+    metrics.addDeletionTime(clock.millis() - action.time);
+  }
+
   /**
    * Reconciles the InflightActions for a given container.
    *
@@ -540,7 +568,7 @@ public class ReplicationManager implements SCMService {
       final Map<ContainerID, List<InflightAction>> inflightActions,
       final Predicate<InflightAction> filter,
       final Runnable timeoutCounter,
-      final Runnable completedCounter) {
+      final Consumer<InflightAction> completedCounter) {
     final ContainerID id = container.containerID();
     final long deadline = clock.millis() - rmConf.getEventTimeout();
     if (inflightActions.containsKey(id)) {
@@ -562,7 +590,7 @@ public class ReplicationManager implements SCMService {
             if (isTimeout) {
               timeoutCounter.run();
             } else if (isCompleted) {
-              completedCounter.run();
+              completedCounter.accept(a);
             }
 
             updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
@@ -1131,13 +1159,18 @@ public class ReplicationManager implements SCMService {
           return;
         }
 
+        // We should ensure that the target datanode has enough space
+        // for a complete container to be created, but since the container
+        // size may be changed smaller than origin, we should be defensive.
+        final long dataSizeRequired = Math.max(container.getUsedBytes(),
+            currentContainerSize);
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
         excludeList.addAll(replicationInFlight);
         final List<DatanodeDetails> selectedDatanodes = containerPlacement
             .chooseDatanodes(excludeList, null, replicasNeeded,
-                0, container.getUsedBytes());
+                0, dataSizeRequired);
         if (repDelta > 0) {
           LOG.info("Container {} is under replicated. Expected replica count" +
                   " is {}, but found {}.", id, replicationFactor,
@@ -1473,10 +1506,12 @@ public class ReplicationManager implements SCMService {
   }
 
   private String getContainerToken(ContainerID containerID) {
-    StorageContainerManager scm = scmContext.getScm();
-    return scm != null
-        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
-        : ""; // unit test
+    if (scmContext.getScm() instanceof StorageContainerManager) {
+      StorageContainerManager scm =
+              (StorageContainerManager) scmContext.getScm();
+      return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
+    }
+    return ""; // unit test
   }
 
   /**
@@ -1529,6 +1564,7 @@ public class ReplicationManager implements SCMService {
         action -> inflightDeletion.get(id).add(action));
 
     metrics.incrNumDeletionCmdsSent();
+    metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
   }
 
   /**

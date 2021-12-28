@@ -22,6 +22,7 @@ import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -73,7 +74,8 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable();
+    Table<String, OmKeyInfo> omKeyInfoTable =
+        omMetadataManager.getKeyTable(getBucketLayout());
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         keyIter = omKeyInfoTable.iterator()) {
@@ -215,6 +217,10 @@ public class FileSizeCountTask implements ReconOmTask {
     Long count = fileSizeCountMap.containsKey(key) ?
         fileSizeCountMap.get(key) + 1L : 1L;
     fileSizeCountMap.put(key, count);
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   /**

@@ -76,7 +76,7 @@ If implementing an external script, it will be specified with the `net.topology.
 
 ## Write path
 
-Placement of the closed containers can be configured with `ozone.scm.container.placement.impl` configuration key. The available container placement policies can be found in the `org.apache.hdds.scm.container.placement` [package](https://github.com/apache/hadoop-ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms). 
+Placement of the closed containers can be configured with `ozone.scm.container.placement.impl` configuration key. The available container placement policies can be found in the `org.apache.hdds.scm.container.placement` [package](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms).
 
 By default the `SCMContainerPlacementRandom` is used for topology-awareness the `SCMContainerPlacementRackAware` can be used:
 

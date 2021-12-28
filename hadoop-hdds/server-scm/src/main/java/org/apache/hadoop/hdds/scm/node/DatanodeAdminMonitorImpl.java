@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -34,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Monitor thread which watches for nodes to be decommissioned, recommissioned
@@ -68,6 +70,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
+  // The number of containers for each of under replicated and unhealthy
+  // that will be logged in detail each time a node is checked.
+  private static final int CONTAINER_DETAILS_LOGGING_LIMIT = 5;
 
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
@@ -275,6 +280,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     int sufficientlyReplicated = 0;
     int underReplicated = 0;
     int unhealthy = 0;
+    List<ContainerID> underReplicatedIDs = new ArrayList<>();
+    List<ContainerID> unhealthyIDs = new ArrayList<>();
     Set<ContainerID> containers =
         nodeManager.getContainers(dn);
     for (ContainerID cid : containers) {
@@ -284,9 +291,25 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         if (replicaSet.isSufficientlyReplicated()) {
           sufficientlyReplicated++;
         } else {
+          if (LOG.isDebugEnabled()) {
+            underReplicatedIDs.add(cid);
+          }
+          if (underReplicated < CONTAINER_DETAILS_LOGGING_LIMIT
+              || LOG.isDebugEnabled()) {
+            LOG.info("Under Replicated Container {} {}; {}",
+                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+          }
           underReplicated++;
         }
         if (!replicaSet.isHealthy()) {
+          if (LOG.isDebugEnabled()) {
+            unhealthyIDs.add(cid);
+          }
+          if (unhealthy < CONTAINER_DETAILS_LOGGING_LIMIT
+              || LOG.isDebugEnabled()) {
+            LOG.info("Unhealthy Container {} {}; {}",
+                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+          }
           unhealthy++;
         }
       } catch (ContainerNotFoundException e) {
@@ -297,7 +320,26 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
+    if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
+        unhealthyIDs.size() < 10000) {
+      LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
+              "containers", dn, underReplicated,
+          underReplicatedIDs.stream().map(
+              Object::toString).collect(Collectors.joining(", ")),
+          unhealthy, unhealthyIDs.stream().map(
+              Object::toString).collect(Collectors.joining(", ")));
+    }
     return underReplicated == 0 && unhealthy == 0;
+  }
+
+  private String replicaDetails(Set<ContainerReplica> replicas) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Replicas{");
+    sb.append(replicas.stream()
+        .map(Object::toString)
+        .collect(Collectors.joining(",")));
+    sb.append("}");
+    return sb.toString();
   }
 
   private void completeDecommission(DatanodeDetails dn)

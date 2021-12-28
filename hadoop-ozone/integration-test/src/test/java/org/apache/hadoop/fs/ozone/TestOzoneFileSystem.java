@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -97,6 +97,8 @@ import org.slf4j.LoggerFactory;
  */
 @RunWith(Parameterized.class)
 public class TestOzoneFileSystem {
+
+  private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -140,6 +142,7 @@ public class TestOzoneFileSystem {
   private static boolean omRatisEnabled;
 
   private static MiniOzoneCluster cluster;
+  private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
   private static String volumeName;
@@ -148,25 +151,25 @@ public class TestOzoneFileSystem {
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, (float) 0.15);
-    // Trash with 9 second deletes and 6 seconds checkpoints
-    conf.setFloat(FS_TRASH_INTERVAL_KEY, (float) 0.15); // 9 seconds
-    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, (float) 0.1); // 6 seconds
+    conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      TestOMRequestUtils.configureFSOptimizedPaths(conf, enabledFileSystemPaths,
-          OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
-    } else {
+    if (!bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        bucketLayout.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)
             .build();
     cluster.waitForClusterToBeReady();
 
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
@@ -225,6 +228,10 @@ public class TestOzoneFileSystem {
 
   public static String getVolumeName() {
     return volumeName;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   @Test
@@ -575,15 +582,29 @@ public class TestOzoneFileSystem {
         .setLocationInfoList(new ArrayList<>())
         .build();
 
-    OpenKeySession session = cluster.getOzoneManager().openKey(keyArgs);
-    cluster.getOzoneManager().commitKey(keyArgs, session.getId());
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, session.getId());
 
     Path parent = new Path("/");
+
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(()-> {
+        try {
+          return fs.listStatus(parent).length!=0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
+
     FileStatus[] fileStatuses = fs.listStatus(parent);
 
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
-    cluster.getOzoneManager().deleteKey(keyArgs);
+    writeClient.deleteKey(keyArgs);
   }
 
   /**
@@ -1242,7 +1263,7 @@ public class TestOzoneFileSystem {
     Assert.assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
-    Assert.assertEquals((float) 0.15, trash.getConf().
+    assertEquals(TRASH_INTERVAL, trash.getConf().
         getFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0), 0);
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);

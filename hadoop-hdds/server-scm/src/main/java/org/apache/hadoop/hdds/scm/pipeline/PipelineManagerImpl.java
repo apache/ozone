@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -56,8 +58,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * SCM Pipeline Manager implementation.
@@ -69,10 +70,10 @@ public class PipelineManagerImpl implements PipelineManager {
       LoggerFactory.getLogger(PipelineManagerImpl.class);
 
   // Limit the number of on-going ratis operation to be 1.
-  private final Lock lock;
+  private final ReentrantReadWriteLock lock;
   private PipelineFactory pipelineFactory;
-  private StateManager stateManager;
-  private BackgroundPipelineCreatorV2 backgroundPipelineCreator;
+  private PipelineStateManager stateManager;
+  private BackgroundPipelineCreator backgroundPipelineCreator;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -80,7 +81,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private final SCMPipelineMetrics metrics;
   private final long pipelineWaitDefaultTimeout;
   private final SCMHAManager scmhaManager;
-  private final SCMContext scmContext;
+  private SCMContext scmContext;
   private final NodeManager nodeManager;
   // This allows for freezing/resuming the new pipeline creation while the
   // SCM is already out of SafeMode.
@@ -89,11 +90,11 @@ public class PipelineManagerImpl implements PipelineManager {
   protected PipelineManagerImpl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
                                 NodeManager nodeManager,
-                                StateManager pipelineStateManager,
+                                PipelineStateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher,
                                 SCMContext scmContext) {
-    this.lock = new ReentrantLock();
+    this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
     this.conf = conf;
@@ -119,8 +120,8 @@ public class PipelineManagerImpl implements PipelineManager {
       EventPublisher eventPublisher,
       SCMContext scmContext,
       SCMServiceManager serviceManager) throws IOException {
-    // Create PipelineStateManager
-    StateManager stateManager = PipelineStateManagerV2Impl
+    // Create PipelineStateManagerImpl
+    PipelineStateManager stateManager = PipelineStateManagerImpl
         .newBuilder().setPipelineStore(pipelineStore)
         .setRatisServer(scmhaManager.getRatisServer())
         .setNodeManager(nodeManager)
@@ -137,8 +138,8 @@ public class PipelineManagerImpl implements PipelineManager {
         eventPublisher, scmContext);
 
     // Create background thread.
-    BackgroundPipelineCreatorV2 backgroundPipelineCreator =
-        new BackgroundPipelineCreatorV2(
+    BackgroundPipelineCreator backgroundPipelineCreator =
+        new BackgroundPipelineCreator(
             pipelineManager, conf, serviceManager, scmContext);
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
@@ -164,7 +165,7 @@ public class PipelineManagerImpl implements PipelineManager {
       throw new IOException(message);
     }
 
-    lock.lock();
+    acquireWriteLock();
     try {
       Pipeline pipeline = pipelineFactory.create(replicationConfig);
       stateManager.addPipeline(pipeline.getProtobufMessage(
@@ -177,7 +178,7 @@ public class PipelineManagerImpl implements PipelineManager {
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -254,6 +255,13 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
+  public void addContainerToPipelineSCMStart(
+      PipelineID pipelineID, ContainerID containerID) throws IOException {
+    // should not lock here, since no ratis operation happens.
+    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+  }
+
+  @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     // should not lock here, since no ratis operation happens.
@@ -273,7 +281,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
-    lock.lock();
+    acquireWriteLock();
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
       if (pipeline.isClosed()) {
@@ -287,7 +295,7 @@ public class PipelineManagerImpl implements PipelineManager {
       metrics.incNumPipelineCreated();
       metrics.createPerPipelineMetrics(pipeline);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -300,7 +308,7 @@ public class PipelineManagerImpl implements PipelineManager {
   protected void removePipeline(Pipeline pipeline) throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
-    lock.lock();
+    acquireWriteLock();
     try {
       stateManager.removePipeline(pipelineID.getProtobuf());
       metrics.incNumPipelineDestroyed();
@@ -308,7 +316,7 @@ public class PipelineManagerImpl implements PipelineManager {
       metrics.incNumPipelineDestroyFailed();
       throw ex;
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -320,8 +328,20 @@ public class PipelineManagerImpl implements PipelineManager {
   protected void closeContainersForPipeline(final PipelineID pipelineId)
       throws IOException {
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
+    ContainerManager containerManager = scmContext.getScm()
+        .getContainerManager();
     for (ContainerID containerID : containerIDs) {
+      if (containerManager.getContainer(containerID).getState()
+            == HddsProtos.LifeCycleState.OPEN) {
+        try {
+          containerManager.updateContainerState(containerID,
+              HddsProtos.LifeCycleEvent.FINALIZE);
+        } catch (InvalidStateTransitionException ex) {
+          throw new IOException(ex);
+        }
+      }
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
   }
 
@@ -335,7 +355,9 @@ public class PipelineManagerImpl implements PipelineManager {
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
     PipelineID pipelineID = pipeline.getId();
-    lock.lock();
+    // close containers.
+    closeContainersForPipeline(pipelineID);
+    acquireWriteLock();
     try {
       if (!pipeline.isClosed()) {
         stateManager.updatePipelineState(pipelineID.getProtobuf(),
@@ -344,10 +366,8 @@ public class PipelineManagerImpl implements PipelineManager {
       }
       metrics.removePipelineMetrics(pipelineID);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
-    // close containers.
-    closeContainersForPipeline(pipelineID);
     if (!onTimeout) {
       // close pipeline right away.
       removePipeline(pipeline);
@@ -430,12 +450,12 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
-    lock.lock();
+    acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineID.getProtobuf(),
               HddsProtos.PipelineState.PIPELINE_OPEN);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -448,12 +468,12 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
-    lock.lock();
+    acquireWriteLock();
     try {
       stateManager.updatePipelineState(pipelineID.getProtobuf(),
           HddsProtos.PipelineState.PIPELINE_DORMANT);
     } finally {
-      lock.unlock();
+      releaseWriteLock();
     }
   }
 
@@ -554,7 +574,7 @@ public class PipelineManagerImpl implements PipelineManager {
     try {
       stateManager.close();
     } catch (Exception ex) {
-      LOG.error("PipelineStateManager close failed", ex);
+      LOG.error("PipelineStateManagerImpl close failed", ex);
     }
   }
 
@@ -570,7 +590,7 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @VisibleForTesting
-  public StateManager getStateManager() {
+  public PipelineStateManager getStateManager() {
     return stateManager;
   }
 
@@ -580,18 +600,23 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private void setBackgroundPipelineCreator(
-      BackgroundPipelineCreatorV2 backgroundPipelineCreator) {
+      BackgroundPipelineCreator backgroundPipelineCreator) {
     this.backgroundPipelineCreator = backgroundPipelineCreator;
   }
 
   @VisibleForTesting
-  public BackgroundPipelineCreatorV2 getBackgroundPipelineCreator() {
+  public BackgroundPipelineCreator getBackgroundPipelineCreator() {
     return this.backgroundPipelineCreator;
   }
 
   @VisibleForTesting
   public PipelineFactory getPipelineFactory() {
     return pipelineFactory;
+  }
+
+  @VisibleForTesting
+  public void setScmContext(SCMContext context) {
+    this.scmContext = context;
   }
 
   private void recordMetricsForPipeline(Pipeline pipeline) {
@@ -628,7 +653,23 @@ public class PipelineManagerImpl implements PipelineManager {
     }
   }
 
-  protected Lock getLock() {
-    return lock;
+  @Override
+  public void acquireReadLock() {
+    lock.readLock().lock();
+  }
+
+  @Override
+  public void releaseReadLock() {
+    lock.readLock().unlock();
+  }
+
+  @Override
+  public void acquireWriteLock() {
+    lock.writeLock().lock();
+  }
+
+  @Override
+  public void releaseWriteLock() {
+    lock.writeLock().unlock();
   }
 }

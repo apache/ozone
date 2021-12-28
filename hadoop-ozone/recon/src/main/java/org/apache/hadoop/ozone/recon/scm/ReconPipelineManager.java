@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerV2Impl;
-import org.apache.hadoop.hdds.scm.pipeline.StateManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersions;
@@ -55,7 +55,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
   private ReconPipelineManager(ConfigurationSource conf,
                                SCMHAManager scmhaManager,
                                NodeManager nodeManager,
-                               StateManager pipelineStateManager,
+                               PipelineStateManager pipelineStateManager,
                                PipelineFactory pipelineFactory,
                                EventPublisher eventPublisher,
                                SCMContext scmContext) {
@@ -71,8 +71,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       SCMHAManager scmhaManager,
       SCMContext scmContext) throws IOException {
 
-    // Create PipelineStateManager
-    StateManager stateManager = PipelineStateManagerV2Impl
+    // Create PipelineStateManagerImpl
+    PipelineStateManager stateManager = PipelineStateManagerImpl
         .newBuilder()
         .setPipelineStore(pipelineStore)
         .setNodeManager(nodeManager)
@@ -94,7 +94,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    */
   void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
 
-    getLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
@@ -116,12 +116,12 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         removeInvalidPipelines(pipelinesFromScm);
       }
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
 
   public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
-    getLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       // Removing pipelines in Recon that are no longer in SCM.
@@ -151,7 +151,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         }
       });
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
   /**
@@ -161,12 +161,12 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    */
   @VisibleForTesting
   public void addPipeline(Pipeline pipeline) throws IOException {
-    getLock().lock();
+    acquireWriteLock();
     try {
       getStateManager().addPipeline(
           pipeline.getProtobufMessage(ClientVersions.CURRENT_VERSION));
     } finally {
-      getLock().unlock();
+      releaseWriteLock();
     }
   }
 }

@@ -201,7 +201,7 @@ public final class HAUtils {
       // an inconsistent state and this marker file will fail it from
       // starting up.
       Files.createFile(markerFile);
-      Files.move(checkpointPath, oldDB.toPath());
+      FileUtils.moveDirectory(checkpointPath, oldDB.toPath());
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata "

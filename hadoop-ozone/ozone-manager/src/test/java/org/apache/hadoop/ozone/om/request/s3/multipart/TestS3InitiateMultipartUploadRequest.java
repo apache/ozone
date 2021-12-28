@@ -69,7 +69,9 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNotNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNotNull(omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+        .get(multipartKey));
     Assert.assertNotNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
 
@@ -78,14 +80,16 @@ public class TestS3InitiateMultipartUploadRequest
         omMetadataManager.getMultipartInfoTable().get(multipartKey)
             .getUploadID());
 
-    Assert.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
-        .getKeyArgs().getModificationTime(),
-        omMetadataManager.getOpenKeyTable().get(multipartKey)
-        .getModificationTime());
-    Assert.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
-            .getKeyArgs().getModificationTime(),
-        omMetadataManager.getOpenKeyTable().get(multipartKey)
-            .getCreationTime());
+    Assert.assertEquals(
+        modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
+            .getModificationTime(), omMetadataManager
+            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+            .get(multipartKey).getModificationTime());
+    Assert.assertEquals(
+        modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
+            .getModificationTime(), omMetadataManager
+            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+            .get(multipartKey).getCreationTime());
 
   }
 
@@ -115,7 +119,9 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+        .get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
   }
@@ -143,7 +149,9 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+        .get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
   }

@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -92,6 +92,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class TestUtils {
 
   private static ThreadLocalRandom random = ThreadLocalRandom.current();
+  private static PipelineID randomPipelineID = PipelineID.randomId();
 
   private TestUtils() {
   }
@@ -523,7 +524,7 @@ public final class TestUtils {
   }
 
   public static org.apache.hadoop.hdds.scm.container.ContainerInfo
-      allocateContainer(ContainerManagerV2 containerManager)
+      allocateContainer(ContainerManager containerManager)
       throws IOException {
     return containerManager
         .allocateContainer(new RatisReplicationConfig(ReplicationFactor.THREE),
@@ -531,8 +532,8 @@ public final class TestUtils {
 
   }
 
-  public static void closeContainer(ContainerManagerV2 containerManager,
-      ContainerID id) throws IOException, InvalidStateTransitionException {
+  public static void closeContainer(ContainerManager containerManager,
+        ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -546,8 +547,8 @@ public final class TestUtils {
    * @param id
    * @throws IOException
    */
-  public static void quasiCloseContainer(ContainerManagerV2 containerManager,
-      ContainerID id) throws IOException, InvalidStateTransitionException {
+  public static void quasiCloseContainer(ContainerManager containerManager,
+       ContainerID id) throws IOException, InvalidStateTransitionException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -621,7 +622,7 @@ public final class TestUtils {
     return StorageContainerManager.createSCM(conf, configurator);
   }
 
-  public static ContainerInfo getContainer(
+  private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
       final HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
         .setContainerID(RandomUtils.nextLong())
@@ -629,7 +630,20 @@ public final class TestUtils {
             new RatisReplicationConfig(ReplicationFactor.THREE))
         .setState(state)
         .setSequenceId(10000L)
-        .setOwner("TEST")
+        .setOwner("TEST");
+  }
+
+  public static ContainerInfo getContainer(
+      final HddsProtos.LifeCycleState state) {
+    return getDefaultContainerInfoBuilder(state)
+        .setPipelineID(randomPipelineID)
+        .build();
+  }
+
+  public static ContainerInfo getContainer(
+      final HddsProtos.LifeCycleState state, PipelineID pipelineID) {
+    return getDefaultContainerInfoBuilder(state)
+        .setPipelineID(pipelineID)
         .build();
   }
 

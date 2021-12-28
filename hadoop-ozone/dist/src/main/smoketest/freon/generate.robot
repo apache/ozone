@@ -21,6 +21,12 @@ Test Timeout        5 minutes
 *** Variables ***
 ${PREFIX}    ${EMPTY}
 
+*** Keywords ***
+DN Chunk Generator
+    Return From Keyword If    '${SECURITY_ENABLED}' == 'true'
+    ${result} =        Execute          ozone freon dcg -t1 -n100 -p dcg${PREFIX}
+                       Should contain   ${result}   Successful executions: 100
+
 *** Test Cases ***
 Ozone Client Key Generator
     ${result} =        Execute          ozone freon ockg ${OM_HA_PARAM} -t=1 -n=1 -p ockg${PREFIX}
@@ -33,3 +39,6 @@ OM Key Generator
 OM Bucket Generator
     ${result} =        Execute          ozone freon ombg ${OM_HA_PARAM} -t=1 -n=1 -p ombg${PREFIX}
                        Should contain   ${result}   Successful executions: 1
+
+DN Chunk Generator
+    DN Chunk Generator

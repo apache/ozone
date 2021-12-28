@@ -335,10 +335,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DATANODE_ID_DIR =
       "ozone.scm.datanode.id.dir";
 
-  public static final String OZONE_SCM_DB_CACHE_SIZE_MB =
-      "ozone.scm.db.cache.size.mb";
-  public static final int OZONE_SCM_DB_CACHE_SIZE_DEFAULT = 128;
-
   public static final String OZONE_SCM_CONTAINER_SIZE =
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";
@@ -454,11 +450,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
 
-  public static final String HDDS_DATANODE_UPGRADE_LAYOUT_INLINE =
-      "hdds.datanode.upgrade.layout.inline";
-  public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
-      true;
-
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";
   public static final long OZONE_SCM_INFO_WAIT_DURATION_DEFAULT =
@@ -482,12 +473,17 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE =
           "ozone.scm.ha.ratis.segment.size";
-  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "16KB";
+  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "4MB";
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE =
           "ozone.scm.ha.ratis.segment.preallocated.size";
   public static final String
-          OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT = "16KB";
+          OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT = "4MB";
+
+  public static final String OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM =
+      "ozone.scm.ha.ratis.log.appender.queue.num-elements";
+  public static final int
+      OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM_DEFAULT = 1024;
 
   public static final String OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT =
           "ozone.scm.ha.ratis.log.appender.queue.byte-limit";
@@ -549,6 +545,10 @@ public final class ScmConfigKeys {
   public static final long
           OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT = 30 * 1000L;
 
+  public static final String OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE =
+      "ozone.scm.ha.ratis.server.leaderelection.pre-vote";
+  public static final boolean
+      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
 
   /**
    * Never constructed.

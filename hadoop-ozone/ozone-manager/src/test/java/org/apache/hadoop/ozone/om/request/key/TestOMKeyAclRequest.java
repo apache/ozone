@@ -47,10 +47,11 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   public void testKeyAddAclRequest() throws Exception {
     // Manually add volume, bucket and key to DB
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);
@@ -59,7 +60,8 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
     // Create KeyAddAcl request
     OMRequest originalRequest = createAddAclkeyRequest(acl);
-    OMKeyAclRequest omKeyAddAclRequest = getOmKeyAddAclRequest(originalRequest);
+    OMKeyAclRequest omKeyAddAclRequest =
+        getOmKeyAddAclRequest(originalRequest);
     OMRequest preExecuteRequest = omKeyAddAclRequest.preExecute(ozoneManager);
 
     // When preExecute() of adding acl,
@@ -82,10 +84,11 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   @Test
   public void testKeyRemoveAclRequest() throws Exception {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);
@@ -106,8 +109,9 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omAddAclResponse.getStatus());
 
     // Verify result of adding acl.
-    List<OzoneAcl> keyAcls = omMetadataManager.getKeyTable().get(ozoneKey)
-        .getAcls();
+    List<OzoneAcl> keyAcls =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getAcls();
     Assert.assertEquals(1, keyAcls.size());
     Assert.assertEquals(acl, keyAcls.get(0));
 
@@ -135,18 +139,20 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omRemoveAclResponse.getStatus());
 
     // Verify result of removing acl.
-    List<OzoneAcl> newAcls = omMetadataManager.getKeyTable().get(ozoneKey)
-        .getAcls();
+    List<OzoneAcl> newAcls =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getAcls();
     Assert.assertEquals(0, newAcls.size());
   }
 
   @Test
   public void testKeySetAclRequest() throws Exception {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);
@@ -175,8 +181,9 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omSetAclResponse.getStatus());
 
     // Verify result of setting acl.
-    List<OzoneAcl> newAcls = omMetadataManager.getKeyTable().get(ozoneKey)
-        .getAcls();
+    List<OzoneAcl> newAcls =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getAcls();
     Assert.assertEquals(newAcls.get(0), acl);
   }
 
@@ -250,16 +257,15 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   }
 
   protected OMKeyAclRequest getOmKeyAddAclRequest(OMRequest originalRequest) {
-    return new OMKeyAddAclRequest(
-        originalRequest);
+    return new OMKeyAddAclRequest(originalRequest, ozoneManager);
   }
 
   protected OMKeyAclRequest getOmKeyRemoveAclRequest(
       OMRequest removeAclRequest) {
-    return new OMKeyRemoveAclRequest(removeAclRequest);
+    return new OMKeyRemoveAclRequest(removeAclRequest, ozoneManager);
   }
 
   protected OMKeyAclRequest getOmKeySetAclRequest(OMRequest setAclRequest) {
-    return new OMKeySetAclRequest(setAclRequest);
+    return new OMKeySetAclRequest(setAclRequest, ozoneManager);
   }
 }

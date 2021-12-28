@@ -145,15 +145,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.upgrade.layout.inline</name>
-    <value>true</value>
-    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>Determines whether to upgrade the DN layout on restart
-      automatically. If set of false, the tool verifies that the current
-      disk format is correct.
-    </description>
-  </property>
-  <property>
     <name>hdds.datanode.dir.du.reserved</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -467,6 +458,10 @@
       EXAMPLEOMSERVICEID). The OM service ID should be the value (one of the
       values if there are multiple) set for the parameter ozone.om.service.ids.
 
+      Decommissioned nodes (represented by node Ids in
+      ozone.om.decommissioned.nodes config list) will be ignored and not
+      included in the OM HA setup even if added to this list.
+
       Unique identifiers for each OM Node, delimited by commas. This will be
       used by OzoneManagers in HA setup to determine all the OzoneManagers
       belonging to the same OMservice in the cluster. For example, if you
@@ -474,6 +469,15 @@
       use “om1”, “om2” and "om3" as the individual IDs of the OzoneManagers,
       you would configure a property ozone.om.nodes.omService1, and its value
       "om1,om2,om3".
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.decommissioned.nodes.EXAMPLEOMSERVICEID</name>
+    <value/>
+    <tag>OM, HA</tag>
+    <description>
+      Comma-separated list of OM node Ids which have been decommissioned. OMs
+      present in this list will not be included in the OM HA ring.
     </description>
   </property>
   <property>
@@ -554,28 +558,6 @@
       The actual address the OM web server will bind to using HTTPS.
       If this optional address is set, it overrides only the hostname portion of
       ozone.om.https-address.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.keytab.file</name>
-    <value/>
-    <tag>OM, SECURITY</tag>
-    <description>
-      The keytab file for Kerberos authentication in OM.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OM, PERFORMANCE</tag>
-    <description>
-      The size of OM DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Ozone at scale.
-
-      A large value for this key allows a proportionally larger amount of OM
-      metadata to be cached in memory. This makes OM operations faster.
     </description>
   </property>
   <property>
@@ -945,18 +927,6 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The port number of the Ozone SCM service.
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OZONE, PERFORMANCE</tag>
-    <description>SCM keeps track of the Containers in the cluster. This DB holds
-      the container metadata. This value is set to a small value to make the
-      unit
-      testing runs smooth. In production, we recommend a value of 16GB or
-      higher. This allows SCM to avoid disk I/O's while looking up the container
-      location.
     </description>
   </property>
   <property>
@@ -1754,6 +1724,14 @@
   </property>
 
   <property>
+    <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
+    <value>false</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description>Enable/disable OM HA leader election pre-vote phase.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.server.failure.timeout.duration</name>
     <value>120s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
@@ -2109,7 +2087,7 @@
       not be renewed.
     </description>
   </property>
-  
+
   <property>
     <name>ozone.fs.iterate.batch-size</name>
     <value>100</value>
@@ -2333,6 +2311,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.admin.protocol.max.retries</name>
+    <value>20</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Expert only. The maximum number of retries for Ozone Manager Admin
+      protocol on each OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.admin.protocol.wait.between.retries</name>
+    <value>1000</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Expert only. The time to wait, in milliseconds, between retry attempts
+      for Ozone Manager Admin protocol.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
     <tag>RECON, MANAGEMENT</tag>
@@ -2400,6 +2396,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.administrators</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      Recon administrator users delimited by a comma.
+      This is the list of users who can access admin only information from recon.
+      Users defined in ozone.administrators will always be able to access all
+      recon information regardless of this setting.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
     <tag>DATANODE, SECURITY, KERBEROS</tag>
@@ -2445,21 +2452,6 @@
     <tag>S3G, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.container.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>RECON, PERFORMANCE</tag>
-    <description>
-      The size of Recon DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Recon at scale.
-
-      A large value for this key allows a proportionally larger amount of Recon
-      container DB to be cached in memory. This makes Recon Container-Key
-      operations faster.
     </description>
   </property>
   <property>
@@ -2766,18 +2758,6 @@
   </property>
 
   <property>
-    <name>ozone.om.metadata.layout</name>
-    <tag>OZONE, OM</tag>
-    <value>SIMPLE</value>
-    <description>
-      This property is used to define the metadata layout of file system
-      paths. If it is configured as PREFIX in combination with
-      ozone.om.enable.filesystem.paths to true then this allows to perform
-      atomic rename and delete of any directory at any level in the namespace.
-      Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
-    </description>
-  </property>
-  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
@@ -2803,7 +2783,7 @@
     <tag>OZONE, SCM</tag>
     <description>Thread pool size configured to process container reports.
     </description>
-  </property>  
+  </property>
 
   <property>
     <name>ozone.scm.datanode.ratis.volume.free-space.min</name>
@@ -2832,18 +2812,18 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.segment.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the raft segment used by Apache Ratis on
-      SCM. (16 KB by default)
+      SCM. (4 MB by default)
     </description>
   </property>
   <property>
     <name>ozone.scm.ha.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the buffer which is preallocated for
-      raft segment used by Apache Ratis on SCM.(16 KB by default)
+      raft segment used by Apache Ratis on SCM.(4 MB by default)
     </description>
   </property>
   <property>
@@ -2851,6 +2831,13 @@
     <value>32MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>Byte limit for Raft's Log Worker queue.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Number of operation pending with Raft's Log Worker.
+    </description>
   </property>
   <property>
     <name>ozone.scm.ha.ratis.log.purge.enabled</name>
@@ -2892,6 +2879,12 @@
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM ratis leader
       election. Default is 1s.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
+    <value>false</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Enable/disable SCM HA leader election pre-vote phase.</description>
   </property>
   <property>
     <name>ozone.scm.ha.ratis.leader.ready.wait.timeout</name>
@@ -2949,11 +2942,50 @@
   </property>
 
   <property>
+    <name>hdds.container.checksum.verification.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description> To enable/disable checksum verification of the
+      containers.
+    </description>
+  </property>
+
+  <property>
     <name>hadoop.http.idle_timeout.ms</name>
     <value>60000</value>
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
     <description>
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.default.bucket.layout</name>
+    <value>OBJECT_STORE</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default bucket layout used by Ozone Manager during bucket creation when a client does not specify the
+      bucket layout option. Supported values are OBJECT_STORE and FILE_SYSTEM_OPTIMIZED.
+      OBJECT_STORE: This layout allows the bucket to behave as a pure object store and will not allow
+      interoperability between S3 and FS APIs.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
+      For testing purposes LEGACY layout is also allowed. LEGACY layout is not recommended and will be removed in the
+      future.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.test.ofs.default.bucket.layout</name>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      This configuration is used for testing purposes. Default bucket layout value when buckets are created using OFS.
+      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
     </description>
   </property>
 </configuration>

@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.RatisPipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.junit.Assert;
@@ -46,7 +46,7 @@ public class TestLeaderChoosePolicy {
   public void testDefaultPolicy() {
     RatisPipelineProvider ratisPipelineProvider = new RatisPipelineProvider(
         mock(NodeManager.class),
-        mock(PipelineStateManager.class),
+        mock(PipelineStateManagerImpl.class),
         conf,
         mock(EventPublisher.class),
         SCMContext.emptyContext());
@@ -63,7 +63,7 @@ public class TestLeaderChoosePolicy {
             ".HelloWorld");
     new RatisPipelineProvider(
         mock(NodeManager.class),
-        mock(PipelineStateManager.class),
+        mock(PipelineStateManagerImpl.class),
         conf,
         mock(EventPublisher.class),
         SCMContext.emptyContext());

@@ -160,7 +160,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
             fromKeyName);
         String toKey =
             omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
-        OmKeyInfo toKeyValue = omMetadataManager.getKeyTable().get(toKey);
+        OmKeyInfo toKeyValue =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(toKey);
 
         if (toKeyValue != null) {
 
@@ -173,7 +174,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         }
 
         // fromKeyName should exist
-        fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
+        fromKeyValue =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(fromKey);
         if (fromKeyValue == null) {
           renameStatus = false;
           unRenamedKeys.add(
@@ -194,7 +196,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         // Add to cache.
         // fromKey should be deleted, toKey should be added with newly updated
         // omKeyInfo.
-        Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+        Table<String, OmKeyInfo> keyTable =
+            omMetadataManager.getKeyTable(getBucketLayout());
         keyTable.addCacheEntry(new CacheKey<>(fromKey),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
         keyTable.addCacheEntry(new CacheKey<>(toKey),

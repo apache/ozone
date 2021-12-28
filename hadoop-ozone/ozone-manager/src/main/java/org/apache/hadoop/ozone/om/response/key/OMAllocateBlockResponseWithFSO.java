@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -39,16 +40,17 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
 
   public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omKeyInfo, clientID, omBucketInfo);
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, omKeyInfo, clientID, omBucketInfo, bucketLayout);
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
+                                        @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override
