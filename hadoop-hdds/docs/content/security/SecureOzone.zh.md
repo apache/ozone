@@ -84,11 +84,11 @@ ozone-site.xml 中应进行如下配置：
             <td>SCM 进程使用的 keytab 文件</td>
           </tr>
           <tr>
-            <td>hdds.scm.http.kerberos.principal</th>
+            <td>hdds.scm.http.auth.kerberos.principal</th>
             <td>SCM http 服务主体</td>
           </tr>
           <tr>
-            <td>hdds.scm.http.kerberos.keytab</th>
+            <td>hdds.scm.http.auth.kerberos.keytab</th>
             <td>SCM http 服务使用的 keytab 文件</td>
           </tr>
         </tbody>
@@ -119,11 +119,11 @@ ozone-site.xml 中应进行如下配置：
             <td>OM 进程使用的 keytab 文件</td>
           </tr>
           <tr>
-            <td>ozone.om.http.kerberos.principal</th>
+            <td>ozone.om.http.auth.kerberos.principal</th>
             <td>OM http 服务主体</td>
           </tr>
           <tr>
-            <td>ozone.om.http.kerberos.keytab</th>
+            <td>ozone.om.http.auth.kerberos.keytab</th>
             <td>OM http 服务使用的 keytab 文件</td>
           </tr>
         </tbody>
