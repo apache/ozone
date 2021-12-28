@@ -85,11 +85,11 @@ ozone-site.xml 中应进行如下配置：
           </tr>
           <tr>
             <td>hdds.scm.http.auth.kerberos.principal</th>
-            <td>SCM http 服务主体</td>
+            <td>SCM http 服务主体，如果为 SCM http 服务器启用了 SPNEGO</td>
           </tr>
           <tr>
             <td>hdds.scm.http.auth.kerberos.keytab</th>
-            <td>SCM http 服务使用的 keytab 文件</td>
+            <td>SCM http 服务使用的 keytab 文件，如果为 SCM http 服务器启用了 SPNEGO</td>
           </tr>
         </tbody>
       </table>
@@ -112,7 +112,7 @@ ozone-site.xml 中应进行如下配置：
         <tbody>
           <tr>
             <td>ozone.om.kerberos.principal</th>
-            <td>OzoneManager 服务主体，例如：om/_HOST@REALM.COM</td>
+            <td>OM 服务主体，例如：om/_HOST@REALM.COM</td>
           </tr>
           <tr>
             <td>ozone.om.kerberos.keytab.file</th>
@@ -120,11 +120,11 @@ ozone-site.xml 中应进行如下配置：
           </tr>
           <tr>
             <td>ozone.om.http.auth.kerberos.principal</th>
-            <td>OM http 服务主体</td>
+            <td>OM http 服务主体，如果为 om http 服务器启用了 SPNEGO</td>
           </tr>
           <tr>
             <td>ozone.om.http.auth.kerberos.keytab</th>
-            <td>OM http 服务使用的 keytab 文件</td>
+            <td>OM http 服务使用的 keytab 文件，如果为 om http 服务器启用了 SPNEGO</td>
           </tr>
         </tbody>
       </table>
@@ -151,15 +151,15 @@ ozone-site.xml 中应进行如下配置：
           </tr>
           <tr>
             <td>ozone.s3g.kerberos.keytab.file</th>
-            <td>S3 网关使用的密钥表文件，例如：/etc/security/keytabs/s3g.keytab/td>
+            <td>S3 网关使用的 keytab 文件，例如：/etc/security/keytabs/s3g.keytab/td>
           </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.principal</th>
-            <td>S3 网关主体，如果 S3 网关 http 服务器启用了 SPNEGO，例如：HTTP/_HOST@EXAMPLE.COM</td>
+            <td>S3 网关主体，如果为 S3 网关 http 服务器启用了 SPNEGO，例如：HTTP/_HOST@EXAMPLE.COM</td>
           </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.keytab</th>
-            <td>S3 网关使用的密钥表文件，如果 S3 网关 http 服务器启用了 SPNEGO。</td>
+            <td>S3 网关使用的 keytab 文件，如果为 S3 网关 http 服务器启用了 SPNEGO</td>
           </tr>
         </tbody>
       </table>
