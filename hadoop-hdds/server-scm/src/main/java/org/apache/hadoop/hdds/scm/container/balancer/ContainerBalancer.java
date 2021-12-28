@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -124,7 +125,8 @@ public class ContainerBalancer {
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
     this.ozoneConfiguration = ozoneConfiguration;
-    this.config = new ContainerBalancerConfiguration(ozoneConfiguration);
+    this.config = ozoneConfiguration.
+        getObject(ContainerBalancerConfiguration.class);
     this.metrics = ContainerBalancerMetrics.create();
     this.scmContext = scmContext;
 
@@ -155,7 +157,7 @@ public class ContainerBalancer {
 
       balancerRunning = true;
       this.config = balancerConfiguration;
-      this.ozoneConfiguration = config.getOzoneConfiguration();
+      validateConfiguration(config);
       LOG.info("Starting Container Balancer...{}", this);
 
       //we should start a new balancer thread async
@@ -762,6 +764,31 @@ public class ContainerBalancer {
     }
     currentBalancingThread = null;
     LOG.info("Container Balancer stopped successfully.");
+  }
+
+  private void validateConfiguration(ContainerBalancerConfiguration conf) {
+    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
+    // greater than container size
+    long size = (long) ozoneConfiguration.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    if (conf.getMaxSizeEnteringTarget() <= size) {
+      LOG.info("MaxSizeEnteringTarget should be larger than " +
+          "ozone.scm.container.size");
+    }
+    if (conf.getMaxSizeLeavingSource() <= size) {
+      LOG.info("MaxSizeLeavingSource should be larger than " +
+          "ozone.scm.container.size");
+    }
+
+    // balancing interval should be greater than DUFactory refresh period
+    DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
+    long balancingInterval = duConf.getRefreshPeriod().toMillis();
+    if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
+      LOG.info("balancing.iteration.interval should be larger than " +
+          "hdds.datanode.du.refresh.period.");
+    }
   }
 
   public void setNodeManager(NodeManager nodeManager) {

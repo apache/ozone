@@ -103,7 +103,8 @@ public class TestContainerBalancer {
     containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
 
-    balancerConfiguration = new ContainerBalancerConfiguration(conf);
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setIdleIteration(1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
@@ -488,8 +489,10 @@ public class TestContainerBalancer {
     Assert.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
 
     // some containers should be selected when using default values
-    containerBalancer.start(
-        new ContainerBalancerConfiguration(new OzoneConfiguration()));
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ContainerBalancerConfiguration cbc = ozoneConfiguration.
+        getObject(ContainerBalancerConfiguration.class);
+    containerBalancer.start(cbc);
 
     // waiting for balance completed.
     // TODO: this is a temporary implementation for now
@@ -589,6 +592,23 @@ public class TestContainerBalancer {
       Assert.assertTrue(source.equals(dn1) || source.equals(dn2));
       Assert.assertTrue(target.equals(dn1) || target.equals(dn2));
     }
+  }
+
+  @Test
+  public void testContainerBalancerConfiguration() {
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set("ozone.scm.container.size", "5GB");
+    ozoneConfiguration.setDouble(
+        "hdds.container.balancer.utilization.threshold", 0.01);
+
+    ContainerBalancerConfiguration cbConf =
+        ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
+    Assert.assertEquals(cbConf.getThreshold(), 0.01d, 0.001);
+
+    Assert.assertEquals(cbConf.getMaxSizeLeavingSource(),
+        26 * 1024 * 1024 * 1024L);
+
+    Assert.assertEquals(cbConf.getMoveTimeout().toMillis(), 30 * 60 * 1000);
   }
 
   /**
