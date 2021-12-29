@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -50,7 +51,8 @@ public class OMKeyCreateResponseWithFSO extends OMFileCreateResponseWithFSO {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse, @Nonnull
+                                    BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 }

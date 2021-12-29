@@ -115,6 +115,7 @@ Here is an  example,
 | ozone.scm.client.address       | SCM server name and port     | Used by client-side                                              |
 | ozone.scm.datanode.address     | SCM server name and port     | Used by datanode to talk to SCM                                  |
 | ozone.om.address               | OM server name               | Used by Ozone handler and Ozone file system.                     |
+| hdds.datanode.dir               | file path                | HDDS datanodes store data in this directory.           |
 
 
 ## Startup the cluster

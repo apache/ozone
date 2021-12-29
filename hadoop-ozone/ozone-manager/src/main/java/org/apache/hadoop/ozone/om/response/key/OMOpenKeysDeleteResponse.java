@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -53,9 +54,10 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
    * For a successful request, the other constructor should be used.
    */
   public OMOpenKeysDeleteResponse(
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
+      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse, @Nonnull
+      BucketLayout bucketLayout) {
 
-    super(omResponse);
+    super(omResponse, bucketLayout);
   }
 
   @Override

@@ -210,7 +210,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponseWithFSO(createErrorOMResponse(
-              omResponse, exception));
+              omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);

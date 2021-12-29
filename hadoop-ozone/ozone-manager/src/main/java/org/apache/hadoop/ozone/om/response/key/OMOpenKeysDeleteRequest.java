@@ -105,7 +105,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       exception = ex;
       omClientResponse =
           new OMOpenKeysDeleteResponse(createErrorOMResponse(omResponse,
-              exception));
+              exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);

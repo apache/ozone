@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -34,7 +35,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
@@ -79,7 +83,8 @@ public class TestRepeatedOmKeyInfoCodec {
   }
 
   @Test
-  public void test() {
+  public void test() throws InterruptedException {
+    threadSafety();
     testWithoutPipeline(1);
     testWithoutPipeline(2);
     testCompatibility(1);
@@ -119,5 +124,34 @@ public class TestRepeatedOmKeyInfoCodec {
     } catch (IOException e) {
       fail("Should success");
     }
+  }
+
+  public void threadSafety() throws InterruptedException {
+    final OmKeyInfo key = getKeyInfo(1);
+    final RepeatedOmKeyInfo subject = new RepeatedOmKeyInfo(key);
+    final RepeatedOmKeyInfoCodec codec = new RepeatedOmKeyInfoCodec(true);
+    final AtomicBoolean failed = new AtomicBoolean();
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
+        .build();
+    threadFactory.newThread(() -> {
+      for (int i = 0; i < 1000000; i++) {
+        try {
+          codec.toPersistedFormat(subject.copyObject());
+        } catch (Exception e) {
+          e.printStackTrace();
+          failed.set(true);
+        }
+      }
+    }).start();
+    threadFactory.newThread(() -> {
+      for (int i = 0; i < 10000; i++) {
+        subject.addOmKeyInfo(key);
+      }
+    }).start();
+    final long start = Time.monotonicNow();
+    while (!failed.get() && (Time.monotonicNow() - start < 5000)) {
+      Thread.sleep(100);
+    }
+    assertFalse(failed.get());
   }
 }

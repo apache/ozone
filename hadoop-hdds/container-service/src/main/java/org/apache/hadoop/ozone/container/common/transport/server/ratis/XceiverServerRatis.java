@@ -850,7 +850,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return minIndex == null ? -1 : minIndex.longValue();
   }
 
-  void notifyGroupRemove(RaftGroupId gid) {
+  public void notifyGroupRemove(RaftGroupId gid) {
     raftGids.remove(gid);
     // Remove any entries for group leader map
     groupLeaderMap.remove(gid);
