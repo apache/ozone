@@ -65,6 +65,6 @@ public class RepeatedOmKeyInfoCodec implements Codec<RepeatedOmKeyInfo> {
 
   @Override
   public RepeatedOmKeyInfo copyObject(RepeatedOmKeyInfo object) {
-    return object;
+    return object.copyObject();
   }
 }

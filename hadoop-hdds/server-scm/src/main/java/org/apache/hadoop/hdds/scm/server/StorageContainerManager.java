@@ -380,8 +380,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     initializeEventHandlers();
 
-    containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration, scmContext,
+    containerBalancer = new ContainerBalancer(scmNodeManager, containerManager,
+        replicationManager, configuration, scmContext, clusterMap,
         ContainerPlacementPolicyFactory
             .getPolicy(conf, scmNodeManager, clusterMap, true,
                 placementMetrics));
@@ -1319,11 +1319,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "server", getBlockProtocolServer().getBlockRpcAddress()));
     }
     getBlockProtocolServer().start();
-
-    if (LOG.isInfoEnabled()) {
-      LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
-          "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
-    }
 
     // If HA is enabled, start datanode protocol server once leader is ready.
     if (!scmStorageConfig.isSCMHAEnabled()) {
