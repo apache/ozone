@@ -58,8 +58,9 @@ public class OMPathsPurgeResponseWithFSO extends OmKeyResponse {
   public OMPathsPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.KeyInfo> markDeletedDirs,
       @Nonnull List<OzoneManagerProtocolProtos.KeyInfo> files,
-      @Nonnull List<String> dirs, boolean isRatisEnabled) {
-    super(omResponse, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      @Nonnull List<String> dirs, boolean isRatisEnabled,
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.markDeletedDirList = markDeletedDirs;
     this.dirList = dirs;
     this.fileList = files;

@@ -249,7 +249,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected S3MultipartUploadCompleteResponse getOmClientResponse(
       OMResponse.Builder omResponse, IOException exception) {
     return new S3MultipartUploadCompleteResponse(
-        createErrorOMResponse(omResponse, exception));
+        createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
   protected OMClientResponse getOmClientResponse(String multipartKey,
@@ -257,7 +257,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmKeyInfo omKeyInfo, List<OmKeyInfo> unUsedParts) {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
-        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts);
+        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout());
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
@@ -381,13 +382,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected String getDBOzoneKey(OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName) throws IOException {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
-  }
-
-  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String uploadID, OMMetadataManager omMetadataManager)
-      throws IOException {
-    return omMetadataManager
-        .getMultipartKey(volumeName, bucketName, keyName, uploadID);
   }
 
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,

@@ -32,9 +32,9 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
  */
 public final class OMConfiguration {
 
-  // OM nodes present in OM's memory
+  // OM nodes present in OM's memory (does not include Decommissioned nodes)
   private List<OMNodeDetails> omNodesInMemory = new ArrayList<>();
-  // OM nodes reloaded from new config on disk
+  // OM nodes reloaded from new config on disk (includes Decommissioned nodes)
   private List<OMNodeDetails> omNodesInNewConf = new ArrayList<>();
 
   private OMConfiguration(List<OMNodeDetails> inMemoryNodeList,
@@ -80,13 +80,25 @@ public final class OMConfiguration {
   }
 
   /**
-   * Reload configuration from disk and return all the OM nodes present in
-   * the new conf under current serviceId.
+   * Reload configuration from disk and return all active OM nodes (excludes
+   * decommissioned nodes) present in the new conf under current serviceId.
    */
-  public Map<String, OMNodeDetails> getOmNodesInNewConf() {
-    return omNodesInNewConf.stream().collect(Collectors.toMap(
-        NodeDetails::getNodeId,
-        omNodeDetails -> omNodeDetails,
-        (nodeId, omNodeDetails) -> omNodeDetails));
+  public Map<String, OMNodeDetails> getActiveOmNodesInNewConf() {
+    return omNodesInNewConf.stream()
+        .filter(omNodeDetails -> !omNodeDetails.isDecommissioned())
+        .collect(Collectors.toMap(NodeDetails::getNodeId,
+            omNodeDetails -> omNodeDetails,
+            (nodeId, omNodeDetails) -> omNodeDetails));
+  }
+
+  /**
+   * Return all decommissioned nodes in the reloaded config.
+   */
+  public Map<String, OMNodeDetails> getDecommissionedNodesInNewConf() {
+    return omNodesInNewConf.stream()
+        .filter(omNodeDetails -> omNodeDetails.isDecommissioned())
+        .collect(Collectors.toMap(NodeDetails::getNodeId,
+            omNodeDetails -> omNodeDetails,
+            (nodeId, omNodeDetails) -> omNodeDetails));
   }
 }

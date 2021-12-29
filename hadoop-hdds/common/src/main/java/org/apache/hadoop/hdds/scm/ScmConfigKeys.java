@@ -335,10 +335,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DATANODE_ID_DIR =
       "ozone.scm.datanode.id.dir";
 
-  public static final String OZONE_SCM_DB_CACHE_SIZE_MB =
-      "ozone.scm.db.cache.size.mb";
-  public static final int OZONE_SCM_DB_CACHE_SIZE_DEFAULT = 128;
-
   public static final String OZONE_SCM_CONTAINER_SIZE =
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";

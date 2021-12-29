@@ -178,7 +178,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
-          new OMKeyDeleteResponse(createErrorOMResponse(omResponse, exception));
+          new OMKeyDeleteResponse(createErrorOMResponse(omResponse, exception),
+              getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
