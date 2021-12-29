@@ -168,7 +168,7 @@ All these settings should be made in ozone-site.xml.
         <tbody>
           <tr>
             <td>ozone.s3g.kerberos.principal</th>
-            <td>S3 Gateway principal. <br/> e.g. s3g/_HOST@REAML</td>
+            <td>S3 Gateway principal. <br/> e.g. s3g/_HOST@REALM</td>
           </tr>
           <tr>
             <td>ozone.s3g.kerberos.keytab.file</th>

@@ -147,7 +147,7 @@ ozone-site.xml 中应进行如下配置：
         <tbody>
           <tr>
             <td>ozone.s3g.kerberos.principal</th>
-            <td>S3 网关主体，例如：s3g/_HOST@REAML</td>
+            <td>S3 网关主体，例如：s3g/_HOST@REALM</td>
           </tr>
           <tr>
             <td>ozone.s3g.kerberos.keytab.file</th>
