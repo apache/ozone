@@ -147,11 +147,11 @@ ozone-site.xml 中应进行如下配置：
         <tbody>
           <tr>
             <td>ozone.s3g.kerberos.principal</th>
-            <td>S3 网关主体，例如：s3g/_host@REAML</td>
+            <td>S3 网关主体，例如：s3g/_HOST@REAML</td>
           </tr>
           <tr>
             <td>ozone.s3g.kerberos.keytab.file</th>
-            <td>S3 网关使用的 keytab 文件，例如：/etc/security/keytabs/s3g.keytab/td>
+            <td>S3 网关使用的 keytab 文件，例如：/etc/security/keytabs/s3g.keytab</td>
           </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.principal</th>
