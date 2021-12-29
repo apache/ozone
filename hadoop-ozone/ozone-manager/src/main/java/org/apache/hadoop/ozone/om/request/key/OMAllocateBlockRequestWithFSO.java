@@ -66,13 +66,9 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   private static final Logger LOG =
           LoggerFactory.getLogger(OMAllocateBlockRequestWithFSO.class);
 
-  public OMAllocateBlockRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  public OMAllocateBlockRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -173,7 +169,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponseWithFSO(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
               "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
@@ -227,6 +223,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
       OmBucketInfo omBucketInfo) {
     return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
-            clientID, omBucketInfo);
+            clientID, omBucketInfo, getBucketLayout());
   }
 }

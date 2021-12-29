@@ -193,7 +193,8 @@ public class TestOMRatisSnapshots {
     Assert.assertNotNull(followerOMMetaMngr.getBucketTable().get(
         followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
-      Assert.assertNotNull(followerOMMetaMngr.getKeyTable(getBucketLayout())
+      Assert.assertNotNull(followerOMMetaMngr.getKeyTable(
+          getDefaultBucketLayout())
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
   }
@@ -318,7 +319,7 @@ public class TestOMRatisSnapshots {
     return keys;
   }
 
-  public BucketLayout getBucketLayout() {
+  private static BucketLayout getDefaultBucketLayout() {
     return BucketLayout.DEFAULT;
   }
 

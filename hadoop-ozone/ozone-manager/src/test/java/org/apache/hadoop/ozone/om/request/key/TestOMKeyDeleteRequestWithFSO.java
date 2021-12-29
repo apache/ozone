@@ -43,7 +43,8 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
   @Override
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
       OMRequest modifiedOmRequest) {
-    return new OMKeyDeleteRequestWithFSO(modifiedOmRequest);
+    return new OMKeyDeleteRequestWithFSO(modifiedOmRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override

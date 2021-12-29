@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -74,6 +75,18 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of replication bytes completed.")
   private MutableCounterLong numReplicationBytesCompleted;
 
+  @Metric("Number of deletion bytes total.")
+  private MutableCounterLong numDeletionBytesTotal;
+
+  @Metric("Number of deletion bytes completed.")
+  private MutableCounterLong numDeletionBytesCompleted;
+
+  @Metric("Time elapsed for replication")
+  private MutableRate replicationTime;
+
+  @Metric("Time elapsed for deletion")
+  private MutableRate deletionTime;
+
   private MetricsRegistry registry;
 
   private ReplicationManager replicationManager;
@@ -105,6 +118,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     numDeletionCmdsTimeout.snapshot(builder, all);
     numReplicationBytesTotal.snapshot(builder, all);
     numReplicationBytesCompleted.snapshot(builder, all);
+    numDeletionBytesTotal.snapshot(builder, all);
+    numDeletionBytesCompleted.snapshot(builder, all);
+    replicationTime.snapshot(builder, all);
+    deletionTime.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -143,6 +160,22 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.numReplicationBytesCompleted.incr(bytes);
   }
 
+  public void incrNumDeletionBytesTotal(long bytes) {
+    this.numDeletionBytesTotal.incr(bytes);
+  }
+
+  public void incrNumDeletionBytesCompleted(long bytes) {
+    this.numDeletionBytesCompleted.incr(bytes);
+  }
+
+  public void addReplicationTime(long millis) {
+    this.replicationTime.add(millis);
+  }
+
+  public void addDeletionTime(long millis) {
+    this.deletionTime.add(millis);
+  }
+
   public long getInflightReplication() {
     return replicationManager.getInflightReplication().size();
   }
@@ -177,6 +210,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getNumDeletionCmdsTimeout() {
     return this.numDeletionCmdsTimeout.value();
+  }
+
+  public long getNumDeletionBytesTotal() {
+    return this.numDeletionBytesTotal.value();
+  }
+
+  public long getNumDeletionBytesCompleted() {
+    return this.numDeletionBytesCompleted.value();
   }
 
   public long getNumReplicationBytesTotal() {

@@ -29,6 +29,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -56,7 +57,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
@@ -888,7 +888,8 @@ public final class OMFileRequest {
     iterator.seek(seekDirInDB);
 
     if (iterator.hasNext()) {
-      OmDirectoryInfo dirInfo = iterator.value().getValue();
+      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+      OmDirectoryInfo dirInfo = entry.getValue();
       return isImmediateChild(dirInfo.getParentObjectID(),
               omKeyInfo.getObjectID());
     }
@@ -926,7 +927,8 @@ public final class OMFileRequest {
     iterator.seek(seekFileInDB);
 
     if (iterator.hasNext()) {
-      OmKeyInfo fileInfo = iterator.value().getValue();
+      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+      OmKeyInfo fileInfo = entry.getValue();
       return isImmediateChild(fileInfo.getParentObjectID(),
               omKeyInfo.getObjectID()); // found a sub path file
     }
@@ -948,7 +950,27 @@ public final class OMFileRequest {
    * @throws IOException DB failure or parent not exists in DirectoryTable
    */
   public static long getParentID(long bucketId, Iterator<Path> pathComponents,
-      String keyName, OMMetadataManager omMetadataManager) throws IOException {
+                                 String keyName,
+                                 OMMetadataManager omMetadataManager)
+      throws IOException {
+
+    return getParentID(bucketId, pathComponents, keyName, omMetadataManager,
+        null);
+  }
+
+  /**
+   * Get parent id for the user given path.
+   *
+   * @param bucketId       bucket id
+   * @param pathComponents fie path elements
+   * @param keyName        user given key name
+   * @param omMetadataManager   om metadata manager
+   * @return lastKnownParentID
+   * @throws IOException DB failure or parent not exists in DirectoryTable
+   */
+  public static long getParentID(long bucketId, Iterator<Path> pathComponents,
+      String keyName, OMMetadataManager omMetadataManager, String errMsg)
+      throws IOException {
 
     long lastKnownParentId = bucketId;
 
@@ -956,7 +978,9 @@ public final class OMFileRequest {
     if(!pathComponents.hasNext()){
       return bucketId;
     }
-
+    if (StringUtils.isBlank(errMsg)) {
+      errMsg = "Failed to find parent directory of " + keyName;
+    }
     OmDirectoryInfo omDirectoryInfo;
     while (pathComponents.hasNext()) {
       String nodeName = pathComponents.next().toString();
@@ -977,14 +1001,39 @@ public final class OMFileRequest {
         // One of the sub-dir doesn't exists in DB. Immediate parent should
         // exists for committing the key, otherwise will fail the operation.
         if (!reachedLastPathComponent) {
-          throw new OMException("Failed to find parent directory of "
-                  + keyName + " in DirectoryTable", KEY_NOT_FOUND);
+          throw new OMException(errMsg,
+              OMException.ResultCodes.DIRECTORY_NOT_FOUND);
         }
         break;
       }
     }
 
     return lastKnownParentId;
+  }
+
+  /**
+   * Get parent ID for the user given keyName.
+   *
+   * @param omMetadataManager
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @return
+   * @throws IOException
+   */
+  public static long getParentId(OMMetadataManager omMetadataManager,
+                                 String volumeName, String bucketName,
+                                 String keyName)
+      throws IOException {
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+
+    long bucketId = omBucketInfo.getObjectID();
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    return OMFileRequest
+        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
   }
 
   /**

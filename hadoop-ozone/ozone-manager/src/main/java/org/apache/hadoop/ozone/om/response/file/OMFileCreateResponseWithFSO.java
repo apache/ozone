@@ -58,8 +58,9 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
+                                     @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override

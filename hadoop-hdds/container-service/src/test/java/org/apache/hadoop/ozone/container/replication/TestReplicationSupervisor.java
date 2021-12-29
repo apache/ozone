@@ -23,7 +23,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -237,8 +236,7 @@ public class TestReplicationSupervisor {
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
         Mockito.mock(SimpleContainerDownloader.class);
-    CompletableFuture<Path> res = new CompletableFuture<>();
-    res.complete(Paths.get("file:/tmp/no-such-file"));
+    Path res = Paths.get("file:/tmp/no-such-file");
     Mockito.when(
         moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList()))
         .thenReturn(res);

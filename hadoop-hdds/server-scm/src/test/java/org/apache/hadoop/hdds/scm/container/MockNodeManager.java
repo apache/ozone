@@ -750,7 +750,8 @@ public class MockNodeManager implements NodeManager {
     SCMNodeStat stat = this.nodeMetricMap.get(datanodeDetails);
     if (stat != null) {
       aggregateStat.subtract(stat);
-      stat.getCapacity().add(size);
+      stat.getScmUsed().add(size);
+      stat.getRemaining().subtract(size);
       aggregateStat.add(stat);
       nodeMetricMap.put(datanodeDetails, stat);
     }
@@ -766,7 +767,8 @@ public class MockNodeManager implements NodeManager {
     SCMNodeStat stat = this.nodeMetricMap.get(datanodeDetails);
     if (stat != null) {
       aggregateStat.subtract(stat);
-      stat.getCapacity().subtract(size);
+      stat.getScmUsed().subtract(size);
+      stat.getRemaining().add(size);
       aggregateStat.add(stat);
       nodeMetricMap.put(datanodeDetails, stat);
     }

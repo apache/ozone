@@ -42,8 +42,9 @@ import java.util.Iterator;
 public class S3MultipartUploadAbortRequestWithFSO
     extends S3MultipartUploadAbortRequest {
 
-  public S3MultipartUploadAbortRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadAbortRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -51,7 +52,7 @@ public class S3MultipartUploadAbortRequestWithFSO
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponseWithFSO(createErrorOMResponse(
-        omResponse, exception));
+        omResponse, exception), getBucketLayout());
   }
 
   @Override
@@ -64,7 +65,7 @@ public class S3MultipartUploadAbortRequestWithFSO
         omResponse.setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
         multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-        omBucketInfo.copyObject());
+        omBucketInfo.copyObject(), getBucketLayout());
     return omClientResp;
   }
 
@@ -86,10 +87,5 @@ public class S3MultipartUploadAbortRequestWithFSO
         fileName, multipartUploadID);
 
     return multipartKey;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

@@ -114,12 +114,13 @@ public interface ScmClient extends Closeable {
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    * @param state Container of this state will be returned.
-   *
+   * @param factor container factor.
    * @return a list of pipeline.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state) throws IOException;
+  List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      throws IOException;
 
   /**
    * Read meta data from an existing container.

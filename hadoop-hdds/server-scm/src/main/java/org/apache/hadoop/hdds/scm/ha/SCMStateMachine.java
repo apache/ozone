@@ -176,6 +176,13 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void notifyLogFailed(Throwable ex,
+      RaftProtos.LogEntryProto failedEntry) {
+    LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
+    ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+  }
+
+  @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     if (!isInitialized) {
       return;

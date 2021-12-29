@@ -90,7 +90,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       defaultValue = "")
   private String datanodes;
 
-  private XceiverClientManager xceiverClientManager;
   private List<XceiverClientSpi> xceiverClients;
 
   private Timer timer;
@@ -104,8 +103,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
 
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
-    xceiverClientManager =
-        new XceiverClientManager(ozoneConf);
     if (OzoneSecurityUtil.isSecurityEnabled(ozoneConf)) {
       throw new IllegalArgumentException(
           "Datanode chunk generator is not supported in secure environment");
@@ -118,7 +115,9 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     Set<Pipeline> pipelines;
 
     try (StorageContainerLocationProtocol scmLocationClient =
-               createStorageContainerLocationClient(ozoneConf)) {
+               createStorageContainerLocationClient(ozoneConf);
+         XceiverClientManager xceiverClientManager =
+             new XceiverClientManager(ozoneConf)) {
       List<Pipeline> pipelinesFromSCM = scmLocationClient.listPipelines();
       Pipeline firstPipeline;
       init();
@@ -203,7 +202,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     DatanodeBlockID blockId = DatanodeBlockID.newBuilder()
         .setContainerID(1L)
         .setLocalID(stepNo % 20)
-        .setBlockCommitSequenceId(stepNo)
         .build();
 
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()

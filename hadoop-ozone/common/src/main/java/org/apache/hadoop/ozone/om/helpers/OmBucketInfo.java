@@ -91,6 +91,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketLayout bucketLayout;
 
+  private final String owner;
+
   /**
    * Private constructor, constructed via builder.
    * @param volumeName - Volume name.
@@ -108,6 +110,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param quotaInBytes Bucket quota in bytes.
    * @param quotaInNamespace Bucket quota in counts.
    * @param bucketLayout Bucket Layout.
+   * @param owner owner of the bucket.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -127,7 +130,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       long usedNamespace,
       long quotaInBytes,
       long quotaInNamespace,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout,
+      String owner) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -146,6 +150,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
     this.bucketLayout = bucketLayout;
+    this.owner = owner;
   }
 
   /**
@@ -288,6 +293,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return sourceVolume != null && sourceBucket != null;
   }
 
+  public String getOwner() {
+    return owner;
+  }
+
   /**
    * Returns new builder class that builds a OmBucketInfo.
    *
@@ -362,7 +371,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
-        .setBucketLayout(bucketLayout);
+        .setBucketLayout(bucketLayout)
+        .setOwner(owner);
   }
 
   /**
@@ -387,6 +397,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private long quotaInBytes;
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
+    private String owner;
 
     public Builder() {
       //Default values
@@ -510,6 +521,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setOwner(String ownerName) {
+      this.owner = ownerName;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketInfo.
      * @return instance of OmBucketInfo.
@@ -524,7 +540,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, modificationTime, objectID, updateID,
           metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout);
+          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, owner);
     }
   }
 
@@ -558,6 +574,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (sourceBucket != null) {
       bib.setSourceBucket(sourceBucket);
+    }
+    if (owner != null) {
+      bib.setOwner(owner);
     }
     return bib.build();
   }
@@ -617,6 +636,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     if (bucketInfo.hasSourceBucket()) {
       obib.setSourceBucket(bucketInfo.getSourceBucket());
     }
+    if (bucketInfo.hasOwner()) {
+      obib.setOwner(bucketInfo.getOwner());
+    }
     return obib.build();
   }
 
@@ -664,7 +686,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
-        Objects.equals(bekInfo, that.bekInfo);
+        Objects.equals(bekInfo, that.bekInfo) &&
+        Objects.equals(owner, that.owner);
   }
 
   @Override
@@ -692,6 +715,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +
+        ", owner=" + owner +
         '}';
   }
 }

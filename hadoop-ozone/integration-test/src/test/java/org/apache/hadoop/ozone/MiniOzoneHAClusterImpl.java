@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -28,7 +30,6 @@ import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -64,7 +65,7 @@ import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_
  */
 public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneHAClusterImpl.class);
 
   private final OMHAService omhaService;
@@ -180,6 +181,23 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public StorageContainerManager getStorageContainerManager(int index) {
     return this.scmhaService.getServiceByIndex(index);
+  }
+
+  private OzoneManager getOMLeader(boolean waitForLeaderElection)
+      throws TimeoutException, InterruptedException {
+    if (waitForLeaderElection) {
+      final OzoneManager[] om = new OzoneManager[1];
+      GenericTestUtils.waitFor(new Supplier<Boolean>() {
+        @Override
+        public Boolean get() {
+          om[0] = getOMLeader();
+          return om[0] != null;
+        }
+      }, 200, waitForClusterToBeReadyTimeout);
+      return om[0];
+    } else {
+      return getOMLeader();
+    }
   }
 
   /**
@@ -491,11 +509,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             }
           }
 
-          // Set default OM address to point to the first OM. Clients would
-          // try connecting to this address by default
-          conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
-              NetUtils.getHostPortString(omList.get(0).getOmRpcServerAddr()));
-
           break;
         } catch (BindException e) {
           for (OzoneManager om : omList) {
@@ -686,17 +699,33 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   /**
-   * Bootstrap new OM and add to existing OM HA service ring.
-   * @return new OM nodeId
+   * Bootstrap new OM by updating existing OM configs.
    */
   public void bootstrapOzoneManager(String omNodeId) throws Exception {
+    bootstrapOzoneManager(omNodeId, true, false);
+  }
 
-    int basePort;
+  /**
+   * Bootstrap new OM and add to existing OM HA service ring.
+   * @param omNodeId nodeId of new OM
+   * @param updateConfigs if true, update the old OM configs with new node
+   *                      information
+   * @param force if true, start new OM with FORCE_BOOTSTRAP option.
+   *              Otherwise, start new OM with BOOTSTRAP option.
+   */
+  public void bootstrapOzoneManager(String omNodeId,
+      boolean updateConfigs, boolean force) throws Exception {
+
+    // Set testReloadConfigFlag to true so that
+    // OzoneManager#reloadConfiguration does not reload config as it will
+    // return the default configurations.
+    OzoneManager.setTestReloadConfigFlag(true);
+
     int retryCount = 0;
-
     OzoneManager om = null;
 
-    long leaderSnapshotIndex = getOMLeader().getRatisSnapshotIndex();
+    OzoneManager omLeader = getOMLeader(true);
+    long leaderSnapshotIndex = omLeader.getRatisSnapshotIndex();
 
     while (true) {
       try {
@@ -704,7 +733,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         OzoneConfiguration newConf = addNewOMToConfig(getOMServiceId(),
             omNodeId, portSet);
 
-        om = bootstrapNewOM(omNodeId);
+        if (updateConfigs) {
+          updateOMConfigs(newConf);
+        }
+
+        om = bootstrapNewOM(omNodeId, newConf, force);
 
         LOG.info("Bootstrapped OzoneManager {} RPC server at {}", omNodeId,
             om.getOmRpcServerAddr());
@@ -712,7 +745,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         // Add new OMs to cluster's in memory map and update existing OMs conf.
         setConf(newConf);
 
-        omhaService.addInstance(om, true);
         break;
       } catch (IOException e) {
         // Existing OM config could have been updated with new conf. Reset it.
@@ -731,7 +763,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     waitForBootstrappedNodeToBeReady(om, leaderSnapshotIndex);
-    waitForConfigUpdateOnAllOMs(omNodeId);
+    if (updateConfigs) {
+      waitForConfigUpdateOnActiveOMs(omNodeId);
+    }
   }
 
   /**
@@ -739,7 +773,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   private OzoneConfiguration addNewOMToConfig(String omServiceId,
       String omNodeId, List<Integer> portList) {
-    OzoneConfiguration newConf = getConf();
+
+    OzoneConfiguration newConf = new OzoneConfiguration(getConf());
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
     StringBuilder omNodesKeyValue = new StringBuilder();
@@ -766,34 +801,48 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   /**
-   * Start a new OM in Bootstrap mode. Configs for the new OM must already be
-   * set.
+   * Update the configurations of the given list of OMs.
    */
-  private OzoneManager bootstrapNewOM(String nodeId)
-      throws IOException, AuthenticationException {
-    OzoneConfiguration config = new OzoneConfiguration(getConf());
+  public void updateOMConfigs(OzoneConfiguration newConf) {
+    for (OzoneManager om : omhaService.getActiveServices()) {
+      om.setConfiguration(newConf);
+    }
+  }
+
+  /**
+   * Start a new OM in Bootstrap mode. Configs (address and ports) for the new
+   * OM must already be set in the newConf.
+   */
+  private OzoneManager bootstrapNewOM(String nodeId, OzoneConfiguration newConf,
+      boolean force) throws IOException, AuthenticationException {
+
+    OzoneConfiguration config = new OzoneConfiguration(newConf);
+
+    // For bootstrapping node, set the nodeId config also.
     config.set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, nodeId);
-    // Set the OM rpc and http(s) address to null so that the cluster picks
-    // up the address set with service ID and node ID
-    config.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
-    config.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "");
-    config.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "");
 
     // Set metadata/DB dir base path
     String metaDirPath = clusterMetaPath + "/" + nodeId;
     config.set(OZONE_METADATA_DIRS, metaDirPath);
 
-    // Update existing OMs config
-    for (OzoneManager existingOM : omhaService.getServices()) {
-      existingOM.setConfiguration(config);
+    OzoneManager.omInit(config);
+    OzoneManager om;
+
+    if (force) {
+      om = OzoneManager.createOm(config,
+          OzoneManager.StartupOption.FORCE_BOOTSTRAP);
+    } else {
+      om = OzoneManager.createOm(config, OzoneManager.StartupOption.BOOTSTRAP);
     }
 
-    OzoneManager.omInit(config);
-    OzoneManager om = OzoneManager.createOm(config,
-        OzoneManager.StartupOption.BOOTSTRAP);
-    om.start();
-    return om;
+    ExitManagerForOM exitManager = new ExitManagerForOM(this, nodeId);
+    om.setExitManagerForTesting(exitManager);
+    omhaService.addInstance(om, false);
 
+    om.start();
+    omhaService.activate(om);
+
+    return om;
   }
 
   /**
@@ -814,7 +863,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
-  private void waitForConfigUpdateOnAllOMs(String newOMNodeId)
+  private void waitForConfigUpdateOnActiveOMs(String newOMNodeId)
       throws Exception {
     OzoneManager newOMNode = omhaService.getServiceById(newOMNodeId);
     OzoneManagerRatisServer newOMRatisServer = newOMNode.getOmRatisServer();
@@ -835,6 +884,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       }
       return true;
     }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
+  public void setupExitManagerForTesting() {
+    for (OzoneManager om : omhaService.getServices()) {
+      om.setExitManagerForTesting(new ExitManagerForOM(this, om.getOMNodeId()));
+    }
   }
 
   /**
@@ -972,5 +1027,32 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         .stream()
         .map(inetSocketAddress -> inetSocketAddress.getPort())
         .collect(Collectors.toList());
+  }
+
+  private static final class ExitManagerForOM extends ExitManager {
+
+    private MiniOzoneHAClusterImpl cluster;
+    private String omNodeId;
+
+    private ExitManagerForOM(MiniOzoneHAClusterImpl cluster, String nodeId) {
+      this.cluster = cluster;
+      this.omNodeId = nodeId;
+    }
+
+    @Override
+    public void exitSystem(int status, String message, Throwable throwable,
+        Logger log) throws IOException {
+      LOG.error(omNodeId + " - System Exit: " + message, throwable);
+      cluster.stopOzoneManager(omNodeId);
+      throw new IOException(throwable);
+    }
+
+    @Override
+    public void exitSystem(int status, String message, Logger log)
+        throws IOException {
+      LOG.error(omNodeId + " - System Exit: " + message);
+      cluster.stopOzoneManager(omNodeId);
+      throw new IOException(message);
+    }
   }
 }

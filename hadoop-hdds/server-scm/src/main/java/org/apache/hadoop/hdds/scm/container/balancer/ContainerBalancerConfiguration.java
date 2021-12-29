@@ -18,15 +18,10 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.fs.DUFactory;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -34,9 +29,9 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -46,7 +41,6 @@ import java.util.stream.Collectors;
 public final class ContainerBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
-  private OzoneConfiguration ozoneConfiguration;
 
   @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
       "0.1", tags = {ConfigTag.BALANCER},
@@ -72,19 +66,19 @@ public final class ContainerBalancerConfiguration {
   private long maxSizeToMovePerIteration = 30 * OzoneConsts.GB;
 
   @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
-      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      defaultValue = "26GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can enter a target datanode in each " +
       "iteration while balancing. This is the sum of data from multiple " +
-      "sources. The default value is greater than the configured" +
-      " (or default) ozone.scm.container.size by 1GB.")
+      "sources. The value must be greater than the configured" +
+      " (or default) ozone.scm.container.size.")
   private long maxSizeEnteringTarget;
 
   @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
-      defaultValue = "", tags = {ConfigTag.BALANCER}, description = "The " +
+      defaultValue = "26GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can leave a source datanode in each " +
       "iteration while balancing. This is the sum of data moving to multiple " +
-      "targets. The default value is greater than the configured" +
-      " (or default) ozone.scm.container.size by 1GB.")
+      "targets. The value must be greater than the configured" +
+      " (or default) ozone.scm.container.size.")
   private long maxSizeLeavingSource;
 
   @Config(key = "idle.iterations", type = ConfigType.INT,
@@ -98,43 +92,37 @@ public final class ContainerBalancerConfiguration {
   private String excludeContainers = "";
 
   @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
-      timeUnit = TimeUnit.MINUTES, tags = {ConfigTag.BALANCER}, description =
+      tags = {ConfigTag.BALANCER}, description =
       "The amount of time in minutes to allow a single container to move " +
           "from source to target.")
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "1h", timeUnit = TimeUnit.MINUTES, tags = {
+      defaultValue = "70m", tags = {
       ConfigTag.BALANCER}, description = "The interval period between each " +
       "iteration of Container Balancer.")
   private long balancingInterval;
 
-  private DUFactory.Conf duConf;
+  @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
+      "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
+      "hostnames or ip addresses separated by commas. Only the Datanodes " +
+      "specified in this list are balanced. This configuration is empty by " +
+      "default and is applicable only if it is non-empty.")
+  private String includeNodes = "";
 
-  /**
-   * Create configuration with default values.
-   *
-   * @param config Ozone configuration
-   */
-  public ContainerBalancerConfiguration(OzoneConfiguration config) {
-    Preconditions.checkNotNull(config,
-        "OzoneConfiguration should not be null.");
-    this.ozoneConfiguration = config;
+  @Config(key = "exclude.datanodes", type = ConfigType.STRING, defaultValue =
+      "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
+      "hostnames or ip addresses separated by commas. The Datanodes specified" +
+      " in this list are excluded from balancing. This configuration is empty" +
+      " by default.")
+  private String excludeNodes = "";
 
-    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
-    // greater than container size
-    long size = (long) ozoneConfiguration.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.GB) +
-        OzoneConsts.GB;
-    maxSizeEnteringTarget = size;
-    maxSizeLeavingSource = size;
-
-    // balancing interval should be greater than DUFactory refresh period
-    duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
-    balancingInterval = duConf.getRefreshPeriod().toMillis() +
-        Duration.ofMinutes(10).toMillis();
-  }
+  @Config(key = "move.networkTopology.enable", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "whether to take network topology into account when " +
+          "selecting a target for a source. " +
+          "This configuration is false by default.")
+  private boolean networkTopologyEnable = false;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -179,6 +167,24 @@ public final class ContainerBalancerConfiguration {
               "-1(for infinitely running).");
     }
     this.idleIterations = count;
+  }
+
+  /**
+   * Get the NetworkTopologyEnable value for Container Balancer.
+   *
+   * @return the boolean value of networkTopologyEnable
+   */
+  public Boolean getNetworkTopologyEnable() {
+    return networkTopologyEnable;
+  }
+
+  /**
+   * Set the NetworkTopologyEnable value for Container Balancer.
+   *
+   * @param enable the boolean value to be set to networkTopologyEnable
+   */
+  public void setNetworkTopologyEnable(Boolean enable) {
+    networkTopologyEnable = enable;
   }
 
   /**
@@ -284,21 +290,56 @@ public final class ContainerBalancerConfiguration {
   }
 
   public void setBalancingInterval(Duration balancingInterval) {
-    if (balancingInterval.toMillis() > duConf.getRefreshPeriod().toMillis()) {
-      this.balancingInterval = balancingInterval.toMillis();
-    } else {
-      LOG.warn("Balancing interval duration must be greater than du refresh " +
-          "period, {} milliseconds", duConf.getRefreshPeriod().toMillis());
-    }
+    this.balancingInterval = balancingInterval.toMillis();
   }
 
   /**
-   * Gets the {@link OzoneConfiguration} using which this configuration was
-   * constructed.
-   * @return the {@link OzoneConfiguration} being used by this configuration
+   * Gets a set of datanode hostnames or ip addresses that will be the exclusive
+   * participants in balancing.
+   * @return Set of hostname or ip address strings, or an empty set if the
+   * configuration is empty
    */
-  public OzoneConfiguration getOzoneConfiguration() {
-    return this.ozoneConfiguration;
+  public Set<String> getIncludeNodes() {
+    if (includeNodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+    return Arrays.stream(includeNodes.split(","))
+        .map(String::trim)
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Sets the datanodes that will be the exclusive participants in balancing.
+   * Applicable only if the specified string is non-empty.
+   * @param includeNodes a String of datanode hostnames or ip addresses
+   *                     separated by commas
+   */
+  public void setIncludeNodes(String includeNodes) {
+    this.includeNodes = includeNodes;
+  }
+
+  /**
+   * Gets a set of datanode hostnames or ip addresses that will be excluded
+   * from balancing.
+   * @return Set of hostname or ip address strings, or an empty set if the
+   * configuration is empty
+   */
+  public Set<String> getExcludeNodes() {
+    if (excludeNodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+    return Arrays.stream(excludeNodes.split(","))
+        .map(String::trim)
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Sets the datanodes that will be excluded from balancing.
+   * @param excludeNodes a String of datanode hostnames or ip addresses
+   *                     separated by commas
+   */
+  public void setExcludeNodes(String excludeNodes) {
+    this.excludeNodes = excludeNodes;
   }
 
   @Override
@@ -307,9 +348,16 @@ public final class ContainerBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
-            "%-50s %dB%n", "Key", "Value", "Threshold",
+            "%-50s %dGB%n"+
+            "%-50s %dGB%n"+
+            "%-50s %dGB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Involve per Iteration(ratio)",
         maxDatanodesRatioToInvolvePerIteration,
-        "Max Size to Move per Iteration", maxSizeToMovePerIteration);
+        "Max Size to Move per Iteration",
+        maxSizeToMovePerIteration / OzoneConsts.GB,
+        "Max Size Entering Target per Iteration",
+        maxSizeEnteringTarget / OzoneConsts.GB,
+        "Max Size Leaving Source per Iteration",
+        maxSizeLeavingSource / OzoneConsts.GB);
   }
 }

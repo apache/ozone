@@ -36,7 +36,7 @@ import java.util.List;
 public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
 
   public OMPathsPurgeRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+    super(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
@@ -56,15 +56,10 @@ public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
 
     OMClientResponse omClientResponse = new OMPathsPurgeResponseWithFSO(
         omResponse.build(), markDeletedSubDirsList, deletedSubFilesList,
-        deletedDirsList, ozoneManager.isRatisEnabled());
+        deletedDirsList, ozoneManager.isRatisEnabled(), getBucketLayout());
     addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
         omDoubleBufferHelper);
 
     return omClientResponse;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

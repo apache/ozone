@@ -99,6 +99,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -113,7 +114,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
-import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
@@ -183,6 +183,9 @@ public abstract class TestOzoneRpcClientAbstract {
    * @throws Exception
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
+    // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
+    //  for testZReadKeyWithUnhealthyContainerReplica.
+    conf.set("ozone.scm.stale.node.interval", "10s");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setTotalPipelineNumLimit(10)
@@ -1528,7 +1531,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
   // Make this executed at last, for it has some side effect to other UTs
   @Test
-  public void testZReadKeyWithUnhealthyContainerReplia() throws Exception {
+  public void testZReadKeyWithUnhealthyContainerReplica() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -1561,7 +1564,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .getContainerID();
 
     // Set container replica to UNHEALTHY
-    Container container = null;
+    Container container;
     int index = 1;
     List<HddsDatanodeService> involvedDNs = new ArrayList<>();
     for (HddsDatanodeService hddsDatanode : cluster.getHddsDatanodes()) {
@@ -1598,7 +1601,6 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
 
-    Thread.currentThread().sleep(5000);
     StorageContainerManager scm = cluster.getStorageContainerManager();
     GenericTestUtils.waitFor(() -> {
       try {
@@ -1609,7 +1611,7 @@ public abstract class TestOzoneRpcClientAbstract {
         fail("Failed to get container info for " + e.getMessage());
         return false;
       }
-    }, 1000, 5000);
+    }, 1000, 10000);
 
     // Try reading keyName2
     try {
@@ -3372,8 +3374,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     String ozoneKey = ozoneManager.getMetadataManager()
         .getOzoneKey(bucket.getVolumeName(), bucket.getName(), keyName);
-    OmKeyInfo omKeyInfo = ozoneManager.getMetadataManager().getKeyTable()
-        .get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        ozoneManager.getMetadataManager().getKeyTable(getBucketLayout())
+            .get(ozoneKey);
 
     OmKeyLocationInfoGroup latestVersionLocations =
         omKeyInfo.getLatestVersionLocations();
@@ -3511,14 +3514,14 @@ public abstract class TestOzoneRpcClientAbstract {
 
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable().get(omMetadataManager.getOzoneKey(
-            volumeName, bucketName, keyName));
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
     omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
 
-    omMetadataManager.getKeyTable().put(omMetadataManager.getOzoneKey(
-         volumeName, bucketName, keyName), omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
+            omKeyInfo);
 
     //Step 5
     key = bucket.getKey(keyName);
@@ -3632,8 +3635,8 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testHeadObject() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    ReplicationConfig replicationConfig = fromTypeAndFactor(RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+    ReplicationConfig replicationConfig = ReplicationConfig
+        .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -3667,11 +3670,15 @@ public abstract class TestOzoneRpcClientAbstract {
 
   }
 
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
   private void createRequiredForVersioningTest(String volumeName,
       String bucketName, String keyName, boolean versioning) throws Exception {
 
-    ReplicationConfig replicationConfig = fromTypeAndFactor(RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+    ReplicationConfig replicationConfig = ReplicationConfig
+        .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -3697,8 +3704,9 @@ public abstract class TestOzoneRpcClientAbstract {
   private void checkExceptedResultForVersioningTest(String volumeName,
       String bucketName, String keyName, int expectedCount) throws Exception {
     OmKeyInfo omKeyInfo = cluster.getOzoneManager().getMetadataManager()
-        .getKeyTable().get(cluster.getOzoneManager().getMetadataManager()
-            .getOzoneKey(volumeName, bucketName, keyName));
+        .getKeyTable(getBucketLayout()).get(
+            cluster.getOzoneManager().getMetadataManager()
+                .getOzoneKey(volumeName, bucketName, keyName));
 
     Assert.assertNotNull(omKeyInfo);
     Assert.assertEquals(expectedCount,
