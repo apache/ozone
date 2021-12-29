@@ -74,7 +74,7 @@ public final class DFSConfigKeysLegacy {
       "dfs.datanode.keytab.file";
 
   public static final String DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =
-          "dfs.datanode.kerberos.keytab.file";
+      "dfs.datanode.kerberos.keytab.file";
 
   public static final String DFS_METRICS_PERCENTILES_INTERVALS_KEY =
       "dfs.metrics.percentiles.intervals";
