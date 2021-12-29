@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
