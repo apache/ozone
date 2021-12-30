@@ -43,7 +43,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;

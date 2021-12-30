@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -55,7 +55,7 @@ public class TestReconWithOzoneManagerHA {
   @Rule
   public Timeout timeout = Timeout.seconds(300);;
 
-  private MiniOzoneOMHAClusterImpl cluster;
+  private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
   private static final String OM_SERVICE_ID = "omService1";
   private static final String VOL_NAME = "testrecon";
@@ -70,7 +70,7 @@ public class TestReconWithOzoneManagerHA {
     dbConf.setSyncOption(true);
     conf.setFromObject(dbConf);
 
-    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(OM_SERVICE_ID)
