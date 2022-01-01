@@ -384,9 +384,14 @@ public class TestDefaultCAServer {
 
 
     Assert.assertNotNull(certificateHolder);
-    Assert.assertEquals(10, certificateHolder.getNotAfter().toInstant()
+    LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
         .atZone(ZoneId.systemDefault())
-        .toLocalDate().compareTo(LocalDate.now()));
+        .toLocalDate();
+    LocalDate now = LocalDate.now();
+    // valid for at least 9 years
+    Assert.assertTrue(0 < invalidAfterDate.compareTo(now.plusYears(9)));
+    // invalid after 10 years
+    Assert.assertTrue(0 <= now.plusYears(10).compareTo(invalidAfterDate));
 
     X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 
