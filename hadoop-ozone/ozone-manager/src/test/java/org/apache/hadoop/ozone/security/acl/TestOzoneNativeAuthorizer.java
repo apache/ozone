@@ -213,10 +213,10 @@ public class TestOzoneNativeAuthorizer {
   @Test
   public void testCheckAccessForVolume() throws Exception {
     expectedAclResult = true;
-    resetAclsAndValidateAccess(volObj, USER, volumeManager);
-    resetAclsAndValidateAccess(volObj, GROUP, volumeManager);
-    resetAclsAndValidateAccess(volObj, WORLD, volumeManager);
-    resetAclsAndValidateAccess(volObj, ANONYMOUS, volumeManager);
+    resetAclsAndValidateAccess(volObj, USER, writeClient);
+    resetAclsAndValidateAccess(volObj, GROUP, writeClient);
+    resetAclsAndValidateAccess(volObj, WORLD, writeClient);
+    resetAclsAndValidateAccess(volObj, ANONYMOUS, writeClient);
   }
 
   @Test
@@ -232,13 +232,13 @@ public class TestOzoneNativeAuthorizer {
     setVolumeAcl(Arrays.asList(userAcl, groupAcl));
 
 
-    resetAclsAndValidateAccess(buckObj, USER, bucketManager);
-    resetAclsAndValidateAccess(buckObj, GROUP, bucketManager);
-    resetAclsAndValidateAccess(buckObj, WORLD, bucketManager);
-    resetAclsAndValidateAccess(buckObj, ANONYMOUS, bucketManager);
+    resetAclsAndValidateAccess(buckObj, USER, writeClient);
+    resetAclsAndValidateAccess(buckObj, GROUP, writeClient);
+    resetAclsAndValidateAccess(buckObj, WORLD, writeClient);
+    resetAclsAndValidateAccess(buckObj, ANONYMOUS, writeClient);
   }
 
-  //@Test
+  @Test
   public void testCheckAccessForKey() throws Exception {
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
         parentDirUserAcl, ACCESS);
@@ -250,13 +250,13 @@ public class TestOzoneNativeAuthorizer {
     setVolumeAcl(Arrays.asList(userAcl, groupAcl));
     setBucketAcl(Arrays.asList(userAcl, groupAcl));
 
-    resetAclsAndValidateAccess(keyObj, USER, keyManager);
-    resetAclsAndValidateAccess(keyObj, GROUP, keyManager);
-    resetAclsAndValidateAccess(keyObj, WORLD, keyManager);
-    resetAclsAndValidateAccess(keyObj, ANONYMOUS, keyManager);
+    resetAclsAndValidateAccess(keyObj, USER, writeClient);
+    resetAclsAndValidateAccess(keyObj, GROUP, writeClient);
+    resetAclsAndValidateAccess(keyObj, WORLD, writeClient);
+    resetAclsAndValidateAccess(keyObj, ANONYMOUS, writeClient);
   }
 
-  // @Test
+  @Test
   public void testCheckAccessForPrefix() throws Exception {
     prefixObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
@@ -278,10 +278,10 @@ public class TestOzoneNativeAuthorizer {
     setBucketAcl(Arrays.asList(userAcl, groupAcl));
 
 
-    resetAclsAndValidateAccess(prefixObj, USER, prefixManager);
-    resetAclsAndValidateAccess(prefixObj, GROUP, prefixManager);
-    resetAclsAndValidateAccess(prefixObj, WORLD, prefixManager);
-    resetAclsAndValidateAccess(prefixObj, ANONYMOUS, prefixManager);
+    resetAclsAndValidateAccess(prefixObj, USER, writeClient);
+    resetAclsAndValidateAccess(prefixObj, GROUP, writeClient);
+    resetAclsAndValidateAccess(prefixObj, WORLD, writeClient);
+    resetAclsAndValidateAccess(prefixObj, ANONYMOUS, writeClient);
   }
 
 
@@ -328,7 +328,7 @@ public class TestOzoneNativeAuthorizer {
   }
 
   private void resetAclsAndValidateAccess(OzoneObj obj,
-      ACLIdentityType accessType, IOzoneAcl aclImplementor)
+      ACLIdentityType accessType, OzoneManagerProtocol aclImplementor)
       throws IOException {
     List<OzoneAcl> acls;
     String user = testUgi.getUserName();
