@@ -155,11 +155,11 @@ public class ContainerBalancer {
         return false;
       }
 
-      balancerRunning = true;
       this.config = balancerConfiguration;
       if (!validateConfiguration(config)) {
         return false;
       }
+      balancerRunning = true;
       LOG.info("Starting Container Balancer...{}", this);
 
       //we should start a new balancer thread async
