@@ -377,14 +377,6 @@ public class TestKeyManagerImpl {
           OMException.ResultCodes.FILE_ALREADY_EXISTS);
     }
 
-    // create directory for root directory
-    keyName = "";
-    keyArgs = createBuilder()
-        .setKeyName(keyName)
-        .build();
-    writeClient.createDirectory(keyArgs);
-    Assert.assertTrue(keyManager.getFileStatus(keyArgs).isDirectory());
-
     // create directory where parent is root
     keyName = RandomStringUtils.randomAlphabetic(5);
     keyArgs = createBuilder()
