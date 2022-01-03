@@ -68,11 +68,8 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -200,7 +197,8 @@ public class TestKeyManagerImpl {
         Mockito.mock(StorageContainerLocationProtocol.class);
     
     OmTestWriteClient omTestWriteClient
-      = new OmTestWriteClient(conf, scm.getBlockProtocolServer(), mockScmContainerClient);
+        = new OmTestWriteClient(conf, scm.getBlockProtocolServer(),
+        mockScmContainerClient);
     om = omTestWriteClient.getTestOm();
     metadataManager = omTestWriteClient.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestWriteClient.getKeyManager();
@@ -260,7 +258,8 @@ public class TestKeyManagerImpl {
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
-  private static void createBucket(String volumeName, String bucketName, boolean isVersionEnabled)
+  private static void createBucket(String volumeName, String bucketName,
+                                   boolean isVersionEnabled)
       throws IOException {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
@@ -1500,7 +1499,8 @@ public class TestKeyManagerImpl {
     return createBuilder(BUCKET_NAME);
   }
 
-  private OmKeyArgs.Builder createBuilder(String bucketName) throws IOException {
+  private OmKeyArgs.Builder createBuilder(String bucketName)
+      throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return new OmKeyArgs.Builder()
         .setBucketName(bucketName)

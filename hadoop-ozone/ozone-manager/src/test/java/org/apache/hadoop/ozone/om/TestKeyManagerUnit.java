@@ -110,7 +110,7 @@ public class TestKeyManagerUnit {
     blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
 
     OmTestWriteClient omTestWriteClient
-      = new OmTestWriteClient(configuration, blockClient, containerClient);
+        = new OmTestWriteClient(configuration, blockClient, containerClient);
     om = omTestWriteClient.getTestOm();
     metadataManager = omTestWriteClient.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestWriteClient.getKeyManager();
@@ -127,7 +127,6 @@ public class TestKeyManagerUnit {
   @Test
   public void listMultipartUploadPartsWithZeroUpload() throws IOException {
     //GIVEN
-    System.out.println("gbj6");
     createBucket(metadataManager, "vol1", "bucket1");
 
     OmMultipartInfo omMultipartInfo =
@@ -283,7 +282,7 @@ public class TestKeyManagerUnit {
     Assert.assertEquals("dir/key2", uploads.get(1).getKeyName());
   }
 
-  private void createBucket(OMMetadataManager metadataManager,
+  private void createBucket(OMMetadataManager omMetadataManager,
       String volume, String bucket)
       throws IOException {
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
@@ -293,7 +292,7 @@ public class TestKeyManagerUnit {
         .setIsVersionEnabled(false)
         .setAcls(new ArrayList<>())
         .build();
-    TestOMRequestUtils.addBucketToOM(metadataManager, omBucketInfo);
+    TestOMRequestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
   }
 
   private OmMultipartInfo initMultipartUpload(OzoneManagerProtocol omtest,
