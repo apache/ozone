@@ -155,7 +155,7 @@ ozone-site.xml 中应进行如下配置：
           </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.principal</th>
-            <td>S3 网关主体（ S3 网关 http 服务器启用了 SPNEGO，例如：HTTP/_HOST@EXAMPLE.COM）</td>
+            <td>S3 网关主体（ S3 网关 http 服务器启用了 SPNEGO ），例如：HTTP/_HOST@EXAMPLE.COM</td>
           </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.keytab</th>
