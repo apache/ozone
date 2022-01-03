@@ -3490,7 +3490,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       DBUpdatesRequest dbUpdatesRequest)
       throws SequenceNumberNotFoundException {
     long limitCount = Long.MAX_VALUE;
-    if (dbUpdatesRequest.hasSequenceNumber()) {
+    if (dbUpdatesRequest.hasLimitCount()) {
       limitCount = dbUpdatesRequest.getLimitCount();
     }
     DBUpdatesWrapper updatesSince = metadataManager.getStore()
