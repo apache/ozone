@@ -136,7 +136,7 @@ All these settings should be made in ozone-site.xml.
           </tr>
           <tr>
             <td>ozone.om.kerberos.keytab.file</th>
-            <td>TThe keytab file used by SCM daemon to login as its service principal.</td>
+            <td>The keytab file used by OM daemon to login as its service principal.</td>
           </tr>
           <tr>
             <td>ozone.om.http.auth.kerberos.principal</th>
