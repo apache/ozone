@@ -248,10 +248,14 @@ public class TestKeyManagerImpl {
         mockScmContainerClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
+    HddsWhiteboxTestUtils.setInternalState(om,
+        "scmClient", scmClient);
   }
   private static void mockBlockClient() {
     ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
+        "scmClient", scmClient);
+    HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
   private static void createBucket(String volumeName, String bucketName)
@@ -316,7 +320,7 @@ public class TestKeyManagerImpl {
             ALL, ALL))
         .build();
     LambdaTestUtils.intercept(OMException.class,
-        "Allocated 0 blocks. Requested 1 blocks", () -> {
+        "SafeModePrecheck failed for allocateBlock", () -> {
           writeClient.openKey(keyArgs);
         });
   }
