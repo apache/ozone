@@ -1259,126 +1259,116 @@ public class TestKeyManagerImpl {
     }
   }
 
-  //@Test
+  @Test
   public void testRefreshPipeline() throws Exception {
 
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build();
-    try {
-      cluster.waitForClusterToBeReady();
-      OzoneManager ozoneManager = cluster.getOzoneManager();
+    OzoneManager ozoneManager = om;
 
-      StorageContainerLocationProtocol sclProtocolMock = mock(
-          StorageContainerLocationProtocol.class);
+    StorageContainerLocationProtocol sclProtocolMock = mock(
+        StorageContainerLocationProtocol.class);
 
-      List<Long> containerIDs = new ArrayList<>();
-      containerIDs.add(100L);
-      containerIDs.add(200L);
+    List<Long> containerIDs = new ArrayList<>();
+    containerIDs.add(100L);
+    containerIDs.add(200L);
 
-      List<ContainerWithPipeline> cps = new ArrayList<>();
-      for (Long containerID : containerIDs) {
-        ContainerWithPipeline containerWithPipelineMock =
-            mock(ContainerWithPipeline.class);
-        when(containerWithPipelineMock.getPipeline())
-            .thenReturn(getRandomPipeline());
+    List<ContainerWithPipeline> cps = new ArrayList<>();
+    for (Long containerID : containerIDs) {
+      ContainerWithPipeline containerWithPipelineMock =
+          mock(ContainerWithPipeline.class);
+      when(containerWithPipelineMock.getPipeline())
+          .thenReturn(getRandomPipeline());
 
-        ContainerInfo ci = mock(ContainerInfo.class);
-        when(ci.getContainerID()).thenReturn(containerID);
-        when(containerWithPipelineMock.getContainerInfo()).thenReturn(ci);
+      ContainerInfo ci = mock(ContainerInfo.class);
+      when(ci.getContainerID()).thenReturn(containerID);
+      when(containerWithPipelineMock.getContainerInfo()).thenReturn(ci);
 
-        cps.add(containerWithPipelineMock);
-      }
-
-      when(sclProtocolMock.getContainerWithPipelineBatch(containerIDs))
-          .thenReturn(cps);
-
-      ScmClient scmClientMock = mock(ScmClient.class);
-      when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
-
-      OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
-          "b1", "k1", ReplicationType.RATIS,
-          ReplicationFactor.THREE);
-
-      // Add block to key.
-      List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-      Pipeline pipeline = getRandomPipeline();
-
-      OmKeyLocationInfo omKeyLocationInfo =
-          new OmKeyLocationInfo.Builder().setBlockID(
-              new BlockID(100L, 1000L))
-              .setOffset(0).setLength(100L).setPipeline(pipeline).build();
-
-      omKeyLocationInfoList.add(omKeyLocationInfo);
-
-      OmKeyLocationInfo omKeyLocationInfo2 =
-          new OmKeyLocationInfo.Builder().setBlockID(
-              new BlockID(200L, 1000L))
-              .setOffset(0).setLength(100L).setPipeline(pipeline).build();
-      omKeyLocationInfoList.add(omKeyLocationInfo2);
-
-      OmKeyLocationInfo omKeyLocationInfo3 =
-          new OmKeyLocationInfo.Builder().setBlockID(
-              new BlockID(100L, 2000L))
-              .setOffset(0).setLength(100L).setPipeline(pipeline).build();
-      omKeyLocationInfoList.add(omKeyLocationInfo3);
-
-      omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
-
-      KeyManagerImpl keyManagerImpl =
-          new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
-
-      keyManagerImpl.refresh(omKeyInfo);
-
-      verify(sclProtocolMock, times(1))
-          .getContainerWithPipelineBatch(containerIDs);
-    } finally {
-      cluster.shutdown();
+      cps.add(containerWithPipelineMock);
     }
+
+    when(sclProtocolMock.getContainerWithPipelineBatch(containerIDs))
+        .thenReturn(cps);
+
+    ScmClient scmClientMock = mock(ScmClient.class);
+    when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
+
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
+        "b1", "k1", ReplicationType.RATIS,
+        ReplicationFactor.THREE);
+
+    // Add block to key.
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    Pipeline pipeline = getRandomPipeline();
+
+    OmKeyLocationInfo omKeyLocationInfo =
+        new OmKeyLocationInfo.Builder().setBlockID(
+            new BlockID(100L, 1000L))
+            .setOffset(0).setLength(100L).setPipeline(pipeline).build();
+
+    omKeyLocationInfoList.add(omKeyLocationInfo);
+
+    OmKeyLocationInfo omKeyLocationInfo2 =
+        new OmKeyLocationInfo.Builder().setBlockID(
+            new BlockID(200L, 1000L))
+            .setOffset(0).setLength(100L).setPipeline(pipeline).build();
+    omKeyLocationInfoList.add(omKeyLocationInfo2);
+
+    OmKeyLocationInfo omKeyLocationInfo3 =
+        new OmKeyLocationInfo.Builder().setBlockID(
+            new BlockID(100L, 2000L))
+            .setOffset(0).setLength(100L).setPipeline(pipeline).build();
+    omKeyLocationInfoList.add(omKeyLocationInfo3);
+
+    omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
+
+    KeyManagerImpl keyManagerImpl =
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
+
+    keyManagerImpl.refresh(omKeyInfo);
+
+    verify(sclProtocolMock, times(1))
+        .getContainerWithPipelineBatch(containerIDs);
+
   }
 
 
-  //@Test
+  @Test
   public void testRefreshPipelineException() throws Exception {
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build();
+
+    OzoneManager ozoneManager = om;
+
+    String errorMessage = "Cannot find container!!";
+    StorageContainerLocationProtocol sclProtocolMock = mock(
+        StorageContainerLocationProtocol.class);
+    doThrow(new IOException(errorMessage)).when(sclProtocolMock)
+        .getContainerWithPipelineBatch(anyList());
+
+    ScmClient scmClientMock = mock(ScmClient.class);
+    when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
+
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
+        "b1", "k1", ReplicationType.RATIS,
+        ReplicationFactor.THREE);
+
+    // Add block to key.
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    Pipeline pipeline = getRandomPipeline();
+
+    OmKeyLocationInfo omKeyLocationInfo =
+        new OmKeyLocationInfo.Builder().setBlockID(
+            new BlockID(100L, 1000L))
+            .setOffset(0).setLength(100L).setPipeline(pipeline).build();
+    omKeyLocationInfoList.add(omKeyLocationInfo);
+    omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
+
+    KeyManagerImpl keyManagerImpl =
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
+
     try {
-      cluster.waitForClusterToBeReady();
-      OzoneManager ozoneManager = cluster.getOzoneManager();
-
-      String errorMessage = "Cannot find container!!";
-      StorageContainerLocationProtocol sclProtocolMock = mock(
-          StorageContainerLocationProtocol.class);
-      doThrow(new IOException(errorMessage)).when(sclProtocolMock)
-          .getContainerWithPipelineBatch(anyList());
-
-      ScmClient scmClientMock = mock(ScmClient.class);
-      when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
-
-      OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
-          "b1", "k1", ReplicationType.RATIS,
-          ReplicationFactor.THREE);
-
-      // Add block to key.
-      List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-      Pipeline pipeline = getRandomPipeline();
-
-      OmKeyLocationInfo omKeyLocationInfo =
-          new OmKeyLocationInfo.Builder().setBlockID(
-              new BlockID(100L, 1000L))
-              .setOffset(0).setLength(100L).setPipeline(pipeline).build();
-      omKeyLocationInfoList.add(omKeyLocationInfo);
-      omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
-
-      KeyManagerImpl keyManagerImpl =
-          new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
-
-      try {
-        keyManagerImpl.refresh(omKeyInfo);
-        Assert.fail();
-      } catch (OMException omEx) {
-        Assert.assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
-        Assert.assertTrue(omEx.getMessage().equals(errorMessage));
-      }
-    } finally {
-      cluster.shutdown();
+      keyManagerImpl.refresh(omKeyInfo);
+      Assert.fail();
+    } catch (OMException omEx) {
+      Assert.assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
+      Assert.assertTrue(omEx.getMessage().equals(errorMessage));
     }
   }
 
