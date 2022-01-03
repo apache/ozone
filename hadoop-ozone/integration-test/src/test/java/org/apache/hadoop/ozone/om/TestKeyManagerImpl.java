@@ -166,7 +166,6 @@ public class TestKeyManagerImpl {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    DefaultMetricsSystem.setMiniClusterMode(true);
     conf = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
@@ -198,27 +197,15 @@ public class TestKeyManagerImpl {
 
     mockScmContainerClient =
         Mockito.mock(StorageContainerLocationProtocol.class);
-    // Create an OM and connect writeClient to it
-    OMStorage omStorage = new OMStorage(conf);
-    omStorage.setClusterId(scm.getClientProtocolServer()
-        .getScmInfo().getClusterId());
-    omStorage.setOmId("om1");
-    omStorage.initialize();
-
-    om = OzoneManager.createOm(conf);
-    metadataManager = (OMMetadataManager) HddsWhiteboxTestUtils
-      .getInternalState(om, "metadataManager");
-
-    keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
-      .getInternalState(om, "keyManager");
+    
+    OmTestWriteClient omTestWriteClient
+      = new OmTestWriteClient(conf, scm.getBlockProtocolServer(), mockScmContainerClient);
+    om = omTestWriteClient.getTestOm();
+    metadataManager = omTestWriteClient.getMetadataManager();
+    keyManager = (KeyManagerImpl)omTestWriteClient.getKeyManager();
     mockContainerClient();
-
-    prefixManager = (PrefixManager) HddsWhiteboxTestUtils.getInternalState(
-        om, "prefixManager");
-    om.start();
-    writeClient = OzoneClientFactory.getRpcClient(conf).getObjectStore()
-      .getClientProxy().getOzoneManagerClient();
-
+    writeClient = omTestWriteClient.getWriteClient();
+    prefixManager = omTestWriteClient.getPrefixManager();
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
