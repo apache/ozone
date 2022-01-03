@@ -85,11 +85,11 @@ ozone-site.xml 中应进行如下配置：
           </tr>
           <tr>
             <td>hdds.scm.http.auth.kerberos.principal</th>
-            <td>SCM http 服务主体（ SCM http 服务器启用了 SPNEGO）</td>
+            <td>SCM http 服务主体（当 SCM http 服务器启用了 SPNEGO）</td>
           </tr>
           <tr>
             <td>hdds.scm.http.auth.kerberos.keytab</th>
-            <td>SCM http 服务使用的 keytab 文件（ SCM http 服务器启用了 SPNEGO）</td>
+            <td>SCM http 服务使用的 keytab 文件（当 SCM http 服务器启用了 SPNEGO）</td>
           </tr>
         </tbody>
       </table>
@@ -120,11 +120,11 @@ ozone-site.xml 中应进行如下配置：
           </tr>
           <tr>
             <td>ozone.om.http.auth.kerberos.principal</th>
-            <td>OM http 服务主体（ OM http 服务器启用了 SPNEGO）</td>
+            <td>OM http 服务主体（当 OM http 服务器启用了 SPNEGO）</td>
           </tr>
           <tr>
             <td>ozone.om.http.auth.kerberos.keytab</th>
-            <td>OM http 服务使用的 keytab 文件（ OM http 服务器启用了 SPNEGO）</td>
+            <td>OM http 服务使用的 keytab 文件（当 OM http 服务器启用了 SPNEGO）</td>
           </tr>
         </tbody>
       </table>
@@ -155,11 +155,11 @@ ozone-site.xml 中应进行如下配置：
           </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.principal</th>
-            <td>S3 网关主体（ S3 网关 http 服务器启用了 SPNEGO），例如：HTTP/_HOST@EXAMPLE.COM</td>
+            <td>S3 网关主体（当 S3 网关 http 服务器启用了 SPNEGO），例如：HTTP/_HOST@EXAMPLE.COM</td>
           </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.keytab</th>
-            <td>S3 网关使用的 keytab 文件（ S3 网关 http 服务器启用了 SPNEGO）</td>
+            <td>S3 网关使用的 keytab 文件（当 S3 网关 http 服务器启用了 SPNEGO）</td>
           </tr>
         </tbody>
       </table>
