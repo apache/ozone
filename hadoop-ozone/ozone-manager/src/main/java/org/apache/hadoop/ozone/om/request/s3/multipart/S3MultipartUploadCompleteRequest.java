@@ -384,13 +384,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
   }
 
-  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String uploadID, OMMetadataManager omMetadataManager)
-      throws IOException {
-    return omMetadataManager
-        .getMultipartKey(volumeName, bucketName, keyName, uploadID);
-  }
-
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
     return omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
