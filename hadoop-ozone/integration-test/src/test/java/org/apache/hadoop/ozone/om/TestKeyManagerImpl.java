@@ -156,6 +156,7 @@ public class TestKeyManagerImpl {
   private static long scmBlockSize;
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
+  private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager om;
@@ -215,7 +216,8 @@ public class TestKeyManagerImpl {
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
-    createBucket(VOLUME_NAME, BUCKET_NAME);
+    createBucket(VOLUME_NAME, BUCKET_NAME, false);
+    createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
   }
 
   @AfterClass
@@ -258,12 +260,12 @@ public class TestKeyManagerImpl {
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
-  private static void createBucket(String volumeName, String bucketName)
+  private static void createBucket(String volumeName, String bucketName, boolean isVersionEnabled)
       throws IOException {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-      //        .setIsVersionEnabled(true)
+        .setIsVersionEnabled(isVersionEnabled)
         .build();
 
     TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
@@ -848,7 +850,7 @@ public class TestKeyManagerImpl {
   @Test
   public void testLatestLocationVersion() throws IOException {
     String keyName = RandomStringUtils.randomAlphabetic(5);
-    OmKeyArgs keyArgs = createBuilder()
+    OmKeyArgs keyArgs = createBuilder(VERSIONED_BUCKET_NAME)
         .setKeyName(keyName)
         .setLatestVersionLocation(true)
         .build();
@@ -889,6 +891,13 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(locationInfoList);
 
     writeClient.commitKey(keyArgs, keySession.getId());
+    ContainerInfo containerInfo = new ContainerInfo.Builder().setContainerID(1L)
+        .setPipelineID(pipeline.getId()).build();
+    List<ContainerWithPipeline> containerWithPipelines = Arrays.asList(
+        new ContainerWithPipeline(containerInfo, pipeline));
+    when(mockScmContainerClient.getContainerWithPipelineBatch(
+        Arrays.asList(1L))).thenReturn(containerWithPipelines);
+
     OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
     Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
 
@@ -915,7 +924,7 @@ public class TestKeyManagerImpl {
     key = keyManager.lookupFile(keyArgs, null);
     Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
 
-    keyArgs = createBuilder()
+    keyArgs = createBuilder(VERSIONED_BUCKET_NAME)
         .setKeyName(keyName)
         .setLatestVersionLocation(false)
         .build();
@@ -1496,9 +1505,13 @@ public class TestKeyManagerImpl {
   }
 
   private OmKeyArgs.Builder createBuilder() throws IOException {
+    return createBuilder(BUCKET_NAME);
+  }
+
+  private OmKeyArgs.Builder createBuilder(String bucketName) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return new OmKeyArgs.Builder()
-        .setBucketName(BUCKET_NAME)
+        .setBucketName(bucketName)
         .setDataSize(0)
         .setReplicationConfig(
             new StandaloneReplicationConfig(ONE))
