@@ -109,7 +109,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setIdleIteration(1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
     conf.setFromObject(balancerConfiguration);
     GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
 
@@ -390,7 +390,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -417,7 +417,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
 
     containerBalancer.start(balancerConfiguration);
 
@@ -443,7 +443,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(0.1);
     balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
     balancerConfiguration.setExcludeContainers("1, 4, 5");
 
     containerBalancer.start(balancerConfiguration);
@@ -473,38 +473,17 @@ public class TestContainerBalancer {
 
     // no containers should be selected when the limit is zero
     balancerConfiguration.setMaxSizeEnteringTarget(0);
-    containerBalancer.start(balancerConfiguration);
+    boolean startResult = containerBalancer.start(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(500);
-    } catch (InterruptedException e) {}
-
-    containerBalancer.stop();
-    // balancer should have identified unbalanced nodes
-    Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    // no container should have been selected
-    Assert.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assert.assertFalse(startResult);
 
     // some containers should be selected when using default values
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ContainerBalancerConfiguration cbc = ozoneConfiguration.
         getObject(ContainerBalancerConfiguration.class);
-    containerBalancer.start(cbc);
+    startResult = containerBalancer.start(cbc);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(500);
-    } catch (InterruptedException e) {}
-
-    containerBalancer.stop();
-    // balancer should have identified unbalanced nodes
-    Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    Assert.assertFalse(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assert.assertFalse(startResult);
   }
 
   @Test
