@@ -37,6 +37,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -301,7 +302,9 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta(HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpcslowness.timeout",
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
-           + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout")
+           + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
+        new DeprecationDelta("dfs.datanode.keytab.file",
+            DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY)
     });
   }
 }
