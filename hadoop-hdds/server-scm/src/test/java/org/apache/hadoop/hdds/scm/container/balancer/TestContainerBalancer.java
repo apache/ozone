@@ -481,9 +481,19 @@ public class TestContainerBalancer {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ContainerBalancerConfiguration cbc = ozoneConfiguration.
         getObject(ContainerBalancerConfiguration.class);
-    startResult = containerBalancer.start(cbc);
+    containerBalancer.start(cbc);
 
-    Assert.assertFalse(startResult);
+    // waiting for balance completed.
+    // TODO: this is a temporary implementation for now
+    // modify this after balancer is fully completed
+    try {
+      Thread.sleep(500);
+    } catch (InterruptedException e) {}
+
+    containerBalancer.stop();
+    // balancer should have identified unbalanced nodes
+    Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
+    Assert.assertFalse(containerBalancer.getSourceToTargetMap().isEmpty());
   }
 
   @Test
