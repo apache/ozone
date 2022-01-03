@@ -525,9 +525,9 @@ public class TestKeyManagerImpl {
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
         ACLType.READ, ACCESS);
-    prefixManager.addAcl(ozPrefix1, ozAcl1);
+    writeClient.addAcl(ozPrefix1, ozAcl1);
 
-    List<OzoneAcl> ozAclGet = prefixManager.getAcl(ozPrefix1);
+    List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
     Assert.assertEquals(1, ozAclGet.size());
     Assert.assertEquals(ozAcl1, ozAclGet.get(0));
 
@@ -554,8 +554,8 @@ public class TestKeyManagerImpl {
     acls.add(ozAcl2);
     acls.add(ozAcl3);
 
-    prefixManager.setAcl(ozPrefix1, acls);
-    ozAclGet = prefixManager.getAcl(ozPrefix1);
+    writeClient.setAcl(ozPrefix1, acls);
+    ozAclGet = writeClient.getAcl(ozPrefix1);
     Assert.assertEquals(2, ozAclGet.size());
 
     int matchEntries = 0;
@@ -571,27 +571,27 @@ public class TestKeyManagerImpl {
     }
     Assert.assertEquals(2, matchEntries);
 
-    boolean result = prefixManager.removeAcl(ozPrefix1, ozAcl4);
+    boolean result = writeClient.removeAcl(ozPrefix1, ozAcl4);
     Assert.assertEquals(true, result);
 
-    ozAclGet = prefixManager.getAcl(ozPrefix1);
+    ozAclGet = writeClient.getAcl(ozPrefix1);
     Assert.assertEquals(2, ozAclGet.size());
 
-    result = prefixManager.removeAcl(ozPrefix1, ozAcl3);
+    result = writeClient.removeAcl(ozPrefix1, ozAcl3);
     Assert.assertEquals(true, result);
-    ozAclGet = prefixManager.getAcl(ozPrefix1);
+    ozAclGet = writeClient.getAcl(ozPrefix1);
     Assert.assertEquals(1, ozAclGet.size());
 
     Assert.assertEquals(ozAcl2, ozAclGet.get(0));
 
     // add dev:w
-    prefixManager.addAcl(ozPrefix1, ozAcl4);
-    ozAclGet = prefixManager.getAcl(ozPrefix1);
+    writeClient.addAcl(ozPrefix1, ozAcl4);
+    ozAclGet = writeClient.getAcl(ozPrefix1);
     Assert.assertEquals(2, ozAclGet.size());
 
     // add dev:r and validate the acl bitset combined
-    prefixManager.addAcl(ozPrefix1, ozAcl5);
-    ozAclGet = prefixManager.getAcl(ozPrefix1);
+    writeClient.addAcl(ozPrefix1, ozAcl5);
+    ozAclGet = writeClient.getAcl(ozPrefix1);
     Assert.assertEquals(2, ozAclGet.size());
 
     matchEntries = 0;
