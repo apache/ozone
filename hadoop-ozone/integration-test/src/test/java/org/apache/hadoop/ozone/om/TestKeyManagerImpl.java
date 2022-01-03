@@ -471,11 +471,11 @@ public class TestKeyManagerImpl {
     RequestContext context = currentUserReads();
     Assert.assertTrue(keyManager.checkAccess(fileKey, context));
 
-    OzoneObj parentDirKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setKeyName("testdir")
-        .build();
     // gbj todo remove??
+    // OzoneObj parentDirKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
+    //     .setStoreType(OzoneObj.StoreType.OZONE)
+    //     .setKeyName("testdir")
+    //     .build();
     // Assert.assertTrue(keyManager.checkAccess(parentDirKey, context));
   }
 
