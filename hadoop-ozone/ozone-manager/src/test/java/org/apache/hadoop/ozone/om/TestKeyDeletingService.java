@@ -109,8 +109,8 @@ public class TestKeyDeletingService {
         Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         new ScmBlockLocationTestingClient(null, null, 0);
-    OmTestWriteClient omTestWriteClient
-        = new OmTestWriteClient(conf, blockClient, containerClient);
+    OmTestManagers omTestWriteClient
+        = new OmTestManagers(conf, blockClient, containerClient);
     KeyManager keyManager = omTestWriteClient.getKeyManager();
     writeClient = omTestWriteClient.getWriteClient();
     om = omTestWriteClient.getTestOm();
@@ -136,8 +136,8 @@ public class TestKeyDeletingService {
         Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         new ScmBlockLocationTestingClient(null, null, 1);
-    OmTestWriteClient omTestWriteClient
-        = new OmTestWriteClient(conf, blockClient, containerClient);
+    OmTestManagers omTestWriteClient
+        = new OmTestManagers(conf, blockClient, containerClient);
     KeyManager keyManager = omTestWriteClient.getKeyManager();
     writeClient = omTestWriteClient.getWriteClient();
     om = omTestWriteClient.getTestOm();
@@ -177,8 +177,8 @@ public class TestKeyDeletingService {
         Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         new ScmBlockLocationTestingClient(null, null, 1);
-    OmTestWriteClient omTestWriteClient
-        = new OmTestWriteClient(conf, blockClient, containerClient);
+    OmTestManagers omTestWriteClient
+        = new OmTestManagers(conf, blockClient, containerClient);
     KeyManager keyManager = omTestWriteClient.getKeyManager();
     writeClient = omTestWriteClient.getWriteClient();
     om = omTestWriteClient.getTestOm();

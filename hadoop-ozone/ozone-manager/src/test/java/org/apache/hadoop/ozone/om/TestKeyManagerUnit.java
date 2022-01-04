@@ -109,8 +109,8 @@ public class TestKeyManagerUnit {
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
 
-    OmTestWriteClient omTestWriteClient
-        = new OmTestWriteClient(configuration, blockClient, containerClient);
+    OmTestManagers omTestWriteClient
+        = new OmTestManagers(configuration, blockClient, containerClient);
     om = omTestWriteClient.getTestOm();
     metadataManager = omTestWriteClient.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestWriteClient.getKeyManager();

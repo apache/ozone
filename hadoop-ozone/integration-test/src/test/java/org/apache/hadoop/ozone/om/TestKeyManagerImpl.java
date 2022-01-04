@@ -196,8 +196,8 @@ public class TestKeyManagerImpl {
     mockScmContainerClient =
         Mockito.mock(StorageContainerLocationProtocol.class);
     
-    OmTestWriteClient omTestWriteClient
-        = new OmTestWriteClient(conf, scm.getBlockProtocolServer(),
+    OmTestManagers omTestWriteClient
+        = new OmTestManagers(conf, scm.getBlockProtocolServer(),
         mockScmContainerClient);
     om = omTestWriteClient.getTestOm();
     metadataManager = omTestWriteClient.getMetadataManager();

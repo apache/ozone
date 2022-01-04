@@ -34,7 +34,7 @@ import java.io.IOException;
 /**
  * Test utility for creating a write client to the OM.
  */
-public final class OmTestWriteClient {
+public final class OmTestManagers {
 
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
@@ -44,7 +44,7 @@ public final class OmTestWriteClient {
   private BucketManager bucketManager;
   private PrefixManager prefixManager;
 
-  private OmTestWriteClient() {
+  private OmTestManagers() {
   }
   public OzoneManager getTestOm() {
     return om;
@@ -70,9 +70,9 @@ public final class OmTestWriteClient {
     return keyManager;
   }
 
-  public OmTestWriteClient(OzoneConfiguration conf,
-      ScmBlockLocationProtocol blockClient,
-      StorageContainerLocationProtocol containerClient)
+  public OmTestManagers(OzoneConfiguration conf,
+                        ScmBlockLocationProtocol blockClient,
+                        StorageContainerLocationProtocol containerClient)
       throws AuthenticationException, IOException {
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);
