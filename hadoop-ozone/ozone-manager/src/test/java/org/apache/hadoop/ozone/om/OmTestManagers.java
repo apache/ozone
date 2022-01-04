@@ -70,10 +70,24 @@ public final class OmTestManagers {
     return keyManager;
   }
 
+  public OmTestManagers(OzoneConfiguration conf)
+      throws AuthenticationException, IOException {
+    this(conf, null, null);
+  }
+
   public OmTestManagers(OzoneConfiguration conf,
                         ScmBlockLocationProtocol blockClient,
                         StorageContainerLocationProtocol containerClient)
       throws AuthenticationException, IOException {
+    if (containerClient == null) {
+      containerClient =
+          Mockito.mock(StorageContainerLocationProtocol.class);
+    }
+    if (blockClient == null) {
+        blockClient =
+            new ScmBlockLocationTestingClient(null, null, 0);
+    }
+
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);
     OMStorage omStorage = new OMStorage(conf);

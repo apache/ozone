@@ -74,12 +74,8 @@ public class TestTrashService {
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(configuration, folder.toString());
 
-    StorageContainerLocationProtocol containerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
-    ScmBlockLocationProtocol blockClient =
-        new ScmBlockLocationTestingClient(null, null, 0);
     OmTestManagers omTestManagers
-        = new OmTestManagers(configuration, blockClient, containerClient);
+        = new OmTestManagers(configuration);
     keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();

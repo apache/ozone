@@ -105,12 +105,8 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    StorageContainerLocationProtocol containerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
-    ScmBlockLocationProtocol blockClient =
-        new ScmBlockLocationTestingClient(null, null, 0);
     OmTestManagers omTestManagers
-        = new OmTestManagers(conf, blockClient, containerClient);
+        = new OmTestManagers(conf);
     KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
@@ -132,12 +128,8 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    StorageContainerLocationProtocol containerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
-    ScmBlockLocationProtocol blockClient =
-        new ScmBlockLocationTestingClient(null, null, 1);
     OmTestManagers omTestManagers
-        = new OmTestManagers(conf, blockClient, containerClient);
+        = new OmTestManagers(conf);
     KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
@@ -155,7 +147,7 @@ public class TestKeyDeletingService {
                                  return false;
                                }
                              },
-        100, 1000);
+        100, 30000);
     Assert.assertEquals(
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
     // Make sure that we have run the background thread 5 times more
@@ -173,12 +165,8 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    StorageContainerLocationProtocol containerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
-    ScmBlockLocationProtocol blockClient =
-        new ScmBlockLocationTestingClient(null, null, 1);
     OmTestManagers omTestManagers
-        = new OmTestManagers(conf, blockClient, containerClient);
+        = new OmTestManagers(conf);
     KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();

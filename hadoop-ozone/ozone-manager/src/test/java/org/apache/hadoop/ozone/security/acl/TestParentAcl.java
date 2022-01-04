@@ -96,18 +96,13 @@ public class TestParentAcl {
     ozConfig.set(OZONE_METADATA_DIRS, dir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
-    StorageContainerLocationProtocol containerClient =
-        mock(StorageContainerLocationProtocol.class);
-    ScmBlockLocationProtocol blockClient =
-        mock(ScmBlockLocationProtocol.class);
     OmTestManagers omTestManagers =
-        new OmTestManagers(ozConfig, blockClient, containerClient);
-    keyManager = omTestManagers.getKeyManager();
-
+        new OmTestManagers(ozConfig);
     metadataManager = omTestManagers.getMetadataManager();
     volumeManager = omTestManagers.getVolumeManager();
     bucketManager = omTestManagers.getBucketManager();
     prefixManager = omTestManagers.getPrefixManager();
+    keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,

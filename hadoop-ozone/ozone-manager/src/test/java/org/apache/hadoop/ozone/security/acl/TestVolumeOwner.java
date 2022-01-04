@@ -77,17 +77,12 @@ public class TestVolumeOwner {
     File dir = GenericTestUtils.getRandomizedTestDir();
     ozoneConfig.set(OZONE_METADATA_DIRS, dir.toString());
 
-    StorageContainerLocationProtocol containerClient =
-        mock(StorageContainerLocationProtocol.class);
-    ScmBlockLocationProtocol blockClient =
-        mock(ScmBlockLocationProtocol.class);
     OmTestManagers omTestManagers =
-        new OmTestManagers(ozoneConfig, blockClient, containerClient);
-    keyManager = omTestManagers.getKeyManager();
-
+        new OmTestManagers(ozoneConfig);
     metadataManager = omTestManagers.getMetadataManager();
     volumeManager = omTestManagers.getVolumeManager();
     bucketManager = omTestManagers.getBucketManager();
+    keyManager = omTestManagers.getKeyManager();
     prefixManager = omTestManagers.getPrefixManager();
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
