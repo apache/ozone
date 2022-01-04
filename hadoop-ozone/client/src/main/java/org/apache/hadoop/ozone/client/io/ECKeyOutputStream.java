@@ -209,7 +209,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       failedDataStripeChunkLens[i] = dataBuffers[i].limit();
     }
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
-    for (int i = 0; i <  numParityBlks; i++) {
+    for (int i = 0; i < numParityBlks; i++) {
       failedParityStripeChunkLens[i] = parityBuffers[i].limit();
     }
 
@@ -365,11 +365,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   void writeParityCells(int parityCellSize) throws IOException {
     final ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
-    ecChunkBufferCache.allocateParityBuffers(parityCellSize);
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
 
-    for(int i=0; i< buffers.length; i++){
-      buffers[i].flip();
+    for (ByteBuffer b : parityBuffers) {
+      b.limit(parityCellSize);
+    }
+    for (ByteBuffer b : buffers) {
+      b.flip();
     }
     encoder.encode(buffers, parityBuffers);
     blockOutputStreamEntryPool
@@ -713,6 +715,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       parityBuffers = new ByteBuffer[numParity];
       this.byteBufferPool = byteBufferPool;
       allocateBuffers(dataBuffers, this.cellSize);
+      allocateBuffers(parityBuffers, this.cellSize);
     }
 
     private ByteBuffer[] getDataBuffers() {
@@ -721,10 +724,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
     private ByteBuffer[] getParityBuffers() {
       return parityBuffers;
-    }
-
-    public void allocateParityBuffers(int size){
-      allocateBuffers(parityBuffers, size);
     }
 
     private int addToDataBuffer(int i, byte[] b, int off, int len) {
