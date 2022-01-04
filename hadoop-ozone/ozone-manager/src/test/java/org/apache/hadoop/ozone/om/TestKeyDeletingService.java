@@ -128,8 +128,10 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
+    ScmBlockLocationProtocol blockClient =
+        new ScmBlockLocationTestingClient(null, null, 1);
     OmTestManagers omTestManagers
-        = new OmTestManagers(conf);
+      = new OmTestManagers(conf, blockClient, null);
     KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
@@ -166,8 +168,10 @@ public class TestKeyDeletingService {
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
+    ScmBlockLocationProtocol blockClient =
+        new ScmBlockLocationTestingClient(null, null, 1);
     OmTestManagers omTestManagers
-        = new OmTestManagers(conf);
+        = new OmTestManagers(conf, blockClient, null);
     KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
