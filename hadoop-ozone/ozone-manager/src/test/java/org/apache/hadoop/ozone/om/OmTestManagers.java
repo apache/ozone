@@ -32,7 +32,8 @@ import org.mockito.Mockito;
 import java.io.IOException;
 
 /**
- * Test utility for creating a write client to the OM.
+ * Test utility for creating a dummy OM, the associated
+ * managers, and writeClient.
  */
 public final class OmTestManagers {
 
@@ -44,16 +45,12 @@ public final class OmTestManagers {
   private BucketManager bucketManager;
   private PrefixManager prefixManager;
 
-  private OmTestManagers() {
-  }
   public OzoneManager getOzoneManager() {
     return om;
   }
-
   public OzoneManagerProtocol getWriteClient() {
     return writeClient;
   }
-
   public BucketManager getBucketManager() {
     return bucketManager;
   }

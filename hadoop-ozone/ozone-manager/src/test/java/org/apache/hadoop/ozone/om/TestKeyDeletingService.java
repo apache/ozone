@@ -129,6 +129,7 @@ public class TestKeyDeletingService {
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
     ScmBlockLocationProtocol blockClient =
+        //failCallsFrequency = 1 , means all calls fail.
         new ScmBlockLocationTestingClient(null, null, 1);
     OmTestManagers omTestManagers
       = new OmTestManagers(conf, blockClient, null);
@@ -140,17 +141,6 @@ public class TestKeyDeletingService {
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    // gbj todo:
-    // GenericTestUtils.waitFor(
-    //                          () -> {
-    //                            try {
-    //                              return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size() == keyCount;
-    //                            } catch (IOException e) {
-    //                              e.printStackTrace();
-    //                              return false;
-    //                            }
-    //                          },
-    //     100, 30000);
     Assert.assertEquals(
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
     // Make sure that we have run the background thread 5 times more
@@ -169,6 +159,7 @@ public class TestKeyDeletingService {
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
     ScmBlockLocationProtocol blockClient =
+        //failCallsFrequency = 1 , means all calls fail.
         new ScmBlockLocationTestingClient(null, null, 1);
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, blockClient, null);
