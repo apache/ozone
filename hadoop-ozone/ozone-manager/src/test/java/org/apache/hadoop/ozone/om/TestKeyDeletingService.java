@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -52,7 +51,6 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
 
 /**
  * Test Key Deleting Service.
@@ -132,7 +130,7 @@ public class TestKeyDeletingService {
         //failCallsFrequency = 1 , means all calls fail.
         new ScmBlockLocationTestingClient(null, null, 1);
     OmTestManagers omTestManagers
-      = new OmTestManagers(conf, blockClient, null);
+        = new OmTestManagers(conf, blockClient, null);
     KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();

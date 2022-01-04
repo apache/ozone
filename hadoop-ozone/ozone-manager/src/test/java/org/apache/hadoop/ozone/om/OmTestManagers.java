@@ -81,8 +81,8 @@ public final class OmTestManagers {
           Mockito.mock(StorageContainerLocationProtocol.class);
     }
     if (blockClient == null) {
-        blockClient =
-            new ScmBlockLocationTestingClient(null, null, 0);
+      blockClient =
+          new ScmBlockLocationTestingClient(null, null, 0);
     }
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
