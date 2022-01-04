@@ -138,16 +138,17 @@ public class TestKeyDeletingService {
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    GenericTestUtils.waitFor(
-                             () -> {
-                               try {
-                                 return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size() == keyCount;
-                               } catch (IOException e) {
-                                 e.printStackTrace();
-                                 return false;
-                               }
-                             },
-        100, 30000);
+    // gbj todo:
+    // GenericTestUtils.waitFor(
+    //                          () -> {
+    //                            try {
+    //                              return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size() == keyCount;
+    //                            } catch (IOException e) {
+    //                              e.printStackTrace();
+    //                              return false;
+    //                            }
+    //                          },
+    //     100, 30000);
     Assert.assertEquals(
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
     // Make sure that we have run the background thread 5 times more
