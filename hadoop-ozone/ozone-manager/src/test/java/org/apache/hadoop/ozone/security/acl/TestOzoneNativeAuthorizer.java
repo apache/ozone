@@ -130,15 +130,15 @@ public class TestOzoneNativeAuthorizer {
         mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         mock(ScmBlockLocationProtocol.class);
-    OmTestManagers omTestWriteClient =
+    OmTestManagers omTestManagers =
         new OmTestManagers(ozConfig, blockClient, containerClient);
-    keyManager = omTestWriteClient.getKeyManager();
+    keyManager = omTestManagers.getKeyManager();
 
-    metadataManager = omTestWriteClient.getMetadataManager();
-    volumeManager = omTestWriteClient.getVolumeManager();
-    bucketManager = omTestWriteClient.getBucketManager();
-    prefixManager = omTestWriteClient.getPrefixManager();
-    writeClient = omTestWriteClient.getWriteClient();
+    metadataManager = omTestManagers.getMetadataManager();
+    volumeManager = omTestManagers.getVolumeManager();
+    bucketManager = omTestManagers.getBucketManager();
+    prefixManager = omTestManagers.getPrefixManager();
+    writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
         Collections.singletonList("om"));

@@ -196,15 +196,15 @@ public class TestKeyManagerImpl {
     mockScmContainerClient =
         Mockito.mock(StorageContainerLocationProtocol.class);
     
-    OmTestManagers omTestWriteClient
+    OmTestManagers omTestManagers
         = new OmTestManagers(conf, scm.getBlockProtocolServer(),
         mockScmContainerClient);
-    om = omTestWriteClient.getTestOm();
-    metadataManager = omTestWriteClient.getMetadataManager();
-    keyManager = (KeyManagerImpl)omTestWriteClient.getKeyManager();
+    om = omTestManagers.getOzoneManager();
+    metadataManager = omTestManagers.getMetadataManager();
+    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
     mockContainerClient();
-    writeClient = omTestWriteClient.getWriteClient();
-    prefixManager = omTestWriteClient.getPrefixManager();
+    writeClient = omTestManagers.getWriteClient();
+    prefixManager = omTestManagers.getPrefixManager();
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),

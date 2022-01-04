@@ -46,7 +46,7 @@ public final class OmTestManagers {
 
   private OmTestManagers() {
   }
-  public OzoneManager getTestOm() {
+  public OzoneManager getOzoneManager() {
     return om;
   }
 

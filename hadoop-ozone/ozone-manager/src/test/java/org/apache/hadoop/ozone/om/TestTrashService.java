@@ -78,11 +78,11 @@ public class TestTrashService {
         Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         new ScmBlockLocationTestingClient(null, null, 0);
-    OmTestManagers omTestWriteClient
+    OmTestManagers omTestManagers
         = new OmTestManagers(configuration, blockClient, containerClient);
-    keyManager = omTestWriteClient.getKeyManager();
-    writeClient = omTestWriteClient.getWriteClient();
-    om = omTestWriteClient.getTestOm();
+    keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
     volumeName = "volume";
     bucketName = "bucket";
   }

@@ -109,11 +109,11 @@ public class TestKeyDeletingService {
         Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         new ScmBlockLocationTestingClient(null, null, 0);
-    OmTestManagers omTestWriteClient
+    OmTestManagers omTestManagers
         = new OmTestManagers(conf, blockClient, containerClient);
-    KeyManager keyManager = omTestWriteClient.getKeyManager();
-    writeClient = omTestWriteClient.getWriteClient();
-    om = omTestWriteClient.getTestOm();
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
@@ -136,11 +136,11 @@ public class TestKeyDeletingService {
         Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         new ScmBlockLocationTestingClient(null, null, 1);
-    OmTestManagers omTestWriteClient
+    OmTestManagers omTestManagers
         = new OmTestManagers(conf, blockClient, containerClient);
-    KeyManager keyManager = omTestWriteClient.getKeyManager();
-    writeClient = omTestWriteClient.getWriteClient();
-    om = omTestWriteClient.getTestOm();
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
@@ -177,11 +177,11 @@ public class TestKeyDeletingService {
         Mockito.mock(StorageContainerLocationProtocol.class);
     ScmBlockLocationProtocol blockClient =
         new ScmBlockLocationTestingClient(null, null, 1);
-    OmTestManagers omTestWriteClient
+    OmTestManagers omTestManagers
         = new OmTestManagers(conf, blockClient, containerClient);
-    KeyManager keyManager = omTestWriteClient.getKeyManager();
-    writeClient = omTestWriteClient.getWriteClient();
-    om = omTestWriteClient.getTestOm();
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 0);
