@@ -202,9 +202,10 @@ public class TestKeyManagerImpl {
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
-    mockContainerClient();
-    writeClient = omTestManagers.getWriteClient();
     prefixManager = omTestManagers.getPrefixManager();
+    writeClient = omTestManagers.getWriteClient();
+
+    mockContainerClient();
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
@@ -471,12 +472,6 @@ public class TestKeyManagerImpl {
     RequestContext context = currentUserReads();
     Assert.assertTrue(keyManager.checkAccess(fileKey, context));
 
-    // gbj todo remove??
-    // OzoneObj parentDirKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
-    //     .setStoreType(OzoneObj.StoreType.OZONE)
-    //     .setKeyName("testdir")
-    //     .build();
-    // Assert.assertTrue(keyManager.checkAccess(parentDirKey, context));
   }
 
   @Test
@@ -882,6 +877,7 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(locationInfoList);
 
     writeClient.commitKey(keyArgs, keySession.getId());
+    // Mock out the pipelines from the SCM
     ContainerInfo containerInfo = new ContainerInfo.Builder().setContainerID(1L)
         .setPipelineID(pipeline.getId()).build();
     List<ContainerWithPipeline> containerWithPipelines = Arrays.asList(
