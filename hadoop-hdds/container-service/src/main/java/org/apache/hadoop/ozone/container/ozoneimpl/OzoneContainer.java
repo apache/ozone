@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,8 +44,10 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
@@ -137,13 +138,17 @@ public class OzoneContainer {
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
-    Consumer<ContainerReplicaProto> icrSender = containerReplicaProto -> {
-      IncrementalContainerReportProto icr = IncrementalContainerReportProto
-          .newBuilder()
-          .addReport(containerReplicaProto)
-          .build();
-      context.addIncrementalReport(icr);
-      context.getParent().triggerHeartbeat();
+    IncrementalReportSender<Container> icrSender = container -> {
+      synchronized (containerSet) {
+        ContainerReplicaProto containerReport = container.getContainerReport();
+
+        IncrementalContainerReportProto icr = IncrementalContainerReportProto
+            .newBuilder()
+            .addReport(containerReport)
+            .build();
+        context.addIncrementalReport(icr);
+        context.getParent().triggerHeartbeat();
+      }
     };
 
     for (ContainerType containerType : ContainerType.values()) {
@@ -178,7 +183,7 @@ public class OzoneContainer {
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
     Duration svcInterval = conf.getObject(
-            DatanodeConfiguration.class).getBlockDeletionInterval();
+        DatanodeConfiguration.class).getBlockDeletionInterval();
 
     long serviceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
