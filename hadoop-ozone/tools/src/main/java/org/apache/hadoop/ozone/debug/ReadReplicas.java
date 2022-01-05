@@ -9,7 +9,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.kohsuke.MetaInfServices;
@@ -23,6 +22,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 
+/**
+ * Class that for a given key downloads every blocks every replica and creates
+ * a manifest file with information about the replicas.
+ */
 @CommandLine.Command(name = "read-replicas",
     description = "Reads a given keys every blocks every replica.")
 @MetaInfServices(SubcommandWithParent.class)
@@ -36,7 +39,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   }
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) throws IOException, OzoneClientException {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException, OzoneClientException {
 
     clientProtocol = client.getObjectStore().getClientProxy();
 
@@ -45,13 +49,18 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
 
-    OzoneKeyDetails keyInfoDetails = clientProtocol.getKeyDetails(volumeName, bucketName, keyName);
-    Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas = clientProtocol.getKeysEveryReplicas(volumeName, bucketName, keyName);
+    OzoneKeyDetails keyInfoDetails
+        = clientProtocol.getKeyDetails(volumeName, bucketName, keyName);
 
-    String fileSuffix = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+    Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas
+        = clientProtocol.getKeysEveryReplicas(volumeName, bucketName, keyName);
+
+
+    String fileSuffix
+        = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
     String directoryName = volumeName + "_" + bucketName + "_" + keyName +
         "_" + fileSuffix;
-    System.out.println("Creating directory : " + directoryName );
+    System.out.println("Creating directory : " + directoryName);
     File dir = new File("/opt/hadoop/" + directoryName);
     if (!dir.exists()){
       if(dir.mkdir()) {
@@ -62,13 +71,15 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     }
 
     JsonObject result = new JsonObject();
-    result.addProperty("filename", volumeName + "/" + bucketName + "/" + keyName);
+    result.addProperty("filename",
+        volumeName + "/" + bucketName + "/" + keyName);
     result.addProperty("datasize", keyInfoDetails.getDataSize());
 
     JsonArray blocks = new JsonArray();
     int blockIndex = 0;
 
-    for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> block : replicas.entrySet()) {
+    for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
+        block : replicas.entrySet()) {
       JsonObject blockJson = new JsonObject();
       JsonArray replicasJson = new JsonArray();
 
@@ -79,19 +90,24 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       blockJson.addProperty("length", block.getKey().getLength());
       blockJson.addProperty("offset", block.getKey().getOffset());
 
-      for (Map.Entry<DatanodeDetails, OzoneInputStream> replica : block.getValue().entrySet()) {
+      for (Map.Entry<DatanodeDetails, OzoneInputStream>
+          replica : block.getValue().entrySet()) {
         JsonObject replicaJson = new JsonObject();
 
-        replicaJson.addProperty("datanode hostname", replica.getKey().getHostName());
-        replicaJson.addProperty("datanode uuid", replica.getKey().getUuidString());
+        replicaJson.addProperty("datanode hostname",
+            replica.getKey().getHostName());
+        replicaJson.addProperty("datanode uuid",
+            replica.getKey().getUuidString());
 
         OzoneInputStream is = replica.getValue();
         String fileName = keyName + "_block" + blockIndex + "_" +
             replica.getKey().getHostName();
-        System.out.println("Writing : " + fileName );
-        File replicaFile = new File("/opt/hadoop/" + directoryName + "/" + fileName);
+        System.out.println("Writing : " + fileName);
+        File replicaFile
+            = new File("/opt/hadoop/" + directoryName + "/" + fileName);
 
-        Files.copy(is, replicaFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(is, replicaFile.toPath(),
+            StandardCopyOption.REPLACE_EXISTING);
         is.close();
 
         replicasJson.add(replicaJson);
@@ -105,7 +121,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
     String manifestFileName = keyName + "_manifest";
     System.out.println("Writing manifest file : " + manifestFileName);
-    File manifestFile = new File("/opt/hadoop/" + directoryName + "/" + manifestFileName);
+    File manifestFile
+        = new File("/opt/hadoop/" + directoryName + "/" + manifestFileName);
     Files.write(manifestFile.toPath(), prettyJson.getBytes());
   }
 }
