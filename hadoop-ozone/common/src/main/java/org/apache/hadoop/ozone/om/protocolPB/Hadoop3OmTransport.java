@@ -26,6 +26,7 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
@@ -89,7 +90,7 @@ public class Hadoop3OmTransport implements OmTransport {
       return omResponse;
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
-          OMFailoverProxyProvider.getNotLeaderException(e);
+          OmUtils.getNotLeaderException(e);
       if (notLeaderException == null) {
         throw ProtobufHelper.getRemoteException(e);
       }

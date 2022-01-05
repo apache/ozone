@@ -34,6 +34,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.ha.OMRetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
@@ -139,9 +140,15 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
         OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_DEFAULT) *
         omFailoverProxyProvider.getOMProxies().size();
 
+    OMRetryPolicy omRetryPolicy = new OMRetryPolicy(
+        maxFailovers);
+    omRetryPolicy.addRetryRule(
+        OMRetryPolicy.ExceptionType.RECONFIGURATION_IN_PROGRESS,
+        OMRetryPolicy.RetryAction.RETRY_ON_SAME_OM);
+
     OMAdminProtocolPB retryProxy = (OMAdminProtocolPB) RetryProxy.create(
         OMAdminProtocolPB.class, omFailoverProxyProvider,
-        omFailoverProxyProvider.getRetryPolicy(maxFailovers));
+        omFailoverProxyProvider.getRetryPolicy(omRetryPolicy));
 
     List<OMNodeDetails> allOMNodeDetails = OmUtils.getAllOMHAAddresses(conf,
         omServiceId, false);
@@ -192,13 +199,13 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
       response = rpcProxy.decommission(NULL_RPC_CONTROLLER, decommOMRequest);
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
-          OMFailoverProxyProvider.getNotLeaderException(e);
+          OmUtils.getNotLeaderException(e);
       if (notLeaderException != null) {
         throwException(notLeaderException.getMessage());
       }
 
       OMLeaderNotReadyException leaderNotReadyException =
-          OMFailoverProxyProvider.getLeaderNotReadyException(e);
+          OmUtils.getLeaderNotReadyException(e);
       if (leaderNotReadyException != null) {
         throwException(leaderNotReadyException.getMessage());
       }

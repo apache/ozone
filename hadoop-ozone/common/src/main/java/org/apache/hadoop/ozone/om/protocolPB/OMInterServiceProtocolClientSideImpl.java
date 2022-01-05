@@ -26,10 +26,12 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMRetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMRequest;
@@ -70,9 +72,15 @@ public class OMInterServiceProtocolClientSideImpl implements
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
+    OMRetryPolicy omRetryPolicy = new OMRetryPolicy(
+        maxFailovers);
+    omRetryPolicy.addRetryRule(
+        OMRetryPolicy.ExceptionType.RECONFIGURATION_IN_PROGRESS,
+        OMRetryPolicy.RetryAction.RETRY_ON_SAME_OM);
+
     this.rpcProxy = (OMInterServiceProtocolPB) RetryProxy.create(
         OMInterServiceProtocolPB.class, omFailoverProxyProvider,
-        omFailoverProxyProvider.getRetryPolicy(maxFailovers));
+        omFailoverProxyProvider.getRetryPolicy(omRetryPolicy));
   }
 
   @Override
@@ -88,14 +96,14 @@ public class OMInterServiceProtocolClientSideImpl implements
       response = rpcProxy.bootstrap(NULL_RPC_CONTROLLER, bootstrapOMRequest);
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
-          OMFailoverProxyProvider.getNotLeaderException(e);
+          OmUtils.getNotLeaderException(e);
       if (notLeaderException != null) {
         throwException(ErrorCode.LEADER_UNDETERMINED,
             notLeaderException.getMessage());
       }
 
       OMLeaderNotReadyException leaderNotReadyException =
-          OMFailoverProxyProvider.getLeaderNotReadyException(e);
+          OmUtils.getLeaderNotReadyException(e);
       if (leaderNotReadyException != null) {
         throwException(ErrorCode.LEADER_NOT_READY,
             leaderNotReadyException.getMessage());

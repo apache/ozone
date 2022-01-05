@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ServiceException;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -45,15 +44,12 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -230,77 +226,64 @@ public class OMFailoverProxyProvider<T> implements
     return proxyInfo;
   }
 
-  @VisibleForTesting
-  public RetryPolicy getRetryPolicy(int maxFailovers) {
-    // Client will attempt upto maxFailovers number of failovers between
-    // available OMs before throwing exception.
+  /**
+   * Create RetryPolicy based on the provided OMRetryPolicy.
+   */
+  public RetryPolicy getRetryPolicy(OMRetryPolicy omRetryPolicy) {
     RetryPolicy retryPolicy = new RetryPolicy() {
+
       @Override
       public RetryAction shouldRetry(Exception exception, int retries,
-          int failovers, boolean isIdempotentOrAtMostOnce)
-          throws Exception {
-
-        String omNodeId = getCurrentProxyOMNodeId();
-
-        if (LOG.isDebugEnabled()) {
-          if (exception.getCause() != null) {
-            LOG.debug("RetryProxy: OM {}: {}: {}", omNodeId,
-                exception.getCause().getClass().getSimpleName(),
-                exception.getCause().getMessage());
-          } else {
-            LOG.debug("RetryProxy: OM {}: {}", omNodeId,
-                exception.getMessage());
-          }
-        }
-
-        if (exception instanceof ServiceException) {
-          OMNotLeaderException notLeaderException =
-              getNotLeaderException(exception);
-          if (notLeaderException != null) {
-            // TODO: NotLeaderException should include the host
-            //  address of the suggested leader along with the nodeID.
-            //  Failing over just based on nodeID is not very robust.
-
-            // OMFailoverProxyProvider#performFailover() is a dummy call and
-            // does not perform any failover. Failover manually to the next OM.
+          int failovers, boolean isIdempotentOrAtMostOnce) throws Exception {
+        OMRetryPolicy.RetryAction retryAction = omRetryPolicy.getRetryAction(
+            exception, failovers, getCurrentProxyOMNodeId());
+        switch (retryAction) {
+          case FAILOVER_AND_RETRY:
             performFailoverToNextProxy();
-            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
-          }
-
-          OMLeaderNotReadyException leaderNotReadyException =
-              getLeaderNotReadyException(exception);
-          if (leaderNotReadyException != null) {
-            // Retry on same OM again as leader OM is not ready.
-            // Failing over to same OM so that wait time between retries is
-            // incremented
-            performFailoverIfRequired(omNodeId);
-            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
-          }
+            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY);
+          case RETRY_ON_SAME_OM:
+            performFailoverIfRequired(getCurrentProxyOMNodeId());
+            // RetryAction is specified as FAILOVER_AND_RETRY here as well
+            // to increment the count of failovers. Though internally
+            // performFailover() would be called because of this, since
+            // performFailove() is a dummy call, we can use this action here.
+            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY);
+          case FAIL:
+            return RetryAction.FAIL;
+          case EXHAUSTED_MAX_FAILOVER_ATTEMPTS:
+            LOG.error("Failed to connect to OMs: {}. Attempted {} failovers.",
+                getOMProxyInfos(), failovers);
+            return RetryAction.FAIL;
+          case UNDETERMINED:
+          default: // Undertermined or default case
+            if(!shouldFailover(exception)) {
+              return RetryAction.FAIL;
+            } else {
+              // Default action is to failover to next proxy
+              performFailoverToNextProxy();
+              return getRetryAction(RetryDecision.FAILOVER_AND_RETRY);
+            }
         }
-
-        if (!shouldFailover(exception)) {
-          return RetryAction.FAIL; // do not retry
-        }
-
-        // For all other exceptions, fail over manually to the next OM Node
-        // proxy.
-        performFailoverToNextProxy();
-        return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
 
-      private RetryAction getRetryAction(RetryDecision fallbackAction,
-          int failovers) {
-        if (failovers < maxFailovers) {
-          return new RetryAction(fallbackAction, getWaitTime());
-        } else {
-          LOG.error("Failed to connect to OMs: {}. Attempted {} failovers.",
-              getOMProxyInfos(), maxFailovers);
-          return RetryAction.FAIL;
-        }
+      /**
+       * Computes and adds a wait time between failovers/ retries.
+       */
+      private RetryAction getRetryAction(RetryDecision retryAction) {
+        return new RetryAction(retryAction, getWaitTime());
       }
     };
-
     return retryPolicy;
+  }
+
+  /**
+   * Return default OMRetryPolicy.
+   */
+  @VisibleForTesting
+  public RetryPolicy getRetryPolicy(int maxFailovers) {
+    OMRetryPolicy omRetryPolicy = new OMRetryPolicy(
+        maxFailovers);
+    return getRetryPolicy(omRetryPolicy);
   }
 
   public Text getCurrentProxyDelegationToken() {
@@ -455,7 +438,7 @@ public class OMFailoverProxyProvider<T> implements
     return waitBetweenRetries;
   }
 
-  private synchronized boolean shouldFailover(Exception ex) {
+  public synchronized boolean shouldFailover(Exception ex) {
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
     if (unwrappedException instanceof AccessControlException ||
         unwrappedException instanceof SecretManager.InvalidToken) {
@@ -512,43 +495,6 @@ public class OMFailoverProxyProvider<T> implements
   @VisibleForTesting
   public List<OMProxyInfo> getOMProxyInfos() {
     return new ArrayList<OMProxyInfo>(omProxyInfos.values());
-  }
-
-  /**
-   * Check if exception is OMLeaderNotReadyException.
-   *
-   * @param exception
-   * @return OMLeaderNotReadyException
-   */
-  public static OMLeaderNotReadyException getLeaderNotReadyException(
-      Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMLeaderNotReadyException) {
-        return (OMLeaderNotReadyException) ioException;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Check if exception is a OMNotLeaderException.
-   *
-   * @return OMNotLeaderException.
-   */
-  public static OMNotLeaderException getNotLeaderException(
-      Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMNotLeaderException) {
-        return (OMNotLeaderException) ioException;
-      }
-    }
-    return null;
   }
 
   @VisibleForTesting

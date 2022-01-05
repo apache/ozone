@@ -42,10 +42,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -775,5 +778,42 @@ public final class OmUtils {
     }
     printString.append("]");
     return printString.toString();
+  }
+
+  /**
+   * Check if exception is OMLeaderNotReadyException.
+   *
+   * @param exception
+   * @return OMLeaderNotReadyException
+   */
+  public static OMLeaderNotReadyException getLeaderNotReadyException(
+      Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof OMLeaderNotReadyException) {
+        return (OMLeaderNotReadyException) ioException;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Check if exception is a OMNotLeaderException.
+   *
+   * @return OMNotLeaderException.
+   */
+  public static OMNotLeaderException getNotLeaderException(
+      Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof OMNotLeaderException) {
+        return (OMNotLeaderException) ioException;
+      }
+    }
+    return null;
   }
 }
