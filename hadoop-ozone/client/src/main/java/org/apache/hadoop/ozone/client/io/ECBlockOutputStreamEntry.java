@@ -130,7 +130,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   public void useNextBlockStream() {
-    currentStreamIdx++;
+    currentStreamIdx =
+        (currentStreamIdx + 1) % replicationConfig.getRequiredNodes();
   }
 
   public void markFailed(Exception e) {
