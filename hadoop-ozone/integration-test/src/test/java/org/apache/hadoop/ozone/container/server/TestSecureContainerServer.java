@@ -97,6 +97,8 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.ratis.rpc.RpcType;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.After;
 
@@ -125,6 +127,7 @@ public class TestSecureContainerServer {
   @BeforeClass
   public static void setup() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);
+    ExitUtils.disableSystemExit();
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
     CONF.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
