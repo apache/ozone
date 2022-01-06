@@ -329,15 +329,17 @@ public class ReconStorageContainerManagerFacade
 
   private void initializeSCMDB() {
     try {
-      long scmContainersCount = scmServiceProvider.getSCMContainersCount();
+      long scmContainersCount = scmServiceProvider.getContainerCount();
       long reconContainerCount = containerManager.getContainers().size();
       long threshold = ozoneConfiguration.getInt(
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD,
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
 
       if(Math.abs(scmContainersCount - reconContainerCount) > threshold) {
+        LOG.info("Recon Container Count: {}, SCM Container Count: {}",
+            reconContainerCount, scmContainersCount);
         updateReconSCMDBWithNewSnapshot();
-        LOG.info("Update Recon DB with SCM DB");
+        LOG.info("Updated Recon DB with SCM DB");
       } else {
         initializePipelinesFromScm();
       }
@@ -386,16 +388,16 @@ public class ReconStorageContainerManagerFacade
         KeyValue<UUID, DatanodeDetails> keyValue = iterator.next();
         newNodeTable.put(keyValue.getKey(), keyValue.getValue());
       }
+      sequenceIdGen.reinitialize(
+          ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
+      pipelineManager.reinitialize(
+          ReconSCMDBDefinition.PIPELINES.getTable(newStore));
+      containerManager.reinitialize(
+          ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
+      nodeManager.reinitialize(
+          ReconSCMDBDefinition.NODES.getTable(newStore));
       deleteOldSCMDB();
       setDbStore(newStore);
-      sequenceIdGen.reinitialize(
-          ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-      pipelineManager.reinitialize(
-          ReconSCMDBDefinition.PIPELINES.getTable(dbStore));
-      containerManager.reinitialize(
-          ReconSCMDBDefinition.CONTAINERS.getTable(dbStore));
-      nodeManager.reinitialize(
-          ReconSCMDBDefinition.NODES.getTable(dbStore));
       File newDb = new File(dbFile.getParent() +
           OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
       boolean success = dbFile.renameTo(newDb);

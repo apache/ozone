@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
@@ -98,11 +98,11 @@ public class StorageContainerServiceProviderImpl
     scmSnapshotDBParentDir = ReconUtils.getReconScmDbDir(configuration);
 
     scmDBSnapshotUrl = "http://" + scmHttpAddress +
-            OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 
     if (policy.isHttpsEnabled()) {
       scmDBSnapshotUrl = "https://" + scmHttpsAddress +
-              OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+          OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     }
 
     this.reconUtils = reconUtils;
@@ -140,8 +140,8 @@ public class StorageContainerServiceProviderImpl
   }
 
   @Override
-  public long getSCMContainersCount() throws IOException {
-    return scmClient.getSCMContainersCount();
+  public long getContainerCount() throws IOException {
+    return scmClient.getContainerCount();
   }
 
   public String getScmDBSnapshotUrl() {

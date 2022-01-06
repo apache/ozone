@@ -67,7 +67,15 @@ public interface StorageContainerServiceProvider {
    */
   List<HddsProtos.Node> getNodes() throws IOException;
 
-  long getSCMContainersCount() throws IOException;
+  /**
+   * Requests SCM for container count.
+   * @return Total number of containers in SCM.
+   */
+  long getContainerCount() throws IOException;
 
+  /**
+   * Requests SCM for DB Snapshot.
+   * @return DBCheckpoint from SCM.
+   */
   DBCheckpoint getSCMDBSnapshot();
 }

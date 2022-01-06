@@ -52,8 +52,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSCMContainersCountRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSCMContainersCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -934,14 +934,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public long getSCMContainersCount() throws IOException {
-    GetSCMContainersCountRequestProto request =
-        GetSCMContainersCountRequestProto.newBuilder().build();
+  public long getContainerCount() throws IOException {
+    GetContainerCountRequestProto request =
+        GetContainerCountRequestProto.newBuilder().build();
 
-    GetSCMContainersCountResponseProto response =
-        submitRequest(Type.GetSCMContainersCount,
-          builder -> builder.setGetSCMContainersCountRequest(request))
-        .getGetSCMContainersCountResponse();
+    GetContainerCountResponseProto response =
+        submitRequest(Type.GetContainerCount,
+          builder -> builder.setGetContainerCountRequest(request))
+        .getGetContainerCountResponse();
     return response.getContainerCount();
   }
 

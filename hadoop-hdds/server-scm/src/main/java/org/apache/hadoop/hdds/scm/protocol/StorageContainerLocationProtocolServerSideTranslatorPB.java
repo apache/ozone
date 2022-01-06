@@ -53,7 +53,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSCMContainersCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
@@ -398,12 +398,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setDatanodeUsageInfoResponse(getDatanodeUsageInfo(
                 request.getDatanodeUsageInfoRequest()))
             .build();
-      case GetSCMContainersCount:
+      case GetContainerCount:
         return ScmContainerLocationResponse.newBuilder()
           .setCmdType(request.getCmdType())
           .setStatus(Status.OK)
-          .setGetSCMContainersCountResponse(getSCMContainersCount(
-                  request.getGetSCMContainersCountRequest()))
+          .setGetContainerCountResponse(getContainerCount(
+                  request.getGetContainerCountRequest()))
           .build();
       default:
         throw new IllegalArgumentException(
@@ -839,12 +839,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
-  public GetSCMContainersCountResponseProto getSCMContainersCount(
-      StorageContainerLocationProtocolProtos.GetSCMContainersCountRequestProto
+  public GetContainerCountResponseProto getContainerCount(
+      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
       request) throws IOException {
 
-    return GetSCMContainersCountResponseProto.newBuilder()
-      .setContainerCount(impl.getSCMContainersCount())
+    return GetContainerCountResponseProto.newBuilder()
+      .setContainerCount(impl.getContainerCount())
       .build();
   }
 }

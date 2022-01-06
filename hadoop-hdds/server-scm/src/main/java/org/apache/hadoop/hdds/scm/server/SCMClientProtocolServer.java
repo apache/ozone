@@ -946,7 +946,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public long getSCMContainersCount() throws IOException {
+  public long getContainerCount() throws IOException {
     return scm.getContainerManager().getContainers().size();
   }
 

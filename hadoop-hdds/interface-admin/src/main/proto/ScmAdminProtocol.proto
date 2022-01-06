@@ -74,7 +74,7 @@ message ScmContainerLocationRequest {
   optional ContainerBalancerStatusRequestProto containerBalancerStatusRequest = 35;
   optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 36;
   optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
-  optional GetSCMContainersCountRequestProto getSCMContainersCountRequest = 38;
+  optional GetContainerCountRequestProto getContainerCountRequest = 38;
 }
 
 message ScmContainerLocationResponse {
@@ -120,7 +120,7 @@ message ScmContainerLocationResponse {
   optional ContainerBalancerStatusResponseProto containerBalancerStatusResponse = 35;
   optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 36;
   optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
-  optional GetSCMContainersCountResponseProto getSCMContainersCountResponse = 38;
+  optional GetContainerCountResponseProto getContainerCountResponse = 38;
 
   enum Status {
     OK = 1;
@@ -164,7 +164,7 @@ enum Type {
   GetContainerBalancerStatus = 30;
   FinalizeScmUpgrade = 31;
   QueryUpgradeFinalizationProgress = 32;
-  GetSCMContainersCount = 33;
+  GetContainerCount = 33;
 }
 
 /**
@@ -386,10 +386,10 @@ message GetPipelineResponseProto {
   required Pipeline pipeline = 1;
 }
 
-message GetSCMContainersCountRequestProto {
+message GetContainerCountRequestProto {
 }
 
-message GetSCMContainersCountResponseProto {
+message GetContainerCountResponseProto {
   required int64 containerCount = 1;
 }
 
