@@ -1532,6 +1532,13 @@ message TenantRevokeAdminResponse {
     optional bool success = 1;  // TODO: Remove this field
 }
 
+message OmDBAccessInfo {
+  optional string principal = 1;
+  optional bool isAdmin = 2;
+  optional bool isDelegatedAdmin = 3;
+  optional string tenantId = 4;
+}
+
 message GetS3VolumeResponse {
   optional VolumeInfo volumeInfo = 1;
 }

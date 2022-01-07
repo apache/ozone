@@ -159,41 +159,29 @@ public class S3GetSecretRequest extends OMClientRequest {
     }
 
     try {
-      // Note: We use the same S3_SECRET_LOCK for TenantAccessIdTable.
       acquiredLock = omMetadataManager.getLock()
           .acquireWriteLock(S3_SECRET_LOCK, accessId);
 
-      // Check multi-tenant table first: tenantAccessIdTable
       final S3SecretValue assignS3SecretValue;
-      final OmDBAccessIdInfo omDBAccessIdInfo =
-          omMetadataManager.getTenantAccessIdTable().get(accessId);
-      if (omDBAccessIdInfo == null) {
-        // Not found in TenantAccessIdTable. Fallback to S3SecretTable.
-        final S3SecretValue s3SecretValue =
-            omMetadataManager.getS3SecretTable().get(accessId);
+      final S3SecretValue s3SecretValue =
+          omMetadataManager.getS3SecretTable().get(accessId);
 
-        if (s3SecretValue == null) {
-          if (createIfNotExist) {
-            // Still not found in S3SecretTable. Add new entry in this case
-            assignS3SecretValue = new S3SecretValue(accessId, awsSecret);
-            // Add cache entry first.
-            omMetadataManager.getS3SecretTable().addCacheEntry(
-                    new CacheKey<>(accessId),
-                    new CacheValue<>(Optional.of(assignS3SecretValue),
-                            transactionLogIndex));
-            // TODO: Put accessId entry straight to TenantAccessIdTable
-            //  later when we deprecate the S3SecretTable.
-          } else {
-            assignS3SecretValue = null;
-          }
+      if (s3SecretValue == null) {
+        // Not found in S3SecretTable.
+        if (createIfNotExist) {
+          // Add new entry in this case
+          assignS3SecretValue = new S3SecretValue(accessId, awsSecret);
+          // Add cache entry first.
+          omMetadataManager.getS3SecretTable().addCacheEntry(
+                  new CacheKey<>(accessId),
+                  new CacheValue<>(Optional.of(assignS3SecretValue),
+                          transactionLogIndex));
         } else {
-          // Found in S3SecretTable.
-          awsSecret = s3SecretValue.getAwsSecret();
           assignS3SecretValue = null;
         }
       } else {
-        // Found in TenantAccessIdTable.
-        awsSecret = omDBAccessIdInfo.getSecretKey();
+        // Found in S3SecretTable.
+        awsSecret = s3SecretValue.getAwsSecret();
         assignS3SecretValue = null;
       }
 

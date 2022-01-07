@@ -39,23 +39,20 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_
 /**
  * Response for SetSecret request.
  */
-@CleanupTableInfo(cleanupTables = {S3_SECRET_TABLE, TENANT_ACCESS_ID_TABLE})
+@CleanupTableInfo(cleanupTables = {S3_SECRET_TABLE})
 public class OMSetSecretResponse extends OMClientResponse {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSetSecretResponse.class);
 
   private String accessId;
-  private OmDBAccessIdInfo dbAccessIdInfo;
   private S3SecretValue s3SecretValue;
 
   public OMSetSecretResponse(@Nullable String accessId,
-                             @Nullable OmDBAccessIdInfo dbAccessIdInfo,
                              @Nullable S3SecretValue s3SecretValue,
                              @Nonnull OMResponse omResponse) {
     super(omResponse);
     this.accessId = accessId;
-    this.dbAccessIdInfo = dbAccessIdInfo;
     this.s3SecretValue = s3SecretValue;
   }
 
@@ -73,12 +70,6 @@ public class OMSetSecretResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     assert(getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK);
-
-    if (dbAccessIdInfo != null) {
-      LOG.debug("Updating TenantAccessIdTable");
-      omMetadataManager.getTenantAccessIdTable().putWithBatch(batchOperation,
-          accessId, dbAccessIdInfo);
-    }
 
     if (s3SecretValue != null) {
       LOG.debug("Updating TenantAccessIdTable");

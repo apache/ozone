@@ -75,7 +75,7 @@ public class TestOMMultiTenantManagerImpl {
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
         new OmDBAccessIdInfo(tenantName, "seed-user1",
-            "sharedsecret1", false, false));
+            false, false));
 
     tenantManager = new OMMultiTenantManagerImpl(omMetadataManager, conf);
     assertEquals(1, tenantManager.getTenantCache().size());

@@ -189,7 +189,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           new OmDBAccessIdInfo.Builder()
           .setTenantId(oldAccessIdInfo.getTenantId())
           .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
-          .setSharedSecret(oldAccessIdInfo.getSecretKey())
           .setIsAdmin(true)
           .setIsDelegatedAdmin(delegated)
           .build();
