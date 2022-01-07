@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 
 import com.google.protobuf.GeneratedMessage;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
@@ -255,6 +256,11 @@ public class ReplicationManager implements SCMService {
   private final MoveScheduler moveScheduler;
 
   /**
+   * Report object that is refreshed each time replication Manager runs.
+   */
+  private ReplicationManagerReport containerReport;
+
+  /**
    * Constructs ReplicationManager instance with the given configuration.
    *
    * @param conf OzoneConfiguration
@@ -286,6 +292,7 @@ public class ReplicationManager implements SCMService {
     this.inflightMoveFuture = new ConcurrentHashMap<>();
     this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
     this.clock = clock;
+    this.containerReport = new ReplicationManagerReport();
 
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -366,11 +373,19 @@ public class ReplicationManager implements SCMService {
     final long start = clock.millis();
     final List<ContainerInfo> containers =
         containerManager.getContainers();
-    containers.forEach(this::processContainer);
-
+    ReplicationManagerReport report = new ReplicationManagerReport();
+    for (ContainerInfo c : containers) {
+      processContainer(c, report);
+    }
+    report.setComplete();
+    containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
+  }
+
+  public ReplicationManagerReport getContainerReport() {
+    return containerReport;
   }
 
   /**
@@ -398,7 +413,9 @@ public class ReplicationManager implements SCMService {
    *
    * @param container ContainerInfo
    */
-  private void processContainer(ContainerInfo container) {
+  @SuppressWarnings("checkstyle:methodlength")
+  private void processContainer(ContainerInfo container,
+      ReplicationManagerReport report) {
     if (!shouldRun()) {
       return;
     }
@@ -410,6 +427,7 @@ public class ReplicationManager implements SCMService {
         final Set<ContainerReplica> replicas = containerManager
             .getContainerReplicas(id);
         final LifeCycleState state = container.getState();
+        report.increment(state);
 
         /*
          * We don't take any action if the container is in OPEN state and
@@ -418,6 +436,8 @@ public class ReplicationManager implements SCMService {
          */
         if (state == LifeCycleState.OPEN) {
           if (!isOpenContainerHealthy(container, replicas)) {
+            report.incrementAndSample(
+                HealthState.OPEN_UNHEALTHY, container.containerID());
             eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
           }
           return;
@@ -442,10 +462,14 @@ public class ReplicationManager implements SCMService {
          * If the container is in QUASI_CLOSED state, check and close the
          * container if possible.
          */
-        if (state == LifeCycleState.QUASI_CLOSED &&
-            canForceCloseContainer(container, replicas)) {
-          forceCloseContainer(container, replicas);
-          return;
+        if (state == LifeCycleState.QUASI_CLOSED) {
+          if (canForceCloseContainer(container, replicas)) {
+            forceCloseContainer(container, replicas);
+            return;
+          } else {
+            report.incrementAndSample(HealthState.QUASI_CLOSED_STUCK,
+                container.containerID());
+          }
         }
 
         /*
@@ -498,6 +522,8 @@ public class ReplicationManager implements SCMService {
          * exact number of replicas in the same state.
          */
         if (isContainerEmpty(container, replicas)) {
+          report.incrementAndSample(
+              HealthState.EMPTY, container.containerID());
           /*
            *  If container is empty, schedule task to delete the container.
            */
@@ -509,8 +535,18 @@ public class ReplicationManager implements SCMService {
          * Check if the container is under replicated and take appropriate
          * action.
          */
-        if (!replicaSet.isSufficientlyReplicated()
-            || !placementStatus.isPolicySatisfied()) {
+        boolean sufficientlyReplicated = replicaSet.isSufficientlyReplicated();
+        boolean placementSatisfied = placementStatus.isPolicySatisfied();
+        if (!sufficientlyReplicated || !placementSatisfied) {
+          if (!sufficientlyReplicated) {
+            report.incrementAndSample(
+                HealthState.UNDER_REPLICATED, container.containerID());
+          }
+          if (!placementSatisfied) {
+            report.incrementAndSample(HealthState.MIS_REPLICATED,
+                container.containerID());
+
+          }
           handleUnderReplicatedContainer(container,
               replicaSet, placementStatus);
           return;
@@ -521,6 +557,8 @@ public class ReplicationManager implements SCMService {
          * action.
          */
         if (replicaSet.isOverReplicated()) {
+          report.incrementAndSample(HealthState.OVER_REPLICATED,
+              container.containerID());
           handleOverReplicatedContainer(container, replicaSet);
           return;
         }
@@ -531,6 +569,8 @@ public class ReplicationManager implements SCMService {
        are not in the same state as the container itself.
        */
         if (!replicaSet.isHealthy()) {
+          report.incrementAndSample(HealthState.UNHEALTHY,
+              container.containerID());
           handleUnstableContainer(container, replicas);
         }
       }
