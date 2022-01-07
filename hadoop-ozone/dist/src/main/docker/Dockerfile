@@ -16,7 +16,11 @@
 
 FROM apache/ozone-runner:@docker.ozone-runner.version@
 
-ENV PATH /opt/hadoop/libexec:${PATH}
+ENV PATH=/opt/hadoop/libexec:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/hadoop/bin
+ENV HADOOP_LOG_DIR=
+ENV HADOOP_CONF_DIR=
+ENV OZONE_LOG_DIR=/var/log/hadoop
+ENV OZONE_CONF_DIR=/etc/hadoop
 
 ADD --chown=hadoop . /opt/hadoop
 
