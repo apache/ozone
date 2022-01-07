@@ -51,6 +51,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -97,6 +98,12 @@ public class TestReplicatedFileChecksumHelper {
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
     assertEquals(DataChecksum.Type.CRC32,
         ((MD5MD5CRC32GzipFileChecksum)fileChecksum).getCrcType());
+
+    // test negative length
+    helper = new ReplicatedFileChecksumHelper(
+        volume, bucket, "dummy", -1, rpcClient);
+    helper.compute();
+    assertNull(helper.getKeyLocationInfoList());
   }
 
   @Test

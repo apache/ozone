@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -68,7 +69,9 @@ public abstract class BaseFileChecksumHelper {
     this.rpcClient = rpcClient;
     this.xceiverClientFactory =
         ((RpcClient)rpcClient).getXceiverClientManager();
-    refetchBlocks();
+    if (this.length > 0) {
+      fetchBlocks();
+    }
   }
 
   protected String getSrc() {
@@ -117,7 +120,7 @@ public abstract class BaseFileChecksumHelper {
    *
    * @throws IOException
    */
-  private void refetchBlocks() throws IOException {
+  private void fetchBlocks() throws IOException {
     OzoneManagerProtocol ozoneManagerClient =
         getRpcClient().getOzoneManagerClient();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
