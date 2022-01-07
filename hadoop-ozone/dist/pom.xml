@@ -112,6 +112,11 @@
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
+        <configuration>
+          <nonFilteredFileExtensions>
+            <nonFilteredFileExtension>jks</nonFilteredFileExtension>
+          </nonFilteredFileExtensions>
+        </configuration>
         <executions>
           <execution>
             <id>copy-compose-files</id>

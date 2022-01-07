@@ -73,6 +73,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
     this.scm = scm;
+    this.exitManager = new ExitManager();
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
       this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
@@ -367,7 +368,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
       if (scm.getRootCertificateServer() != null) {
         scm.getRootCertificateServer().reinitialize(metadataStore);
       }
-      scm.getScmCertificateServer().reinitialize(metadataStore);
+      if (scm.getScmCertificateServer() != null) {
+        scm.getScmCertificateServer().reinitialize(metadataStore);
+      }
     }
   }
 

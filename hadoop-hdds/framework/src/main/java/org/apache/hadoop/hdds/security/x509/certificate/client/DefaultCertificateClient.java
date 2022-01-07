@@ -174,7 +174,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (securityConfig.isCustomCAEnabled()) {
 
       Certificate cert = SecurityUtil.getCustomCertificate(securityConfig);
-      // String caCertsPath = securityConfig.getCaCertsPath();
       if (cert != null) {
         CertificateFactory cf = null;
         try {

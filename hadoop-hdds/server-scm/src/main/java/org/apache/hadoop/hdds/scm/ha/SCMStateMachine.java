@@ -369,7 +369,7 @@ public class SCMStateMachine extends BaseStateMachine {
       termIndex =
           scm.getScmHAManager().installCheckpoint(checkpoint);
     } catch (Exception e) {
-      LOG.error("Failed to reinitialize SCMStateMachine.");
+      LOG.error("Failed to reinitialize SCMStateMachine.", e);
       return;
     }
 

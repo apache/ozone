@@ -43,6 +43,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -149,11 +150,12 @@ public final class SecurityUtil {
       IOException, KeyStoreException, java.security.cert.CertificateException,
       NoSuchAlgorithmException {
     String keystorePath = securityConfig.getKeystoreFilePath();
+    String keystoreType = securityConfig.getKeystoreType();
     char[] keystoreFilePassword = securityConfig.getKeystoreFilePassword();
 
     KeyStore keystore;
     try (FileInputStream is = new FileInputStream(keystorePath)) {
-      keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keystore = KeyStore.getInstance(keystoreType);
       keystore.load(is, keystoreFilePassword);
     }
     return keystore;
@@ -191,8 +193,8 @@ public final class SecurityUtil {
     return null;
   }
 
-  public static Certificate getCustomCertificate(SecurityConfig securityConfig)
-      throws IOException {
+  public static X509Certificate getCustomCertificate(
+      SecurityConfig securityConfig) throws IOException {
     try {
       KeyStore keystore = getCustomKeystore(securityConfig);
       char[] keystoreKeyPassword = securityConfig.getKeystoreKeyPassword();
@@ -201,7 +203,7 @@ public final class SecurityUtil {
       Key key = keystore.getKey(keyAlias, keystoreKeyPassword);
       if (key instanceof PrivateKey) {
         // Get certificate of public key
-        return keystore.getCertificate(keyAlias);
+        return (X509Certificate) keystore.getCertificate(keyAlias);
       }
     } catch (Exception ex) {
       throw new SCMSecurityException("Error while getting Certificate from " +
