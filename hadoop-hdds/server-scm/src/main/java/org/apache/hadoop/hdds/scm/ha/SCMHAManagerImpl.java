@@ -73,6 +73,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
     this.scm = scm;
+    this.exitManager = new ExitManager();
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
       this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
@@ -240,7 +241,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       LOG.warn("Cannot proceed with InstallSnapshot as SCM is at TermIndex {} "
           + "and checkpoint has lower TermIndex {}. Reloading old "
           + "state of SCM.", termIndex, checkpointTxnInfo.getTermIndex());
-      throw new IOException("checkpoint is too older to install.");
+      return termIndex;
     }
 
     long term = checkpointTxnInfo.getTerm();
@@ -258,39 +259,21 @@ public class SCMHAManagerImpl implements SCMHAManager {
       throw e;
     }
 
-    File dbBackup = null;
+    File dbBackup;
     try {
       dbBackup = HAUtils
           .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
               checkpointLocation, OzoneConsts.SCM_DB_BACKUP_PREFIX);
+      LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
+          lastAppliedIndex);
+      // Reload the DB store with the new checkpoint.
+      reloadSCMState();
       LOG.info("Replaced DB with checkpoint, term: {}, index: {}",
           term, lastAppliedIndex);
     } catch (Exception e) {
       LOG.error("Failed to install Snapshot as SCM failed to replace"
           + " DB with downloaded checkpoint. Reloading old SCM state.", e);
-    }
-    // Reload the DB store with the new checkpoint.
-    // Restart (unpause) the state machine and update its last applied index
-    // to the installed checkpoint's snapshot index.
-    try {
-      reloadSCMState();
-      LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
-          lastAppliedIndex);
-    } catch (Exception ex) {
-      try {
-        // revert to the old db, since the new db may be a corrupted one,
-        // so that SCM can restart from the old db.
-        if (dbBackup != null) {
-          dbBackup = HAUtils
-              .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
-                  dbBackup.toPath(), OzoneConsts.SCM_DB_BACKUP_PREFIX);
-          startServices();
-        }
-      } finally {
-        String errorMsg =
-            "Failed to reload SCM state and instantiate services.";
-        exitManager.exitSystem(1, errorMsg, ex, LOG);
-      }
+      throw e;
     }
 
     // Delete the backup DB

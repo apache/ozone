@@ -220,6 +220,24 @@ public final class HAUtils {
     return dbBackup;
   }
 
+  public static void backUpDB(File oldDB, String dbPrefix,
+      long lastAppliedIndex) throws IOException {
+    // Take a backup of the current DB
+    String dbBackupName =
+        dbPrefix + lastAppliedIndex + "_" + System
+            .currentTimeMillis();
+    File dbDir = oldDB.getParentFile();
+    File dbBackup = new File(dbDir, dbBackupName);
+
+    try {
+      Files.move(oldDB.toPath(), dbBackup.toPath());
+    } catch (IOException e) {
+      LOG.error("Failed to create a backup of the current DB. Aborting "
+          + "snapshot installation.");
+      throw e;
+    }
+  }
+
   /**
    * Obtain SCMTransactionInfo from Checkpoint.
    */
