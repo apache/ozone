@@ -144,13 +144,11 @@ public abstract class BaseFileChecksumHelper {
   public void compute() throws IOException {
     /**
      * request length is 0 or the file is empty, return one with the
-     * magic entry that matches what previous hdfs versions return.
+     * magic entry that matches the md5 of a 32 byte zero-padded byte array.
      */
     if (keyLocationInfos == null || keyLocationInfos.isEmpty()) {
       // Explicitly specified here in case the default DataOutputBuffer
-      // buffer length value is changed in future. This matters because the
-      // fixed value 32 has to be used to repeat the magic value for previous
-      // HDFS version.
+      // buffer length value is changed in future.
       final int lenOfZeroBytes = 32;
       byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
       MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
