@@ -78,4 +78,10 @@ public interface StorageContainerServiceProvider {
    * @return DBCheckpoint from SCM.
    */
   DBCheckpoint getSCMDBSnapshot();
+
+  /**
+   * Requests Leader SCM for DB Snapshot.
+   * @return DBCheckpoint from Leader SCM.
+   */
+  DBCheckpoint getSCMDBSnapshotHA() throws IOException;
 }

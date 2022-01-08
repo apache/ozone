@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
@@ -42,8 +43,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
+import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -51,6 +56,7 @@ import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.ratis.proto.RaftProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,5 +184,39 @@ public class StorageContainerServiceProviderImpl
       LOG.error("Unable to obtain SCM DB Snapshot. ", e);
     }
     return null;
+  }
+
+  public DBCheckpoint getSCMDBSnapshotHA() throws IOException {
+    String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
+        System.currentTimeMillis();
+    File targetFile = new File(scmSnapshotDBParentDir, snapshotFileName +
+        ".tar.gz");
+
+    List<String> ratisRoles = scmClient.getScmInfo().getRatisPeerRoles();
+    for (String ratisRole: ratisRoles) {
+      String[] role = ratisRole.split(":");
+      if(role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
+        String hostAddress = role[4].trim();
+        int grpcPort = configuration.getInt(
+            ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
+
+        try (SCMSnapshotDownloader downloadClient =
+                 new InterSCMGrpcClient(hostAddress, grpcPort,
+                 configuration, new SCMCertificateClient(
+                 new SecurityConfig(configuration)))) {
+          downloadClient.download(targetFile.toPath()).get();
+        } catch (ExecutionException | InterruptedException e) {
+          LOG.error("Rocks DB checkpoint downloading failed", e);
+          throw new IOException(e);
+        }
+        break;
+      }
+    }
+    Path untarredDbDir = Paths.get(scmSnapshotDBParentDir.getAbsolutePath(),
+        snapshotFileName);
+    reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
+    FileUtils.deleteQuietly(targetFile);
+    return new RocksDBCheckpoint(untarredDbDir);
   }
 }

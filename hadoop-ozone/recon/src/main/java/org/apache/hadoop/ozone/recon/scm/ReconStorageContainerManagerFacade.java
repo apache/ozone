@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -349,7 +350,13 @@ public class ReconStorageContainerManagerFacade
   }
 
   public void updateReconSCMDBWithNewSnapshot() throws IOException {
-    DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+    DBCheckpoint dbSnapshot;
+    if(!SCMHAUtils.isSCMHAEnabled(ozoneConfiguration)) {
+      dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+    } else {
+      dbSnapshot = scmServiceProvider.getSCMDBSnapshotHA();
+      LOG.info("Downloaded SCM Snapshot from Leader SCM");
+    }
     if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
       LOG.info("Got new checkpoint from SCM : " +
           dbSnapshot.getCheckpointLocation());
