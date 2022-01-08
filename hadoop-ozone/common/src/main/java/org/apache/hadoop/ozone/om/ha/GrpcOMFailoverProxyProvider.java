@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.ha;
 
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.io.Text;
@@ -62,8 +63,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
   @Override
   protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
-    Map omProxies = new HashMap<>();
-    Map omProxyInfos = new HashMap<>();
+    Map omProxiesNodeIdKeyset = new HashMap<>();
     List omNodeIDList = new ArrayList<>();
     omAddresses = new HashMap<>();
 
@@ -87,7 +87,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
         if (nodeId == null) {
           nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
         }
-        omProxies.put(nodeId, null);
+        omProxiesNodeIdKeyset.put(nodeId, null);
         if (hostaddr.isPresent()) {
           omAddresses.put(nodeId,
               hostaddr.get() + ":"
@@ -96,22 +96,27 @@ public class GrpcOMFailoverProxyProvider<T> extends
                       .GrpcOmTransportConfig.class)
                   .getPort()));
         } else {
-          omAddresses.put(nodeId,
-              "0.0.0.0:" + HddsUtils.getNumberFromConfigKeys(config,
-                  OMConfigKeys.OZONE_OM_GRPC_PORT_KEY));
+          LOG.error("expected host address not defined: {}", rpcAddrKey);
+          throw new ConfigurationException(rpcAddrKey + "is not defined");
         }
         omNodeIDList.add(nodeId);
       }
     }
 
-    if (omProxies.isEmpty()) {
+    if (omProxiesNodeIdKeyset.isEmpty()) {
       throw new IllegalArgumentException("Could not find any configured " +
           "addresses for OM. Please configure the system with "
           + OZONE_OM_ADDRESS_KEY);
     }
 
-    setOmProxies(omProxies);
-    setOmProxyInfos(omProxyInfos);
+    // set base class omProxies, omProxyInfos, omNodeIDList
+
+    // omProxies needed in base class
+    // omProxies.size == number of om nodes
+    // omProxies key needs to be valid nodeid
+    setOmProxies(omProxiesNodeIdKeyset);
+    // omProxyInfos keyset needed in base class
+    setOmProxyInfos(omProxiesNodeIdKeyset);
     setOmNodeIDList(omNodeIDList);
   }
 
