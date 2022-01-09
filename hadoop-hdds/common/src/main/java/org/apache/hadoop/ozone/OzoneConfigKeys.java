@@ -369,6 +369,10 @@ public final class OzoneConfigKeys {
       "ozone.fs.iterate.batch-size";
   public static final int OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT = 100;
 
+  public static final String OZONE_FS_LIST_STATUS_BATCH_SIZE =
+          "ozone.fs.list.status.batch-size";
+  public static final int OZONE_FS_LIST_STATUS_BATCH_SIZE_DEFAULT = 1024;
+
   // Ozone Client Retry and Failover configurations
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =
       "ozone.client.failover.max.attempts";

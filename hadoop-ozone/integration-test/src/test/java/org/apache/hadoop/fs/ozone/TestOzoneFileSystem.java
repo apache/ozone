@@ -68,7 +68,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
-import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LIST_STATUS_BATCH_SIZE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -100,6 +100,7 @@ import org.slf4j.LoggerFactory;
 public class TestOzoneFileSystem {
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+  private static final int listStatusBatchSize = 1024;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -185,6 +186,7 @@ public class TestOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+    conf.setInt(OZONE_FS_LIST_STATUS_BATCH_SIZE, listStatusBatchSize);
 
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
@@ -643,8 +645,8 @@ public class TestOzoneFileSystem {
     Path root = new Path("/");
     deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
-    int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
-    for (int i = 0; i < numDirs; i++) {
+    int numDirs = listStatusBatchSize + listStatusBatchSize / 2;
+    for(int i = 0; i < numDirs; i++) {
       Path p = new Path(root, String.valueOf(i));
       fs.mkdirs(p);
       paths.add(p.getName());
@@ -1308,7 +1310,7 @@ public class TestOzoneFileSystem {
     String keyName = "dir1/dir2/testListStatusOnLargeDirectoryForACLCheck";
     Path root = new Path(OZONE_URI_DELIMITER, keyName);
     Set<String> paths = new TreeSet<>();
-    int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
+    int numDirs = listStatusBatchSize + listStatusBatchSize / 2;
     for (int i = 0; i < numDirs; i++) {
       Path p = new Path(root, String.valueOf(i));
       getFs().mkdirs(p);

@@ -33,9 +33,6 @@ public final class Constants {
   /** Temporary directory. */
   public static final String BUFFER_TMP_KEY = "hadoop.tmp.dir";
 
-  /** Page size for Ozone listing operation. */
-  public static final int LISTING_PAGE_SIZE = 1024;
-
   private Constants() {
 
   }
