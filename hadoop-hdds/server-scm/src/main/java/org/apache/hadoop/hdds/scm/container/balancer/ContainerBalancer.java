@@ -155,9 +155,11 @@ public class ContainerBalancer {
         return false;
       }
 
-      balancerRunning = true;
       this.config = balancerConfiguration;
-      validateConfiguration(config);
+      if (!validateConfiguration(config)) {
+        return false;
+      }
+      balancerRunning = true;
       LOG.info("Starting Container Balancer...{}", this);
 
       //we should start a new balancer thread async
@@ -766,7 +768,7 @@ public class ContainerBalancer {
     LOG.info("Container Balancer stopped successfully.");
   }
 
-  private void validateConfiguration(ContainerBalancerConfiguration conf) {
+  private boolean validateConfiguration(ContainerBalancerConfiguration conf) {
     // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
@@ -776,10 +778,12 @@ public class ContainerBalancer {
     if (conf.getMaxSizeEnteringTarget() <= size) {
       LOG.info("MaxSizeEnteringTarget should be larger than " +
           "ozone.scm.container.size");
+      return false;
     }
     if (conf.getMaxSizeLeavingSource() <= size) {
       LOG.info("MaxSizeLeavingSource should be larger than " +
           "ozone.scm.container.size");
+      return false;
     }
 
     // balancing interval should be greater than DUFactory refresh period
@@ -788,7 +792,9 @@ public class ContainerBalancer {
     if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
       LOG.info("balancing.iteration.interval should be larger than " +
           "hdds.datanode.du.refresh.period.");
+      return false;
     }
+    return true;
   }
 
   public void setNodeManager(NodeManager nodeManager) {
