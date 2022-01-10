@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import java.util.List;
@@ -36,13 +37,16 @@ public final class ECBlockInputStreamFactoryImpl implements
     ECBlockInputStreamFactory {
 
   private final BlockInputStreamFactory inputStreamFactory;
+  private final ByteBufferPool byteBufferPool;
 
   public static ECBlockInputStreamFactory getInstance(
-      BlockInputStreamFactory streamFactory) {
-    return new ECBlockInputStreamFactoryImpl(streamFactory);
+      BlockInputStreamFactory streamFactory, ByteBufferPool byteBufferPool) {
+    return new ECBlockInputStreamFactoryImpl(streamFactory, byteBufferPool);
   }
 
-  private ECBlockInputStreamFactoryImpl(BlockInputStreamFactory streamFactory) {
+  private ECBlockInputStreamFactoryImpl(BlockInputStreamFactory streamFactory,
+      ByteBufferPool byteBufferPool) {
+    this.byteBufferPool = byteBufferPool;
     this.inputStreamFactory = streamFactory;
   }
 
@@ -72,12 +76,13 @@ public final class ECBlockInputStreamFactoryImpl implements
       ECBlockReconstructedStripeInputStream sis =
           new ECBlockReconstructedStripeInputStream(
               (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
-              xceiverFactory, refreshFunction, inputStreamFactory);
+              xceiverFactory, refreshFunction, inputStreamFactory,
+              byteBufferPool);
       if (failedLocations != null) {
         sis.addFailedDatanodes(failedLocations);
       }
       return new ECBlockReconstructedInputStream(
-          (ECReplicationConfig) repConfig, sis);
+          (ECReplicationConfig) repConfig, byteBufferPool, sis);
     } else {
       // Otherwise create the more efficient non-reconstruction reader
       return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,

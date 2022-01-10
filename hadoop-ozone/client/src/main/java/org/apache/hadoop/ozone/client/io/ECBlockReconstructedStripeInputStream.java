@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.erasurecode.CodecRegistry;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureDecoder;
@@ -108,6 +109,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private List<Integer> dataIndexes = new ArrayList<>();
   // Data Indexes we have tried to read from, and failed for some reason
   private Set<Integer> failedDataIndexes = new HashSet<>();
+  private ByteBufferPool byteBufferPool;
 
   private final RawErasureDecoder decoder;
 
@@ -118,9 +120,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   public ECBlockReconstructedStripeInputStream(ECReplicationConfig repConfig,
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
        XceiverClientFactory xceiverClientFactory, Function<BlockID,
-      Pipeline> refreshFunction, BlockInputStreamFactory streamFactory) {
+      Pipeline> refreshFunction, BlockInputStreamFactory streamFactory,
+      ByteBufferPool byteBufferPool) {
     super(repConfig, blockInfo, verifyChecksum, xceiverClientFactory,
         refreshFunction, streamFactory);
+    this.byteBufferPool = byteBufferPool;
 
     decoder = CodecRegistry.getInstance()
         .getCodecFactory(repConfig.getCodec().toString())
@@ -435,7 +439,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private ByteBuffer allocateBuffer(ECReplicationConfig repConfig) {
-    ByteBuffer buf = ByteBuffer.allocate(repConfig.getEcChunkSize());
+    ByteBuffer buf = byteBufferPool.getBuffer(
+        false, repConfig.getEcChunkSize());
     return buf;
   }
 
@@ -578,6 +583,17 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   public synchronized void close() {
     super.close();
     executor.shutdownNow();
+    // Inside this class, we only allocate buffers to read parity into. Data
+    // is reconstructed or read into a set of buffers passed in from the calling
+    // class. Therefore we only need to ensure we free the parity buffers here.
+    for (int i = getRepConfig().getData();
+         i < getRepConfig().getRequiredNodes(); i++) {
+      ByteBuffer buf = decoderInputBuffers[i];
+      if (buf != null) {
+        byteBufferPool.putBuffer(buf);
+        decoderInputBuffers[i] = null;
+      }
+    }
   }
 
   @Override

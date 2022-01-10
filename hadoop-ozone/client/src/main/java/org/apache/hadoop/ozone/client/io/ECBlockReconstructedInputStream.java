@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.io.ByteBufferPool;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -35,13 +36,16 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   private ECReplicationConfig repConfig;
   private ECBlockReconstructedStripeInputStream stripeReader;
   private ByteBuffer[] bufs;
+  private final ByteBufferPool byteBufferPool;
   private boolean closed = false;
 
   private long position = 0;
 
   public ECBlockReconstructedInputStream(ECReplicationConfig repConfig,
+      ByteBufferPool byteBufferPool,
       ECBlockReconstructedStripeInputStream stripeReader) {
     this.repConfig = repConfig;
+    this.byteBufferPool = byteBufferPool;
     this.stripeReader = stripeReader;
 
     allocateBuffers();
@@ -138,6 +142,10 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() throws IOException {
     stripeReader.close();
+    for (int i = 0; i < bufs.length; i++) {
+      byteBufferPool.putBuffer(bufs[i]);
+      bufs[i] = null;
+    }
     closed = true;
   }
 
@@ -187,7 +195,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   private void allocateBuffers() {
     bufs = new ByteBuffer[repConfig.getData()];
     for (int i = 0; i < repConfig.getData(); i++) {
-      bufs[i] = ByteBuffer.allocate(repConfig.getEcChunkSize());
+      bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
       // Initially set the limit to 0 so there is no remaining space.
       bufs[i].limit(0);
     }
@@ -196,6 +204,11 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   private void clearBuffers() {
     for (ByteBuffer b : bufs) {
       b.clear();
+      // As we are getting buffers from a bufferPool, we may get buffers with a
+      // capacity larger than what we asked for. After calling clear(), the
+      // buffer limit will become the capacity so we need to reset it back to
+      // the desired limit.
+      b.limit(repConfig.getEcChunkSize());
     }
   }
 

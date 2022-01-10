@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.io.ByteBufferPool;
+import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
@@ -38,13 +40,18 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
 
   private ECBlockInputStreamFactory ecBlockStreamFactory;
 
-  public static BlockInputStreamFactory getInstance() {
-    return new BlockInputStreamFactoryImpl();
+  public static BlockInputStreamFactory getInstance(
+      ByteBufferPool byteBufferPool) {
+    return new BlockInputStreamFactoryImpl(byteBufferPool);
   }
 
   public BlockInputStreamFactoryImpl() {
+    this(new ElasticByteBufferPool());
+  }
+
+  public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool) {
     this.ecBlockStreamFactory =
-        ECBlockInputStreamFactoryImpl.getInstance(this);
+        ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool);
   }
 
   /**
