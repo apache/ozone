@@ -294,9 +294,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
           LOG.error("Replacing SCM state with Term : {} and Index:",
               termIndex.getTerm(), termIndex.getTerm());
           // This is being done to check before stop with old db
-          // try reload and then finally terminate and also test has assumption for
-          // reverify after corrupt DB loading without this it fails with NPE
-          // when  finding db location.
+          // try to reload and then finally terminate and also test has
+          // assumption for re-verify after corrupt DB loading without
+          // reloadSCMState call test fails with NPE when finding db location.
           reloadSCMState();
         }
       } finally {
