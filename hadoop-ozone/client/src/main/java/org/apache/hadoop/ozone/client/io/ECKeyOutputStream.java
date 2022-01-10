@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -56,7 +55,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private int ecChunkSize;
   private final int numDataBlks;
   private final int numParityBlks;
-  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
+  private final ByteBufferPool bufferPool;
   private final RawErasureEncoder encoder;
 
   private enum StripeWriteStatus {
@@ -96,8 +95,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
       XceiverClientFactory xceiverClientManager, OzoneManagerProtocol omClient,
       int chunkSize, String requestId, ECReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion) {
+      boolean unsafeByteBufferConversion, ByteBufferPool byteBufferPool) {
     this.config = config;
+    this.bufferPool = byteBufferPool;
     // For EC, cell/chunk size and buffer size can be same for now.
     ecChunkSize = replicationConfig.getEcChunkSize();
     this.config.setStreamBufferMaxSize(ecChunkSize);
@@ -105,8 +105,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
     this.config.setStreamBufferSize(ecChunkSize);
     this.numDataBlks = replicationConfig.getData();
     this.numParityBlks = replicationConfig.getParity();
-    ecChunkBufferCache =
-        new ECChunkBuffers(ecChunkSize, numDataBlks, numParityBlks);
+    ecChunkBufferCache = new ECChunkBuffers(
+        ecChunkSize, numDataBlks, numParityBlks, bufferPool);
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new ECBlockOutputStreamEntryPool(config, omClient, requestId,
@@ -209,7 +209,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       failedDataStripeChunkLens[i] = dataBuffers[i].limit();
     }
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
-    for (int i = 0; i <  numParityBlks; i++) {
+    for (int i = 0; i < numParityBlks; i++) {
       failedParityStripeChunkLens[i] = parityBuffers[i].limit();
     }
 
@@ -259,7 +259,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     newBlockGroupStreamEntry
         .updateBlockGroupToAckedPosition(failedStripeDataSize);
-    ecChunkBufferCache.clear(chunkSize);
+    ecChunkBufferCache.clear();
 
     if (newBlockGroupStreamEntry.getRemaining() <= 0) {
       // In most cases this should not happen except in the case stripe size and
@@ -316,7 +316,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     if (hasPutBlockFailure()) {
       return StripeWriteStatus.FAILED;
     }
-    ecChunkBufferCache.clear(parityCellSize);
+    ecChunkBufferCache.clear();
 
     if (streamEntry.getRemaining() <= 0) {
       streamEntry.close();
@@ -364,11 +364,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   void writeParityCells(int parityCellSize) throws IOException {
     final ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
-    ecChunkBufferCache.allocateParityBuffers(parityCellSize);
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
 
-    for(int i=0; i< buffers.length; i++){
-      buffers[i].flip();
+    for (ByteBuffer b : parityBuffers) {
+      b.limit(parityCellSize);
+    }
+    for (ByteBuffer b : buffers) {
+      b.flip();
     }
     encoder.encode(buffers, parityBuffers);
     blockOutputStreamEntryPool
@@ -613,6 +615,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ECReplicationConfig replicationConfig;
+    private ByteBufferPool byteBufferPool;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -670,10 +673,17 @@ public class ECKeyOutputStream extends KeyOutputStream {
       return this;
     }
 
+    public ECKeyOutputStream.Builder setByteBufferPool(
+        ByteBufferPool bufferPool) {
+      this.byteBufferPool = bufferPool;
+      return this;
+    }
+
     public ECKeyOutputStream build() {
       return new ECKeyOutputStream(clientConfig, openHandler, xceiverManager,
           omClient, chunkSize, requestID, replicationConfig, multipartUploadID,
-          multipartNumber, isMultipartKey, unsafeByteBufferConversion);
+          multipartNumber, isMultipartKey, unsafeByteBufferConversion,
+          byteBufferPool);
     }
   }
 
@@ -695,12 +705,16 @@ public class ECKeyOutputStream extends KeyOutputStream {
     private final ByteBuffer[] dataBuffers;
     private final ByteBuffer[] parityBuffers;
     private int cellSize;
+    private ByteBufferPool byteBufferPool;
 
-    ECChunkBuffers(int cellSize, int numData, int numParity) {
+    ECChunkBuffers(int cellSize, int numData, int numParity,
+        ByteBufferPool byteBufferPool) {
       this.cellSize = cellSize;
       dataBuffers = new ByteBuffer[numData];
       parityBuffers = new ByteBuffer[numParity];
-      allocateBuffers(cellSize, dataBuffers);
+      this.byteBufferPool = byteBufferPool;
+      allocateBuffers(dataBuffers, this.cellSize);
+      allocateBuffers(parityBuffers, this.cellSize);
     }
 
     private ByteBuffer[] getDataBuffers() {
@@ -709,10 +723,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
     private ByteBuffer[] getParityBuffers() {
       return parityBuffers;
-    }
-
-    public void allocateParityBuffers(int size){
-      allocateBuffers(size, parityBuffers);
     }
 
     private int addToDataBuffer(int i, byte[] b, int off, int len) {
@@ -724,9 +734,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
       return pos;
     }
 
-    private void clear(int size) {
-      clearBuffers(size, dataBuffers);
-      clearBuffers(size, parityBuffers);
+    private void clear() {
+      clearBuffers(dataBuffers);
+      clearBuffers(parityBuffers);
     }
 
     private void release() {
@@ -734,24 +744,24 @@ public class ECKeyOutputStream extends KeyOutputStream {
       releaseBuffers(parityBuffers);
     }
 
-    private static void allocateBuffers(int cellSize, ByteBuffer[] buffers) {
+    private void allocateBuffers(ByteBuffer[] buffers, int bufferSize) {
       for (int i = 0; i < buffers.length; i++) {
-        buffers[i] = BUFFER_POOL.getBuffer(false, cellSize);
-        buffers[i].limit(cellSize);
+        buffers[i] = byteBufferPool.getBuffer(false, cellSize);
+        buffers[i].limit(bufferSize);
       }
     }
 
-    private static void clearBuffers(int cellSize, ByteBuffer[] buffers) {
+    private void clearBuffers(ByteBuffer[] buffers) {
       for (int i = 0; i < buffers.length; i++) {
         buffers[i].clear();
         buffers[i].limit(cellSize);
       }
     }
 
-    private static void releaseBuffers(ByteBuffer[] buffers) {
+    private void releaseBuffers(ByteBuffer[] buffers) {
       for (int i = 0; i < buffers.length; i++) {
         if (buffers[i] != null) {
-          BUFFER_POOL.putBuffer(buffers[i]);
+          byteBufferPool.putBuffer(buffers[i]);
           buffers[i] = null;
         }
       }
