@@ -771,7 +771,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       X509Certificate cert =
           org.apache.hadoop.hdds.security.x509.keys.SecurityUtil
               .getCustomCertificate(securityConfig);
-      assert cert != null;
+      Preconditions.checkState(cert != null);
       certId = cert.getSerialNumber().toString();
     } else {
       // Means this is an upgraded cluster, and it has no sub-ca,
