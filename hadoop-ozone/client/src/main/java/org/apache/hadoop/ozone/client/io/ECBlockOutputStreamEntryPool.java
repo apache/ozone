@@ -55,6 +55,9 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
         isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
         openID);
     assert replicationConfig instanceof ECReplicationConfig;
+    getExcludeList()
+        .startAutoExcludeNodesCleaner(config.getExcludeNodesExpiryTime(),
+            config.getRecheckInterval());
   }
 
   @Override
