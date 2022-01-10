@@ -1392,7 +1392,7 @@ public class TestReplicationManager {
   @Test
   public void testContainerWithMissingReplicas()
       throws IOException {
-    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    createContainer(LifeCycleState.CLOSED);
     assertReplicaScheduled(0);
     assertUnderReplicatedCount(1);
     assertMissingCount(1);

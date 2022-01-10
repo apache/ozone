@@ -121,6 +121,14 @@ public class ReplicationManagerReport {
     reportTimeStamp = System.currentTimeMillis();
   }
 
+  /**
+   * The epoch time in milli-seconds when this report was completed.
+   * @return epoch time in milli-seconds.
+   */
+  public long getReportTimeStamp() {
+    return reportTimeStamp;
+  }
+
   public long getStat(HddsProtos.LifeCycleState stat) {
     return getStat(stat.toString());
   }
