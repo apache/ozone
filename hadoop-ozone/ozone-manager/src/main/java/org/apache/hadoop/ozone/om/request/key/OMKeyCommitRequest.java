@@ -341,8 +341,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // versioning of keys. So, this can be revisited later.
       if (omKeyInfo.getKeyLocationVersions().size() == 1) {
         omMetrics.incNumKeys();
-        omMetrics.incDataCommittedBytes(omKeyInfo.getDataSize());
       }
+      omMetrics.incDataCommittedBytes(omKeyInfo.getDataSize());
       LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
               bucketName, keyName);
       break;
