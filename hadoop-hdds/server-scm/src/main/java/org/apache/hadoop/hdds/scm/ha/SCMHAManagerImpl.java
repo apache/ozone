@@ -300,7 +300,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
           reloadSCMState();
         }
       } finally {
-        String errorMsg = "Failed to reload SCM state and instantiate services.";
+        String errorMsg = "Failed to reload SCM state and instantiate " +
+            "services.";
         exitManager.exitSystem(1, errorMsg, ex, LOG);
       }
     }
