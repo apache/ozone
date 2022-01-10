@@ -47,7 +47,7 @@ fi
 mkdir -p "$REPORT_DIR"
 
 cd "$DIST_DIR/kubernetes/examples" || exit 1
-./test-all.sh | tee "${REPORT_DIR}/output.log"
+./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
 RES=$?
 cp -r result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"

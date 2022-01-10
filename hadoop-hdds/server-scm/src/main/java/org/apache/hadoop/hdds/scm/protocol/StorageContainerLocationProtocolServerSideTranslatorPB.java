@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
@@ -397,6 +398,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setDatanodeUsageInfoResponse(getDatanodeUsageInfo(
                 request.getDatanodeUsageInfoRequest()))
             .build();
+      case GetContainerCount:
+        return ScmContainerLocationResponse.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setStatus(Status.OK)
+          .setGetContainerCountResponse(getContainerCount(
+                  request.getGetContainerCountRequest()))
+          .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -838,4 +846,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  public GetContainerCountResponseProto getContainerCount(
+      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
+      request) throws IOException {
+
+    return GetContainerCountResponseProto.newBuilder()
+      .setContainerCount(impl.getContainerCount())
+      .build();
+  }
 }

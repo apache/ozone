@@ -125,7 +125,8 @@ public class ContainerBalancer {
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
     this.ozoneConfiguration = ozoneConfiguration;
-    config = ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
+    this.config = ozoneConfiguration.
+        getObject(ContainerBalancerConfiguration.class);
     this.metrics = ContainerBalancerMetrics.create();
     this.scmContext = scmContext;
 

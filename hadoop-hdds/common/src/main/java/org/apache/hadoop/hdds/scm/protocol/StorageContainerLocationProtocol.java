@@ -365,4 +365,6 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * commands operating on {@code containerID}.
    */
   Token<?> getContainerToken(ContainerID containerID) throws IOException;
+
+  long getContainerCount() throws IOException;
 }

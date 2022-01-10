@@ -19,6 +19,7 @@ CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
+OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
@@ -72,7 +73,7 @@ OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 
 HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
-HDFS-SITE.XML_dfs.datanode.keytab.file=/etc/security/keytabs/dn.keytab
+HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/ozone@EXAMPLE.COM
 HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
 
