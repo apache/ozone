@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,22 +55,33 @@ public class ReplicationManagerReport {
    * Enum representing various health states a container can be in.
    */
   public enum HealthState {
-    UNDER_REPLICATED("Containers with insufficient replicas"),
-    MIS_REPLICATED("Containers with insufficient racks"),
-    OVER_REPLICATED("Containers with more replicas than required"),
+    UNDER_REPLICATED("Containers with insufficient replicas",
+        "NumUnderReplicatedContainers"),
+    MIS_REPLICATED("Containers with insufficient racks",
+        "NumMisReplicatedContainers"),
+    OVER_REPLICATED("Containers with more replicas than required",
+        "NumOverReplicatedContainers"),
     UNHEALTHY(
         "Containers Closed or Quasi_Closed having some replicas in " +
-            "a different state"),
-    EMPTY("Containers having no blocks"),
+            "a different state", "NumUnhealthyContainers"),
+    EMPTY("Containers having no blocks", "NumEmptyContainers"),
     OPEN_UNHEALTHY(
-        "Containers open and having replicas with different states"),
+        "Containers open and having replicas with different states",
+        "NumOpenUnhealthyContainers"),
     QUASI_CLOSED_STUCK(
-        "Containers Quasi_Closed with insufficient datanode origins");
+        "Containers QuasiClosed with insufficient datanode origins",
+        "NumStuckQuasiClosedContainers");
 
     private String description;
+    private String metricName;
 
-    HealthState(String desc) {
+    HealthState(String desc, String name) {
       this.description = desc;
+      this.metricName = name;
+    }
+
+    public String getMetricName() {
+      return this.metricName;
     }
 
     public String getDescription() {
@@ -116,6 +128,18 @@ public class ReplicationManagerReport {
 
   private long getStat(String stat) {
     return stats.get(stat).longValue();
+  }
+
+  public List<ContainerID> getSample(HddsProtos.LifeCycleState stat) {
+    return getSample(stat.toString());
+  }
+
+  public List<ContainerID> getSample(HealthState stat) {
+    return getSample(stat.toString());
+  }
+
+  private List<ContainerID> getSample(String stat) {
+    return containerSample.getOrDefault(stat, Collections.emptyList());
   }
 
   private void increment(String stat) {
