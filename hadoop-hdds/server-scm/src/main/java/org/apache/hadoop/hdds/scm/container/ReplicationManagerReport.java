@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.LongAdder;
  */
 public class ReplicationManagerReport {
 
-  private static final int SAMPLE_LIMIT = 100;
+  public static final int SAMPLE_LIMIT = 100;
   private long reportTimeStamp;
 
   /**
