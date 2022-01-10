@@ -37,7 +37,8 @@ public final class OzoneAclUtils {
   private OzoneAclUtils() {
   }
 
-  public static void setOMMultiTenantManager(OMMultiTenantManager tenantManager) {
+  public static void setOMMultiTenantManager(
+      OMMultiTenantManager tenantManager) {
     multiTenantManager = tenantManager;
   }
 

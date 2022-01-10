@@ -62,12 +62,12 @@ public final class OmDBAccessIdInfo {
    * Convert OmDBAccessIdInfo to protobuf to be persisted to DB.
    */
   public OzoneManagerProtocolProtos.OmDBAccessInfo getProtobuf() {
-        return OzoneManagerProtocolProtos.OmDBAccessInfo.newBuilder()
-            .setPrincipal(userPrincipal)
-            .setIsAdmin(isAdmin)
-            .setIsDelegatedAdmin(isDelegatedAdmin)
-            .setTenantId(tenantId)
-            .build();
+    return OzoneManagerProtocolProtos.OmDBAccessInfo.newBuilder()
+        .setPrincipal(userPrincipal)
+        .setIsAdmin(isAdmin)
+        .setIsDelegatedAdmin(isDelegatedAdmin)
+        .setTenantId(tenantId)
+        .build();
   }
 
   /**
