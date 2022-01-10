@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -91,7 +92,7 @@ public class ReplicationManagerReport {
 
   private final Map<String, LongAdder> stats;
   private final Map<String, List<ContainerID>> containerSample
-      = new HashMap<>();
+      = new ConcurrentHashMap<>();
 
   public ReplicationManagerReport() {
     stats = createStatsMap();
@@ -139,7 +140,13 @@ public class ReplicationManagerReport {
   }
 
   private List<ContainerID> getSample(String stat) {
-    return containerSample.getOrDefault(stat, Collections.emptyList());
+    List<ContainerID> list = containerSample.get(stat);
+    if (list == null) {
+      return Collections.emptyList();
+    }
+    synchronized (list) {
+      return new ArrayList<>(list);
+    }
   }
 
   private void increment(String stat) {
@@ -154,8 +161,10 @@ public class ReplicationManagerReport {
     increment(stat);
     List<ContainerID> list = containerSample
         .computeIfAbsent(stat, k -> new ArrayList<>());
-    if (list.size() < SAMPLE_LIMIT) {
-      list.add(container);
+    synchronized(list) {
+      if (list.size() < SAMPLE_LIMIT) {
+        list.add(container);
+      }
     }
   }
 
