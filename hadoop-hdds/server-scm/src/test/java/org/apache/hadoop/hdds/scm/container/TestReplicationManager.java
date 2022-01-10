@@ -1386,6 +1386,18 @@ public class TestReplicationManager {
   }
 
   /**
+   * ReplicationManager should replicate zero replica when all copies
+   * are missing.
+   */
+  @Test
+  public void testContainerWithMissingReplicas()
+      throws IOException {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    assertReplicaScheduled(0);
+    assertUnderReplicatedCount(1);
+    assertMissingCount(1);
+  }
+  /**
    * When a CLOSED container is over replicated, ReplicationManager
    * deletes the excess replicas. While choosing the replica for deletion
    * ReplicationManager should not attempt to remove a DECOMMISSION or
@@ -1851,6 +1863,7 @@ public class TestReplicationManager {
   private ContainerInfo createContainer(LifeCycleState containerState)
       throws IOException {
     final ContainerInfo container = getContainer(containerState);
+    container.setUsedBytes(1234);
     containerStateManager.addContainer(container.getProtobuf());
     return container;
   }
@@ -1923,6 +1936,12 @@ public class TestReplicationManager {
     ReplicationManagerReport report = replicationManager.getContainerReport();
     Assert.assertEquals(count, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  private void assertMissingCount(int count) {
+    ReplicationManagerReport report = replicationManager.getContainerReport();
+    Assert.assertEquals(count, report.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
   }
 
   private void assertOverReplicatedCount(int count) {

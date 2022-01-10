@@ -62,6 +62,8 @@ public class ReplicationManagerReport {
         "NumMisReplicatedContainers"),
     OVER_REPLICATED("Containers with more replicas than required",
         "NumOverReplicatedContainers"),
+    MISSING("Containers with no online replicas",
+        "NumMissingContainers"),
     UNHEALTHY(
         "Containers Closed or Quasi_Closed having some replicas in " +
             "a different state", "NumUnhealthyContainers"),

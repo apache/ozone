@@ -269,4 +269,14 @@ public class ContainerReplicaCount {
         .allMatch(r -> ReplicationManager.compareState(
             container.getState(), r.getState()));
   }
+
+  /**
+   * Returns true is there are no replicas of a container available, ie the
+   * set of container replica passed in the constructor has zero entries.
+   *
+   * @return true if there are no replicas, false otherwise.
+   */
+  public boolean isMissing() {
+    return replica.size() == 0;
+  }
 }

@@ -541,6 +541,10 @@ public class ReplicationManager implements SCMService {
           if (!sufficientlyReplicated) {
             report.incrementAndSample(
                 HealthState.UNDER_REPLICATED, container.containerID());
+            if (replicaSet.isMissing()) {
+              report.incrementAndSample(HealthState.MISSING,
+                  container.containerID());
+            }
           }
           if (!placementSatisfied) {
             report.incrementAndSample(HealthState.MIS_REPLICATED,
