@@ -302,7 +302,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String omId;
 
   private OMMetadataManager metadataManager;
-  private OMMultiTenantManager multiTenantManagr;
+  private OMMultiTenantManager multiTenantManager;
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private KeyManager keyManager;
@@ -647,8 +647,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
-    multiTenantManagr = new OMMultiTenantManagerImpl(metadataManager,
+    multiTenantManager = new OMMultiTenantManagerImpl(metadataManager,
         configuration);
+    OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
@@ -1354,7 +1355,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return metadata manager.
    */
   public OMMultiTenantManager getMultiTenantManager() {
-    return multiTenantManagr;
+    return multiTenantManager;
   }
 
   public OzoneBlockTokenSecretManager getBlockTokenMgr() {
@@ -2167,8 +2168,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     UserGroupInformation user;
     if (getS3Auth() != null) {
-      user = UserGroupInformation.createRemoteUser(
-          getS3Auth().getAccessId());
+      String principal =
+          OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId());
+      user = UserGroupInformation.createRemoteUser(principal);
     } else {
       user = ProtobufRpcEngine.Server.getRemoteUser();
     }
@@ -2992,14 +2994,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
     try {
       String userName = getRemoteUser().getUserName();
-      if (!multiTenantManagr.isTenantAdmin(userName, tenantId)
+      if (!multiTenantManager.isTenantAdmin(userName, tenantId)
           && !omAdminUsernames.contains(userName)) {
         throw new IOException("Only tenant and ozone admins can access this " +
             "API. '" + userName + "' is not an admin.");
       }
 
       final TenantUserList userList =
-          multiTenantManagr.listUsersInTenant(tenantId, prefix);
+          multiTenantManager.listUsersInTenant(tenantId, prefix);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           OMAction.TENANT_LIST_USER, auditMap));
       return userList;
@@ -3021,7 +3023,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (s3Auth != null) {
       String accessID = s3Auth.getAccessId();
       Optional<String> optionalTenantId =
-          multiTenantManagr.getTenantForAccessID(accessID);
+          multiTenantManager.getTenantForAccessID(accessID);
 
       if (optionalTenantId.isPresent()) {
         String tenantId = optionalTenantId.get();
@@ -3771,20 +3773,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
 
     Pair<String, String> resolved;
-    try {
-      if (isAclEnabled) {
-        InetAddress remoteIp = Server.getRemoteIp();
-        resolved = resolveBucketLink(requested, new HashSet<>(),
-            Server.getRemoteUser(),
-            remoteIp,
-            remoteIp != null ? remoteIp.getHostName() :
-                omRpcAddress.getHostName());
-      } else {
-        resolved = resolveBucketLink(requested, new HashSet<>(),
-            null, null, null);
+    if (isAclEnabled) {
+      UserGroupInformation ugi = Server.getRemoteUser();
+      if (getS3Auth() != null) {
+        ugi = UserGroupInformation
+            .createRemoteUser(
+                OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId()));
       }
-    } catch (Throwable t) {
-      throw t;
+      InetAddress remoteIp = Server.getRemoteIp();
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          ugi,
+          remoteIp,
+          remoteIp != null ? remoteIp.getHostName() :
+              omRpcAddress.getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
     }
     return new ResolvedBucket(requested, resolved);
   }

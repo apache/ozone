@@ -32,7 +32,27 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
  */
 public final class OzoneAclUtils {
 
+  private static OMMultiTenantManager multiTenantManager;
+
   private OzoneAclUtils() {
+  }
+
+  public static void setOMMultiTenantManager(OMMultiTenantManager tenantManager) {
+    multiTenantManager = tenantManager;
+  }
+
+  /**
+   * Converts the given access ID to a kerberos principal.
+   * If the access ID does not belong to a tenant, the access ID is returned
+   * as is to be used as the principal.
+   */
+  public static String principalToAccessID(String accessID) throws IOException {
+    String principal = multiTenantManager.getUserNameGivenAccessId(accessID);
+    if (principal == null) {
+      principal = accessID;
+    }
+
+    return principal;
   }
 
   /**
