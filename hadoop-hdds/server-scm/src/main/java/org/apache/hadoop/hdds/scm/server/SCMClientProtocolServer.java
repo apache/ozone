@@ -755,7 +755,7 @@ public class SCMClientProtocolServer implements
     if (threshold.isPresent()) {
       double tsd = threshold.get();
       Preconditions.checkState(tsd >= 0.0D && tsd < 100.0D,
-          "threshold should to be specified in range [0.0, 100.0).");
+          "threshold should be specified in range [0.0, 100.0).");
       cbc.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {

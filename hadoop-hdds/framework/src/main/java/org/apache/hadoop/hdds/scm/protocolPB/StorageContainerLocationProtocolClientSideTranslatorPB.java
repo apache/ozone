@@ -751,8 +751,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     //make balancer configuration optional
     if (threshold.isPresent()) {
       double tsd = threshold.get();
-      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
-          "threshold should to be specified in range [0.0, 1.0).");
+      Preconditions.checkState(tsd >= 0.0D && tsd < 100D,
+          "threshold should be specified in range [0.0, 100.0).");
       builder.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {

@@ -731,6 +731,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
     if (request.hasIterations()) {
       iterations = Optional.of(request.getIterations());
+    } else if (request.hasIdleiterations()) {
+      iterations = Optional.of(request.getIdleiterations());
     }
 
     if (request.hasMaxDatanodesPercentageToInvolvePerIteration()) {
