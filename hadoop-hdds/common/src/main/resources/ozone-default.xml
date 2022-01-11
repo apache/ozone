@@ -3002,11 +3002,20 @@
   </property>
 
   <property>
+    <name>hdds.custom.keystore.type</name>
+    <value>JKS</value>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      The type of Keystore used to store the key and certificates. Example, "JKS", "JCEKS", "PKCS12", etc.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.custom.keystore.file.path</name>
     <value></value>
     <tag>OZONE, SECURITY</tag>
     <description>
-      The keystore file in JCEKS format that contains the key and the certificate signed by the custom Root CA.
+      The keystore file that contains the key and the certificate signed by the custom Root CA.
     </description>
   </property>
 

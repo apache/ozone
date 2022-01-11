@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.update.server.SCMCRLStore;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -91,16 +92,19 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
   private final StorageContainerManager storageContainerManager;
+  private final SecurityConfig securityConfig;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer rootCertificateServer,
       CertificateServer scmCertificateServer,
-      X509Certificate rootCACert, StorageContainerManager scm)
+      X509Certificate rootCACert, StorageContainerManager scm,
+      SecurityConfig securityConfig)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
     this.rootCACertificate = rootCACert;
+    this.securityConfig = securityConfig;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -145,6 +149,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public String getDataNodeCertificate(
       DatanodeDetailsProto dnDetails,
       String certSignReq) throws IOException {
+    if (securityConfig.isCustomCAEnabled()) {
+      throw new SCMSecurityException("Get DataNode Certificate is not " +
+          "supported when custom CA is enabled.");
+    }
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
@@ -161,6 +169,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   @Override
   public String getOMCertificate(OzoneManagerDetailsProto omDetails,
       String certSignReq) throws IOException {
+    if (securityConfig.isCustomCAEnabled()) {
+      throw new SCMSecurityException("Get OM Certificate is not supported " +
+          "when custom CA is enabled.");
+    }
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
@@ -178,6 +190,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
+    if (securityConfig.isCustomCAEnabled()) {
+      throw new SCMSecurityException("Get SCM Certificate is not supported " +
+          "when custom CA is enabled.");
+    }
     Objects.requireNonNull(scmNodeDetails);
     String primaryScmId =
         storageContainerManager.getScmStorageConfig().getPrimaryScmNodeId();
@@ -285,7 +301,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
    */
   @Override
   public String getCACertificate() throws IOException {
-    LOGGER.debug("Getting CA certificate.");
+    if (securityConfig.isCustomCAEnabled()) {
+      throw new SCMSecurityException("Get CA Certificate is not supported " +
+          "when custom CA is enabled.");
+    }
+    if(LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Getting CA certificate.");
+    }
     try {
       return CertificateCodec.getPEMEncodedString(
           scmCertificateServer.getCACertificate());
@@ -325,6 +347,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
   @Override
   public List<String> listCACertificate() throws IOException {
+    if (securityConfig.isCustomCAEnabled()) {
+      throw new SCMSecurityException("List CA Certificate is not supported " +
+          "when custom CA is enabled.");
+    }
     List<String> caCerts =
         listCertificate(NodeType.SCM, 0, 10, false);
     return caCerts;
@@ -332,6 +358,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
   @Override
   public String getRootCACertificate() throws IOException {
+    if (securityConfig.isCustomCAEnabled()) {
+      throw new SCMSecurityException("Get RootCA Certificate is not supported" +
+          " when custom CA is enabled.");
+    }
     LOGGER.debug("Getting Root CA certificate.");
     if (storageContainerManager.getScmStorageConfig()
         .checkPrimarySCMIdInitialized()) {

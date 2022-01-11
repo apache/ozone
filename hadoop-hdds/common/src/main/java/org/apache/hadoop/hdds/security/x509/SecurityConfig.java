@@ -40,6 +40,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CUSTOM_KEYSTORE_TYPE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
@@ -114,6 +115,7 @@ public class SecurityConfig {
   private boolean grpcTlsUseTestCert;
   private final boolean isCustomCAEnabled;
   // The following configs are used only when custom Root CA is enabled
+  private final String keystoreType;
   private final String keystoreFilePath;
   private char[] keystoreFilePassword;
   private char[] keystoreKeyPassword;
@@ -198,6 +200,7 @@ public class SecurityConfig {
         this.configuration.get(HDDS_CUSTOM_KEYSTORE_FILE_PATH);
     this.truststoreFilePath =
         this.configuration.get(HDDS_CUSTOM_TRUSTSTORE_FILE_PATH);
+    this.keystoreType = this.configuration.get(HDDS_CUSTOM_KEYSTORE_TYPE);
     try {
       this.keystoreFilePassword =
           this.configuration.getPassword(HDDS_CUSTOM_KEYSTORE_FILE_PASSWORD);
@@ -452,6 +455,10 @@ public class SecurityConfig {
 
   public String getKeystoreFilePath() {
     return keystoreFilePath;
+  }
+
+  public String getKeystoreType() {
+    return keystoreType;
   }
 
   public char[] getKeystoreFilePassword() {

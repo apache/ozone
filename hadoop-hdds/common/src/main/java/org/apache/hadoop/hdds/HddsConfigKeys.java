@@ -134,6 +134,8 @@ public final class HddsConfigKeys {
   public static final String HDDS_CUSTOM_ROOT_CA_ENABLED =
       "hdds.custom.rootca.enabled";
   public static final boolean HDDS_CUSTOM_ROOT_CA_ENABLED_DEFAULT = false;
+  public static final String HDDS_CUSTOM_KEYSTORE_TYPE =
+      "hdds.custom.keystore.type";
   public static final String HDDS_CUSTOM_KEYSTORE_FILE_PATH =
       "hdds.custom.keystore.file.path";
   public static final String HDDS_CUSTOM_KEYSTORE_FILE_PASSWORD =
