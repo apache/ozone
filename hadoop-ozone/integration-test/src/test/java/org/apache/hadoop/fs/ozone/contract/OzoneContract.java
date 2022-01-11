@@ -70,6 +70,12 @@ class OzoneContract extends AbstractFSContract {
     fsOptimizedServer = fsoServer;
   }
 
+  public static void createCluster(boolean fsoServer) throws IOException {
+    // Set the flag to enable/disable FSO on server.
+    initOzoneConfiguration(fsoServer);
+    createCluster();
+  }
+
   public static void createCluster() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
@@ -89,9 +95,16 @@ class OzoneContract extends AbstractFSContract {
     if (fsOptimizedServer){
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           true);
+
+      // Default bucket layout is set to FSO in case of FSO server.
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    } else {
+      // Default bucket layout is set to LEGACY to support Hadoop compatible
+      // FS operations that are incompatible with OBS (default config value).
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.LEGACY.name());
     }
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
