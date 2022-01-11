@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.util.Daemon;
-import org.apache.hadoop.util.Time;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -82,7 +81,7 @@ public class ExcludeList {
 
   public void addDatanode(DatanodeDetails dn) {
     synchronized (datanodes) {
-      datanodes.put(dn, Time.monotonicNow());
+      datanodes.put(dn, monotonicNow());
     }
   }
 

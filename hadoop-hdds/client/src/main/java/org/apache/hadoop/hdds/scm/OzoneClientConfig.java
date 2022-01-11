@@ -138,11 +138,11 @@ public class OzoneClientConfig {
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
 
   @Config(key = "exclude.nodes.recheck.interval",
-      defaultValue = "600000",
+      defaultValue = "300000",
       description = "Ozone EC client time to recheck periodically to expire the"
           + " exclude nodes.",
       tags = ConfigTag.CLIENT)
-  private long recheckInterval = 10 * 60 * 1000;
+  private long recheckInterval = 5 * 60 * 1000;
 
   @PostConstruct
   private void validate() {

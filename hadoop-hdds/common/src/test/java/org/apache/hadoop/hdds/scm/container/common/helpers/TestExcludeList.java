@@ -32,14 +32,37 @@ public class TestExcludeList {
   public void autoCleanerShouldCleanTheNodesWhichArePresentForLong()
       throws InterruptedException {
     ExcludeList list = new ExcludeList();
-    list.startAutoExcludeNodesCleaner(10, 10);
-    DatanodeDetails node =
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
-            .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
+    list.startAutoExcludeNodesCleaner(10, 5);
+    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
-            .build();
-    list.addDatanode(node);
-    Thread.sleep(15);
+        .build());
+    Assert.assertTrue(list.getDatanodes().size() == 1);
+    Thread.sleep(20);
     Assert.assertTrue(list.getDatanodes().size() == 0);
+    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .setIpAddress("127.0.0.2").setHostName("localhost").addPort(
+            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
+        .build());
+    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .setIpAddress("127.0.0.3").setHostName("localhost").addPort(
+            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
+        .build());
+    Assert.assertTrue(list.getDatanodes().size() == 2);
+  }
+
+  @Test
+  public void stopAutoCleanerShouldNotCleanTheNodes()
+      throws InterruptedException {
+    ExcludeList list = new ExcludeList();
+    list.startAutoExcludeNodesCleaner(10, 5);
+    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
+            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
+        .build());
+    list.stopAutoExcludeNodesCleaner();
+    Assert.assertTrue(list.getDatanodes().size() == 1);
+    Thread.sleep(20);
+    Assert.assertTrue(list.getDatanodes().size() == 1);
   }
 }
