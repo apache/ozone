@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -45,7 +46,7 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
       @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, isRatisEnabled);
+    super(omResponse, isRatisEnabled, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
   }
@@ -54,8 +55,9 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyDeleteResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyDeleteResponse(@Nonnull OMResponse omResponse, @Nonnull
+                             BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override
@@ -66,7 +68,8 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     // not called in failure scenario in OM code.
     String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+    Table<String, OmKeyInfo> keyTable =
+        omMetadataManager.getKeyTable(getBucketLayout());
     addDeletionToBatch(omMetadataManager, batchOperation, keyTable, ozoneKey,
         omKeyInfo);
 

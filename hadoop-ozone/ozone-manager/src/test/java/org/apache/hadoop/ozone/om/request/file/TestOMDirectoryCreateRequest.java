@@ -24,6 +24,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -150,9 +151,9 @@ public class TestOMDirectoryCreateRequest {
 
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
         == OzoneManagerProtocolProtos.Status.OK);
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName)) != null);
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        != null);
 
   }
 
@@ -180,7 +181,7 @@ public class TestOMDirectoryCreateRequest {
         omClientResponse.getOMResponse().getStatus());
 
     // Key should not exist in DB
-    Assert.assertNull(omMetadataManager.getKeyTable().
+    Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout()).
         get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
 
   }
@@ -210,9 +211,9 @@ public class TestOMDirectoryCreateRequest {
         == OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
 
     // Key should not exist in DB
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName)) == null);
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        == null);
   }
 
   @Test
@@ -247,12 +248,13 @@ public class TestOMDirectoryCreateRequest {
         == OzoneManagerProtocolProtos.Status.OK);
 
     // Key should exist in DB and cache.
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName)) != null);
-    Assert.assertTrue(omMetadataManager.getKeyTable().getCacheValue(
-        new CacheKey<>(omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName))) != null);
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        != null);
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .getCacheValue(new CacheKey<>(
+            omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)))
+        != null);
 
   }
 
@@ -289,14 +291,15 @@ public class TestOMDirectoryCreateRequest {
         == OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
 
     // Key should exist in DB
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName)) != null);
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        != null);
 
     // As it already exists, it should not be in cache.
-    Assert.assertTrue(omMetadataManager.getKeyTable().getCacheValue(
-        new CacheKey<>(omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName))) == null);
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .getCacheValue(new CacheKey<>(
+            omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)))
+        == null);
 
   }
 
@@ -331,9 +334,9 @@ public class TestOMDirectoryCreateRequest {
         == OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
 
     // Key should not exist in DB
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName)) == null);
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
+        == null);
 
   }
 
@@ -366,7 +369,7 @@ public class TestOMDirectoryCreateRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    Assert.assertNotNull(omMetadataManager.getKeyTable().get(
+    Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
 
     Assert.assertEquals(4L, omMetrics.getNumKeys());
@@ -397,5 +400,9 @@ public class TestOMDirectoryCreateRequest {
       keyNameBuilder.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
     return keyNameBuilder.toString();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

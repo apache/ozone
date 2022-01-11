@@ -272,11 +272,12 @@ public final class OmKeyInfo extends WithParentObjectId {
    *
    * @param newLocationList the list of new blocks to be added.
    * @param updateTime - if true, updates modification time.
+   * @param keepOldVersions - if false, old blocks won't be kept.
    * @throws IOException
    */
   public synchronized long addNewVersion(
-      List<OmKeyLocationInfo> newLocationList, boolean updateTime)
-      throws IOException {
+      List<OmKeyLocationInfo> newLocationList, boolean updateTime,
+      boolean keepOldVersions) {
     long latestVersionNum;
     if (keyLocationVersions.size() == 0) {
       // no version exist, these blocks are the very first version.
@@ -286,8 +287,17 @@ public final class OmKeyInfo extends WithParentObjectId {
       // it is important that the new version are always at the tail of the list
       OmKeyLocationInfoGroup currentLatestVersion =
           keyLocationVersions.get(keyLocationVersions.size() - 1);
+
+      // Create a new version here. When bucket versioning is enabled,
+      // It includes previous block versions. Otherwise, only the blocks
+      // of new version is included.
       OmKeyLocationInfoGroup newVersion =
           currentLatestVersion.generateNextVersion(newLocationList);
+      if (!keepOldVersions) {
+        // Even though old versions are cleared here, they will be
+        // moved to delete table at the time of key commit
+        keyLocationVersions.clear();
+      }
       keyLocationVersions.add(newVersion);
       latestVersionNum = newVersion.getVersion();
     }
@@ -480,13 +490,26 @@ public final class OmKeyInfo extends WithParentObjectId {
   }
 
   /**
-   * For network transmit.
+   * For network transmit to return KeyInfo.
+   * @param clientVersion
+   * @param latestVersion
+   * @return key info.
+   */
+  public KeyInfo getNetworkProtobuf(int clientVersion, boolean latestVersion) {
+    return getProtobuf(false, null, clientVersion, latestVersion);
+  }
+
+  /**
+   * For network transmit to return KeyInfo.
    *
    * @param fullKeyName the user given full key name
+   * @param clientVersion
+   * @param latestVersion
    * @return key info with the user given full key name
    */
-  public KeyInfo getProtobuf(String fullKeyName, int clientVersion) {
-    return getProtobuf(false, fullKeyName, clientVersion);
+  public KeyInfo getNetworkProtobuf(String fullKeyName, int clientVersion,
+      boolean latestVersion) {
+    return getProtobuf(false, fullKeyName, clientVersion, latestVersion);
   }
 
   /**
@@ -495,7 +518,7 @@ public final class OmKeyInfo extends WithParentObjectId {
    * @return
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
-    return getProtobuf(ignorePipeline, null, clientVersion);
+    return getProtobuf(ignorePipeline, null, clientVersion, false);
   }
 
   /**
@@ -506,14 +529,21 @@ public final class OmKeyInfo extends WithParentObjectId {
    * @return key info object
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
-                              int clientVersion) {
+                              int clientVersion, boolean latestVersionBlocks) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
-    for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-      keyLocations.add(locationInfoGroup.getProtobuf(
-          ignorePipeline, clientVersion));
+    if (!latestVersionBlocks) {
+      for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
+        keyLocations.add(locationInfoGroup.getProtobuf(
+            ignorePipeline, clientVersion));
+      }
+    } else {
+      if (latestVersion != -1) {
+        keyLocations.add(keyLocationVersions.get(keyLocationVersions.size() - 1)
+            .getProtobuf(ignorePipeline, clientVersion));
+      }
     }
 
     KeyInfo.Builder kb = KeyInfo.newBuilder()
@@ -562,7 +592,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())
         .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
+                .fromProtoTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
@@ -646,7 +676,8 @@ public final class OmKeyInfo extends WithParentObjectId {
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(
             new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                keyLocationVersion.getLocationList())));
+                keyLocationVersion.getLocationList(),
+                keyLocationVersion.isMultipartKey())));
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),
@@ -668,6 +699,14 @@ public final class OmKeyInfo extends WithParentObjectId {
    */
   public void clearFileEncryptionInfo() {
     this.encInfo = null;
+  }
+
+  /**
+   * Set the file encryption info.
+   * @param fileEncryptionInfo
+   */
+  public void setFileEncryptionInfo(FileEncryptionInfo fileEncryptionInfo) {
+    this.encInfo = fileEncryptionInfo;
   }
 
   public String getPath() {

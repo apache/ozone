@@ -136,7 +136,7 @@ All these settings should be made in ozone-site.xml.
           </tr>
           <tr>
             <td>ozone.om.kerberos.keytab.file</th>
-            <td>TThe keytab file used by SCM daemon to login as its service principal.</td>
+            <td>The keytab file used by OM daemon to login as its service principal.</td>
           </tr>
           <tr>
             <td>ozone.om.http.auth.kerberos.principal</th>
@@ -166,6 +166,14 @@ All these settings should be made in ozone-site.xml.
           </tr>
         </thead>
         <tbody>
+          <tr>
+            <td>ozone.s3g.kerberos.principal</th>
+            <td>S3 Gateway principal. <br/> e.g. s3g/_HOST@REALM</td>
+          </tr>
+          <tr>
+            <td>ozone.s3g.kerberos.keytab.file</th>
+            <td>The keytab file used by S3 gateway. <br/> e.g. /etc/security/keytabs/s3g.keytab</td>
+          </tr>
           <tr>
             <td>ozone.s3g.http.auth.kerberos.principal</th>
             <td>S3 Gateway principal if SPNEGO is enabled for S3 Gateway http server. <br/> e.g. HTTP/_HOST@EXAMPLE.COM</td>

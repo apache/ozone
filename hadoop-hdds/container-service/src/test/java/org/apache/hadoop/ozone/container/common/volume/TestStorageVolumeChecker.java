@@ -175,6 +175,8 @@ public class TestStorageVolumeChecker {
     if (result) {
       assertThat(numCallbackInvocations.get(), is(1L));
     }
+
+    checker.shutdownAndWait(0, TimeUnit.SECONDS);
   }
 
   /**
@@ -207,6 +209,8 @@ public class TestStorageVolumeChecker {
     for (HddsVolume volume : volumes) {
       verify(volume, times(1)).check(anyObject());
     }
+
+    checker.shutdownAndWait(0, TimeUnit.SECONDS);
   }
 
 

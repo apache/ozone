@@ -71,11 +71,11 @@ The defined prefixes can be used to define the address of each of the SCM servic
    <value>host1</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm2</name>
    <value>host2</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm3</name>
    <value>host3</value>
 </property>
 ```
@@ -109,7 +109,7 @@ Based on the `ozone.scm.primordial.node.id`, the init process will be ignored on
 
 ## SCM HA Security
 
-![Overview](scm-secure-ha.png)
+{{< image src="scm-secure-ha.png">}}
 
 In a secure SCM HA cluster on the SCM where we perform init, we call this SCM as a primordial SCM. 
 Primordial SCM starts root-CA with self-signed certificates and is used to issue a signed certificate 

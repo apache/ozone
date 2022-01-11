@@ -17,11 +17,12 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MultivaluedMap;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,7 @@ import java.util.regex.Pattern;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -72,6 +74,19 @@ public final class StringToSignProducer {
           .withZone(ZoneOffset.UTC);
 
   private StringToSignProducer() {
+  }
+
+  public static String createSignatureBase(
+      SignatureInfo signatureInfo,
+      ContainerRequestContext context
+  ) throws Exception {
+    return createSignatureBase(signatureInfo,
+        context.getUriInfo().getRequestUri().getScheme(),
+        context.getMethod(),
+        context.getUriInfo().getRequestUri().getPath(),
+        LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders()),
+        fromMultiValueToSingleValueMap(
+            context.getUriInfo().getQueryParameters()));
   }
 
   @VisibleForTesting
@@ -122,11 +137,11 @@ public final class StringToSignProducer {
   }
 
   public static Map<String, String> fromMultiValueToSingleValueMap(
-      Map<String, String[]> queryParameters
+      MultivaluedMap<String, String> queryParameters
   ) {
     Map<String, String> result = new HashMap<>();
-    for (Map.Entry<String, String[]> entry : queryParameters.entrySet()) {
-      result.put(entry.getKey(), entry.getValue()[0]);
+    for (String key : queryParameters.keySet()) {
+      result.put(key, queryParameters.getFirst(key));
     }
     return result;
   }
@@ -232,8 +247,7 @@ public final class StringToSignProducer {
 
   private static String urlEncode(String str) {
     try {
-
-      return URLEncoder.encode(str, UTF_8.name())
+      return S3Utils.urlEncode(str)
           .replaceAll("\\+", "%20")
           .replaceAll("%7E", "~");
     } catch (UnsupportedEncodingException e) {

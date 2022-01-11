@@ -36,10 +36,13 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -70,7 +73,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private String rootPath;
 
-  private MiniOzoneCluster cluster = null;
+  private static MiniOzoneCluster cluster = null;
 
   private OzoneFileSystem o3fs;
 
@@ -78,19 +81,32 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private String bucketName;
 
+  @BeforeClass
+  public static void initClass() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
+        .build();
+    cluster.waitForClusterToBeReady();
+  }
+
+  @AfterClass
+  public static void teardownClass() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+  }
 
   @Before
   public void init() throws Exception {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
-    OzoneConfiguration conf = new OzoneConfiguration();
-
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
+    OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
@@ -102,9 +118,6 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   @After
   public void teardown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
     IOUtils.closeQuietly(o3fs);
   }
 

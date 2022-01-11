@@ -20,7 +20,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -45,21 +45,24 @@ public class ContainerBalancerSelectionCriteria {
   private ContainerBalancerConfiguration balancerConfiguration;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
-  private ContainerManagerV2 containerManagerV2;
+  private ContainerManager containerManager;
   private Set<ContainerID> selectedContainers;
   private Set<ContainerID> excludeContainers;
+  private FindSourceStrategy findSourceStrategy;
 
   public ContainerBalancerSelectionCriteria(
       ContainerBalancerConfiguration balancerConfiguration,
       NodeManager nodeManager,
       ReplicationManager replicationManager,
-      ContainerManagerV2 containerManagerV2) {
+      ContainerManager containerManager,
+      FindSourceStrategy findSourceStrategy) {
     this.balancerConfiguration = balancerConfiguration;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
-    this.containerManagerV2 = containerManagerV2;
+    this.containerManager = containerManager;
     selectedContainers = new HashSet<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
+    this.findSourceStrategy = findSourceStrategy;
   }
 
   /**
@@ -105,7 +108,7 @@ public class ContainerBalancerSelectionCriteria {
     // remove not closed containers
     containerIDSet.removeIf(containerID -> {
       try {
-        return containerManagerV2.getContainer(containerID).getState() !=
+        return containerManager.getContainer(containerID).getState() !=
             HddsProtos.LifeCycleState.CLOSED;
       } catch (ContainerNotFoundException e) {
         LOG.warn("Could not retrieve ContainerInfo for container {} for " +
@@ -113,6 +116,23 @@ public class ContainerBalancerSelectionCriteria {
             "container.", containerID.toString(), e);
         return true;
       }
+    });
+
+    //if the utilization of the source data node becomes lower than lowerLimit
+    //after the container is moved out , then the container can not be
+    // a candidate one, and we should remove it from the candidateContainers.
+    containerIDSet.removeIf(c -> {
+      ContainerInfo cInfo;
+      try {
+        cInfo = containerManager.getContainer(c);
+      } catch (ContainerNotFoundException e) {
+        LOG.warn("Could not find container {} when " +
+            "be matched with a move target", c);
+        //remove this not found container
+        return true;
+      }
+      return !findSourceStrategy.canSizeLeaveSource(
+          node, cInfo.getUsedBytes());
     });
 
     containerIDSet.removeIf(this::isContainerReplicatingOrDeleting);
@@ -133,8 +153,8 @@ public class ContainerBalancerSelectionCriteria {
       return 0;
     }
     try {
-      ContainerInfo firstInfo = containerManagerV2.getContainer(first);
-      ContainerInfo secondInfo = containerManagerV2.getContainer(second);
+      ContainerInfo firstInfo = containerManager.getContainer(first);
+      ContainerInfo secondInfo = containerManager.getContainer(second);
       if (firstInfo.getUsedBytes() > secondInfo.getUsedBytes()) {
         return 1;
       } else {

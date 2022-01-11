@@ -34,10 +34,10 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.KeyDeletingService;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -92,8 +92,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     if (isBucketFSOptimized) {
-      TestOMRequestUtils.configureFSOptimizedPaths(conf,
-          enabledFileSystemPaths, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     } else {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
@@ -209,7 +209,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -255,7 +256,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
@@ -328,7 +330,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getFSOBucketLayout());
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
     Table<String, RepeatedOmKeyInfo> deletedKeyTable =
@@ -398,5 +401,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     // verify whether KeyDeletingService has purged the keys
     currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     Assert.assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
+  }
+
+  private static BucketLayout getFSOBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

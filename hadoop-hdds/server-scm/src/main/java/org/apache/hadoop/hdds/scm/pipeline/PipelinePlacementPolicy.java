@@ -55,7 +55,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   static final Logger LOG =
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
   private final NodeManager nodeManager;
-  private final StateManager stateManager;
+  private final PipelineStateManager stateManager;
   private final ConfigurationSource conf;
   private final int heavyNodeCriteria;
   private static final int REQUIRED_RACKS = 2;
@@ -70,11 +70,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * load balancing and rack awareness.
    *
    * @param nodeManager NodeManager
-   * @param stateManager PipelineStateManager
+   * @param stateManager PipelineStateManagerImpl
    * @param conf        Configuration
    */
   public PipelinePlacementPolicy(final NodeManager nodeManager,
-                                 final StateManager stateManager,
+                                 final PipelineStateManager stateManager,
                                  final ConfigurationSource conf) {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
@@ -287,7 +287,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // base on distance in topology, rack awareness and load balancing.
     List<DatanodeDetails> exclude = new ArrayList<>();
     // First choose an anchor node.
-    DatanodeDetails anchor = chooseNode(healthyNodes);
+    DatanodeDetails anchor = chooseFirstNode(healthyNodes);
     if (anchor != null) {
       results.add(anchor);
       removePeers(anchor, healthyNodes);
@@ -367,6 +367,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   /**
    * Find a node from the healthy list and return it after removing it from the
    * list that we are operating on.
+   * Return random node in the list.
    *
    * @param healthyNodes - Set of healthy nodes we can choose from.
    * @return chosen datanodeDetails
@@ -378,6 +379,27 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
     DatanodeDetails selectedNode =
             healthyNodes.get(getRand().nextInt(healthyNodes.size()));
+    healthyNodes.remove(selectedNode);
+    if (selectedNode != null) {
+      removePeers(selectedNode, healthyNodes);
+    }
+    return selectedNode;
+  }
+
+  /**
+   * Find a node from the healthy list and return it after removing it from the
+   * list that we are operating on.
+   * Return the first node in the list.
+   *
+   * @param healthyNodes - Set of healthy nodes we can choose from.
+   * @return chosen datanodeDetails
+   */
+  private DatanodeDetails chooseFirstNode(
+      final List<DatanodeDetails> healthyNodes) {
+    if (healthyNodes == null || healthyNodes.isEmpty()) {
+      return null;
+    }
+    DatanodeDetails selectedNode = healthyNodes.get(0);
     healthyNodes.remove(selectedNode);
     if (selectedNode != null) {
       removePeers(selectedNode, healthyNodes);

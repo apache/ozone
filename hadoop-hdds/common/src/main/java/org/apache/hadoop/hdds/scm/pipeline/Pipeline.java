@@ -338,7 +338,7 @@ public final class Pipeline {
     }
 
     final ReplicationConfig config = ReplicationConfig
-        .fromProto(pipeline.getType(), pipeline.getFactor());
+        .fromProtoTypeAndFactor(pipeline.getType(), pipeline.getFactor());
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setReplicationConfig(config)
         .setState(PipelineState.fromProtobuf(pipeline.getState()))

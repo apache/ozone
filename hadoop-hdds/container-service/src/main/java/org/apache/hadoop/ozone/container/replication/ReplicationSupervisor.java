@@ -120,7 +120,6 @@ public class ReplicationSupervisor {
    *
    * @return Count of in-flight replications.
    */
-  @VisibleForTesting
   int getInFlightReplications() {
     return containersInFlight.size();
   }
@@ -182,6 +181,14 @@ public class ReplicationSupervisor {
 
   public long getReplicationRequestCount() {
     return requestCounter.get();
+  }
+
+  public long getQueueSize() {
+    if (executor instanceof ThreadPoolExecutor) {
+      return ((ThreadPoolExecutor)executor).getQueue().size();
+    } else {
+      return 0;
+    }
   }
 
   public long getReplicationSuccessCount() {

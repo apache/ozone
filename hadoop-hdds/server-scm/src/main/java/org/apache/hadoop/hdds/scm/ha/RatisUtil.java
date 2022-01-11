@@ -73,7 +73,7 @@ public final class RatisUtil {
     setRaftLogProperties(properties, conf);
     setRaftRetryCacheProperties(properties, conf);
     setRaftSnapshotProperties(properties, conf);
-    setRaftLeadElectionProperties(properties);
+    setRaftLeadElectionProperties(properties, conf);
     return properties;
   }
 
@@ -151,9 +151,12 @@ public final class RatisUtil {
    *
    */
   private static void setRaftLeadElectionProperties(
-      final RaftProperties properties) {
-    // Disable the pre vote feature (related to leader election) in Ratis
-    RaftServerConfigKeys.LeaderElection.setPreVote(properties, false);
+      final RaftProperties properties, final ConfigurationSource ozoneConf) {
+    //Disable/Enable the pre vote feature (related to leader election) in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        ozoneConf.getBoolean(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE,
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT));
   }
 
   /**
@@ -170,11 +173,10 @@ public final class RatisUtil {
                 ScmConfigKeys.OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT,
                 StorageUnit.BYTES)));
     Log.Appender.setBufferElementLimit(properties,
-        (int) ozoneConf.getStorageSize(
-                ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        ozoneConf.getInt(
+                ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM,
                 ScmConfigKeys.
-                        OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-                StorageUnit.BYTES));
+                        OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM_DEFAULT));
     Log.Appender.setBufferByteLimit(properties, SizeInBytes.valueOf(
         (long) ozoneConf.getStorageSize(
               ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,

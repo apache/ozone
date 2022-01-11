@@ -108,9 +108,13 @@ public class CreatePipelineCommandHandler implements CommandHandler {
             pipelineID);
       }
     } catch (IOException e) {
-      LOG.error("Can't create pipeline {} {} {}",
-          createCommand.getReplicationType(),
-          createCommand.getFactor(), pipelineID, e);
+      // The server.addGroup may exec after a getGroupManagementApi call
+      // from another peer, so we may got an AlreadyExistsException.
+      if (!(e.getCause() instanceof AlreadyExistsException)) {
+        LOG.error("Can't create pipeline {} {} {}",
+            createCommand.getReplicationType(),
+            createCommand.getFactor(), pipelineID, e);
+      }
     } finally {
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;

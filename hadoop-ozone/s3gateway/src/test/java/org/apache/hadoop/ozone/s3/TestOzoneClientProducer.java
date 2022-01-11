@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import javax.ws.rs.WebApplicationException;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -93,7 +93,7 @@ public class TestOzoneClientProducer {
       producer.createClient();
       fail("testGetClientFailure");
     } catch (Exception ex) {
-      Assert.assertTrue(ex instanceof WebApplicationException);
+      Assert.assertTrue(ex instanceof IOException);
     }
   }
 

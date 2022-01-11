@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
 /**
@@ -48,6 +49,8 @@ public final class OMConfigKeys {
       "ozone.om.nodes";
   public static final String OZONE_OM_NODE_ID_KEY =
       "ozone.om.node.id";
+  public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
+      "ozone.om.decommissioned.nodes";
 
   public static final String OZONE_OM_ADDRESS_KEY =
       "ozone.om.address";
@@ -65,16 +68,9 @@ public final class OMConfigKeys {
       "ozone.om.http-address";
   public static final String OZONE_OM_HTTPS_ADDRESS_KEY =
       "ozone.om.https-address";
-  public static final String OZONE_OM_KEYTAB_FILE =
-      "ozone.om.keytab.file";
   public static final String OZONE_OM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
-
-  // LevelDB cache file uses an off-heap cache in LevelDB of 128 MB.
-  public static final String OZONE_OM_DB_CACHE_SIZE_MB =
-      "ozone.om.db.cache.size.mb";
-  public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
 
   public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
       "ozone.om.volume.listall.allowed";
@@ -160,6 +156,12 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
       = TimeDuration.valueOf(120, TimeUnit.SECONDS);
+
+  public static final String OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE =
+      "ozone.om.ratis.server.leaderelection.pre-vote";
+  public static final boolean
+      OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
+
 
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =
@@ -258,11 +260,14 @@ public final class OMConfigKeys {
 //  atomic rename and delete of any directory at any level in the namespace.
 //  Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
 
-  public static final String OZONE_OM_METADATA_LAYOUT =
-          "ozone.om.metadata.layout";
-  public static final String OZONE_OM_METADATA_LAYOUT_DEFAULT = "SIMPLE";
-
-  public static final String OZONE_OM_METADATA_LAYOUT_PREFIX = "PREFIX";
+  // Default bucket layout used by Ozone Manager during bucket creation
+  // when a client does not specify the bucket layout option.
+  public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
+      "ozone.default.bucket.layout";
+  public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
+      BucketLayout.OBJECT_STORE.name();
+  public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
+      BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
 
   /**
    * Configuration properties for Directory Deleting Service.
@@ -286,4 +291,15 @@ public final class OMConfigKeys {
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
       false;
+  /**
+   * Configuration properties for OMAdminProtcol service.
+   */
+  public static final String OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_KEY =
+      "ozone.om.admin.protocol.max.retries";
+  public static final int OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_DEFAULT = 20;
+  public static final String OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY =
+      "ozone.om.admin.protocol.wait.between.retries";
+  public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
+      = 1000;
+
 }

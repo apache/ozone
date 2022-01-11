@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -35,11 +35,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 
 /**
  * Handle Multipart upload complete request.
@@ -50,8 +50,9 @@ public class S3MultipartUploadCompleteRequestWithFSO
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
-  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -141,7 +142,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
       IOException exception) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(
-        createErrorOMResponse(omResponse, exception));
+        createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
   @Override
@@ -151,19 +152,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
       List<OmKeyInfo> unUsedParts) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
-        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts);
-  }
-
-  private long getParentId(OMMetadataManager omMetadataManager,
-      String volumeName, String bucketName, String keyName) throws IOException {
-
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    return OMFileRequest
-        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
+        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout());
   }
 }
 

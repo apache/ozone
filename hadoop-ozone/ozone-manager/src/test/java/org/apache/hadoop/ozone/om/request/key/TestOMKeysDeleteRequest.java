@@ -70,7 +70,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     // Check all keys are deleted.
     for (String deleteKey : deleteKeyList) {
-      Assert.assertNull(omMetadataManager.getKeyTable()
+      Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
           .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
               deleteKey)));
     }
@@ -106,7 +106,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     // Check keys are deleted and in response check unDeletedKey.
     for (String deleteKey : deleteKeyList) {
-      Assert.assertNull(omMetadataManager.getKeyTable()
+      Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
           .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
               deleteKey)));
     }

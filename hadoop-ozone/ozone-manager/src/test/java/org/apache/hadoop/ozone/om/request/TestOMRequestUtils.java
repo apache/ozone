@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -96,9 +97,17 @@ public final class TestOMRequestUtils {
   public static void addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager) throws Exception {
 
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
+  }
+
+  public static void addVolumeAndBucketToDB(String volumeName,
+      String bucketName, OMMetadataManager omMetadataManager,
+      BucketLayout bucketLayout) throws Exception {
+
     addVolumeToDB(volumeName, omMetadataManager);
 
-    addBucketToDB(volumeName, bucketName, omMetadataManager);
+    addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
   }
 
   @SuppressWarnings("parameterNumber")
@@ -130,10 +139,10 @@ public final class TestOMRequestUtils {
       HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor,
       OMMetadataManager omMetadataManager,
-      List<OmKeyLocationInfo> locationList) throws Exception {
+      List<OmKeyLocationInfo> locationList, long version) throws Exception {
     addKeyToTable(openKeyTable, false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, 0L, omMetadataManager,
-        locationList);
+        locationList, version);
   }
 
 
@@ -171,10 +180,10 @@ public final class TestOMRequestUtils {
       HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
       OMMetadataManager omMetadataManager,
-      List<OmKeyLocationInfo> locationList) throws Exception {
+      List<OmKeyLocationInfo> locationList, long version) throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationType, replicationFactor, trxnLogIndex);
+        replicationType, replicationFactor, trxnLogIndex, Time.now(), version);
     omKeyInfo.appendNewBlocks(locationList, false);
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
@@ -219,19 +228,22 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-            new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+        omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
+            .addCacheEntry(new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
+          .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
       if (addToCache) {
-        omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+        omMetadataManager.getKeyTable(getDefaultBucketLayout())
+            .addCacheEntry(new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getKeyTable(getDefaultBucketLayout())
+          .put(ozoneKey, omKeyInfo);
     }
   }
 
@@ -255,7 +267,7 @@ public final class TestOMRequestUtils {
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor);
 
-    omMetadataManager.getKeyTable().addCacheEntry(
+    omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName)), new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
@@ -345,18 +357,30 @@ public final class TestOMRequestUtils {
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long objectID,
       long creationTime) {
+    return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
+            replicationFactor, objectID, creationTime, 0L);
+  }
+
+  /**
+   * Create OmKeyInfo.
+   */
+  @SuppressWarnings("parameterNumber")
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long creationTime, long version) {
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            new OmKeyLocationInfoGroup(version, new ArrayList<>())))
         .setCreationTime(creationTime)
         .setModificationTime(Time.now())
         .setDataSize(1000L)
         .setReplicationConfig(
             ReplicationConfig
-                .fromTypeAndFactor(replicationType, replicationFactor))
+                .fromProtoTypeAndFactor(replicationType, replicationFactor))
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();
@@ -429,9 +453,18 @@ public final class TestOMRequestUtils {
   public static void addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager) throws Exception {
 
+    addBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
+  }
+
+  public static void addBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
+      throws Exception {
+
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now()).build();
+            .setBucketName(bucketName).setCreationTime(Time.now())
+            .setBucketLayout(bucketLayout).build();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
@@ -484,12 +517,15 @@ public final class TestOMRequestUtils {
           String bucketName, String volumeName, boolean isVersionEnabled,
           OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
     OzoneManagerProtocolProtos.BucketInfo bucketInfo =
-            OzoneManagerProtocolProtos.BucketInfo.newBuilder()
-                    .setBucketName(bucketName)
-                    .setVolumeName(volumeName)
-                    .setIsVersionEnabled(isVersionEnabled)
-                    .setStorageType(storageTypeProto)
-                    .addAllMetadata(getMetadataListFSO()).build();
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setBucketName(bucketName)
+            .setVolumeName(volumeName)
+            .setIsVersionEnabled(isVersionEnabled)
+            .setStorageType(storageTypeProto)
+            .addAllMetadata(getMetadataListFSO()).setBucketLayout(
+                OzoneManagerProtocolProtos.BucketLayoutProto.
+                    FILE_SYSTEM_OPTIMIZED)
+            .build();
     OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
             OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
     req.setBucketInfo(bucketInfo);
@@ -514,9 +550,6 @@ public final class TestOMRequestUtils {
             "value1").build());
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key2").setValue(
             "value2").build());
-    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT).setValue(
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX).build());
     metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
             OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS).setValue(
             "false").build());
@@ -711,10 +744,11 @@ public final class TestOMRequestUtils {
       OMMetadataManager omMetadataManager, long trxnLogIndex)
       throws IOException {
     // Retrieve the keyInfo
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getDefaultBucketLayout()).get(ozoneKey);
 
     // Delete key from KeyTable and put in DeletedKeyTable
-    omMetadataManager.getKeyTable().delete(ozoneKey);
+    omMetadataManager.getKeyTable(getDefaultBucketLayout()).delete(ozoneKey);
 
     RepeatedOmKeyInfo repeatedOmKeyInfo =
         omMetadataManager.getDeletedTable().get(ozoneKey);
@@ -860,8 +894,9 @@ public final class TestOMRequestUtils {
     final String dbKey = omMetadataManager.getOzoneKey(
         omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
         omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable().put(dbKey, omKeyInfo);
-    omMetadataManager.getKeyTable().addCacheEntry(
+    omMetadataManager.getKeyTable(getDefaultBucketLayout())
+        .put(dbKey, omKeyInfo);
+    omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(dbKey),
         new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
@@ -907,18 +942,31 @@ public final class TestOMRequestUtils {
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long objectID,
       long parentID, long trxnLogIndex, long creationTime) {
+    return createOmKeyInfo(volumeName, bucketName, keyName,
+      replicationType, replicationFactor, objectID,
+      parentID, trxnLogIndex, creationTime, 0L);
+  }
+
+  /**
+   * Create OmKeyInfo.
+   */
+  @SuppressWarnings("parameterNumber")
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long parentID, long trxnLogIndex, long creationTime, long version) {
     String fileName = OzoneFSUtils.getFileName(keyName);
     return new OmKeyInfo.Builder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+                    new OmKeyLocationInfoGroup(version, new ArrayList<>())))
             .setCreationTime(creationTime)
             .setModificationTime(Time.now())
             .setDataSize(1000L)
             .setReplicationConfig(ReplicationConfig
-                    .fromTypeAndFactor(replicationType, replicationFactor))
+                    .fromProtoTypeAndFactor(replicationType, replicationFactor))
             .setObjectID(objectID)
             .setUpdateID(trxnLogIndex)
             .setParentObjectID(parentID)
@@ -943,19 +991,22 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOpenFileName(
               omKeyInfo.getParentObjectID(), fileName, clientID);
       if (addToCache) {
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-                new CacheKey<>(ozoneKey),
+        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzonePathKey(
               omKeyInfo.getParentObjectID(), fileName);
       if (addToCache) {
-        omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+        omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .addCacheEntry(new CacheKey<>(ozoneKey),
                 new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
-      omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
+      omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .put(ozoneKey, omKeyInfo);
     }
   }
 
@@ -1012,9 +1063,21 @@ public final class TestOMRequestUtils {
   }
 
   public static void configureFSOptimizedPaths(Configuration conf,
-      boolean enableFileSystemPaths, String version) {
+                                               boolean enableFileSystemPaths) {
+    configureFSOptimizedPaths(conf, enableFileSystemPaths,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  public static void configureFSOptimizedPaths(Configuration conf,
+                                               boolean enableFileSystemPaths,
+                                               BucketLayout bucketLayout) {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             enableFileSystemPaths);
-    conf.set(OMConfigKeys.OZONE_OM_METADATA_LAYOUT, version);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+            bucketLayout.name());
+  }
+
+  private static BucketLayout getDefaultBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }
