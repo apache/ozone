@@ -162,7 +162,7 @@ public class ReplicationManagerReport {
   private void increment(String stat) {
     LongAdder adder = stats.get(stat);
     if (adder == null) {
-      throw new RuntimeException("Unexpected stat " + stat);
+      throw new IllegalArgumentException("Unexpected stat " + stat);
     }
     adder.increment();
   }
