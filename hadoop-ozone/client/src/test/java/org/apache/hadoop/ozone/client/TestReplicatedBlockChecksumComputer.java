@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.ozone.client.checksum.AbstractBlockChecksumComputer;
+import org.apache.hadoop.ozone.client.checksum.ReplicatedBlockChecksumComputer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Test;
 

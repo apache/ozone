@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client;
+package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.io.MD5Hash;
@@ -27,21 +27,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
 
-class ReplicatedBlockChecksumComputer extends
-    AbstractBlockChecksumComputer {
+public class ReplicatedBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicatedBlockChecksumComputer.class);
 
   private List<ContainerProtos.ChunkInfo> chunkInfoList;
 
-  ReplicatedBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfoList)
+  public ReplicatedBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
     this.chunkInfoList = chunkInfoList;
   }
 
   @Override
-  void compute() throws IOException {
+  public void compute() throws IOException {
     computeMd5Crc();
   }
 

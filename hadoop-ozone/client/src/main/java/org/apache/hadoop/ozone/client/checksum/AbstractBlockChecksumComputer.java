@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client;
+package org.apache.hadoop.ozone.client.checksum;
 
 import java.io.IOException;
 
@@ -26,13 +26,13 @@ public abstract class AbstractBlockChecksumComputer {
    * Compute block checksum. The result can be obtained by getOutBytes().
    * @throws IOException
    */
-  abstract void compute() throws IOException;
+  public abstract void compute() throws IOException;
 
-  byte[] getOutBytes() {
+  public byte[] getOutBytes() {
     return outBytes;
   }
 
-  void setOutBytes(byte[] bytes) {
+  public void setOutBytes(byte[] bytes) {
     this.outBytes = bytes;
   }
 }
