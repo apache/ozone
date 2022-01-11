@@ -127,7 +127,7 @@ public class OzoneClientProducer {
     }
   }
 
-  public void setOzoneConfiguration(OzoneConfiguration config) {
+  public synchronized void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
   }
 
