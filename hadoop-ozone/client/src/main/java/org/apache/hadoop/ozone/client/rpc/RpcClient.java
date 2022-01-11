@@ -870,11 +870,10 @@ public class RpcClient implements ClientProtocol {
     OzoneKMSUtil.checkCryptoProtocolVersion(feInfo);
     KeyProvider.KeyVersion decrypted = null;
     try {
-      // Do proxy thing only when current UGI not matching with login UGI
-      // In this way, proxying is done only for s3g where
-      // s3g can act as proxy to end user. This is for older version of S3G.
-      // But after HDDS-5881 the user will not be different,
-      // as it is single RpcClient. So we should be checking threadlocal S3Auth.
+
+      // After HDDS-5881 the user will not be different,
+      // as S3G uses single RpcClient. So we should be checking thread-local
+      // S3Auth and use it during proxy.
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
       UserGroupInformation proxyUser;
       if (getThreadLocalS3Auth() != null) {
@@ -882,15 +881,6 @@ public class RpcClient implements ClientProtocol {
             getThreadLocalS3Auth().getAccessID());
         proxyUser = UserGroupInformation.createProxyUser(
             s3gUGI.getShortUserName(), loginUser);
-        decrypted = proxyUser.doAs(
-            (PrivilegedExceptionAction<KeyProvider.KeyVersion>) () -> {
-              return OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
-                  getKeyProvider());
-            });
-      } else if (!ugi.getShortUserName().equals(loginUser.getShortUserName())) {
-        proxyUser =
-            UserGroupInformation.createProxyUser(ugi.getShortUserName(),
-                loginUser);
         decrypted = proxyUser.doAs(
             (PrivilegedExceptionAction<KeyProvider.KeyVersion>) () -> {
               return OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
