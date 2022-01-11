@@ -41,11 +41,10 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
  */
 public class ITestOzoneContractDistCpWithFSO
     extends AbstractContractDistCpTest {
-  private static final boolean fsOptimizedServer = true;
 
   @BeforeClass
   public static void createCluster() throws IOException {
-    OzoneContract.createCluster(fsOptimizedServer);
+    OzoneContract.createCluster(true);
   }
 
   @AfterClass
