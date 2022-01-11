@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client;
+package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
@@ -30,7 +30,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.client.checksum.ReplicatedFileChecksumHelper;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -40,6 +41,7 @@ import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -54,7 +56,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Che
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -85,7 +86,7 @@ public class TestReplicatedFileChecksumHelper {
         .setAcls(null)
         .build();
 
-    when(om.lookupKey(any())).thenReturn(omKeyInfo);
+    when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
 
     OzoneVolume volume = Mockito.mock(OzoneVolume.class);
     when(volume.getName()).thenReturn("vol1");
@@ -134,7 +135,7 @@ public class TestReplicatedFileChecksumHelper {
       }
     };
     XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
-    when(factory.acquireClientForReadData(any())).thenReturn(client);
+    when(factory.acquireClientForReadData(ArgumentMatchers.any())).thenReturn(client);
 
     when(rpcClient.getXceiverClientManager()).thenReturn(factory);
 
@@ -165,7 +166,7 @@ public class TestReplicatedFileChecksumHelper {
         .setAcls(null)
         .build();
 
-    when(om.lookupKey(any())).thenReturn(omKeyInfo);
+    when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
 
     OzoneVolume volume = Mockito.mock(OzoneVolume.class);
     when(volume.getName()).thenReturn("vol1");
