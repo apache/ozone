@@ -41,6 +41,7 @@ import javax.ws.rs.core.StreamingOutput;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -50,6 +51,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -71,7 +73,6 @@ import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.io.S3WrapperInputStream;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
@@ -90,6 +91,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
@@ -102,6 +104,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
+
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,6 +121,7 @@ public class ObjectEndpoint extends EndpointBase {
 
   @Context
   private HttpHeaders headers;
+
 
   private List<String> customizableGetHeaders = new ArrayList<>();
   private int bufferSize;
@@ -170,7 +175,7 @@ public class ObjectEndpoint extends EndpointBase {
       S3StorageType s3StorageType;
       boolean storageTypeDefault;
       if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault();
+        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
         storageTypeDefault = true;
       } else {
         s3StorageType = toS3StorageType(storageType);
@@ -289,7 +294,6 @@ public class ObjectEndpoint extends EndpointBase {
             .header(CONTENT_LENGTH, keyDetails.getDataSize());
 
       } else {
-        OzoneInputStream key = bucket.readKey(keyPath);
 
         long startOffset = rangeHeader.getStartOffset();
         long endOffset = rangeHeader.getEndOffset();
@@ -297,11 +301,9 @@ public class ObjectEndpoint extends EndpointBase {
         // byte from start offset
         long copyLength = endOffset - startOffset + 1;
         StreamingOutput output = dest -> {
-          try (S3WrapperInputStream s3WrapperInputStream =
-              new S3WrapperInputStream(
-                  key.getInputStream())) {
-            s3WrapperInputStream.seek(startOffset);
-            IOUtils.copyLarge(s3WrapperInputStream, dest, 0,
+          try (OzoneInputStream ozoneInputStream = bucket.readKey(keyPath)) {
+            ozoneInputStream.seek(startOffset);
+            IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
           }
         };
@@ -475,7 +477,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       S3StorageType s3StorageType;
       if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault();
+        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
       } else {
         s3StorageType = toS3StorageType(storageType);
       }
@@ -830,14 +832,21 @@ public class ObjectEndpoint extends EndpointBase {
     }
     int pos = header.indexOf('/');
     if (pos == -1) {
-      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable
-          .INVALID_ARGUMENT, header);
+      OS3Exception ex = S3ErrorTable.newError(INVALID_ARGUMENT, header);
       ex.setErrorMessage("Copy Source must mention the source bucket and " +
           "key: sourcebucket/sourcekey");
       throw ex;
     }
 
-    return Pair.of(header.substring(0, pos), header.substring(pos + 1));
+    try {
+      String bucket = header.substring(0, pos);
+      String key = urlDecode(header.substring(pos + 1));
+      return Pair.of(bucket, key);
+    } catch (UnsupportedEncodingException e) {
+      OS3Exception ex = S3ErrorTable.newError(INVALID_ARGUMENT, header);
+      ex.setErrorMessage("Copy Source header could not be url-decoded");
+      throw ex;
+    }
   }
 
   private static S3StorageType toS3StorageType(String storageType)
@@ -845,7 +854,7 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       return S3StorageType.valueOf(storageType);
     } catch (IllegalArgumentException ex) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT,
+      throw S3ErrorTable.newError(INVALID_ARGUMENT,
           storageType);
     }
   }
@@ -858,34 +867,53 @@ public class ObjectEndpoint extends EndpointBase {
     return partMarker;
   }
 
-  private static long parseOzoneDate(String ozoneDateStr) throws OS3Exception {
+  // Parses date string and return long representation. Returns an
+  // empty if DateStr is null or invalid. Dates in the future are
+  // considered invalid.
+  private static OptionalLong parseAndValidateDate(String ozoneDateStr) {
     long ozoneDateInMs;
+    if (ozoneDateStr == null) {
+      return OptionalLong.empty();
+    }
     try {
       ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
     } catch (ParseException e) {
-      throw S3ErrorTable.newError(S3ErrorTable
-          .INVALID_ARGUMENT, ozoneDateStr);
+      // if time not parseable, then return empty()
+      return OptionalLong.empty();
     }
-    return ozoneDateInMs;
+
+    long currentDate = System.currentTimeMillis();
+    if  (ozoneDateInMs <= currentDate){
+      return OptionalLong.of(ozoneDateInMs);
+    } else {
+      // dates in the future are invalid, so return empty()
+      return OptionalLong.empty();
+    }
   }
 
   private boolean checkCopySourceModificationTime(Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
-      String copySourceIfUnmodifiedSinceStr) throws OS3Exception {
+      String copySourceIfUnmodifiedSinceStr) {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
     long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
-    if (copySourceIfModifiedSinceStr != null) {
-      copySourceIfModifiedSince =
-          parseOzoneDate(copySourceIfModifiedSinceStr);
+    OptionalLong modifiedDate =
+        parseAndValidateDate(copySourceIfModifiedSinceStr);
+    if (modifiedDate.isPresent()) {
+      copySourceIfModifiedSince = modifiedDate.getAsLong();
     }
 
-    if (copySourceIfUnmodifiedSinceStr != null) {
-      copySourceIfUnmodifiedSince =
-          parseOzoneDate(copySourceIfUnmodifiedSinceStr);
+    OptionalLong unmodifiedDate =
+        parseAndValidateDate(copySourceIfUnmodifiedSinceStr);
+    if (unmodifiedDate.isPresent()) {
+      copySourceIfUnmodifiedSince = unmodifiedDate.getAsLong();
     }
-
     return (copySourceIfModifiedSince <= lastModificationTime) &&
         (lastModificationTime <= copySourceIfUnmodifiedSince);
+  }
+
+  @VisibleForTesting
+  public void setOzoneConfiguration(OzoneConfiguration config) {
+    this.ozoneConfiguration = config;
   }
 }

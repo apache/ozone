@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -77,6 +80,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
       LoggerFactory.getLogger(OMFileCreateRequest.class);
   public OMFileCreateRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMFileCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -219,12 +226,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
-      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(ozoneKey);
-
-      if (dbKeyInfo != null) {
-        ozoneManager.getKeyManager().refresh(dbKeyInfo);
-      }
 
       OMFileRequest.OMPathInfo pathInfo =
           OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
@@ -276,7 +279,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
@@ -293,7 +296,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
       numMissingParents = missingParentInfos.size();
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()))
+          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+              keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(CreateFile);
@@ -307,7 +311,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
-            omResponse, exception));
+            omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -387,4 +391,15 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
   }
 
+  public static OMFileCreateRequest getInstance(KeyArgs keyArgs,
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMFileCreateRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMFileCreateRequest(omRequest);
+  }
 }

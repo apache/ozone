@@ -26,6 +26,7 @@ import java.util.HashMap;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -60,6 +61,7 @@ public class TestObjectHead {
     // Create HeadBucket and setClient to OzoneClientStub
     keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
+    keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   @Test

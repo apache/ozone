@@ -201,7 +201,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
         list.put(partKeyInfo.getPartNumber(), partKeyInfo));
 
     final ReplicationConfig replicationConfig = ReplicationConfig
-            .fromTypeAndFactor(
+            .fromProtoTypeAndFactor(
                     multipartKeyInfo.getType(),
                     multipartKeyInfo.getFactor());
 

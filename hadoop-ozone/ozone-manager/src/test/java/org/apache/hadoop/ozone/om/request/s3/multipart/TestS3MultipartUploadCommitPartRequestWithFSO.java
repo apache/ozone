@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -42,14 +43,16 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
 
   @Override
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
-          OMRequest omRequest) {
-    return new S3MultipartUploadCommitPartRequestWithFSO(omRequest);
+      OMRequest omRequest) {
+    return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-          OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);
+      OMRequest initiateMPURequest) {
+    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
@@ -93,7 +96,8 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
                     keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-            new S3InitiateMultipartUploadRequestWithFSO(omRequest);
+        new S3InitiateMultipartUploadRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedRequest =
             s3InitiateMultipartUploadRequest.preExecute(ozoneManager);
@@ -114,5 +118,10 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
     // Create parent dirs for the path
     parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
             dirName, omMetadataManager);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

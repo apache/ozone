@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -295,7 +297,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_PIPELIME_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
-    protected final OzoneConfiguration conf;
+    protected OzoneConfiguration conf;
     protected String path;
 
     protected String clusterId;
@@ -314,6 +316,7 @@ public interface MiniOzoneCluster {
     protected Optional<String> omId = Optional.empty();
     
     protected Boolean randomContainerPort = true;
+    protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
@@ -339,6 +342,12 @@ public interface MiniOzoneCluster {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      ExitUtils.disableSystemExit();
+    }
+
+    public Builder setConf(OzoneConfiguration config) {
+      this.conf = config;
+      return this;
     }
 
     /**
@@ -352,6 +361,17 @@ public interface MiniOzoneCluster {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
+      return this;
+    }
+
+    /**
+     * For tests that do not use any features of SCM, we can get by with
+     * 0 datanodes.  Also need to skip safemode in this case.
+     * This allows the cluster to come up much faster.
+     */
+    public Builder withoutDatanodes() {
+      setNumDatanodes(0);
+      conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
       return this;
     }
 
@@ -478,6 +498,24 @@ public interface MiniOzoneCluster {
      */
     public Builder setTrace(Boolean trace) {
       enableTrace = Optional.of(trace);
+      return this;
+    }
+
+    /**
+     * Sets the reserved space
+     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
+     * HDDS_DATANODE_DIR_DU_RESERVED
+     * for each volume in each datanode.
+     * @param reservedSpace String that contains the numeric size value and
+     *                      ends with a
+     *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
+     *                      suffix. For example, "50GB".
+     * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
+     *
+     * @return {@link MiniOzoneCluster} Builder
+     */
+    public Builder setDatanodeReservedSpace(String reservedSpace) {
+      datanodeReservedSpace = Optional.of(reservedSpace);
       return this;
     }
 

@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -87,8 +88,9 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
             fileName, modifiedRequest.getInitiateMultiPartUploadRequest()
                     .getKeyArgs().getMultipartUploadID());
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
-            .get(multipartOpenFileKey);
+    OmKeyInfo omKeyInfo = omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
+        .get(multipartOpenFileKey);
     Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
     Assert.assertEquals("FileName mismatches!", fileName,
             omKeyInfo.getKeyName());
@@ -140,6 +142,12 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
       OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);
+    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

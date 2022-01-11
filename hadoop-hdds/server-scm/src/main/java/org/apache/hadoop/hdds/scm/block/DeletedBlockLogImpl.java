@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -77,7 +77,7 @@ public class DeletedBlockLogImpl
       LoggerFactory.getLogger(DeletedBlockLogImpl.class);
 
   private final int maxRetry;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
@@ -92,7 +92,7 @@ public class DeletedBlockLogImpl
 
   @SuppressWarnings("parameternumber")
   public DeletedBlockLogImpl(ConfigurationSource conf,
-      ContainerManagerV2 containerManager,
+      ContainerManager containerManager,
       SCMRatisServer ratisServer,
       Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       DBTransactionBuffer dbTxBuffer,
@@ -416,9 +416,10 @@ public class DeletedBlockLogImpl
             txIDs.add(txn.getTxID());
           }
         }
-
-        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
-        metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
+        if (!txIDs.isEmpty()) {
+          deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
+          metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
+        }
       }
       return transactions;
     } finally {

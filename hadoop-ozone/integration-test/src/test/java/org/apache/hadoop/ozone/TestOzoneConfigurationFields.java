@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.http.HttpServer2;
@@ -48,6 +49,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         new Class[] {OzoneConfigKeys.class, ScmConfigKeys.class,
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconServerConfigKeys.class,
+            ReconConfigKeys.class, ReconServerConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
             ScmConfig.ConfigStrings.class
@@ -56,6 +58,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     errorIfMissingXmlProps = true;
     xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
+    xmlPropsToSkipCompare.add("ozone.om.decommissioned.nodes" +
+        ".EXAMPLEOMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
@@ -64,6 +68,10 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     configurationPrefixToSkipCompare.add("ozone.s3g");
     configurationPropsToSkipCompare
         .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY);
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION);
     // This property is tested in TestHttpServer2 instead
     xmlPropsToSkipCompare.add(HttpServer2.HTTP_IDLE_TIMEOUT_MS_KEY);
     addPropertiesNotInXml();
@@ -77,6 +85,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_SECURITY_PROVIDER,
         HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
         OMConfigKeys.OZONE_OM_NODES_KEY,
+        OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
         OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
@@ -84,6 +93,12 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
+        OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
+        ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
+        ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
+        ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
+        ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
+        ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
         ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
         ReconServerConfigKeys

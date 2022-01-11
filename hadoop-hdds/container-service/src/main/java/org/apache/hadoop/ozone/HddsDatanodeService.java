@@ -244,12 +244,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
               DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
-              conf.get(DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY));
+              conf.get(
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
           UserGroupInformation.setConfiguration(conf);
 
           SecurityUtil
-              .login(conf, DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY,
+              .login(conf,
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
                   DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY,
                   hostname);
         } else {
@@ -309,7 +311,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * datanode.
    */
   private void startRatisForTest() throws IOException {
-    String scmId = "scm-01";
     String clusterId = "clusterId";
     datanodeStateMachine.getContainer().start(clusterId);
     MutableVolumeSet volumeSet =
@@ -319,8 +320,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
       HddsVolume hddsVolume = (HddsVolume) entry.getValue();
-      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
-          clusterId, LOG);
+      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, clusterId,
+          clusterId, conf, LOG);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }

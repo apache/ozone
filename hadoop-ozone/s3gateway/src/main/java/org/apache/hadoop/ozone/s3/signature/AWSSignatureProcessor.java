@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
+import javax.enterprise.context.RequestScoped;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MultivaluedMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -37,24 +41,19 @@ import org.slf4j.LoggerFactory;
  * header. For more details refer to AWS documentation https://docs.aws
  * .amazon.com/general/latest/gr/sigv4-create-canonical-request.html.
  **/
-
+@RequestScoped
 public class AWSSignatureProcessor implements SignatureProcessor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AWSSignatureProcessor.class);
 
-  private Map<String, String> headerMap;
-  private Map<String, String[]> parameterMap;
+  @Context
+  private ContainerRequestContext context;
 
-  public AWSSignatureProcessor(Map<String, String> headerMap,
-                               Map<String, String[]> parameterMap) {
-    this.headerMap = headerMap;
-    this.parameterMap = parameterMap;
-  }
   public SignatureInfo parseSignature() throws OS3Exception {
 
     LowerCaseKeyStringMap headers =
-        LowerCaseKeyStringMap.fromHeaderMap(headerMap);
+        LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders());
 
     String authHeader = headers.get("Authorization");
 
@@ -63,7 +62,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
         headers.get(StringToSignProducer.X_AMAZ_DATE)));
     signatureParsers.add(new AuthorizationV4QueryParser(
         StringToSignProducer.fromMultiValueToSingleValueMap(
-            parameterMap)));
+            context.getUriInfo().getQueryParameters())));
     signatureParsers.add(new AuthorizationV2HeaderParser(authHeader));
 
     SignatureInfo signatureInfo = null;
@@ -82,6 +81,11 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     return signatureInfo;
   }
 
+  @VisibleForTesting
+  public void setContext(ContainerRequestContext context) {
+    this.context = context;
+  }
+
   /**
    * A simple map which forces lower case key usage.
    */
@@ -94,20 +98,28 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     }
 
     public static LowerCaseKeyStringMap fromHeaderMap(
-        Map<String,
+        MultivaluedMap<String,
             String> rawHeaders
     ) {
+
       //header map is MUTABLE. It's better to save it here. (with lower case
       // keys!!!)
       final LowerCaseKeyStringMap headers =
           new LowerCaseKeyStringMap();
-      rawHeaders.forEach((k, v) -> {
-        if (headers.containsKey(k)) {
-          headers.put(k, headers.get(k) + "," + v);
-        } else {
-          headers.put(k, v);
+
+      for (Entry<String, List<String>> headerEntry : rawHeaders.entrySet()) {
+        if (0 < headerEntry.getValue().size()) {
+          String headerKey = headerEntry.getKey();
+          if (headers.containsKey(headerKey)) {
+            //multiple headers from the same type are combined
+            headers.put(headerKey,
+                headers.get(headerKey) + "," + headerEntry.getValue().get(0));
+          } else {
+            headers.put(headerKey, headerEntry.getValue().get(0));
+          }
         }
-      });
+      }
+
       headers.fixContentType();
 
       if (LOG.isTraceEnabled()) {

@@ -331,12 +331,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count)
       throws IOException {
-    return listContainer(startContainerID, count, null);
+    return listContainer(startContainerID, count, null, null);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
+    return listContainer(startContainerID, count, state, null);
+  }
+
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,
@@ -348,6 +355,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setTraceID(TracingUtil.exportCurrentSpan());
     if (state != null) {
       builder.setState(state);
+    }
+    if (factor != null) {
+      builder.setFactor(factor);
     }
 
     SCMListContainerRequestProto request = builder.build();
@@ -729,7 +739,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public boolean startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> idleiterations,
       Optional<Double> maxDatanodesRatioToInvolvePerIteration,
-      Optional<Long> maxSizeToMovePerIterationInGB) throws IOException{
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTargetInGB,
+      Optional<Long> maxSizeLeavingSourceInGB) throws IOException{
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -764,6 +776,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
               " -1(infinitly run container balancer).");
       builder.setIdleiterations(idi);
     }
+
+    if (maxSizeEnteringTargetInGB.isPresent()) {
+      long mset = maxSizeEnteringTargetInGB.get();
+      Preconditions.checkState(mset > 0,
+          "maxSizeEnteringTargetInGB must be positive.");
+      builder.setMaxSizeEnteringTargetInGB(mset);
+    }
+
+    if (maxSizeLeavingSourceInGB.isPresent()) {
+      long msls = maxSizeLeavingSourceInGB.get();
+      Preconditions.checkState(msls > 0,
+          "maxSizeLeavingSourceInGB must be positive.");
+      builder.setMaxSizeLeavingSourceInGB(msls);
+    }
+
 
     StartContainerBalancerRequestProto request = builder.build();
     StartContainerBalancerResponseProto response =

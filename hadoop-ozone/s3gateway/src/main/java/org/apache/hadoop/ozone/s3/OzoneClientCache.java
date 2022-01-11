@@ -20,12 +20,16 @@ package org.apache.hadoop.ozone.s3;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.PreDestroy;
 import javax.enterprise.context.ApplicationScoped;
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
 
 /**
  * Cached ozone client for s3 requests.
@@ -42,6 +46,11 @@ public final class OzoneClientCache {
   private OzoneClientCache(String omServiceID,
                            OzoneConfiguration ozoneConfiguration)
       throws IOException {
+    // S3 Gateway should always set the S3 Auth.
+    ozoneConfiguration.setBoolean(S3Auth.S3_AUTH_CHECK, true);
+    // Set the expected OM version if not set via config.
+    ozoneConfiguration.setIfUnset(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
+        OZONE_OM_CLIENT_PROTOCOL_VERSION);
     try {
       if (omServiceID == null) {
         client = OzoneClientFactory.getRpcClient(ozoneConfiguration);

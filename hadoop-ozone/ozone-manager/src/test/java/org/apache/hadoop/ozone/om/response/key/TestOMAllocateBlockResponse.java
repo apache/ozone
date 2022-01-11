@@ -55,13 +55,15 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     String openKey = getOpenKey();
 
     // Not adding key entry before to test whether commit is successful or not.
-    Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertFalse(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     omAllocateBlockResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertTrue(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
   }
 
   @Test
@@ -82,7 +84,8 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
 
     // Before calling addToDBBatch
     String openKey = getOpenKey();
-    Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertFalse(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
     omAllocateBlockResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -90,7 +93,8 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse is error it is a no-op.
-    Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertFalse(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
   }
 
@@ -109,6 +113,6 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
           OMResponse omResponse) {
     return new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
-            omBucketInfo);
+            omBucketInfo, getBucketLayout());
   }
 }

@@ -41,10 +41,10 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineProvider.class);
   private final NodeManager nodeManager;
-  private final StateManager stateManager;
+  private final PipelineStateManager stateManager;
 
   public PipelineProvider(NodeManager nodeManager,
-      StateManager stateManager) {
+      PipelineStateManager stateManager) {
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;
   }
@@ -58,7 +58,7 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     return nodeManager;
   }
 
-  public StateManager getPipelineStateManager() {
+  public PipelineStateManager getPipelineStateManager() {
     return stateManager;
   }
 

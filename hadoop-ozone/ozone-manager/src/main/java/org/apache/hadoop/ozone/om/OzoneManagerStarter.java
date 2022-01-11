@@ -125,22 +125,38 @@ public class OzoneManagerStarter extends GenericCli {
 
   /**
    * This function implements a sub-command to allow the OM to be bootstrapped
-   * initialized from the command line. After OM is initialized, it will
-   * contact the leader OM to add itself to the ring. Once the leader OM
-   * responds back affirmatively, bootstrap step is complete and the OM is
-   * functional.
+   * from the command line.
+   *
+   * During initialization, OM will get the metadata information from all the
+   * other OMs to check whether their on disk configs have been updated with
+   * this new OM information. If not, the bootstrap step will fail. This
+   * check is skipped with the --force option.
+   * Note that if an OM does not have updated configs, it can crash when a
+   * force bootstrap is initiated. The force option is provided for the
+   * scenario where one of the old OMs is down or not responding and the
+   * bootstrap needs to continue.
+   *
+   * Bootstrapping OM will request the leader OM to add itself to the ring.
+   * Once the leader OM responds back affirmatively, bootstrap step is
+   * complete and the OM is functional.
    */
   @CommandLine.Command(name = "--bootstrap",
-      customSynopsis = "ozone om [global options] --bootstrap",
+      customSynopsis = "ozone om [global options] --bootstrap [options]",
       hidden = false,
-      description = "Initialize if not already initialized and Bootstrap " +
-          "the Ozone Manager",
+      description = "Initializes and Bootstraps the Ozone Manager.",
       mixinStandardHelpOptions = true,
       versionProvider = HddsVersionProvider.class)
-  public void bootstrapOM()
+  public void bootstrapOM(@CommandLine.Option(names = {"--force"},
+      description = "This option will skip checking whether existing OMs " +
+          "configs have been updated with the new OM information. Force " +
+          "bootstrap can cause an existing OM to crash if it does not have " +
+          "updated configs. It should only be used if an existing OM is down " +
+          "or not responding and after manually checking that the ozone-site" +
+          ".xml config is updated on all OMs.",
+      defaultValue = "false") boolean force)
       throws Exception {
     commonInit();
-    receiver.bootstrap(conf);
+    receiver.bootstrap(conf, force);
   }
 
   /**
@@ -186,27 +202,34 @@ public class OzoneManagerStarter extends GenericCli {
     }
 
     @Override
-    public void bootstrap(OzoneConfiguration conf)
+    public void bootstrap(OzoneConfiguration conf, boolean force)
         throws IOException, AuthenticationException {
       // Initialize the Ozone Manager, if not already initialized.
       boolean initialize = OzoneManager.omInit(conf);
       if (!initialize) {
         throw new IOException("OM Init failed.");
       }
+      OzoneManager.StartupOption startupOption;
+      if (force) {
+        startupOption = OzoneManager.StartupOption.FORCE_BOOTSTRAP;
+      } else {
+        startupOption = OzoneManager.StartupOption.BOOTSTRAP;
+      }
       // Bootstrap the OM
-      OzoneManager om = OzoneManager.createOm(conf,
-          OzoneManager.StartupOption.BOOTSTRAP);
-      om.start();
-      om.join();
+      try (OzoneManager om = OzoneManager.createOm(conf, startupOption)) {
+        om.start();
+        om.join();
+      }
     }
 
     @Override
     public void startAndCancelPrepare(OzoneConfiguration conf)
         throws IOException, AuthenticationException {
-      OzoneManager om = OzoneManager.createOm(conf);
-      om.getPrepareState().cancelPrepare();
-      om.start();
-      om.join();
+      try (OzoneManager om = OzoneManager.createOm(conf)) {
+        om.getPrepareState().cancelPrepare();
+        om.start();
+        om.join();
+      }
     }
   }
 }

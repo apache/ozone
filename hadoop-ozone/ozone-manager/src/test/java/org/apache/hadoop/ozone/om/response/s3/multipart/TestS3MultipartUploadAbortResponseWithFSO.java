@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
@@ -44,6 +45,11 @@ public class TestS3MultipartUploadAbortResponseWithFSO
   }
 
   @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Override
   protected String getMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String multipartUploadID) {
     String fileName = StringUtils.substringAfter(keyName, dirName);
@@ -62,7 +68,18 @@ public class TestS3MultipartUploadAbortResponseWithFSO
         multipartKeyInfo.getUploadID());
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>());
+        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>(),
+        getBucketLayout());
+  }
+
+  @Override
+  protected S3InitiateMultipartUploadResponse
+      getS3InitiateMultipartUploadResponse(
+      String volumeName, String bucketName, String keyName,
+      String multipartUploadID) {
+    return createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+        keyName,
+        multipartUploadID, new ArrayList<>());
   }
 
   @Override
@@ -71,7 +88,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3MultipartUploadAbortResponseWithFSO(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo);
+        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        getBucketLayout());
   }
 
   @Override

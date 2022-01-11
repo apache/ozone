@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -142,6 +143,10 @@ public class TestReconPipelineManager {
                  eventQueue,
                  scmhaManager,
                  scmContext)) {
+      scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+              .setLeader(true).setIsPreCheckComplete(true)
+              .setSCM(mock(StorageContainerManager.class)).build();
+      reconPipelineManager.setScmContext(scmContext);
       reconPipelineManager.addPipeline(validPipeline);
       reconPipelineManager.addPipeline(invalidPipeline);
 

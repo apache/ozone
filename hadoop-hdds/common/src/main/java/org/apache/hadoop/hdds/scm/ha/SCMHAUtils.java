@@ -22,12 +22,13 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.protobuf.ServiceException;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -73,6 +74,7 @@ public final class SCMHAUtils {
           .add(SCMException.class)
           .add(NonRetriableException.class)
           .add(PipelineNotFoundException.class)
+          .add(ContainerNotFoundException.class)
           .build();
 
   private SCMHAUtils() {
@@ -309,8 +311,13 @@ public final class SCMHAUtils {
 
   public static RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
       Exception e, int maxRetryCount, long retryInterval) {
-    // For AccessControl Exception where Client is not authenticated.
-    if (isAccessControlException(e)) {
+    Throwable unwrappedException = HddsUtils.getUnwrappedException(e);
+    if (unwrappedException instanceof AccessControlException) {
+      // For AccessControl Exception where Client is not authenticated.
+      return RetryPolicy.RetryAction.FAIL;
+    } else if (HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
+      // For some types of Rpc Exceptions, retrying on different server would
+      // not help.
       return RetryPolicy.RetryAction.FAIL;
     } else if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
       if (retry < maxRetryCount) {
@@ -332,25 +339,5 @@ public final class SCMHAUtils {
         return RetryPolicy.RetryAction.FAIL;
       }
     }
-  }
-
-  /**
-   * Unwrap exception to check if it is some kind of access control problem.
-   * {@link AccessControlException}
-   */
-  public static boolean isAccessControlException(Exception ex) {
-    if (ex instanceof ServiceException) {
-      Throwable t = ex.getCause();
-      if (t instanceof RemoteException) {
-        t = ((RemoteException) t).unwrapRemoteException();
-      }
-      while (t != null) {
-        if (t instanceof AccessControlException) {
-          return true;
-        }
-        t = t.getCause();
-      }
-    }
-    return false;
   }
 }

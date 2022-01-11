@@ -198,7 +198,7 @@ public class SCMClientProtocolServer implements
 
     final ContainerInfo container = scm.getContainerManager()
         .allocateContainer(
-            ReplicationConfig.fromTypeAndFactor(replicationType, factor),
+            ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
             owner);
     final Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
@@ -363,7 +363,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count) throws IOException {
-    return listContainer(startContainerID, count, null);
+    return listContainer(startContainerID, count, null, null);
   }
 
   /**
@@ -379,6 +379,23 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
+    return listContainer(startContainerID, count, state, null);
+  }
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
+   * @param factor Container factor.
+   * @return a list of pipeline.
+   * @throws IOException
+   */
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -386,14 +403,32 @@ public class SCMClientProtocolServer implements
     if (state != null) {
       auditMap.put("state", state.name());
     }
+    if (factor != null) {
+      auditMap.put("factor", factor.name());
+    }
     try {
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      if(null == state) {
-        return scm.getContainerManager().getContainers(containerId, count);
+      if (state != null) {
+        if (factor != null) {
+          return scm.getContainerManager().getContainers(state).stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .filter(info -> (info.getReplicationFactor() == factor))
+              .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(state).stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .sorted().limit(count).collect(Collectors.toList());
+        }
+      } else {
+        if (factor != null) {
+          return scm.getContainerManager().getContainers().stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .filter(info -> info.getReplicationFactor() == factor)
+              .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(containerId, count);
+        }
       }
-      return scm.getContainerManager().getContainers(state).stream()
-          .filter(info -> info.containerID().getId() >= startContainerID)
-          .sorted().limit(count).collect(Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -528,7 +563,7 @@ public class SCMClientProtocolServer implements
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
     Pipeline result = scm.getPipelineManager()
-        .createPipeline(ReplicationConfig.fromTypeAndFactor(type, factor));
+        .createPipeline(ReplicationConfig.fromProtoTypeAndFactor(type, factor));
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.CREATE_PIPELINE, null));
     return result;
@@ -711,10 +746,12 @@ public class SCMClientProtocolServer implements
   public boolean startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> idleiterations,
       Optional<Double> maxDatanodesRatioToInvolvePerIteration,
-      Optional<Long> maxSizeToMovePerIterationInGB) throws IOException {
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTarget,
+      Optional<Long> maxSizeLeavingSource) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     ContainerBalancerConfiguration cbc =
-        new ContainerBalancerConfiguration(scm.getConfiguration());
+        scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     if (threshold.isPresent()) {
       double tsd = threshold.get();
       Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
@@ -734,7 +771,7 @@ public class SCMClientProtocolServer implements
               "greater than equal to zero.");
       Preconditions.checkState(mdti <= 1,
           "maxDatanodesRatioToInvolvePerIteration must be " +
-              "lesser than equal to one.");
+              "lesser than or equal to one.");
       cbc.setMaxDatanodesRatioToInvolvePerIteration(mdti);
     }
     if (idleiterations.isPresent()) {
@@ -744,6 +781,23 @@ public class SCMClientProtocolServer implements
               " -1(infinitly run container balancer).");
       cbc.setIdleIteration(idi);
     }
+
+    if (maxSizeEnteringTarget.isPresent()) {
+      long mset = maxSizeEnteringTarget.get();
+      Preconditions.checkState(mset > 0,
+          "maxSizeEnteringTarget must be " +
+              "greater than zero.");
+      cbc.setMaxSizeEnteringTarget(mset * OzoneConsts.GB);
+    }
+
+    if (maxSizeLeavingSource.isPresent()) {
+      long msls = maxSizeLeavingSource.get();
+      Preconditions.checkState(msls > 0,
+          "maxSizeLeavingSource must be " +
+              "greater than zero.");
+      cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
+    }
+
 
     boolean isStartedSuccessfully = scm.getContainerBalancer().start(cbc);
     if (isStartedSuccessfully) {

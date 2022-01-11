@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.om;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
@@ -38,7 +36,6 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -60,20 +57,15 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   /**
    * Test a client request when all OM nodes are running. The request should
-   * succeed.
+   * succeed. Repeat with one OM node down.
    * @throws Exception
    */
   @Test
-  public void testAllOMNodesRunning() throws Exception {
+  public void testAllOMNodesRunningAndOneDown() throws Exception {
     createVolumeTest(true);
     createKeyTest(true);
-  }
 
-  /**
-   * Test client request succeeds even if one OM is down.
-   */
-  @Test
-  public void testOneOMNodeDown() throws Exception {
+    // Repeat the test with one OM down
     getCluster().stopOzoneManager(1);
     Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
@@ -109,11 +101,17 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
+    testMultipartUploadWithOneOmNodeDown();
   }
 
-
   @Test
-  public void testFileOperationsWithRecursive() throws Exception {
+  public void testFileOperationsAndDelete() throws Exception {
+    testFileOperationsWithRecursive();
+    testFileOperationsWithNonRecursive();
+    testKeysDelete();
+  }
+
+  private void testFileOperationsWithRecursive() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
 
     String data = "random data";
@@ -152,8 +150,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   }
 
-  @Test
-  public void testKeysDelete() throws Exception {
+  private void testKeysDelete() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String data = "random data";
     String keyName1 = "dir/file1";
@@ -193,8 +190,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
 
-  @Test
-  public void testFileOperationsWithNonRecursive() throws Exception {
+  private void testFileOperationsWithNonRecursive() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
 
     String data = "random data";
@@ -250,8 +246,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   }
 
-  @Test
-  public void testMultipartUploadWithOneOmNodeDown() throws Exception {
+  private void testMultipartUploadWithOneOmNodeDown() throws Exception {
 
     OzoneBucket ozoneBucket = setupBucket();
 
@@ -279,42 +274,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     String newLeaderOMNodeId =
         omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
-    Assert.assertTrue(leaderOMNodeId != newLeaderOMNodeId);
+    Assert.assertTrue(!leaderOMNodeId.equals(newLeaderOMNodeId));
   }
-
-  /**
-   * 1. Stop one of the OM
-   * 2. make a call to OM, this will make failover attempts to find new node.
-   * a) if LE finishes but leader not ready, it retries to same node
-   * b) if LE not done, it will failover to new node and check
-   * 3. Try failover to same OM explicitly.
-   * Now #3 should wait additional waitBetweenRetries time.
-   * LE: Leader Election.
-   */
-  @Test
-  public void testIncrementalWaitTimeWithSameNodeFailover() throws Exception {
-    long waitBetweenRetries = getConf().getLong(
-        OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(getObjectStore().getClientProxy());
-
-    // The OMFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
-
-    getCluster().stopOzoneManager(leaderOMNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
-    createKeyTest(true); // failover should happen to new node
-
-    long numTimesTriedToSameNode = omFailoverProxyProvider.getWaitTime()
-        / waitBetweenRetries;
-    omFailoverProxyProvider.performFailoverIfRequired(omFailoverProxyProvider.
-        getCurrentProxyOMNodeId());
-    Assert.assertEquals((numTimesTriedToSameNode + 1) * waitBetweenRetries,
-        omFailoverProxyProvider.getWaitTime());
-  }
-
 
   private String initiateMultipartUpload(OzoneBucket ozoneBucket,
       String keyName) throws Exception {
@@ -353,63 +314,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     byte[] fileContent = new byte[value.getBytes(UTF_8).length];
     ozoneInputStream.read(fileContent);
     Assert.assertEquals(value, new String(fileContent, UTF_8));
-  }
-
-
-  private void createKeyTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner(userName)
-        .setAdmin(adminName)
-        .build();
-
-    try {
-      getObjectStore().createVolume(volumeName, createVolumeArgs);
-
-      OzoneVolume retVolumeinfo = getObjectStore().getVolume(volumeName);
-
-      Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-      Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-      Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
-
-      String bucketName = UUID.randomUUID().toString();
-      String keyName = UUID.randomUUID().toString();
-      retVolumeinfo.createBucket(bucketName);
-
-      OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
-
-      Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-      Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
-
-      String value = "random data";
-      OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-          value.length(), ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>());
-      ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
-      ozoneOutputStream.close();
-
-      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
-
-    } catch (ConnectException | RemoteException e) {
-      if (!checkSuccess) {
-        // If the last OM to be tried by the RetryProxy is down, we would get
-        // ConnectException. Otherwise, we would get a RemoteException from the
-        // last running OM as it would fail to get a quorum.
-        if (e instanceof RemoteException) {
-          GenericTestUtils.assertExceptionContains(
-              "OMNotLeaderException", e);
-        }
-      } else {
-        throw e;
-      }
-    }
   }
 
   @Test
@@ -495,6 +399,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   @Test
   public void testOMRestart() throws Exception {
+    // start fresh cluster
+    shutdown();
+    init();
+
     ObjectStore objectStore = getObjectStore();
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
