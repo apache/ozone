@@ -751,7 +751,7 @@ public class SCMClientProtocolServer implements
       Optional<Long> maxSizeLeavingSource) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     ContainerBalancerConfiguration cbc =
-        new ContainerBalancerConfiguration(scm.getConfiguration());
+        scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     if (threshold.isPresent()) {
       double tsd = threshold.get();
       Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
@@ -943,6 +943,11 @@ public class SCMClientProtocolServer implements
 
     return scm.getContainerTokenGenerator()
         .generateToken(remoteUser.getUserName(), containerID);
+  }
+
+  @Override
+  public long getContainerCount() throws IOException {
+    return scm.getContainerManager().getContainers().size();
   }
 
   /**

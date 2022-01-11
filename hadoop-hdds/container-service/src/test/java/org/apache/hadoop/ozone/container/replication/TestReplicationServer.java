@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -34,15 +33,13 @@ public class TestReplicationServer {
   @Test
   public void testEpollDisabled() {
     OzoneConfiguration config = new OzoneConfiguration();
-    DatanodeConfiguration dnConf =
-        config.getObject(DatanodeConfiguration.class);
     ReplicationServer.ReplicationConfig replicationConfig =
         config.getObject(ReplicationServer.ReplicationConfig.class);
     SecurityConfig secConf = new SecurityConfig(config);
     System.setProperty(
         "org.apache.ratis.thirdparty.io.netty.transport.noNative", "true");
     ReplicationServer server = new ReplicationServer(null, replicationConfig,
-        secConf, dnConf, null);
+        secConf, null);
 
     try {
       server.start();

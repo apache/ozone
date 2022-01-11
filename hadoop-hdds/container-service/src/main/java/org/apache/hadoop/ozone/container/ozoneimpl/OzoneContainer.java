@@ -173,7 +173,6 @@ public class OzoneContainer {
         controller,
         conf.getObject(ReplicationConfig.class),
         secConf,
-        conf.getObject(DatanodeConfiguration.class),
         certClient);
 
     readChannel = new XceiverServerGrpc(
