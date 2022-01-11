@@ -875,8 +875,17 @@ public class RpcClient implements ClientProtocol {
       // s3g can act as proxy to end user.
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
       if (!ugi.getShortUserName().equals(loginUser.getShortUserName())) {
-        UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
-            ugi.getShortUserName(), loginUser);
+        UserGroupInformation proxyUser;
+        if (getThreadLocalS3Auth() == null) {
+          proxyUser =
+              UserGroupInformation.createProxyUser(ugi.getShortUserName(),
+              loginUser);
+        } else {
+          UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
+              getThreadLocalS3Auth().getAccessID());
+          proxyUser = UserGroupInformation.createProxyUser(
+              s3gUGI.getShortUserName(), loginUser);
+        }
         decrypted = proxyUser.doAs(
             (PrivilegedExceptionAction<KeyProvider.KeyVersion>) () -> {
               return OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
