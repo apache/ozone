@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
 import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -254,6 +255,24 @@ public class TestBlockDataStreamOutput {
     key.close();
     String dataString = new String(data, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
+  }
+
+  @Test
+  public void testTotalAckDataLength() throws Exception {
+    int dataLength = 400;
+    String keyName = getKeyName();
+    OzoneDataStreamOutput key = createKey(
+        keyName, ReplicationType.RATIS, 0);
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+            .getBytes(UTF_8);
+    KeyDataStreamOutput keyDataStreamOutput =
+        (KeyDataStreamOutput) key.getByteBufStreamOutput();
+    BlockDataStreamOutputEntry stream =
+        keyDataStreamOutput.getStreamEntries().get(0);
+    key.write(ByteBuffer.wrap(data));
+    key.close();
+    Assert.assertTrue(stream.getTotalAckDataLength()==dataLength);
   }
 
 }

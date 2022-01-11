@@ -133,6 +133,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
+  // buffers for which putBlock is yet to be executed
+  private List<StreamBuffer> buffersForPutBlock;
   /**
    * Creates a new BlockDataStreamOutput.
    *
@@ -180,6 +182,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
     metrics = XceiverClientManager.getXceiverClientMetrics();
+    buffersForPutBlock = new ArrayList<>();
   }
 
   private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
@@ -287,6 +290,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   private void writeChunk(StreamBuffer sb) throws IOException {
     bufferList.add(sb);
+    if (buffersForPutBlock == null) {
+      buffersForPutBlock = new ArrayList<>();
+    }
+    buffersForPutBlock.add(sb);
     ByteBuffer dup = sb.duplicate();
     dup.position(0);
     dup.limit(sb.position());
@@ -392,7 +399,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     final List<StreamBuffer> byteBufferList;
     if (!force) {
       Preconditions.checkNotNull(bufferList);
-      byteBufferList = bufferList;
+      byteBufferList = buffersForPutBlock;
+      buffersForPutBlock = null;
       Preconditions.checkNotNull(byteBufferList);
     } else {
       byteBufferList = null;
