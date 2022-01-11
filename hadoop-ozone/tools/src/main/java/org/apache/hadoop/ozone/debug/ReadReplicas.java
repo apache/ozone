@@ -8,6 +8,7 @@ import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
@@ -94,9 +95,9 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
           replica : block.getValue().entrySet()) {
         JsonObject replicaJson = new JsonObject();
 
-        replicaJson.addProperty("datanode hostname",
+        replicaJson.addProperty("hostname",
             replica.getKey().getHostName());
-        replicaJson.addProperty("datanode uuid",
+        replicaJson.addProperty("uuid",
             replica.getKey().getUuidString());
 
         OzoneInputStream is = replica.getValue();
@@ -106,9 +107,14 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         File replicaFile
             = new File("/opt/hadoop/" + directoryName + "/" + fileName);
 
-        Files.copy(is, replicaFile.toPath(),
-            StandardCopyOption.REPLACE_EXISTING);
-        is.close();
+        try {
+          Files.copy(is, replicaFile.toPath(),
+              StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+          replicaJson.addProperty("exception", e.getMessage());
+        } finally {
+          is.close();
+        }
 
         replicasJson.add(replicaJson);
       }

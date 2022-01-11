@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -899,7 +900,7 @@ public class RpcClient implements ClientProtocol {
                          String keyName) throws IOException {
 
     Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> > result
-        = new HashMap<>();
+        = new LinkedHashMap<>();
 
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
@@ -927,7 +928,8 @@ public class RpcClient implements ClientProtocol {
         List<DatanodeDetails> nodes = new ArrayList<>();
         nodes.add(dn);
         Pipeline pipeline
-            = new Pipeline.Builder(pipelineBefore).setNodes(nodes).build();
+            = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
+            .setId(PipelineID.randomId()).build();
         keyLocationInfo.setPipeline(pipeline);
 
         List<OmKeyLocationInfo> keyLocationInfoList = new ArrayList<>();
