@@ -15,12 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client;
+package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.ozone.client.checksum.AbstractBlockChecksumComputer;
-import org.apache.hadoop.ozone.client.checksum.ReplicatedBlockChecksumComputer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Test;
 
@@ -28,14 +26,14 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
 
 /**
  * Unit tests for ReplicatedBlockChecksumComputer class.
  */
 public class TestReplicatedBlockChecksumComputer {
-
-  @Test public void testComputeMd5Crc() throws IOException {
+  @Test
+  public void testComputeMd5Crc() throws IOException {
     final int lenOfZeroBytes = 32;
     byte[] emptyChunkChecksum = new byte[lenOfZeroBytes];
     MD5Hash emptyBlockMD5 = MD5Hash.digest(emptyChunkChecksum);
