@@ -59,7 +59,6 @@ import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -1059,13 +1058,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public StorageContainerManager getStorageContainerManager() {
     return getStorageContainerManagers().get(0);
-  }
-
-  private static List<Integer> getFreePortList(int size) {
-    return org.apache.ratis.util.NetUtils.createLocalServerAddress(size)
-        .stream()
-        .map(inetSocketAddress -> inetSocketAddress.getPort())
-        .collect(Collectors.toList());
   }
 
   private static final class ExitManagerForOM extends ExitManager {
