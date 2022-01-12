@@ -93,9 +93,6 @@ class OzoneContract extends AbstractFSContract {
     conf.addResource(CONTRACT_XML);
 
     if (fsOptimizedServer){
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-          true);
-
       // Default bucket layout is set to FSO in case of FSO server.
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
