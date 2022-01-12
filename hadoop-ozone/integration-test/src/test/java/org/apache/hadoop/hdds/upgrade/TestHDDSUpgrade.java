@@ -100,7 +100,7 @@ import org.slf4j.LoggerFactory;
  * Test SCM and DataNode Upgrade sequence.
  */
 @Timeout(11000)
-@Flaky({"HDDS-6028","HDDS-6049"})
+@Flaky({"HDDS-6028", "HDDS-6049"})
 public class TestHDDSUpgrade {
 
   /**

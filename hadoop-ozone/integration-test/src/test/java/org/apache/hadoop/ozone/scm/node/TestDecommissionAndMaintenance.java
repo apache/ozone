@@ -85,7 +85,7 @@ import static org.junit.Assert.fail;
 /**
  * Test from the scmclient for decommission and maintenance.
  */
-@Flaky({"HDDS-6028","HDDS-6049"})
+@Flaky({"HDDS-6028", "HDDS-6049"})
 public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
