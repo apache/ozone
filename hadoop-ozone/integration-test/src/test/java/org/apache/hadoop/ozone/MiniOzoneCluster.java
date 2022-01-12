@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -341,6 +342,7 @@ public interface MiniOzoneCluster {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      ExitUtils.disableSystemExit();
     }
 
     public Builder setConf(OzoneConfiguration config) {

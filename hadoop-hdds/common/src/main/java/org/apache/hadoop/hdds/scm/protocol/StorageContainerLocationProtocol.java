@@ -312,8 +312,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Start ContainerBalancer.
    */
   boolean startContainerBalancer(Optional<Double> threshold,
-      Optional<Integer> idleiterations,
-      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB) throws IOException;
@@ -365,4 +365,6 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * commands operating on {@code containerID}.
    */
   Token<?> getContainerToken(ContainerID containerID) throws IOException;
+
+  long getContainerCount() throws IOException;
 }

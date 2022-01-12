@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
@@ -166,9 +167,11 @@ public class DatanodeStateMachine implements Closeable {
 
     replicatorMetrics = new MeasuredReplicator(replicator);
 
+    ReplicationConfig replicationConfig =
+        conf.getObject(ReplicationConfig.class);
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, dnConf.getReplicationMaxStreams());
+            replicatorMetrics, replicationConfig);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);

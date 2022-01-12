@@ -48,10 +48,9 @@ public final class Genesis {
       split = ",", description =
       "Option used for specifying benchmarks to run.\n"
           + "Ex. ozone genesis -benchmark BenchMarkContainerStateMap,"
-          + "BenchMarkOMKeyAllocation.\n"
           + "Possible benchmarks which can be used are "
           + "{BenchMarkContainerStateMap, "
-          + "BenchMarkOzoneManager, BenchMarkOMClient, "
+          + "BenchMarkOMClient, "
           + "BenchMarkSCM, BenchMarkMetadataStoreReads, "
           + "BenchMarkMetadataStoreWrites, BenchMarkDatanodeDispatcher, "
           + "BenchMarkRocksDbStore, BenchMarkCRCStreaming, BenchMarkCRCBatch}")

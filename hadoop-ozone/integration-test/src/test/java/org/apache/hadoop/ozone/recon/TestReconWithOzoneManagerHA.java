@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -114,7 +114,7 @@ public class TestReconWithOzoneManagerHA {
     String expectedUrl = "http://" +
         (hostname.equals("0.0.0.0") ? "localhost" : hostname) + ":" +
         ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
-        OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
     Assert.assertEquals("OM Snapshot should be requested from the leader.",
         expectedUrl, snapshotUrl);
