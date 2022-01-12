@@ -27,14 +27,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
 
-public class ReplicatedBlockChecksumComputer extends AbstractBlockChecksumComputer {
+public class ReplicatedBlockChecksumComputer extends
+    AbstractBlockChecksumComputer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicatedBlockChecksumComputer.class);
 
   private List<ContainerProtos.ChunkInfo> chunkInfoList;
 
-  public ReplicatedBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfoList)
+  public ReplicatedBlockChecksumComputer(
+      List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
     this.chunkInfoList = chunkInfoList;
   }

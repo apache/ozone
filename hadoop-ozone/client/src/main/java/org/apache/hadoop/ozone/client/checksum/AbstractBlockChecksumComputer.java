@@ -19,6 +19,10 @@ package org.apache.hadoop.ozone.client.checksum;
 
 import java.io.IOException;
 
+/**
+ * Base class for computing block checksum which is a function of chunk
+ * checksums.
+ */
 public abstract class AbstractBlockChecksumComputer {
   private byte[] outBytes;
 

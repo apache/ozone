@@ -30,6 +30,9 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
+/**
+ * Unit tests for ReplicatedBlockChecksumComputer class.
+ */
 public class TestReplicatedBlockChecksumComputer {
 
   @Test public void testComputeMd5Crc() throws IOException {
