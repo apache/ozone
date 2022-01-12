@@ -294,4 +294,9 @@ public class ReconNodeManager extends SCMNodeManager {
     return currentTime - getLastHeartbeat(datanodeDetails) >=
         reconDatanodeOutdatedTime;
   }
+
+  public void reinitialize(Table<UUID, DatanodeDetails> nodeTable) {
+    this.nodeDB = nodeTable;
+    loadExistingNodes();
+  }
 }

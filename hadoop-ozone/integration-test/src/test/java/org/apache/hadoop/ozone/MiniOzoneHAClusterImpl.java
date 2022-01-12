@@ -59,7 +59,6 @@ import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -371,6 +370,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private static final String SCM_NODE_ID_PREFIX = "scmNode-";
     private List<StorageContainerManager> activeSCMs = new ArrayList<>();
     private List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
+
+    // These port reservations are for servers started when the component
+    // (OM or SCM) is started.  These are Ratis, HTTP and HTTPS.  We also have
+    // another set of ports for RPC endpoints, which are started as soon as
+    // the component is created (in methods called by OzoneManager and
+    // StorageContainerManager constructors respectively).  So we need to manage
+    // them separately, see initOMHAConfig() and initSCMHAConfig().
     private final ReservedPorts omPorts = new ReservedPorts(3);
     private final ReservedPorts scmPorts = new ReservedPorts(3);
 
@@ -1054,13 +1060,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return getStorageContainerManagers().get(0);
   }
 
-  private static List<Integer> getFreePortList(int size) {
-    return org.apache.ratis.util.NetUtils.createLocalServerAddress(size)
-        .stream()
-        .map(inetSocketAddress -> inetSocketAddress.getPort())
-        .collect(Collectors.toList());
-  }
-
   private static final class ExitManagerForOM extends ExitManager {
 
     private MiniOzoneHAClusterImpl cluster;
@@ -1102,11 +1101,23 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       this.portsPerNode = portsPerNode;
     }
 
+    /**
+     * Reserve {@code portsPerNode * nodes} ports by binding server sockets
+     * to random free ports.  The sockets are kept open until
+     * {@link #release(String)} or {@link #releaseAll} is called.
+     */
     public void reserve(int nodes) {
       Preconditions.checkState(allPorts.isEmpty());
       allPorts.addAll(reservePorts(portsPerNode * nodes));
     }
 
+    /**
+     * Assign {@code portsPerNode} ports to a service identified by {@code id}.
+     * This set of ports should be released right before starting the service
+     * by calling {@link #release(String)}.
+     *
+     * @return iterator of the ports assigned
+     */
     public PrimitiveIterator.OfInt assign(String id) {
       Preconditions.checkState(allPorts.size() >= portsPerNode);
       List<ServerSocket> nodePorts = new LinkedList<>();
@@ -1119,6 +1130,15 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       return nodePorts.stream().mapToInt(ServerSocket::getLocalPort).iterator();
     }
 
+    /**
+     * Release the ports assigned to the service identified by {@code id}.
+     *
+     * This closes the server sockets, making the same ports available for
+     * the service.  Note: there is a race condition with other processes
+     * running on the host, but that's OK since this is for tests.
+     *
+     * If no ports are assigned to the service, this is a no-op.
+     */
     public void release(String id) {
       List<ServerSocket> ports = assignedPorts.remove(id);
       LOG.debug("release ports for {}: {}", id, ports);
@@ -1127,6 +1147,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       }
     }
 
+    /**
+     * Release all reserved ports, assigned or not.
+     */
     public void releaseAll() {
       IOUtils.cleanup(LOG, allPorts.toArray(new Closeable[0]));
       allPorts.clear();
