@@ -272,7 +272,7 @@ public class TestBlockDataStreamOutput {
         keyDataStreamOutput.getStreamEntries().get(0);
     key.write(ByteBuffer.wrap(data));
     key.close();
-    Assert.assertTrue(stream.getTotalAckDataLength()==dataLength);
+    Assert.assertEquals(dataLength, stream.getTotalAckDataLength());
   }
 
 }
