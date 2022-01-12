@@ -78,14 +78,49 @@ import static org.mockito.Mockito.when;
  * Unit tests for ReplicatedFileChecksumHelper class.
  */
 public class TestReplicatedFileChecksumHelper {
+  private OzoneClient client;
+  private ObjectStore store;
+  private OzoneVolume volume;
+  private RpcClient rpcClient;
+
+  @Before
+  public void init() throws IOException {
+    ConfigurationSource config = new InMemoryConfiguration();
+    rpcClient = new RpcClient(config, null) {
+
+      @Override
+      protected OmTransport createOmTransport(
+          String omServiceId)
+          throws IOException {
+        return new MockOmTransport();
+      }
+
+      @NotNull
+      @Override
+      protected XceiverClientFactory createXceiverClientFactory(
+          List<X509Certificate> x509Certificates)
+          throws IOException {
+        return new MockXceiverClientFactory();
+      }
+    };
+    client = new OzoneClient(config, rpcClient);
+
+    store = client.getObjectStore();
+  }
+
+  @After
+  public void close() throws IOException {
+    client.close();
+  }
+
 
   @Test
   public void testEmptyBlock() throws IOException {
     // test the file checksum of a file with an empty block.
-    RpcClient rpcClient = Mockito.mock(RpcClient.class);
+    RpcClient mockRpcClient = Mockito.mock(RpcClient.class);
 
     OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
-    when(rpcClient.getOzoneManagerClient()).thenReturn(om);
+    when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
         .setVolumeName(null)
@@ -104,13 +139,13 @@ public class TestReplicatedFileChecksumHelper {
 
     when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
 
-    OzoneVolume volume = Mockito.mock(OzoneVolume.class);
-    when(volume.getName()).thenReturn("vol1");
+    OzoneVolume mockVolume = Mockito.mock(OzoneVolume.class);
+    when(mockVolume.getName()).thenReturn("vol1");
     OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, "dummy", 10, rpcClient);
+        mockVolume, bucket, "dummy", 10, mockRpcClient);
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
@@ -119,7 +154,7 @@ public class TestReplicatedFileChecksumHelper {
 
     // test negative length
     helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, "dummy", -1, rpcClient);
+        mockVolume, bucket, "dummy", -1, mockRpcClient);
     helper.compute();
     assertNull(helper.getKeyLocationInfoList());
   }
@@ -129,7 +164,7 @@ public class TestReplicatedFileChecksumHelper {
     // test the file checksum of a file with one block.
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    RpcClient rpcClient = Mockito.mock(RpcClient.class);
+    RpcClient mockRpcClient = Mockito.mock(RpcClient.class);
 
     List<DatanodeDetails> dns = Arrays.asList(
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build());
@@ -142,7 +177,8 @@ public class TestReplicatedFileChecksumHelper {
         .setNodes(dns)
         .build();
 
-    XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+    XceiverClientGrpc xceiverClientGrpc =
+        new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
@@ -151,12 +187,13 @@ public class TestReplicatedFileChecksumHelper {
       }
     };
     XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
-    when(factory.acquireClientForReadData(ArgumentMatchers.any())).thenReturn(client);
+    when(factory.acquireClientForReadData(ArgumentMatchers.any())).
+        thenReturn(xceiverClientGrpc);
 
-    when(rpcClient.getXceiverClientManager()).thenReturn(factory);
+    when(mockRpcClient.getXceiverClientManager()).thenReturn(factory);
 
     OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
-    when(rpcClient.getOzoneManagerClient()).thenReturn(om);
+    when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
 
     BlockID blockID = new BlockID(1, 1);
     OmKeyLocationInfo omKeyLocationInfo =
@@ -184,13 +221,13 @@ public class TestReplicatedFileChecksumHelper {
 
     when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
 
-    OzoneVolume volume = Mockito.mock(OzoneVolume.class);
-    when(volume.getName()).thenReturn("vol1");
+    OzoneVolume mockVolume = Mockito.mock(OzoneVolume.class);
+    when(mockVolume.getName()).thenReturn("vol1");
     OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, "dummy", 10, rpcClient);
+        mockVolume, bucket, "dummy", 10, mockRpcClient);
 
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
@@ -244,41 +281,6 @@ public class TestReplicatedFileChecksumHelper {
         replyFuture = new CompletableFuture<>();
     replyFuture.complete(resp);
     return new XceiverClientReply(replyFuture);
-  }
-
-  private OzoneClient client;
-  private ObjectStore store;
-  private OzoneVolume volume;
-  private RpcClient rpcClient;
-
-  @Before
-  public void init() throws IOException {
-    ConfigurationSource config = new InMemoryConfiguration();
-    rpcClient = new RpcClient(config, null) {
-
-      @Override
-      protected OmTransport createOmTransport(
-          String omServiceId)
-          throws IOException {
-        return new MockOmTransport();
-      }
-
-      @NotNull
-      @Override
-      protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates)
-          throws IOException {
-        return new MockXceiverClientFactory();
-      }
-    };
-    client = new OzoneClient(config, rpcClient);
-
-    store = client.getObjectStore();
-  }
-
-  @After
-  public void close() throws IOException {
-    client.close();
   }
 
   private OzoneBucket getOzoneBucket() throws IOException {
