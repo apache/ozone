@@ -120,6 +120,22 @@ public final class  ReconServerConfigKeys {
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "10s";
 
+  public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
+      "ozone.recon.scm.container.threshold";
+  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 100;
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
+      "ozone.recon.scm.snapshot.enabled";
+  public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT =
+      "ozone.recon.scm.connection.timeout";
+  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT = "5s";
+
+  public static final String OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT =
+      "ozone.recon.scm.connection.request.timeout";
+  public static final String
+      OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
   /**
    * Private constructor for utility class.
    */

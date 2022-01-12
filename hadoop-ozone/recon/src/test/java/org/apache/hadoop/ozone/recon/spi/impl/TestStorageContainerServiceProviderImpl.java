@@ -24,13 +24,18 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -55,6 +60,10 @@ public class TestStorageContainerServiceProviderImpl {
         try {
           StorageContainerLocationProtocol mockScmClient = mock(
               StorageContainerLocationProtocol.class);
+          ReconUtils reconUtils =  new ReconUtils();
+          File testDir = GenericTestUtils.getRandomizedTestDir();
+          OzoneConfiguration conf = new OzoneConfiguration();
+          conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
           pipelineID = PipelineID.randomId().getProtobuf();
           when(mockScmClient.getPipeline(pipelineID))
               .thenReturn(mock(Pipeline.class));
@@ -62,6 +71,9 @@ public class TestStorageContainerServiceProviderImpl {
               .toInstance(mockScmClient);
           bind(StorageContainerServiceProvider.class)
               .to(StorageContainerServiceProviderImpl.class);
+          bind(OzoneConfiguration.class).
+              toInstance(conf);
+          bind(ReconUtils.class).toInstance(reconUtils);
         } catch (Exception e) {
           Assert.fail();
         }
