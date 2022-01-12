@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -167,7 +167,7 @@ public class TestOzoneFsHAURLs {
    * @return the leader OM's RPC address in the MiniOzoneHACluster
    */
   private String getLeaderOMNodeAddr() {
-    MiniOzoneOMHAClusterImpl haCluster = (MiniOzoneOMHAClusterImpl) cluster;
+    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
     OzoneManager omLeader = haCluster.getOMLeader();
     Assert.assertNotNull("There should be a leader OM at this point.",
         omLeader);
