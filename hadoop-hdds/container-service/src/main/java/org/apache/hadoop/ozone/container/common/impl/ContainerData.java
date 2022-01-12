@@ -129,19 +129,20 @@ public abstract class ContainerData {
    * Creates a ContainerData Object, which holds metadata of the container.
    * @param type - ContainerType
    * @param containerId - ContainerId
-   * @param layOutVersion - Container layOutVersion
+   * @param layoutVersion - Container layoutVersion
    * @param size - Container maximum size in bytes
    * @param originPipelineId - Pipeline Id where this container is/was created
    * @param originNodeId - Node Id where this container is/was created
    */
   protected ContainerData(ContainerType type, long containerId,
-      ChunkLayOutVersion layOutVersion, long size, String originPipelineId,
-      String originNodeId) {
+                          ContainerLayoutVersion layoutVersion, long size,
+                          String originPipelineId,
+                          String originNodeId) {
     Preconditions.checkNotNull(type);
 
     this.containerType = type;
     this.containerID = containerId;
-    this.layOutVersion = layOutVersion.getVersion();
+    this.layOutVersion = layoutVersion.getVersion();
     this.metadata = new TreeMap<>();
     this.state = ContainerDataProto.State.OPEN;
     this.readCount = new AtomicLong(0L);
@@ -158,7 +159,7 @@ public abstract class ContainerData {
 
   protected ContainerData(ContainerData source) {
     this(source.getContainerType(), source.getContainerID(),
-        source.getLayOutVersion(), source.getMaxSize(),
+        source.getLayoutVersion(), source.getMaxSize(),
         source.getOriginPipelineId(), source.getOriginNodeId());
   }
 
@@ -225,11 +226,11 @@ public abstract class ContainerData {
   }
 
   /**
-   * Returns the layOutVersion of the actual container data format.
-   * @return layOutVersion
+o  * Returns the layoutVersion of the actual container data format.
+   * @return layoutVersion
    */
-  public ChunkLayOutVersion getLayOutVersion() {
-    return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion);
+  public ContainerLayoutVersion getLayoutVersion() {
+    return ContainerLayoutVersion.getContainerLayoutVersion(layOutVersion);
   }
 
   /**

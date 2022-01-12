@@ -252,8 +252,9 @@ public final class ContainerDataYaml {
 
         //Needed this, as TAG.INT type is by default converted to Long.
         long layOutVersion = (long) nodes.get(OzoneConsts.LAYOUTVERSION);
-        ChunkLayOutVersion layoutVersion =
-            ChunkLayOutVersion.getChunkLayOutVersion((int) layOutVersion);
+        ContainerLayoutVersion layoutVersion =
+            ContainerLayoutVersion.getContainerLayoutVersion(
+                (int) layOutVersion);
 
         long size = (long) nodes.get(OzoneConsts.MAX_SIZE);
 
