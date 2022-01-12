@@ -74,7 +74,7 @@ public class ContainerBalancer {
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
   private long sizeMovedPerIteration;
-  private int idleIteration;
+  private int iterations;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
@@ -159,6 +159,7 @@ public class ContainerBalancer {
       if (!validateConfiguration(config)) {
         return false;
       }
+      ozoneConfiguration.setFromObject(balancerConfiguration);
       balancerRunning = true;
       LOG.info("Starting Container Balancer...{}", this);
 
@@ -178,23 +179,12 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    this.idleIteration = config.getIdleIteration();
-    if(this.idleIteration == -1) {
+    this.iterations = config.getIterations();
+    if(this.iterations == -1) {
       //run balancer infinitely
-      this.idleIteration = Integer.MAX_VALUE;
+      this.iterations = Integer.MAX_VALUE;
     }
-    this.threshold = config.getThreshold();
-    this.maxDatanodesRatioToInvolvePerIteration =
-        config.getMaxDatanodesRatioToInvolvePerIteration();
-    this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
-    if (config.getNetworkTopologyEnable()) {
-      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
-          containerManager, placementPolicy, nodeManager, networkTopology);
-    } else {
-      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
-          placementPolicy, nodeManager);
-    }
-    for (int i = 0; i < idleIteration && balancerRunning; i++) {
+    for (int i = 0; i < iterations && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
         stop();
@@ -217,7 +207,7 @@ public class ContainerBalancer {
 
       // wait for configured time before starting next iteration, unless
       // this was the final iteration
-      if (i != idleIteration - 1) {
+      if (i != iterations - 1) {
         synchronized (this) {
           try {
             wait(config.getBalancingInterval().toMillis());
@@ -258,6 +248,17 @@ public class ContainerBalancer {
             "Manager.");
       }
       return false;
+    }
+    this.threshold = config.getThresholdAsRatio();
+    this.maxDatanodesRatioToInvolvePerIteration =
+        config.getMaxDatanodesRatioToInvolvePerIteration();
+    this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
+    if (config.getNetworkTopologyEnable()) {
+      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
+          containerManager, placementPolicy, nodeManager, networkTopology);
+    } else {
+      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
+          placementPolicy, nodeManager);
     }
     this.excludeNodes = config.getExcludeNodes();
     this.includeNodes = config.getIncludeNodes();
@@ -522,7 +523,7 @@ public class ContainerBalancer {
   }
 
   /**
-   * Checks if limits maxDatanodesRatioToInvolvePerIteration and
+   * Checks if limits maxDatanodesPercentageToInvolvePerIteration and
    * maxSizeToMovePerIteration have not been hit.
    *
    * @return {@link IterationResult#MAX_DATANODES_TO_INVOLVE_REACHED} if reached
@@ -872,7 +873,7 @@ public class ContainerBalancer {
     return countDatanodesInvolvedPerIteration;
   }
 
-  long getSizeMovedPerIteration() {
+  public long getSizeMovedPerIteration() {
     return sizeMovedPerIteration;
   }
 
