@@ -61,7 +61,7 @@ public class TestExcludeList {
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
     Assert.assertTrue(list.getDatanodes().size() == 1);
-    clock.fastForward(6);
+    clock.fastForward(1);
     Assert.assertTrue(list.getDatanodes().size() == 1);
   }
 }

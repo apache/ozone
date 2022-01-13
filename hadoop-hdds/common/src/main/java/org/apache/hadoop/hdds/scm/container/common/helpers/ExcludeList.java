@@ -61,20 +61,20 @@ public class ExcludeList {
   }
 
   public Set<DatanodeDetails> getDatanodes() {
-    cleanExpiredNodesIfNeeded();
+    if (expiryTime > 0) {
+      cleanExpiredNodes();
+    }
     return new HashSet<>(datanodes.keySet());
   }
 
-  private void cleanExpiredNodesIfNeeded() {
-    if (expiryTime > 0) {
-      Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
-          datanodes.entrySet().iterator();
-      while (iterator.hasNext()) {
-        Map.Entry<DatanodeDetails, Long> entry = iterator.next();
-        Long value = entry.getValue();
-        if (clock.millis() > value + expiryTime) {
-          iterator.remove(); // removing
-        }
+  private void cleanExpiredNodes() {
+    Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
+        datanodes.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<DatanodeDetails, Long> entry = iterator.next();
+      Long value = entry.getValue();
+      if (clock.millis() > value + expiryTime) {
+        iterator.remove(); // removing
       }
     }
   }
