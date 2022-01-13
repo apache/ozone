@@ -63,6 +63,7 @@ public class  TestMultiRaftSetup {
     pipelineDestroyTimeoutInMillis = 1000;
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
         pipelineDestroyTimeoutInMillis, TimeUnit.MILLISECONDS);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
     nodeManager = scm.getScmNodeManager();
