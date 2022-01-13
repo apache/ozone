@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.util.Daemon;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -31,8 +30,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
  * This class contains set of dns and containers which ozone client provides
@@ -43,8 +40,8 @@ public class ExcludeList {
   private final Map<DatanodeDetails, Long> datanodes;
   private final Set<ContainerID> containerIds;
   private final Set<PipelineID> pipelineIds;
-  private Daemon excludeNodesCleaner;
-  private boolean autoCleanerRunning;
+  private long expiryTime = 0;
+  private java.time.Clock clock;
 
 
   public ExcludeList() {
@@ -53,18 +50,10 @@ public class ExcludeList {
     pipelineIds = new HashSet<>();
   }
 
-  public void startAutoExcludeNodesCleaner(long expiryTime,
-      long recheckInterval) {
-    excludeNodesCleaner =
-        new Daemon(new ExcludeNodesCleaner(expiryTime, recheckInterval));
-    excludeNodesCleaner.start();
-  }
-
-  public void stopAutoExcludeNodesCleaner() {
-    if (excludeNodesCleaner != null) {
-      autoCleanerRunning = false;
-      excludeNodesCleaner.interrupt();
-    }
+  public ExcludeList(long autoExpiryTime, java.time.Clock clock) {
+    this();
+    this.expiryTime = autoExpiryTime;
+    this.clock = clock;
   }
 
   public Set<ContainerID> getContainerIds() {
@@ -72,7 +61,22 @@ public class ExcludeList {
   }
 
   public Set<DatanodeDetails> getDatanodes() {
-    return datanodes.keySet();
+    cleanExpiredNodesIfNeeded();
+    return new HashSet<>(datanodes.keySet());
+  }
+
+  private void cleanExpiredNodesIfNeeded() {
+    if (expiryTime > 0) {
+      Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
+          datanodes.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Map.Entry<DatanodeDetails, Long> entry = iterator.next();
+        Long value = entry.getValue();
+        if (clock.millis() > value + expiryTime) {
+          iterator.remove(); // removing
+        }
+      }
+    }
   }
 
   public void addDatanodes(Collection<DatanodeDetails> dns) {
@@ -80,9 +84,7 @@ public class ExcludeList {
   }
 
   public void addDatanode(DatanodeDetails dn) {
-    synchronized (datanodes) {
-      datanodes.put(dn, monotonicNow());
-    }
+    datanodes.put(dn, clock.millis());
   }
 
   public void addConatinerId(ContainerID containerId) {
@@ -102,9 +104,7 @@ public class ExcludeList {
         HddsProtos.ExcludeListProto.newBuilder();
     containerIds
         .forEach(id -> builder.addContainerIds(id.getId()));
-    synchronized (datanodes) {
-      datanodes.forEach((dn, t) -> builder.addDatanodes(dn.getUuidString()));
-    }
+    getDatanodes().forEach(dn -> builder.addDatanodes(dn.getUuidString()));
     pipelineIds.forEach(pipelineID -> {
       builder.addPipelineIds(pipelineID.getProtobuf());
     });
@@ -129,15 +129,12 @@ public class ExcludeList {
   }
 
   public boolean isEmpty() {
-    return datanodes.isEmpty() && containerIds.isEmpty() && pipelineIds
+    return getDatanodes().isEmpty() && containerIds.isEmpty() && pipelineIds
         .isEmpty();
   }
 
   public void clear() {
-    stopAutoExcludeNodesCleaner();
-    synchronized (datanodes) {
-      datanodes.clear();
-    }
+    datanodes.clear();
     containerIds.clear();
     pipelineIds.clear();
   }
@@ -145,53 +142,10 @@ public class ExcludeList {
   @Override
   public String toString() {
     return "ExcludeList {" +
-        "datanodes = " + datanodes +
+        "datanodes = " + getDatanodes() +
         ", containerIds = " + containerIds +
         ", pipelineIds = " + pipelineIds +
         '}';
-  }
-
-  /*
-   * A periodic thread that scans for exclude nodes that are cached for long.
-   */
-  class ExcludeNodesCleaner implements Runnable {
-    private long expiryTime;
-    private long recheckInterval;
-
-    ExcludeNodesCleaner(long expiry, long recheckTime) {
-      this.expiryTime = expiry;
-      this.recheckInterval = recheckTime;
-    }
-
-    @Override
-    public void run() {
-      autoCleanerRunning = true;
-      while (autoCleanerRunning) {
-        try {
-          check();
-          Thread.sleep(recheckInterval);
-        } catch (InterruptedException ie) {
-          // Someone interrupted. So, exiting from this thread.
-          autoCleanerRunning = false;
-        }
-      }
-    }
-
-    private void check() {
-
-      synchronized (datanodes) {
-        Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
-            datanodes.entrySet().iterator();
-        long now = monotonicNow();
-        while (iterator.hasNext()) {
-          Map.Entry<DatanodeDetails, Long> entry = iterator.next();
-          Long value = entry.getValue();
-          if (now > value + expiryTime) {
-            iterator.remove(); // removing
-          }
-        }
-      }
-    }
   }
 
 }

@@ -133,16 +133,11 @@ public class OzoneClientConfig {
 
   @Config(key = "exclude.nodes.expiry.time",
       defaultValue = "600000",
-      description = "Ozone EC client to expire the exclude nodes.",
+      description = "Ozone EC client to remove the node from the exclude" +
+          " nodes. If this value configured to be zero, it will not removed" +
+          " any nodes from the exclude list.",
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
-
-  @Config(key = "exclude.nodes.recheck.interval",
-      defaultValue = "300000",
-      description = "Ozone EC client time to recheck periodically to expire the"
-          + " exclude nodes.",
-      tags = ConfigTag.CLIENT)
-  private long recheckInterval = 5 * 60 * 1000;
 
   @PostConstruct
   private void validate() {
@@ -250,10 +245,6 @@ public class OzoneClientConfig {
 
   public long getExcludeNodesExpiryTime() {
     return excludeNodesExpiryTime;
-  }
-
-  public long getRecheckInterval() {
-    return recheckInterval;
   }
 
   public int getBufferIncrement() {

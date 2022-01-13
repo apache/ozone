@@ -21,9 +21,13 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+
+import java.time.ZoneOffset;
 
 /**
  * {@link BlockOutputStreamEntryPool} is responsible to manage OM communication
@@ -55,9 +59,12 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
         isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
         openID);
     assert replicationConfig instanceof ECReplicationConfig;
-    getExcludeList()
-        .startAutoExcludeNodesCleaner(config.getExcludeNodesExpiryTime(),
-            config.getRecheckInterval());
+  }
+
+  @Override
+  ExcludeList createExcludeList() {
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        new MonotonicClock(ZoneOffset.UTC));
   }
 
   @Override
