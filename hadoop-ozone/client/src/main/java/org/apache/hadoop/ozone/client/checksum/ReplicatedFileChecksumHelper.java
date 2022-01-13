@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
@@ -90,9 +91,10 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 
-    byte[] blockChecksum = getBlockChecksumFromChunkChecksums(
+    ByteBuffer blockChecksumByteBuffer = getBlockChecksumFromChunkChecksums(
         keyLocationInfo, chunkInfos);
-    String blockChecksumForDebug = populateBlockChecksumBuf(blockChecksum);
+    String blockChecksumForDebug =
+        populateBlockChecksumBuf(blockChecksumByteBuffer);
 
     LOG.debug("got reply from pipeline {} for block {}: blockChecksum={}, " +
             "blockChecksumType={}",
@@ -150,30 +152,33 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   // TODO: copy BlockChecksumHelper here
-  byte[] getBlockChecksumFromChunkChecksums(OmKeyLocationInfo keyLocationInfo,
+  ByteBuffer getBlockChecksumFromChunkChecksums(
+      OmKeyLocationInfo keyLocationInfo,
       List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
+    ByteBuffer buffer;
     AbstractBlockChecksumComputer blockChecksumComputer =
         new ReplicatedBlockChecksumComputer(chunkInfoList);
     // TODO: support composite CRC
     blockChecksumComputer.compute();
 
-    return blockChecksumComputer.getOutBytes();
+    buffer = ByteBuffer.wrap(blockChecksumComputer.getOutBytes());
+    return buffer;
   }
 
   /**
-   * Parses out the raw blockChecksum bytes from {@code checksumData}
-   * according to the blockChecksumType and populates the cumulative
+   * Parses out the raw blockChecksum bytes from {@code checksumData} byte
+   * buffer according to the blockChecksumType and populates the cumulative
    * blockChecksumBuf with it.
    *
    * @return a debug-string representation of the parsed checksum if
    *     debug is enabled, otherwise null.
    */
-  String populateBlockChecksumBuf(byte[] checksumData)
+  String populateBlockChecksumBuf(ByteBuffer checksumData)
       throws IOException {
     String blockChecksumForDebug = null;
     //read md5
-    final MD5Hash md5 = new MD5Hash(checksumData);
+    final MD5Hash md5 = new MD5Hash(checksumData.array());
     md5.write(getBlockChecksumBuf());
     if (LOG.isDebugEnabled()) {
       blockChecksumForDebug = md5.toString();
