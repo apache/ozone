@@ -111,7 +111,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     System.out.println("Writing manifest file : " + manifestFileName);
     File manifestFile
         = new File("/opt/hadoop/" + directoryName + "/" + manifestFileName);
-    Files.write(manifestFile.toPath(), prettyJson.getBytes(StandardCharsets.UTF_8));
+    Files.write(manifestFile.toPath(),
+        prettyJson.getBytes(StandardCharsets.UTF_8));
   }
 
   private void downloadReplicasAndCreateManifest(
