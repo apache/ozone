@@ -27,6 +27,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * The implementation of AbstractBlockChecksumComputer for replicated blocks.
+ */
 public class ReplicatedBlockChecksumComputer extends
     AbstractBlockChecksumComputer {
 
