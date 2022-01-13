@@ -65,24 +65,24 @@ public class RangerClientMultiTenantAccessController implements
     // TODO get these from the existing ranger plugin config.
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     System.err.println("Ranger address: " + rangerHttpsAddress);
-    String clientSslFile = conf.get(OZONE_RANGER_CLIENT_SSL_FILE);
-    System.err.println("ssl file: " + clientSslFile);
     service = conf.get(OZONE_RANGER_SERVICE);
     System.err.println("Ranger service name: " + service);
 
     // Auth using kerberos if using 3.0 snapshot ranger client.
-//    String principal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
-//    String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
-//    client = new RangerClient(rangerHttpsAddress,
-//        "kerberos", principal, keytabPath, clientSslFile);
+    String principal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+    String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+    client = new RangerClient(rangerHttpsAddress,
+        "kerberos", principal, keytabPath, service, "ozone");
 
     // Auth with username/password if using 2.1.0 ranger client.
-    String username = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
-    String password = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
-    RangerRESTClient restClient = new RangerRESTClient(rangerHttpsAddress,
-        clientSslFile, conf);
-    restClient.setBasicAuthInfo(username, password);
-    client = new RangerClient(restClient);
+//    String username = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+//    String password = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+//    String clientSslFile = conf.get(OZONE_RANGER_CLIENT_SSL_FILE);
+//    System.err.println("ssl file: " + clientSslFile);
+//    RangerRESTClient restClient = new RangerRESTClient(rangerHttpsAddress,
+//        clientSslFile, conf);
+//    restClient.setBasicAuthInfo(username, password);
+//    client = new RangerClient(restClient);
   }
 
   @Override
