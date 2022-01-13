@@ -40,6 +40,7 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
@@ -110,7 +111,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     System.out.println("Writing manifest file : " + manifestFileName);
     File manifestFile
         = new File("/opt/hadoop/" + directoryName + "/" + manifestFileName);
-    Files.write(manifestFile.toPath(), prettyJson.getBytes());
+    Files.write(manifestFile.toPath(), prettyJson.getBytes(StandardCharsets.UTF_8));
   }
 
   private void downloadReplicasAndCreateManifest(
