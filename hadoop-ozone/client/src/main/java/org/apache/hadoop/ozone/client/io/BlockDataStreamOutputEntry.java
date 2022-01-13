@@ -156,7 +156,7 @@ public final class BlockDataStreamOutputEntry
     }
   }
 
-  long getTotalAckDataLength() {
+  public long getTotalAckDataLength() {
     if (byteBufferStreamOutput != null) {
       BlockDataStreamOutput out =
           (BlockDataStreamOutput) this.byteBufferStreamOutput;
