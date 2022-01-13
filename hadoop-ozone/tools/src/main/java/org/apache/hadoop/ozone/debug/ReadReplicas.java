@@ -6,8 +6,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelinePlacementPolicy;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -55,7 +53,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     clientProtocol = client.getObjectStore().getClientProxy();
 
     OzoneConfiguration configuration = new OzoneConfiguration();
-    OzoneClientConfig clientConfig = configuration.getObject(OzoneClientConfig.class);
+    OzoneClientConfig clientConfig = configuration
+        .getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
     configuration.setFromObject(clientConfig);
     clientProtocolWithoutChecksum = new RpcClient(configuration, null);
@@ -71,8 +70,9 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas
         = clientProtocol.getKeysEveryReplicas(volumeName, bucketName, keyName);
 
-    Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicasWithoutChecksum
-        = clientProtocolWithoutChecksum.getKeysEveryReplicas(volumeName, bucketName, keyName);
+    Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
+        replicasWithoutChecksum = clientProtocolWithoutChecksum
+        .getKeysEveryReplicas(volumeName, bucketName, keyName);
 
     String directoryName = createDirectory(volumeName, bucketName, keyName);
 
@@ -82,7 +82,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     result.addProperty("datasize", keyInfoDetails.getDataSize());
 
     JsonArray blocks = new JsonArray();
-    downloadReplicasAndCreateManifest(keyName, replicas, replicasWithoutChecksum, directoryName, blocks);
+    downloadReplicasAndCreateManifest(keyName, replicas,
+        replicasWithoutChecksum, directoryName, blocks);
     result.add("blocks", blocks);
 
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -95,7 +96,12 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     Files.write(manifestFile.toPath(), prettyJson.getBytes());
   }
 
-  private void downloadReplicasAndCreateManifest(String keyName, Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas, Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicasWithoutChecksum, String directoryName, JsonArray blocks) throws IOException {
+  private void downloadReplicasAndCreateManifest(
+      String keyName,
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas,
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
+          replicasWithoutChecksum,
+      String directoryName, JsonArray blocks) throws IOException {
     int blockIndex = 0;
 
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
@@ -135,7 +141,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
           if(cause instanceof OzoneChecksumException) {
             BlockID blockID = block.getKey().getBlockID();
             String datanodeUUID = replica.getKey().getUuidString();
-            is = getInputStreamWithoutChecksum(replicasWithoutChecksum, datanodeUUID, blockID);
+            is = getInputStreamWithoutChecksum(replicasWithoutChecksum,
+                datanodeUUID, blockID);
             Files.copy(is, replicaFile.toPath(),
                 StandardCopyOption.REPLACE_EXISTING);
           } else if(cause instanceof StatusRuntimeException) {
@@ -151,26 +158,27 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     }
   }
 
-  private OzoneInputStream getInputStreamWithoutChecksum(Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicasWithoutChecksum, String datanodeUUID, BlockID blockID) {
-
+  private OzoneInputStream getInputStreamWithoutChecksum(
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
+          replicasWithoutChecksum, String datanodeUUID, BlockID blockID) {
+    OzoneInputStream is = new OzoneInputStream();
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         block : replicasWithoutChecksum.entrySet()) {
       if(block.getKey().getBlockID().equals(blockID)) {
         for (Map.Entry<DatanodeDetails, OzoneInputStream>
             replica : block.getValue().entrySet()) {
           if(replica.getKey().getUuidString().equals(datanodeUUID)) {
-            return replica.getValue();
+            is = replica.getValue();
           }
         }
       }
     }
-
-
-    return null;
+    return is;
   }
 
   @NotNull
-  private String createDirectory(String volumeName, String bucketName, String keyName) {
+  private String createDirectory(String volumeName, String bucketName,
+                                 String keyName) {
     String fileSuffix
         = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
     String directoryName = volumeName + "_" + bucketName + "_" + keyName +
