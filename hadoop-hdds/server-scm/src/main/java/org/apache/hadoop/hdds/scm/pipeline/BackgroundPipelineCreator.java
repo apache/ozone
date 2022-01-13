@@ -217,6 +217,9 @@ public class BackgroundPipelineCreator implements SCMService {
         new ArrayList<>();
     for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
         .values()) {
+      if (factor == ReplicationFactor.ZERO) {
+        continue; // Ignore it.
+      }
       final ReplicationConfig replicationConfig =
           ReplicationConfig.fromProtoTypeAndFactor(type, factor);
       if (skipCreation(replicationConfig, autoCreateFactorOne)) {
