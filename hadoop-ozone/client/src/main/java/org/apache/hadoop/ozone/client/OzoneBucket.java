@@ -906,6 +906,16 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Sets/Changes the owner of this Bucket.
+   * @param userName new owner
+   * @throws IOException
+   */
+  public void setOwner(String userName) throws IOException{
+    proxy.setBucketOwner(volumeName, name, userName);
+    this.owner = userName;
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneKey} list.
    */
   private class KeyIterator implements Iterator<OzoneKey> {
