@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Slow;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -99,7 +100,7 @@ import org.junit.jupiter.api.BeforeEach;
 /**
  * Tests the containerStateMachine failure handling.
  */
-
+@Slow
 public class TestContainerStateMachineFailures {
 
   private static MiniOzoneCluster cluster;
