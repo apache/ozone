@@ -18,13 +18,14 @@
 package org.apache.hadoop.ozone.client.checksum;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * Base class for computing block checksum which is a function of chunk
  * checksums.
  */
 public abstract class AbstractBlockChecksumComputer {
-  private byte[] outBytes;
+  private ByteBuffer outByteBuffer;
 
   /**
    * Compute block checksum. The result can be obtained by getOutBytes().
@@ -32,11 +33,11 @@ public abstract class AbstractBlockChecksumComputer {
    */
   public abstract void compute() throws IOException;
 
-  public byte[] getOutBytes() {
-    return outBytes;
+  public ByteBuffer getOutByteBuffer() {
+    return outByteBuffer;
   }
 
   public void setOutBytes(byte[] bytes) {
-    this.outBytes = bytes;
+    this.outByteBuffer = ByteBuffer.wrap(bytes);
   }
 }

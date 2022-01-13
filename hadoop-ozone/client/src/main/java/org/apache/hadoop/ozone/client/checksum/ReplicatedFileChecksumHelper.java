@@ -156,14 +156,12 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       OmKeyLocationInfo keyLocationInfo,
       List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
-    ByteBuffer buffer;
     AbstractBlockChecksumComputer blockChecksumComputer =
         new ReplicatedBlockChecksumComputer(chunkInfoList);
     // TODO: support composite CRC
     blockChecksumComputer.compute();
 
-    buffer = ByteBuffer.wrap(blockChecksumComputer.getOutBytes());
-    return buffer;
+    return blockChecksumComputer.getOutByteBuffer();
   }
 
   /**

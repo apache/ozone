@@ -23,6 +23,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 
@@ -61,7 +62,7 @@ public class TestReplicatedBlockChecksumComputer {
 
     computer.compute();
 
-    byte[] output = computer.getOutBytes();
-    assertArrayEquals(emptyBlockMD5Hash, output);
+    ByteBuffer output = computer.getOutByteBuffer();
+    assertArrayEquals(emptyBlockMD5Hash, output.array());
   }
 }
