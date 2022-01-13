@@ -34,7 +34,8 @@ public class TestExcludeList {
 
   @Test
   public void excludeNodesShouldBeCleanedBasedOnGivenTime() {
-    ExcludeList list = new ExcludeList(10, clock);
+    ExcludeList list = new ExcludeList(10);
+    list.setClock(clock);
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
@@ -55,7 +56,8 @@ public class TestExcludeList {
 
   @Test
   public void excludeNodeShouldNotBeCleanedIfExpiryTimeIsZero() {
-    ExcludeList list = new ExcludeList(0, clock);
+    ExcludeList list = new ExcludeList(0);
+    list.setClock(clock);
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))

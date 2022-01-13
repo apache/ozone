@@ -18,11 +18,14 @@
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,11 +51,16 @@ public class ExcludeList {
     datanodes = new HashMap<>();
     containerIds = new HashSet<>();
     pipelineIds = new HashSet<>();
+    clock = new MonotonicClock(ZoneOffset.UTC);
   }
 
-  public ExcludeList(long autoExpiryTime, java.time.Clock clock) {
+  public ExcludeList(long autoExpiryTime) {
     this();
     this.expiryTime = autoExpiryTime;
+  }
+
+  @VisibleForTesting
+  public void setClock(java.time.Clock clock){
     this.clock = clock;
   }
 
@@ -72,8 +80,8 @@ public class ExcludeList {
         datanodes.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<DatanodeDetails, Long> entry = iterator.next();
-      Long value = entry.getValue();
-      if (clock.millis() > value + expiryTime) {
+      Long storedExpiryTime = entry.getValue();
+      if (clock.millis() > storedExpiryTime) {
         iterator.remove(); // removing
       }
     }
@@ -84,7 +92,7 @@ public class ExcludeList {
   }
 
   public void addDatanode(DatanodeDetails dn) {
-    datanodes.put(dn, clock.millis());
+    datanodes.put(dn, clock.millis() + expiryTime);
   }
 
   public void addConatinerId(ContainerID containerId) {

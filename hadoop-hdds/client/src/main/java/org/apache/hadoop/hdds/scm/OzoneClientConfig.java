@@ -133,9 +133,9 @@ public class OzoneClientConfig {
 
   @Config(key = "exclude.nodes.expiry.time",
       defaultValue = "600000",
-      description = "Ozone EC client to remove the node from the exclude" +
-          " nodes. If this value configured to be zero, it will not removed" +
-          " any nodes from the exclude list.",
+      description = "Time after which an excluded node is reconsidered for" +
+          " writes in EC. If the value is zero, the node is excluded for the" +
+          " life of the client",
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
 
