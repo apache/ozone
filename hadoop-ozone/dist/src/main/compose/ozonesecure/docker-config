@@ -40,6 +40,7 @@ OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_ozone.recon.address=recon:9891
+OZONE-SITE.XML_ozone.scm.ratis.enable=false
 
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true

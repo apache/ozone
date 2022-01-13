@@ -106,6 +106,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         haEnabledPreFinalized);
     StorageContainerManager scm = TestUtils.getScm(conf);
+
     Assert.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
         scm.getUpgradeFinalizer().getStatus());
 
