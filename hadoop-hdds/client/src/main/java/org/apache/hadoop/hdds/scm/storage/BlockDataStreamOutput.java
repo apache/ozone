@@ -343,6 +343,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     while (len > 0) {
       final StreamBuffer buf = bufferList.get(count);
       final long writeLen = Math.min(buf.position(), len);
+      if (buffersForPutBlock == null) {
+        buffersForPutBlock = new ArrayList<>();
+      }
+      buffersForPutBlock.add(buf);
       final ByteBuffer duplicated = buf.duplicate();
       duplicated.position(0);
       duplicated.limit(buf.position());
