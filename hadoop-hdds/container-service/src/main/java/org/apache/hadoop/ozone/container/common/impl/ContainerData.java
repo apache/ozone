@@ -226,7 +226,7 @@ public abstract class ContainerData {
   }
 
   /**
-o  * Returns the layoutVersion of the actual container data format.
+   * Returns the layoutVersion of the actual container data format.
    * @return layoutVersion
    */
   public ContainerLayoutVersion getLayoutVersion() {
