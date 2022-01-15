@@ -149,13 +149,13 @@ public class TestKeyDeletingService {
             int numPendingDeletionKeys =
                 keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
             if (numPendingDeletionKeys != keyCount) {
-              LOG.error("Expected {} keys to be pending deletion, but got {}",
+              LOG.info("Expected {} keys to be pending deletion, but got {}",
                   keyCount, numPendingDeletionKeys);
               return false;
             }
             return true;
           } catch (IOException e) {
-            LOG.error("Error while getting pending deletion keys.");
+            LOG.error("Error while getting pending deletion keys.", e);
             return false;
           }
         }, 100, 2000);
