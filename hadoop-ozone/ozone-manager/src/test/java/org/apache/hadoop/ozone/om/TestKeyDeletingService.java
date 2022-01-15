@@ -121,7 +121,7 @@ public class TestKeyDeletingService {
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), 0);
   }
 
-  @Test(timeout = 30000)
+  @Test(timeout = 40000)
   public void checkIfDeleteServiceWithFailingSCM()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -137,6 +137,10 @@ public class TestKeyDeletingService {
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
+    // Wait for the KeyDeletingService to pick up all the keys.
+    // There isn't any time-consuming code after the deleteKey call - which can
+    // cause assertion failures.
+    Thread.sleep(2000);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
     Assert.assertEquals(
