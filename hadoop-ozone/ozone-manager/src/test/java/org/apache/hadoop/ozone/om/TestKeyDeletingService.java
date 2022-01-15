@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,6 +68,8 @@ public class TestKeyDeletingService {
   public TemporaryFolder folder = new TemporaryFolder();
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestKeyDeletingService.class);
 
   private OzoneConfiguration createConfAndInitValues() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -137,14 +141,26 @@ public class TestKeyDeletingService {
 
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
-    // Wait for the KeyDeletingService to pick up all the keys.
-    // There isn't any time-consuming code after the deleteKey call - which can
-    // cause assertion failures.
-    Thread.sleep(2000);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    Assert.assertEquals(
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            int numPendingDeletionKeys =
+                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
+
+            if (numPendingDeletionKeys != keyCount) {
+              LOG.error("Expected {} keys to be pending deletion, but got {}",
+                  keyCount, numPendingDeletionKeys);
+              return false;
+            }
+
+            return true;
+          } catch (IOException e) {
+            LOG.error("Error while getting pending deletion keys.");
+            return false;
+          }
+        }, 500, 2000);
     // Make sure that we have run the background thread 5 times more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 5,
