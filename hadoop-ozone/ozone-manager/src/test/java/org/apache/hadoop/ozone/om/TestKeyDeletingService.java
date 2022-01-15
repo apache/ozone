@@ -148,19 +148,17 @@ public class TestKeyDeletingService {
           try {
             int numPendingDeletionKeys =
                 keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
-
             if (numPendingDeletionKeys != keyCount) {
               LOG.error("Expected {} keys to be pending deletion, but got {}",
                   keyCount, numPendingDeletionKeys);
               return false;
             }
-
             return true;
           } catch (IOException e) {
             LOG.error("Error while getting pending deletion keys.");
             return false;
           }
-        }, 500, 2000);
+        }, 100, 2000);
     // Make sure that we have run the background thread 5 times more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 5,
