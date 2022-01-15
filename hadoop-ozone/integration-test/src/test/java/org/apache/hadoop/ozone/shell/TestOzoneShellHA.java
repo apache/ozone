@@ -911,6 +911,31 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testPutKeyOnBucketWithECReplicationConfig() throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+    getVolume(volumeName);
+    String bucketPath =
+        Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String[] args =
+        new String[] {"bucket", "create", bucketPath, "-t", "EC", "-r",
+            "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "put", bucketPath + Path.SEPARATOR + keyName,
+        testFilePathString};
+    execute(ozoneShell, args);
+    OzoneBucket bucket =
+        cluster.getClient().getObjectStore().getVolume(volumeName)
+            .getBucket(bucketName);
+    try (OzoneOutputStream out = bucket.createKey(keyName, 1024)) {
+      Assert.assertTrue(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+  }
+
+  @Test
   public void testCreateBucketWithRatisReplicationConfig() throws Exception {
     final String volumeName = "volume101";
     getVolume(volumeName);
