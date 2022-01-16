@@ -153,22 +153,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   /**
-   * Creates a new MiniOzoneCluster without the OzoneManager. This is used by
-   * {@link MiniOzoneOMHAClusterImpl} for starting multiple OzoneManagers.
-   *
-   * @param conf
-   * @param scm
-   * @param hddsDatanodes
-   */
-  MiniOzoneClusterImpl(OzoneConfiguration conf, StorageContainerManager scm,
-      List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer) {
-    this.conf = conf;
-    this.scm = scm;
-    this.hddsDatanodes = hddsDatanodes;
-    this.reconServer = reconServer;
-  }
-
-  /**
    * Creates a new MiniOzoneCluster without the OzoneManager and
    * StorageContainerManager. This is used by
    * {@link MiniOzoneHAClusterImpl} for starting multiple

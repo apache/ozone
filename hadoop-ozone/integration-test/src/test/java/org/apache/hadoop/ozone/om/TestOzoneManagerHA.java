@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -69,7 +69,7 @@ import static org.junit.Assert.fail;
  */
 public abstract class TestOzoneManagerHA {
 
-  private static MiniOzoneOMHAClusterImpl cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static MiniOzoneCluster.Builder clusterBuilder = null;
   private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
@@ -91,7 +91,7 @@ public abstract class TestOzoneManagerHA {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  public MiniOzoneOMHAClusterImpl getCluster() {
+  public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
   }
 
@@ -180,7 +180,7 @@ public abstract class TestOzoneManagerHA {
         .setOmId(omId)
         .setNumOfOzoneManagers(numOfOMs);
 
-    cluster = (MiniOzoneOMHAClusterImpl) clusterBuilder.build();
+    cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
         .getObjectStore();

@@ -16,7 +16,10 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.base.CaseFormat;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -29,6 +32,13 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 
 /**
  * Class contains metrics related to ReplicationManager.
@@ -50,6 +60,28 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   private static final MetricsInfo INFLIGHT_MOVE = Interns.info(
       "InflightMove",
       "Tracked inflight container move requests.");
+
+  // Setup metric names and descriptions for Container Lifecycle states
+  private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS
+      = Collections.unmodifiableMap(
+          new LinkedHashMap<LifeCycleState, MetricsInfo>() {{
+            for (LifeCycleState s : LifeCycleState.values()) {
+              String name = CaseFormat.UPPER_UNDERSCORE
+                  .to(CaseFormat.UPPER_CAMEL, s.toString());
+              String metric = "Num" + name + "Containers";
+              String description = "Containers in " + name + " state";
+              put(s, Interns.info(metric, description));
+            }
+          }});
+
+  // Setup metric names and descriptions for
+  private static final Map<HealthState, MetricsInfo>
+      CONTAINER_HEALTH_STATE_METRICS = Collections.unmodifiableMap(
+          new LinkedHashMap<HealthState, MetricsInfo>() {{
+            for (HealthState s :  HealthState.values()) {
+              put(s, Interns.info(s.getMetricName(), s.getDescription()));
+            }
+          }});
 
   @Metric("Number of replication commands sent.")
   private MutableCounterLong numReplicationCmdsSent;
@@ -109,6 +141,16 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         .addGauge(INFLIGHT_REPLICATION, getInflightReplication())
         .addGauge(INFLIGHT_DELETION, getInflightDeletion())
         .addGauge(INFLIGHT_MOVE, getInflightMove());
+
+    ReplicationManagerReport report = replicationManager.getContainerReport();
+    for (Map.Entry<HddsProtos.LifeCycleState, MetricsInfo> e :
+        LIFECYCLE_STATE_METRICS.entrySet()) {
+      builder.addGauge(e.getValue(), report.getStat(e.getKey()));
+    }
+    for (Map.Entry<ReplicationManagerReport.HealthState, MetricsInfo> e :
+        CONTAINER_HEALTH_STATE_METRICS.entrySet()) {
+      builder.addGauge(e.getValue(), report.getStat(e.getKey()));
+    }
 
     numReplicationCmdsSent.snapshot(builder, all);
     numReplicationCmdsCompleted.snapshot(builder, all);

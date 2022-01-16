@@ -122,9 +122,6 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
                 pathInfoFSO.getLeafNodeName());
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataManager, dbFileKey, keyName);
-        if (dbFileInfo != null) {
-          ozoneManager.getKeyManager().refresh(dbFileInfo);
-        }
       }
 
       // Check if a file or directory exists with same key name.
