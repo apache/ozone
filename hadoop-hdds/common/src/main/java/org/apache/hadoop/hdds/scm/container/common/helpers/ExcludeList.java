@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -54,13 +52,9 @@ public class ExcludeList {
     clock = new MonotonicClock(ZoneOffset.UTC);
   }
 
-  public ExcludeList(long autoExpiryTime) {
+  public ExcludeList(long autoExpiryTime, java.time.Clock clock) {
     this();
     this.expiryTime = autoExpiryTime;
-  }
-
-  @VisibleForTesting
-  public void setClock(java.time.Clock clock){
     this.clock = clock;
   }
 
@@ -69,22 +63,23 @@ public class ExcludeList {
   }
 
   public Set<DatanodeDetails> getDatanodes() {
+    Set<DatanodeDetails> dns = new HashSet<>();
     if (expiryTime > 0) {
-      cleanExpiredNodes();
-    }
-    return new HashSet<>(datanodes.keySet());
-  }
-
-  private void cleanExpiredNodes() {
-    Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
-        datanodes.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<DatanodeDetails, Long> entry = iterator.next();
-      Long storedExpiryTime = entry.getValue();
-      if (clock.millis() > storedExpiryTime) {
-        iterator.remove(); // removing
+      Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
+          datanodes.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Map.Entry<DatanodeDetails, Long> entry = iterator.next();
+        Long storedExpiryTime = entry.getValue();
+        if (clock.millis() > storedExpiryTime) {
+          iterator.remove(); // removing
+        } else {
+          dns.add(entry.getKey());
+        }
       }
+    } else {
+      dns = datanodes.keySet();
     }
+    return dns;
   }
 
   public void addDatanodes(Collection<DatanodeDetails> dns) {
