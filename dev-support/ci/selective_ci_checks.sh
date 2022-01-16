@@ -243,7 +243,6 @@ function get_count_junit_files() {
     start_end::group_start "Count junit test files"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
-        "^hadoop-ozone/dev-support/checks/integration.sh"
         "^hadoop-ozone/dev-support/checks/unit.sh"
         "src/test/java"
         "src/test/resources"
@@ -251,6 +250,28 @@ function get_count_junit_files() {
     filter_changed_files true
     COUNT_JUNIT_CHANGED_FILES=${match_count}
     readonly COUNT_JUNIT_CHANGED_FILES
+    start_end::group_end
+}
+
+function get_count_integration_files() {
+    start_end::group_start "Count integration test files"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
+        "^hadoop-ozone/dev-support/checks/integration.sh"
+        "^hadoop-ozone/integration-test"
+        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
+        "src/test/java"
+    )
+    local ignore_array=(
+        "^hadoop-hdds/.*/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/[a-eghj-z].*/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/insight/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/interface-client/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/interface-storage/src/test/java/.*/Test.*.java"
+    )
+    filter_changed_files true
+    COUNT_INTEGRATION_CHANGED_FILES=${match_count}
+    readonly COUNT_INTEGRATION_CHANGED_FILES
     start_end::group_end
 }
 
@@ -450,7 +471,7 @@ function calculate_test_types_to_run() {
         if [[ ${COUNT_COMPOSE_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             compose_tests_needed="true"
         fi
-        if [[ ${COUNT_JUNIT_CHANGED_FILES} != "0" ]]; then
+        if [[ ${COUNT_INTEGRATION_CHANGED_FILES} != "0" ]]; then
             integration_tests_needed="true"
         fi
         if [[ ${COUNT_KUBERNETES_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
@@ -507,6 +528,7 @@ get_count_all_files
 get_count_compose_files
 get_count_doc_files
 get_count_junit_files
+get_count_integration_files
 get_count_kubernetes_files
 get_count_robot_files
 get_count_misc_files
