@@ -110,7 +110,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       response = ratisHandler.submitRequest(
           scmRatisRequest);
     }
-    LOG.info("Invoking method {} on target {}, cost {}us",
+    LOG.trace("Invoking method {} on target {}, cost {}us",
         method, ratisHandler, (Time.monotonicNowNanos() - startTime) / 1000.0);
 
     if (response.isSuccess()) {
