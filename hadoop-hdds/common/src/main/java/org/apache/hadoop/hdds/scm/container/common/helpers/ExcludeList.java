@@ -25,12 +25,12 @@ import org.apache.hadoop.ozone.common.MonotonicClock;
 
 import java.time.ZoneOffset;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class contains set of dns and containers which ozone client provides
@@ -46,7 +46,7 @@ public class ExcludeList {
 
 
   public ExcludeList() {
-    datanodes = new HashMap<>();
+    datanodes = new ConcurrentHashMap<>();
     containerIds = new HashSet<>();
     pipelineIds = new HashSet<>();
     clock = new MonotonicClock(ZoneOffset.UTC);
