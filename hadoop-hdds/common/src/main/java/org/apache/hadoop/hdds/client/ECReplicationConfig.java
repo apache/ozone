@@ -184,4 +184,12 @@ public class ECReplicationConfig implements ReplicationConfig {
     return Objects.hash(data, parity, codec, ecChunkSize);
   }
 
+  @Override
+  public String toString() {
+    return HddsProtos.ReplicationType.EC + "/ECReplicationConfig{"
+        + "data=" + data
+        + ", parity=" + parity
+        + ", ecChunkSize=" + ecChunkSize
+        + ", codec=" + codec + '}';
+  }
 }
