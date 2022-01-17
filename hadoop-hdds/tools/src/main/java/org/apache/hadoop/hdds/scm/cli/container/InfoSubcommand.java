@@ -86,7 +86,8 @@ public class InfoSubcommand extends ScmSubcommand {
     } else {
       // Print container report info.
       LOG.info("Container id: {}", containerID);
-      boolean verbose = spec.root().userObject() instanceof GenericParentCommand
+      boolean verbose = spec != null
+          && spec.root().userObject() instanceof GenericParentCommand
           && ((GenericParentCommand) spec.root().userObject()).isVerbose();
       if (verbose) {
         LOG.info("Pipeline Info: {}", container.getPipeline());
