@@ -2014,7 +2014,7 @@
   </property>
   <property>
     <name>ozone.scm.ratis.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>Property to enable or disable Ratis server on SCM.
       Please note - this is a temporary property to disable SCM Ratis server.

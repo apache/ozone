@@ -108,7 +108,12 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         .getVolumeTable().get(volumeKey).getCreationTime();
     long modificationTime = omMetadataManager
         .getVolumeTable().get(volumeKey).getModificationTime();
-    Assert.assertTrue(modificationTime > creationTime);
+
+    // creationTime and modificationTime can be the same to the precision of a
+    // millisecond - since there is no time-consuming operation between
+    // TestOMRequestUtils.addVolumeToDB (sets creationTime) and
+    // preExecute (sets modificationTime).
+    Assert.assertTrue(modificationTime >= creationTime);
   }
 
   @Test
