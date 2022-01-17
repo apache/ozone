@@ -46,8 +46,7 @@ public class ContainerReplicaInfoTest {
 
     ContainerReplicaInfo info = ContainerReplicaInfo.fromProto(proto);
 
-    Assert.assertEquals(ContainerID.valueOf(proto.getContainerID()),
-        info.getContainerID());
+    Assert.assertEquals(proto.getContainerID(), info.getContainerID());
     Assert.assertEquals(proto.getBytesUsed(), info.getBytesUsed());
     Assert.assertEquals(proto.getKeyCount(), info.getKeyCount());
     Assert.assertEquals(proto.getPlaceOfBirth(),
