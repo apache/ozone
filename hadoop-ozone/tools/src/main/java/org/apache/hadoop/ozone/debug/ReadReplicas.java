@@ -53,7 +53,8 @@ import java.util.Map;
  * downloaded replicas.
  */
 @CommandLine.Command(name = "read-replicas",
-    description = "Reads a given keys every blocks every replica.")
+    description = "Reads every replica for all the blocks associated with a " +
+        "given key.")
 @MetaInfServices(SubcommandWithParent.class)
 public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
