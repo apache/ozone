@@ -672,11 +672,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
       <dependency>
         <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-core</artifactId>
-        <version>${jmh.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.openjdk.jmh</groupId>
         <artifactId>jmh-generator-annprocess</artifactId>
         <version>${jmh.version}</version>
       </dependency>
