@@ -102,7 +102,7 @@ public class BlockOutputStreamEntryPool {
         .setMultipartUploadPartNumber(partNumber).build();
     this.requestID = requestId;
     this.openID = openID;
-    this.excludeList = new ExcludeList();
+    this.excludeList = createExcludeList();
 
     this.bufferPool =
         new BufferPool(config.getStreamBufferSize(),
@@ -110,6 +110,10 @@ public class BlockOutputStreamEntryPool {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
+  }
+
+  ExcludeList createExcludeList() {
+    return new ExcludeList();
   }
 
   /**
