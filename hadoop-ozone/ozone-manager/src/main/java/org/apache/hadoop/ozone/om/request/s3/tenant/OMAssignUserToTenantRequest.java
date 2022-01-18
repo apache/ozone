@@ -328,6 +328,14 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       acquiredS3SecretLock = omMetadataManager.getLock()
           .acquireWriteLock(S3_SECRET_LOCK, accessId);
 
+      // Expect accessId absence from S3SecretTable
+      if (omMetadataManager.getS3SecretTable().isExist(accessId)) {
+        LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
+        throw new OMException("accessId '" + accessId +
+            "' already exists in S3SecretTable",
+            OMException.ResultCodes.TENANT_USER_ACCESSID_ALREADY_EXISTS);
+      }
+
       omMetadataManager.getS3SecretTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));

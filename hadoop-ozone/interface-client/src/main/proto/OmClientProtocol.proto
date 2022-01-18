@@ -1533,10 +1533,10 @@ message TenantRevokeAdminResponse {
 }
 
 message OmDBAccessInfo {
-  optional string principal = 1;
-  optional bool isAdmin = 2;
-  optional bool isDelegatedAdmin = 3;
-  optional string tenantId = 4;
+  optional string tenantId = 1;
+  optional string userPrincipal = 2;
+  optional bool isAdmin = 3;
+  optional bool isDelegatedAdmin = 4;
 }
 
 message GetS3VolumeResponse {

@@ -3022,13 +3022,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (s3Auth != null) {
       String accessID = s3Auth.getAccessId();
+      // TODO HDDS-6063: Volume lock is needed here along with the other
+      //  multi-tenant read requests.
       Optional<String> optionalTenantId =
           multiTenantManager.getTenantForAccessID(accessID);
 
       if (optionalTenantId.isPresent()) {
         String tenantId = optionalTenantId.get();
-        s3Volume = metadataManager.getTenantStateTable().get(tenantId)
-            .getBucketNamespaceName();
+        OmDBTenantInfo tenantInfo =
+            metadataManager.getTenantStateTable().get(tenantId);
+        if (tenantInfo != null) {
+          s3Volume = metadataManager.getTenantStateTable().get(tenantId)
+              .getBucketNamespaceName();
+        } else {
+          String message = "Expected to find a tenant for access ID " +
+              accessID +
+              " but no tenant was found. Possibly inconsistent OM DB!";
+          LOG.error(message);
+          throw new OMException(message, ResultCodes.TENANT_NOT_FOUND);
+        }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Get S3 volume request for access ID {} belonging to " +
                   "tenant {} is directed to the volume {}.", accessID, tenantId,
