@@ -48,8 +48,9 @@ import java.util.Date;
 import java.util.Map;
 
 /**
- * Class that for a given key downloads every blocks every replica and creates
- * a manifest file with information about the replicas.
+ * Class that downloads every replica for all the blocks associated with a
+ * given key. It also generates a manifest file with information about the
+ * downloaded replicas.
  */
 @CommandLine.Command(name = "read-replicas",
     description = "Reads a given keys every blocks every replica.")
