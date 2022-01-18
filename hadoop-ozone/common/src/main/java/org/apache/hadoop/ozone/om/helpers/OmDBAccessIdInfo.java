@@ -63,7 +63,7 @@ public final class OmDBAccessIdInfo {
    */
   public OzoneManagerProtocolProtos.OmDBAccessInfo getProtobuf() {
     return OzoneManagerProtocolProtos.OmDBAccessInfo.newBuilder()
-        .setPrincipal(userPrincipal)
+        .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
         .setIsDelegatedAdmin(isDelegatedAdmin)
         .setTenantId(tenantId)
@@ -76,7 +76,7 @@ public final class OmDBAccessIdInfo {
   public static OmDBAccessIdInfo getFromProtobuf(
       OzoneManagerProtocolProtos.OmDBAccessInfo infoProto) throws IOException {
     return new Builder()
-        .setKerberosPrincipal(infoProto.getPrincipal())
+        .setKerberosPrincipal(infoProto.getUserPrincipal())
         .setIsAdmin(infoProto.getIsAdmin())
         .setIsDelegatedAdmin(infoProto.getIsDelegatedAdmin())
         .setTenantId(infoProto.getTenantId())

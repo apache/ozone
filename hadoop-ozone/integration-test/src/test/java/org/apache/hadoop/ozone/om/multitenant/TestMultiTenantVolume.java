@@ -152,7 +152,7 @@ public class TestMultiTenantVolume {
     // Manually construct an object store instead of using the cluster
     // provided one so we can specify the access ID.
     RpcClient client = new RpcClient(conf, null);
-    client.setThreadLocalS3Auth(new S3Auth("unused1", "unused2", accessID));
+    client.setTheadLocalS3Auth(new S3Auth("unused1", "unused2", accessID));
     return new ObjectStore(conf, client);
   }
 }
