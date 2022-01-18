@@ -162,9 +162,9 @@ public final class OzoneClientUtils {
     // Priority 1: User passed replication config values.
     // Priority 2: Client side configured replication config values.
     /* if above two are not available, we should just return null and clients
-     can pass null replication config to server. Now will take the decision of
-     finding the replication config( either from bucket defaults or server
-     defaults). */
+     can pass null replication config to server. Now server will take the
+     decision of finding the replication config( either from bucket defaults
+     or server defaults). */
     ReplicationType clientReplicationType = null;
     String clientReplication = null;
     String clientConfiguredDefaultType =
