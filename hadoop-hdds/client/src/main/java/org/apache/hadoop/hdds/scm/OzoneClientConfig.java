@@ -131,6 +131,14 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int maxECStripeWriteRetries = 10;
 
+  @Config(key = "exclude.nodes.expiry.time",
+      defaultValue = "600000",
+      description = "Time after which an excluded node is reconsidered for" +
+          " writes in EC. If the value is zero, the node is excluded for the" +
+          " life of the client",
+      tags = ConfigTag.CLIENT)
+  private long excludeNodesExpiryTime = 10 * 60 * 1000;
+
   @PostConstruct
   private void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -233,6 +241,10 @@ public class OzoneClientConfig {
 
   public int getMaxECStripeWriteRetries() {
     return this.maxECStripeWriteRetries;
+  }
+
+  public long getExcludeNodesExpiryTime() {
+    return excludeNodesExpiryTime;
   }
 
   public int getBufferIncrement() {
