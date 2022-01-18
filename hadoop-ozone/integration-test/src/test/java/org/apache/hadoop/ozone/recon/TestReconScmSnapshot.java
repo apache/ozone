@@ -22,10 +22,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -37,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -49,7 +52,7 @@ public class TestReconScmSnapshot {
   @Rule
   public Timeout timeout = Timeout.seconds(100);
   private static OzoneConfiguration conf;
-  private static MiniOzoneCluster cluster;
+  private static MiniOzoneCluster ozoneCluster;
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -57,15 +60,24 @@ public class TestReconScmSnapshot {
     conf.setBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    ozoneCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(4)
         .includeRecon(true)
         .build();
-    cluster.waitForClusterToBeReady();
+    ozoneCluster.waitForClusterToBeReady();
   }
 
   @Test
   public void  testScmSnapshot() throws Exception {
+    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+        .captureLogs(LoggerFactory.getLogger(
+            StorageContainerServiceProviderImpl.class));
+    testSnapshot(ozoneCluster);
+    assertFalse(logCapture.getOutput()
+        .contains("Downloaded SCM Snapshot from Leader SCM"));
+  }
+
+  public static void testSnapshot(MiniOzoneCluster cluster) throws Exception{
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(LoggerFactory.getLogger(
         ReconStorageContainerManagerFacade.class));
@@ -122,8 +134,8 @@ public class TestReconScmSnapshot {
 
   @AfterClass
   public static void shutdown() throws Exception {
-    if (cluster != null) {
-      cluster.shutdown();
+    if (ozoneCluster != null) {
+      ozoneCluster.shutdown();
     }
   }
 }
