@@ -129,9 +129,9 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       JsonArray replicasJson = new JsonArray();
 
       blockIndex += 1;
-      blockJson.addProperty("block index", blockIndex);
-      blockJson.addProperty("container id", block.getKey().getContainerID());
-      blockJson.addProperty("local id", block.getKey().getLocalID());
+      blockJson.addProperty("blockIndex", blockIndex);
+      blockJson.addProperty("containerId", block.getKey().getContainerID());
+      blockJson.addProperty("localId", block.getKey().getLocalID());
       blockJson.addProperty("length", block.getKey().getLength());
       blockJson.addProperty("offset", block.getKey().getOffset());
 
