@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -66,23 +66,31 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       defaultValue = "4096")
   private int bufferSize;
 
-  @Option(names = { "-F", "--factor" },
-      description = "Replication factor (ONE, THREE)",
-      defaultValue = "THREE"
-  )
-  private ReplicationFactor factor = ReplicationFactor.THREE;
-
   @Option(
       names = "--om-service-id",
       description = "OM Service ID"
   )
   private String omServiceID = null;
 
+  @Option(names = {"--replication"},
+      description =
+          "Replication configuration of the new key. (this is replication "
+              + "specific. for RATIS/STANDALONE you can use ONE or THREE, " +
+              "for EC you can use rs-3-2-1024k, rs-6-3-1024 or rs-10-4-1024k.)"
+              + " Default is specified in the cluster-wide config.")
+  private String replication;
+
+  @Option(names = {"--type"},
+      description = "Replication type of the new key. (use RATIS or " +
+          "STAND_ALONE or EC) Default is specified in the cluster-wide config.")
+  private ReplicationType replicationType;
+
   private Timer timer;
 
   private OzoneBucket bucket;
   private ContentGenerator contentGenerator;
   private Map<String, String> metadata;
+  private ReplicationConfig replicationConfig;
 
   @Override
   public Void call() throws Exception {
@@ -93,6 +101,8 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
+    replicationConfig = ReplicationConfig.parse(replicationType, replication,
+        ozoneConfiguration);
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
@@ -111,8 +121,8 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OutputStream stream = bucket.createKey(key, keySize,
-              ReplicationType.RATIS, factor, metadata)) {
+      try(OutputStream stream = bucket.createKey(key, keySize,
+          replicationConfig, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }
