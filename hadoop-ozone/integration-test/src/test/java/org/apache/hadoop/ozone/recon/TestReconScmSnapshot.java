@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -38,7 +37,6 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -50,7 +48,7 @@ public class TestReconScmSnapshot {
    */
   @Rule
   public Timeout timeout = Timeout.seconds(100);
-  private static OzoneConfiguration conf;
+  private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 
   @Before
@@ -68,13 +66,7 @@ public class TestReconScmSnapshot {
 
   @Test
   public void testScmSnapshot() throws Exception {
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
-        .captureLogs(LoggerFactory.getLogger(
-            StorageContainerServiceProviderImpl.class));
     testSnapshot(ozoneCluster);
-    assertFalse(logCapture.getOutput()
-        .contains("Downloaded SCM Snapshot from Leader SCM"));
-    logCapture.clearOutput();
   }
 
   public static void testSnapshot(MiniOzoneCluster cluster) throws Exception{

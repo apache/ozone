@@ -20,17 +20,13 @@ package org.apache.hadoop.ozone.recon;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Test Recon SCM HA Snapshot Download implementation.
@@ -42,7 +38,7 @@ public class TestReconScmHASnapshot {
    */
   @Rule
   public Timeout timeout = Timeout.seconds(100);
-  private static OzoneConfiguration conf;
+  private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 
   @Before
@@ -62,13 +58,7 @@ public class TestReconScmHASnapshot {
 
   @Test
   public void testScmHASnapshot() throws Exception {
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
-        .captureLogs(LoggerFactory.getLogger(
-            StorageContainerServiceProviderImpl.class));
     TestReconScmSnapshot.testSnapshot(ozoneCluster);
-    assertTrue(logCapture.getOutput()
-        .contains("Downloaded SCM Snapshot from Leader SCM"));
-    logCapture.clearOutput();
   }
 
   @After
