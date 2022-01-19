@@ -134,7 +134,7 @@ public class TestOzoneClientProducer {
     try {
       producer.createClient();
       fail("testGetClientFailure");
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       Assert.assertTrue(ex instanceof IOException);
     }
   }
