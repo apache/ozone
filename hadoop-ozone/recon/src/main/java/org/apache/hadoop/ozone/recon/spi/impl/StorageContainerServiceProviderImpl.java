@@ -176,11 +176,12 @@ public class StorageContainerServiceProviderImpl
           }
           return null;
         });
+        LOG.info("Downloaded SCM Snapshot from SCM");
       } else {
         List<String> ratisRoles = scmClient.getScmInfo().getRatisPeerRoles();
         for (String ratisRole: ratisRoles) {
           String[] role = ratisRole.split(":");
-          if(role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
+          if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
             String hostAddress = role[4].trim();
             int grpcPort = configuration.getInt(
                 ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
