@@ -94,11 +94,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>activation</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.openjdk.jmh</groupId>
-      <artifactId>jmh-generator-annprocess</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-core</artifactId>
     </dependency>
