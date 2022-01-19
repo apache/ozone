@@ -161,6 +161,9 @@ public class GrpcReplicationClient implements AutoCloseable{
       try {
         chunk.getData().writeTo(stream);
       } catch (IOException e) {
+        LOG.error("Failed to write the stream buffer to {} for container {}",
+            outputPath, containerId, e);
+        deleteOutputOnFailure();
         response.completeExceptionally(e);
       }
     }
