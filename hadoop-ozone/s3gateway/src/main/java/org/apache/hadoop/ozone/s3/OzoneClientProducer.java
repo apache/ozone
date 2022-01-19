@@ -93,7 +93,7 @@ public class OzoneClientProducer {
       validateAccessId(awsAccessId);
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
-          awsAccessId);
+          awsAccessId, awsAccessId);
     } catch (OS3Exception ex) {
       LOG.debug("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);

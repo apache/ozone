@@ -1124,17 +1124,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public OmVolumeArgs getS3Volume() throws IOException {
+  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
     final GetS3VolumeRequest request = GetS3VolumeRequest.newBuilder()
         .build();
     final OMRequest omRequest = createOMRequest(Type.GetS3Volume)
         .setGetS3VolumeRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-    final GetS3VolumeResponse resp = handleError(omResponse)
-        .getGetS3VolumeResponse();
 
-    return OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
+    return handleError(omResponse).getGetS3VolumeResponse();
   }
 
   /**

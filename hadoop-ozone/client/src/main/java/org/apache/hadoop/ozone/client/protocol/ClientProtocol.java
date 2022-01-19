@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -54,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -124,11 +126,19 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * @return The {@link OzoneVolume} that should be used to for this S3
-   * request based on its access ID.
+   * @return Basically getS3VolumeInfo() but only return the OzoneVolume.
    * @throws IOException
    */
-  OzoneVolume getS3VolumeDetails() throws IOException;
+  OzoneVolume getS3Volume() throws IOException;
+
+  /**
+   * @return GetS3VolumeResponse includes the {@link OzoneVolume} that should
+   * be used to for this S3 request based on its access ID.
+   * @throws IOException
+   */
+  GetS3VolumeResponse getS3VolumeInfo() throws IOException;
+
+  OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**
    * Checks if a Volume exists and the user with a role specified has access

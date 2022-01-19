@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -154,7 +155,11 @@ public class ObjectStore {
   }
 
   public OzoneVolume getS3Volume() throws IOException {
-    return proxy.getS3VolumeDetails();
+    return proxy.getS3Volume();
+  }
+
+  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
+    return proxy.getS3VolumeInfo();
   }
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {

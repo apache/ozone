@@ -128,6 +128,8 @@ public class ObjectStoreStub extends ObjectStore {
     return getVolume(volumeName);
   }
 
+  // TODO: Add getS3VolumeInfo() if necessary
+
   @Override
   public void createS3Bucket(String s3BucketName) throws
       IOException {

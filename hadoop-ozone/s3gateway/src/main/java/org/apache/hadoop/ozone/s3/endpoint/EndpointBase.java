@@ -27,9 +27,12 @@ import java.util.function.Function;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -98,7 +101,16 @@ public abstract class EndpointBase {
   }
 
   protected OzoneVolume getVolume() throws IOException {
-    return client.getObjectStore().getS3Volume();
+    final GetS3VolumeResponse getS3VolumeResponse =
+        client.getObjectStore().getS3VolumeInfo();
+    // Set to the correct user principal to be used for KMS operations
+    s3Auth.setUserPrincipal(getS3VolumeResponse.getUserPrincipal());
+    final ClientProtocol proxy = getClient().getObjectStore().getClientProxy();
+    proxy.setTheadLocalS3Auth(s3Auth);
+
+    final OmVolumeArgs omVolumeArgs =
+        OmVolumeArgs.getFromProtobuf(getS3VolumeResponse.getVolumeInfo());
+    return proxy.buildOzoneVolume(omVolumeArgs);
   }
 
   /**

@@ -151,6 +151,7 @@ import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -3077,12 +3078,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public OmVolumeArgs getS3Volume() throws IOException {
+  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
     // to the default S3 volume.
     String s3Volume = HddsClientUtils.getDefaultS3VolumeName(configuration);
     S3Authentication s3Auth = getS3Auth();
+    // TODO: Double check return value
+    String userPrincipal = Server.getRemoteUser().getShortUserName();
 
     if (s3Auth != null) {
       String accessID = s3Auth.getAccessId();
@@ -3110,6 +3113,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                   "tenant {} is directed to the volume {}.", accessID, tenantId,
               s3Volume);
         }
+
+        // Inject user name to the response to be used for KMS on the client
+        userPrincipal = OzoneAclUtils.principalToAccessID(accessID);
       } else if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
             "requests to default s3 volume {}.", accessID, s3Volume);
@@ -3123,8 +3129,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           s3Volume);
     }
 
-    // This call performs acl checks and checks volume existence.
-    return getVolumeInfo(s3Volume);
+    // getVolumeInfo() performs acl checks and checks volume existence.
+    final GetS3VolumeResponse resp = GetS3VolumeResponse.newBuilder()
+        .setVolumeInfo(getVolumeInfo(s3Volume).getProtobuf())
+        .setUserPrincipal(userPrincipal)
+        .build();
+
+    return resp;
   }
 
   @Override

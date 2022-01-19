@@ -1543,6 +1543,8 @@ message OmDBAccessInfo {
 
 message GetS3VolumeResponse {
   optional VolumeInfo volumeInfo = 1;
+  // Piggybacked user name (principal) response to be used for KMS operations
+  optional string userPrincipal = 2;
 }
 
 /**

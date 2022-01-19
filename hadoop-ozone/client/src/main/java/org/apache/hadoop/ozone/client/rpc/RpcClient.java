@@ -116,6 +116,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -437,12 +438,18 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public OzoneVolume getS3VolumeDetails() throws IOException {
-    OmVolumeArgs volume = ozoneManagerClient.getS3Volume();
+  public OzoneVolume getS3Volume() throws IOException {
+    final GetS3VolumeResponse resp = getS3VolumeInfo();
+    OmVolumeArgs volume = OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
     return buildOzoneVolume(volume);
   }
 
-  private OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
+  @Override
+  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
+    return ozoneManagerClient.getS3VolumeInfo();
+  }
+
+  public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
     return new OzoneVolume(
         conf,
         this,
@@ -1062,8 +1069,11 @@ public class RpcClient implements ClientProtocol {
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
       UserGroupInformation proxyUser;
       if (getThreadLocalS3Auth() != null) {
+//        String userPrincipal = getThreadLocalS3Auth().getAccessID();
+        String userPrincipal = getThreadLocalS3Auth().getUserPrincipal();
+        Preconditions.checkNotNull(userPrincipal);
         UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
-            getThreadLocalS3Auth().getAccessID());
+            userPrincipal);
         proxyUser = UserGroupInformation.createProxyUser(
             s3gUGI.getShortUserName(), loginUser);
         decrypted = proxyUser.doAs(

@@ -25,12 +25,17 @@ public class S3Auth {
   private String signature;
   private String accessID;
   public static final String S3_AUTH_CHECK = "ozone.s3.auth.check";
+  // User principal to be used for KMS encryption and decryption
+  private String userPrincipal;
 
   public S3Auth(final String stringToSign,
-                final String signature, final String accessID) {
+                final String signature,
+                final String accessID,
+                final String userPrincipal) {
     this.accessID = accessID;
     this.stringToSign = stringToSign;
     this.signature = signature;
+    this.userPrincipal = userPrincipal;
   }
   public String getStringTosSign() {
     return stringToSign;
@@ -42,5 +47,13 @@ public class S3Auth {
 
   public String getAccessID() {
     return accessID;
+  }
+
+  public String getUserPrincipal() {
+    return userPrincipal;
+  }
+
+  public void setUserPrincipal(String userPrincipal) {
+    this.userPrincipal = userPrincipal;
   }
 }

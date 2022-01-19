@@ -228,7 +228,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       case GetS3Volume:
-        GetS3VolumeResponse s3VolumeResponse = getS3Volume();
+        GetS3VolumeResponse s3VolumeResponse = getS3VolumeInfo();
         responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
         break;
       case TenantGetUserInfo:
@@ -708,12 +708,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
-  private GetS3VolumeResponse getS3Volume()
+  private GetS3VolumeResponse getS3VolumeInfo()
       throws IOException {
-    OmVolumeArgs s3VolArgs = impl.getS3Volume();
-    return GetS3VolumeResponse.newBuilder()
-        .setVolumeInfo(s3VolArgs.getProtobuf())
-        .build();
+    return impl.getS3VolumeInfo();
   }
 
   public OzoneManager getOzoneManager() {
