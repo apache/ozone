@@ -253,7 +253,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if(quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
       builder.setQuotaInNamespace(quotaInNamespace);
     }
-    if(ownerName != null) {
+    if (ownerName != null) {
       builder.setOwnerName(ownerName);
     }
     return builder.build();
