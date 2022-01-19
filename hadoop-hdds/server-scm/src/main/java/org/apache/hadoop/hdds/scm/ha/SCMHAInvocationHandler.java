@@ -88,7 +88,9 @@ public class SCMHAInvocationHandler implements InvocationHandler {
    */
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
-    long startTime = Time.monotonicNowNanos();
+    LOG.trace("Invoking method {} on target {}", method, ratisHandler);
+    // If we do want to track time taken by ratis,
+    // it should be done via a metric and not via Info logging.
     Preconditions.checkNotNull(ratisHandler);
     SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
         method.getName(), method.getParameterTypes(), args);
@@ -109,14 +111,6 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     } else {
       response = ratisHandler.submitRequest(
           scmRatisRequest);
-    }
-
-    double elapsed = (Time.monotonicNowNanos() - startTime) / 1000.0;
-    String msg = "Invoking method {} on target {}, cost {}us";
-    if (response.isSuccess()) {
-      LOG.trace(msg, method, ratisHandler, elapsed);
-    } else {
-      LOG.info(msg, method, ratisHandler, elapsed);
     }
 
     if (response.isSuccess()) {
