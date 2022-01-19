@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -43,10 +43,10 @@ public class TestReconScmHASnapshot {
   @Rule
   public Timeout timeout = Timeout.seconds(100);
   private static OzoneConfiguration conf;
-  private static MiniOzoneCluster ozoneCluster;
+  private MiniOzoneCluster ozoneCluster = null;
 
-  @BeforeClass
-  public static void setup() throws Exception {
+  @Before
+  public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setBoolean(
@@ -68,10 +68,11 @@ public class TestReconScmHASnapshot {
     TestReconScmSnapshot.testSnapshot(ozoneCluster);
     assertTrue(logCapture.getOutput()
         .contains("Downloaded SCM Snapshot from Leader SCM"));
+    logCapture.clearOutput();
   }
 
-  @AfterClass
-  public static void shutdown() throws Exception {
+  @After
+  public void shutdown() throws Exception {
     if (ozoneCluster != null) {
       ozoneCluster.shutdown();
     }

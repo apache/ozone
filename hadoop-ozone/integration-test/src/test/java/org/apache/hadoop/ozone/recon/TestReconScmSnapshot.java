@@ -28,8 +28,8 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -51,10 +51,10 @@ public class TestReconScmSnapshot {
   @Rule
   public Timeout timeout = Timeout.seconds(100);
   private static OzoneConfiguration conf;
-  private static MiniOzoneCluster ozoneCluster;
+  private MiniOzoneCluster ozoneCluster = null;
 
-  @BeforeClass
-  public static void setup() throws Exception {
+  @Before
+  public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
@@ -67,13 +67,14 @@ public class TestReconScmSnapshot {
   }
 
   @Test
-  public void  testScmSnapshot() throws Exception {
+  public void testScmSnapshot() throws Exception {
     GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
         .captureLogs(LoggerFactory.getLogger(
             StorageContainerServiceProviderImpl.class));
     testSnapshot(ozoneCluster);
     assertFalse(logCapture.getOutput()
         .contains("Downloaded SCM Snapshot from Leader SCM"));
+    logCapture.clearOutput();
   }
 
   public static void testSnapshot(MiniOzoneCluster cluster) throws Exception{
@@ -131,8 +132,8 @@ public class TestReconScmSnapshot {
     assertEquals(keyCountAfter, keyCountBefore);
   }
 
-  @AfterClass
-  public static void shutdown() throws Exception {
+  @After
+  public void shutdown() throws Exception {
     if (ozoneCluster != null) {
       ozoneCluster.shutdown();
     }
