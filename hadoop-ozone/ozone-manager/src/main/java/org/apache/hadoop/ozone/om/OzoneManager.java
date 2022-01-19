@@ -3900,4 +3900,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
+
+  /**
+   * Get supported Bucket Layouts based on upgrade state.
+   * Before finalization, the method returns an empty list. This leads to the
+   * new client's OzoneClientAdapter and CreateBucketHandler receiving an empty
+   * list - which causes them to continue with LEGACY layout.
+   * After finalization, the method returns a list with the new layouts.
+   * @return Supported Bucket Layouts.
+   */
+  public List<BucketLayout> getSupportedBucketLayouts() {
+    // Check if we are in Pre-Finalize upgrade state.
+    if (versionManager.getUpgradeState() ==
+        UpgradeFinalizer.Status.FINALIZATION_REQUIRED) {
+      // We only allow LEGACY buckets to be created in Pre-Finalized state.
+      return Collections.emptyList();
+    }
+
+    // We are out of pre-finalize state, we can use the new layouts.
+    return Arrays.asList(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        BucketLayout.OBJECT_STORE);
+  }
 }
