@@ -130,7 +130,7 @@ public final class S3ErrorTable {
     OS3Exception err =  new OS3Exception(e.getCode(), e.getErrorMessage(),
         e.getHttpCode());
     err.setResource(resource);
-    LOG.error(err.toXml(), e);
+    LOG.debug(err.toXml(), e);
     return err;
   }
 }
