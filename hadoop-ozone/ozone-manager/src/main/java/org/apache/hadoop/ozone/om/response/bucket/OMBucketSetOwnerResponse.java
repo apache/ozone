@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -50,7 +51,20 @@ public class OMBucketSetOwnerResponse extends OMClientResponse {
    */
   public OMBucketSetOwnerResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
+    if (omResponse.getSuccess()) {
+      checkStatusNotOK();
+    }
+  }
+
+  @Override
+  public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    // When newOwner is the same as oldOwner, status is OK but success is false.
+    // We don't want to add it to DB batch in this case.
+    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK &&
+        getOMResponse().getSuccess()) {
+      addToDBBatch(omMetadataManager, batchOperation);
+    }
   }
 
   @Override

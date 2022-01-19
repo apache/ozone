@@ -780,6 +780,6 @@ public interface ClientProtocol {
    * @param owner to be set for the bucket
    * @throws IOException
    */
-  void setBucketOwner(String volumeName, String bucketName,
+  boolean setBucketOwner(String volumeName, String bucketName,
       String owner) throws IOException;
 }

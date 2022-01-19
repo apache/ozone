@@ -1581,7 +1581,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void setBucketOwner(String volumeName, String bucketName,
+  public boolean setBucketOwner(String volumeName, String bucketName,
       String owner) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
@@ -1590,6 +1590,6 @@ public class RpcClient implements ClientProtocol {
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setOwnerName(owner);
-    ozoneManagerClient.setBucketProperty(builder.build());
+    return ozoneManagerClient.setBucketOwner(builder.build());
   }
 }

@@ -48,7 +48,11 @@ public class UpdateBucketHandler extends BucketHandler {
         .getBucket(bucketName);
 
     if (ownerName != null && !ownerName.isEmpty()) {
-      bucket.setOwner(ownerName);
+      boolean result = bucket.setOwner(ownerName);
+      if (LOG.isDebugEnabled() && !result) {
+        out().format("Bucket '%s' owner is already '%s'. Unchanged.%n",
+            volumeName + "/" + bucketName, ownerName);
+      }
     }
 
     OzoneBucket updatedBucket = client.getObjectStore().getVolume(volumeName)

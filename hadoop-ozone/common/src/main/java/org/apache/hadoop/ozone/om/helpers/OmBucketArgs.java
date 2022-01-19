@@ -156,6 +156,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if(this.storageType != null){
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }
+    if (this.ownerName != null) {
+      auditMap.put(OzoneConsts.OWNER, this.ownerName);
+    }
     return auditMap;
   }
 

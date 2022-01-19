@@ -910,9 +910,10 @@ public class OzoneBucket extends WithMetadata {
    * @param userName new owner
    * @throws IOException
    */
-  public void setOwner(String userName) throws IOException{
-    proxy.setBucketOwner(volumeName, name, userName);
+  public boolean setOwner(String userName) throws IOException{
+    boolean result = proxy.setBucketOwner(volumeName, name, userName);
     this.owner = userName;
+    return result;
   }
 
   /**

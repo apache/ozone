@@ -315,6 +315,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
     assertEquals(ownerName, newOwner);
     assertNotEquals(oldOwner, newOwner);
+    store.getVolume(volumeName).deleteBucket(bucketName);
+    store.deleteVolume(volumeName);
   }
 
   @Test

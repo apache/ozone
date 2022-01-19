@@ -731,7 +731,7 @@ message SetBucketPropertyRequest {
 }
 
 message SetBucketPropertyResponse {
-
+    optional bool response = 1;
 }
 
 message DeleteBucketRequest {

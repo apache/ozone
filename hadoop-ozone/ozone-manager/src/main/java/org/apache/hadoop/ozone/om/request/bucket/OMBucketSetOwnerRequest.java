@@ -137,11 +137,14 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       if (oldOwner.equals(newOwner)) {
         LOG.warn("Bucket '{}/{}' owner is already user '{}'.",
             volumeName, bucketName, oldOwner);
-        omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
+        omResponse.setStatus(OzoneManagerProtocolProtos.Status.OK)
             .setMessage("Bucket '" + volumeName + "/" + bucketName +
                 "' owner is already '" + newOwner + "'.")
             .setSuccess(false);
-        return new OMBucketSetOwnerResponse(omResponse.build());
+        omResponse.setSetBucketPropertyResponse(
+            SetBucketPropertyResponse.newBuilder().setResponse(false).build());
+        omClientResponse = new OMBucketSetOwnerResponse(omResponse.build());
+        return omClientResponse;
       }
 
       omBucketInfo.setOwner(newOwner);
@@ -160,7 +163,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
 
       omResponse.setSetBucketPropertyResponse(
-          SetBucketPropertyResponse.newBuilder().build());
+          SetBucketPropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMBucketSetOwnerResponse(
           omResponse.build(), omBucketInfo);
     } catch (IOException ex) {
@@ -178,7 +181,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.UPDATE_BUCKET,
+    auditLog(auditLogger, buildAuditMessage(OMAction.SET_OWNER,
         omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.
