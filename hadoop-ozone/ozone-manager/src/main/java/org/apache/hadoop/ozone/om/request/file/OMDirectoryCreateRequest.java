@@ -113,7 +113,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) {
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateDirectoryRequest createDirectoryRequest =
         getOmRequest().getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);

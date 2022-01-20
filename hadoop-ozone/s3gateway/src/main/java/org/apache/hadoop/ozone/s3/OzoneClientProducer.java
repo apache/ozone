@@ -97,8 +97,6 @@ public class OzoneClientProducer {
 
       String awsAccessId = signatureInfo.getAwsAccessId();
       validateAccessId(awsAccessId);
-      // TODO: Once HDDS-4440 is merged, access ID should be passed
-      //  through the OM transport. Double check @erose
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
           awsAccessId);
@@ -122,28 +120,18 @@ public class OzoneClientProducer {
     ozoneConfiguration.setIfUnset(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
         OZONE_OM_CLIENT_PROTOCOL_VERSION);
 
-    // TODO: Added this snippet for a quick fix due to a conflict with HDDS-5883
-    //  Double check / optimize.
-    String accessId = null;
-    try {
-      accessId = signatureProcessor.parseSignature().getAwsAccessId();
-    } catch (OS3Exception e) {
-      LOG.error("Unable to parse signature to get accessId");
-    }
-
     if (omServiceID == null) {
-      return OzoneClientFactory.getRpcClient(ozoneConfiguration, accessId);
+      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
     } else {
       // As in HA case, we need to pass om service ID.
-      return OzoneClientFactory.getRpcClient(omServiceID,
-          ozoneConfiguration, accessId);
+      return OzoneClientFactory.getRpcClient(omServiceID, ozoneConfiguration);
     }
   }
 
   // ONLY validate aws access id when needed.
   private void validateAccessId(String awsAccessId) throws Exception {
     if (awsAccessId == null || awsAccessId.equals("")) {
-      LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
+      LOG.error("Malformed s3 header. awsAccessID: {}", awsAccessId);
       throw wrapOS3Exception(MALFORMED_HEADER);
     }
   }

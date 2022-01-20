@@ -1503,7 +1503,7 @@ message TenantRevokeAdminRequest {
 }
 
 message GetS3VolumeRequest {
-  optional string accessID = 1;
+
 }
 
 message CreateTenantResponse {
@@ -1530,6 +1530,13 @@ message TenantAssignAdminResponse {
 
 message TenantRevokeAdminResponse {
     optional bool success = 1;  // TODO: Remove this field
+}
+
+message OmDBAccessInfo {
+  optional string tenantId = 1;
+  optional string userPrincipal = 2;
+  optional bool isAdmin = 3;
+  optional bool isDelegatedAdmin = 4;
 }
 
 message GetS3VolumeResponse {

@@ -605,7 +605,7 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach");
   }
 
-  OmVolumeArgs getS3Volume(String accessID) throws IOException;
+  OmVolumeArgs getS3Volume() throws IOException;
 
   /**
    * Revoke user accessId to a tenant.

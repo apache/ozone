@@ -1102,9 +1102,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public OmVolumeArgs getS3Volume(String accessID) throws IOException {
+  public OmVolumeArgs getS3Volume() throws IOException {
     final GetS3VolumeRequest request = GetS3VolumeRequest.newBuilder()
-        .setAccessID(accessID)
         .build();
     final OMRequest omRequest = createOMRequest(Type.GetS3Volume)
         .setGetS3VolumeRequest(request)

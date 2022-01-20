@@ -23,7 +23,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.function.UnaryOperator;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -34,10 +33,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
@@ -50,9 +46,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class OzoneTokenIdentifier extends
     AbstractDelegationTokenIdentifier {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OzoneTokenIdentifier.class);
-
   public static final Text KIND_NAME = new Text("OzoneToken");
   private String omCertSerialId;
   private Type tokenType;
@@ -60,10 +53,6 @@ public class OzoneTokenIdentifier extends
   private String signature;
   private String strToSign;
   private String omServiceId;
-
-  // Function to convert an arbitrary accessId to the kerberos user that owns
-  // the accessId.
-  private UnaryOperator<String> getUserForAccessId;
 
   /**
    * Create an empty delegation token identifier.
@@ -118,24 +107,10 @@ public class OzoneTokenIdentifier extends
     return buf.getData();
   }
 
-  @Override
-  public UserGroupInformation getUser() {
-    if (getUserForAccessId != null && tokenType.equals(S3AUTHINFO)) {
-      // Should have been passed as accessId
-      String tokenUser = getOwner().toString();
-      String actualUserName = getUserForAccessId.apply(tokenUser);
-      if (actualUserName != null) {
-        LOG.debug("S3 Token user for {} : {}", tokenUser, actualUserName);
-        return UserGroupInformation.createRemoteUser(actualUserName);
-      }
-    }
-    return super.getUser();
-  }
-
-    /** Instead of relying on proto deserialization, this
-     *  provides  explicit deserialization for OzoneTokenIdentifier.
-     * @return byte[]
-     */
+  /** Instead of relying on proto deserialization, this
+   *  provides  explicit deserialization for OzoneTokenIdentifier.
+   * @return byte[]
+   */
   public OzoneTokenIdentifier fromUniqueSerializedKey(byte[] rawData)
       throws IOException {
     DataInputBuffer in = new DataInputBuffer();
@@ -391,10 +366,6 @@ public class OzoneTokenIdentifier extends
 
   public void setStrToSign(String strToSign) {
     this.strToSign = strToSign;
-  }
-
-  public void setGetUserForAccessId(UnaryOperator<String> func) {
-    this.getUserForAccessId = func;
   }
 
   @Override

@@ -133,17 +133,17 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Get User information which needs to be set in the OMRequest object.
    * @return User Info.
    */
-  public OzoneManagerProtocolProtos.UserInfo getUserInfo() {
+  public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder();
 
-    // If S3 Authentication is set, use AccessId as user.
+    // If S3 Authentication is set, determine user based on access ID.
     if (omRequest.hasS3Authentication()) {
-      // TODO: For tenant users, translate accessId to (short) username
-      //  with multiTenantManager.getUserNameGivenAccessId(accessId)
-      userInfo.setUserName(omRequest.getS3Authentication().getAccessId());
+      String principal = OzoneAclUtils.principalToAccessID(
+          omRequest.getS3Authentication().getAccessId());
+      userInfo.setUserName(principal);
     } else if (user != null) {
       // Added not null checks, as in UT's these values might be null.
       userInfo.setUserName(user.getUserName());
@@ -164,7 +164,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
-      OzoneManager ozoneManager) {
+      OzoneManager ozoneManager) throws IOException {
     OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
     if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()){
       OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =

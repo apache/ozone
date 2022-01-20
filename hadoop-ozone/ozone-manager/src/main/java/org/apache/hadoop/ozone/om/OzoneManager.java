@@ -251,7 +251,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESSID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -303,7 +302,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String omId;
 
   private OMMetadataManager metadataManager;
-  private OMMultiTenantManager multiTenantManagr;
+  private OMMultiTenantManager multiTenantManager;
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private KeyManager keyManager;
@@ -648,8 +647,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
-    multiTenantManagr = new OMMultiTenantManagerImpl(metadataManager,
+    multiTenantManager = new OMMultiTenantManagerImpl(metadataManager,
         configuration);
+    OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
@@ -887,7 +887,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setS3SecretManager(s3SecretManager)
         .setCertificateClient(certClient)
         .setOmServiceId(omNodeDetails.getServiceId())
-        .setOMMultiTenantManager(multiTenantManagr)
         .build();
   }
 
@@ -1356,7 +1355,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return metadata manager.
    */
   public OMMultiTenantManager getMultiTenantManager() {
-    return multiTenantManagr;
+    return multiTenantManager;
   }
 
   public OzoneBlockTokenSecretManager getBlockTokenMgr() {
@@ -2169,8 +2168,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     UserGroupInformation user;
     if (getS3Auth() != null) {
-      user = UserGroupInformation.createRemoteUser(
-          getS3Auth().getAccessId());
+      String principal =
+          OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId());
+      user = UserGroupInformation.createRemoteUser(principal);
     } else {
       user = ProtobufRpcEngine.Server.getRemoteUser();
     }
@@ -2994,14 +2994,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
     try {
       String userName = getRemoteUser().getUserName();
-      if (!multiTenantManagr.isTenantAdmin(userName, tenantId)
+      if (!multiTenantManager.isTenantAdmin(userName, tenantId)
           && !omAdminUsernames.contains(userName)) {
         throw new IOException("Only tenant and ozone admins can access this " +
             "API. '" + userName + "' is not an admin.");
       }
 
       final TenantUserList userList =
-          multiTenantManagr.listUsersInTenant(tenantId, prefix);
+          multiTenantManager.listUsersInTenant(tenantId, prefix);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           OMAction.TENANT_LIST_USER, auditMap));
       return userList;
@@ -3013,38 +3013,54 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public OmVolumeArgs getS3Volume(String accessID) throws IOException {
+  public OmVolumeArgs getS3Volume() throws IOException {
+    // Unless the OM request contains S3 authentication info with an access
+    // ID that corresponds to a tenant volume, the request will be directed
+    // to the default S3 volume.
+    String s3Volume = HddsClientUtils.getDefaultS3VolumeName(configuration);
+    S3Authentication s3Auth = getS3Auth();
 
-    final String tenantId;
-    try {
-      tenantId = multiTenantManagr.getTenantForAccessID(accessID);
-      // TODO: Get volume name from DB. Do not assume the same. e.g.
-      //metadataManager.getTenantStateTable().get(tenantId)
-      //    .getBucketNamespaceName();
-      final String volumeName = tenantId;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Get S3 volume request for access ID {} belonging to tenant" +
-                " {} is directed to the volume {}.", accessID, tenantId,
-            volumeName);
-      }
-      // This call performs acl checks and checks volume existence.
-      return getVolumeInfo(volumeName);
+    if (s3Auth != null) {
+      String accessID = s3Auth.getAccessId();
+      // TODO HDDS-6063: Volume lock is needed here along with the other
+      //  multi-tenant read requests.
+      Optional<String> optionalTenantId =
+          multiTenantManager.getTenantForAccessID(accessID);
 
-    } catch (OMException ex) {
-      if (ex.getResult().equals(INVALID_ACCESSID)) {
-        // If the user is not associated with a tenant, they will use the
-        // default s3 volume.
-        String defaultS3volume =
-            HddsClientUtils.getDefaultS3VolumeName(configuration);
-
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("No tenant found for access ID {}. Directing " +
-              "requests to default s3 volume {}.", accessID, defaultS3volume);
+      if (optionalTenantId.isPresent()) {
+        String tenantId = optionalTenantId.get();
+        OmDBTenantInfo tenantInfo =
+            metadataManager.getTenantStateTable().get(tenantId);
+        if (tenantInfo != null) {
+          s3Volume = metadataManager.getTenantStateTable().get(tenantId)
+              .getBucketNamespaceName();
+        } else {
+          String message = "Expected to find a tenant for access ID " +
+              accessID +
+              " but no tenant was found. Possibly inconsistent OM DB!";
+          LOG.error(message);
+          throw new OMException(message, ResultCodes.TENANT_NOT_FOUND);
         }
-        return getVolumeInfo(defaultS3volume);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Get S3 volume request for access ID {} belonging to " +
+                  "tenant {} is directed to the volume {}.", accessID, tenantId,
+              s3Volume);
+        }
+      } else if (LOG.isDebugEnabled()) {
+        LOG.debug("No tenant found for access ID {}. Directing " +
+            "requests to default s3 volume {}.", accessID, s3Volume);
       }
-      throw ex;
+    } else if (LOG.isDebugEnabled()) {
+      // An old S3 gateway talking to a new OM may not attach the auth info.
+      // This old version of s3g will also not have a client that supports
+      // multi-tenancy, so we can direct requests to the default S3 volume.
+      LOG.debug("S3 authentication was not attached to the OM request. " +
+          "Directing requests to the default S3 volume {}.",
+          s3Volume);
     }
+
+    // This call performs acl checks and checks volume existence.
+    return getVolumeInfo(s3Volume);
   }
 
   @Override
@@ -3769,20 +3785,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
 
     Pair<String, String> resolved;
-    try {
-      if (isAclEnabled) {
-        InetAddress remoteIp = Server.getRemoteIp();
-        resolved = resolveBucketLink(requested, new HashSet<>(),
-            Server.getRemoteUser(),
-            remoteIp,
-            remoteIp != null ? remoteIp.getHostName() :
-                omRpcAddress.getHostName());
-      } else {
-        resolved = resolveBucketLink(requested, new HashSet<>(),
-            null, null, null);
+    if (isAclEnabled) {
+      UserGroupInformation ugi = Server.getRemoteUser();
+      if (getS3Auth() != null) {
+        ugi = UserGroupInformation
+            .createRemoteUser(
+                OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId()));
       }
-    } catch (Throwable t) {
-      throw t;
+      InetAddress remoteIp = Server.getRemoteIp();
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          ugi,
+          remoteIp,
+          remoteIp != null ? remoteIp.getHostName() :
+              omRpcAddress.getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
     }
     return new ResolvedBucket(requested, resolved);
   }

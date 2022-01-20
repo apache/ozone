@@ -289,7 +289,6 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantId(tenantId)
           .setKerberosPrincipal(principal)
-          .setSharedSecret(s3SecretValue.getAwsSecret())
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
           .build();
@@ -325,21 +324,18 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
-      // Add to S3SecretTable.
-      // Note: S3SecretTable will be deprecated in the future.
+      // Add S3SecretTable cache entry
       acquiredS3SecretLock = omMetadataManager.getLock()
           .acquireWriteLock(S3_SECRET_LOCK, accessId);
 
       // Expect accessId absence from S3SecretTable
-      // TODO: This table might be merged with tenantAccessIdTable later.
       if (omMetadataManager.getS3SecretTable().isExist(accessId)) {
         LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
         throw new OMException("accessId '" + accessId +
             "' already exists in S3SecretTable",
-            OMException.ResultCodes.INVALID_REQUEST);
+            OMException.ResultCodes.TENANT_USER_ACCESSID_ALREADY_EXISTS);
       }
 
-      // Add S3SecretTable cache entry
       omMetadataManager.getS3SecretTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));
