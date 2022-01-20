@@ -97,16 +97,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 import static org.apache.hadoop.hdds.scm.TestUtils.getRandomPipelineReports;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.*;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_DEADNODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.junit.Assert.assertEquals;
@@ -182,6 +175,7 @@ public class TestSCMNodeManager {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     return conf;
   }
 

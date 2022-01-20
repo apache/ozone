@@ -880,13 +880,17 @@ public class RpcClient implements ClientProtocol {
     OzoneKMSUtil.checkCryptoProtocolVersion(feInfo);
     KeyProvider.KeyVersion decrypted = null;
     try {
-      // Do proxy thing only when current UGI not matching with login UGI
-      // In this way, proxying is done only for s3g where
-      // s3g can act as proxy to end user.
+
+      // After HDDS-5881 the user will not be different,
+      // as S3G uses single RpcClient. So we should be checking thread-local
+      // S3Auth and use it during proxy.
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
-      if (!ugi.getShortUserName().equals(loginUser.getShortUserName())) {
-        UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
-            ugi.getShortUserName(), loginUser);
+      UserGroupInformation proxyUser;
+      if (getThreadLocalS3Auth() != null) {
+        UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
+            getThreadLocalS3Auth().getAccessID());
+        proxyUser = UserGroupInformation.createProxyUser(
+            s3gUGI.getShortUserName(), loginUser);
         decrypted = proxyUser.doAs(
             (PrivilegedExceptionAction<KeyProvider.KeyVersion>) () -> {
               return OzoneKMSUtil.decryptEncryptedDataEncryptionKey(feInfo,
@@ -1642,5 +1646,18 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void clearTheadLocalS3Auth() {
     ozoneManagerClient.clearThreadLocalS3Auth();
+  }
+
+  @Override
+  public boolean setBucketOwner(String volumeName, String bucketName,
+      String owner) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(owner);
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
+    builder.setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setOwnerName(owner);
+    return ozoneManagerClient.setBucketOwner(builder.build());
   }
 }

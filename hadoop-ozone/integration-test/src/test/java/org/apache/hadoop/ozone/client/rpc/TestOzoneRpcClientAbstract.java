@@ -298,6 +298,28 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testBucketSetOwner() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    store.getVolume(volumeName).createBucket(bucketName);
+
+    String oldOwner = store.getVolume(volumeName).getBucket(bucketName)
+        .getOwner();
+    String ownerName = "testUser";
+
+    ClientProtocol proxy = store.getClientProxy();
+    proxy.setBucketOwner(volumeName, bucketName, ownerName);
+    String newOwner = store.getVolume(volumeName).getBucket(bucketName)
+        .getOwner();
+
+    assertEquals(ownerName, newOwner);
+    assertNotEquals(oldOwner, newOwner);
+    store.getVolume(volumeName).deleteBucket(bucketName);
+    store.deleteVolume(volumeName);
+  }
+
+  @Test
   public void testSetAndClrQuota() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

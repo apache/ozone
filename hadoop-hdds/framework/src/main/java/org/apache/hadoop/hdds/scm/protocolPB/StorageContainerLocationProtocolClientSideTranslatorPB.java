@@ -739,8 +739,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public boolean startContainerBalancer(
-      Optional<Double> threshold, Optional<Integer> idleiterations,
-      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Double> threshold, Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB) throws IOException{
@@ -751,8 +751,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     //make balancer configuration optional
     if (threshold.isPresent()) {
       double tsd = threshold.get();
-      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
-          "threshold should to be specified in range [0.0, 1.0).");
+      Preconditions.checkState(tsd >= 0.0D && tsd < 100D,
+          "threshold should be specified in range [0.0, 100.0).");
       builder.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {
@@ -761,22 +761,22 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
           "maxSizeToMovePerIterationInGB must be positive.");
       builder.setMaxSizeToMovePerIterationInGB(mstm);
     }
-    if (maxDatanodesRatioToInvolvePerIteration.isPresent()) {
-      double mdti = maxDatanodesRatioToInvolvePerIteration.get();
+    if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
+      int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
       Preconditions.checkState(mdti >= 0,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
               "greater than equal to zero.");
-      Preconditions.checkState(mdti <= 1,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
-              "lesser than equal to one.");
-      builder.setMaxDatanodesRatioToInvolvePerIteration(mdti);
+      Preconditions.checkState(mdti <= 100,
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
+              "lesser than equal to hundred.");
+      builder.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
     }
-    if (idleiterations.isPresent()) {
-      int idi = idleiterations.get();
-      Preconditions.checkState(idi > 0 || idi == -1,
-          "idleiterations must be positive or" +
-              " -1(infinitly run container balancer).");
-      builder.setIdleiterations(idi);
+    if (iterations.isPresent()) {
+      int i = iterations.get();
+      Preconditions.checkState(i > 0 || i == -1,
+          "number of iterations must be positive or" +
+              " -1 (for running container balancer infinitely).");
+      builder.setIterations(i);
     }
 
     if (maxSizeEnteringTargetInGB.isPresent()) {

@@ -27,7 +27,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -58,7 +58,7 @@ import org.slf4j.event.Level;
 @Timeout(500)
 public class TestOMRatisSnapshots {
 
-  private MiniOzoneOMHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -89,7 +89,7 @@ public class TestOMRatisSnapshots {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
-    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId("om-service-test1")

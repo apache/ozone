@@ -527,6 +527,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
+   * {@inheritDoc}
+   */
+  @Override
+  public boolean setBucketOwner(OmBucketArgs args)
+      throws IOException {
+    SetBucketPropertyRequest.Builder req =
+        SetBucketPropertyRequest.newBuilder();
+    BucketArgs bucketArgs = args.getProtobuf();
+    req.setBucketArgs(bucketArgs);
+
+    OMRequest omRequest = createOMRequest(Type.SetBucketProperty)
+        .setSetBucketPropertyRequest(req)
+        .build();
+
+    OMResponse omResponse = submitRequest(omRequest);
+    SetBucketPropertyResponse response =
+        handleError(omResponse).getSetBucketPropertyResponse();
+
+    return response.getResponse();
+  }
+
+  /**
    * List buckets in a volume.
    *
    * @param volumeName

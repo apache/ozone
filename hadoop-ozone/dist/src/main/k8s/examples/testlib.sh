@@ -116,7 +116,10 @@ regenerate_resources() {
     OZONE_ROOT=$(realpath ../../..)
   fi
 
-  flekszible generate -t mount:hostPath="$OZONE_ROOT",path=/opt/hadoop -t image:image=apache/ozone-runner:20200420-1 -t ozone/onenode
+  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
+  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+
+  flekszible generate -t mount:hostPath="$OZONE_ROOT",path=/opt/hadoop -t image:image=apache/ozone-runner:${runner_version} -t ozone/onenode
 }
 
 revert_resources() {

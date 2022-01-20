@@ -776,6 +776,16 @@ public interface ClientProtocol {
   void clearTheadLocalS3Auth();
 
   /**
+   * Sets the owner of bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param owner to be set for the bucket
+   * @throws IOException
+   */
+  boolean setBucketOwner(String volumeName, String bucketName,
+      String owner) throws IOException;
+
+  /**
    * Reads every replica for all the blocks associated with a given key.
    * @param volumeName Volume name.
    * @param bucketName Bucket name.
