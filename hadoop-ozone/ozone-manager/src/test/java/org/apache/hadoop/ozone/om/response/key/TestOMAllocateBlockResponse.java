@@ -113,6 +113,6 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
           OMResponse omResponse) {
     return new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
-            omBucketInfo);
+            omBucketInfo, getBucketLayout());
   }
 }

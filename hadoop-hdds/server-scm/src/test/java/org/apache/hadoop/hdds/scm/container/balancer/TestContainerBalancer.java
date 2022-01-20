@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -102,12 +103,13 @@ public class TestContainerBalancer {
     containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
 
-    balancerConfiguration = new ContainerBalancerConfiguration(conf);
-    balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setIdleIteration(1);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
     conf.setFromObject(balancerConfiguration);
     GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
 
@@ -145,7 +147,8 @@ public class TestContainerBalancer {
         .thenReturn(new ArrayList<>(cidToInfoMap.values()));
 
     containerBalancer = new ContainerBalancer(mockNodeManager, containerManager,
-        replicationManager, conf, SCMContext.emptyContext(), placementPolicy);
+        replicationManager, conf, SCMContext.emptyContext(),
+        new NetworkTopologyImpl(conf), placementPolicy);
   }
 
   @Test
@@ -173,7 +176,7 @@ public class TestContainerBalancer {
 
     // check for random threshold values
     for (int i = 0; i < 50; i++) {
-      double randomThreshold = RANDOM.nextDouble();
+      double randomThreshold = RANDOM.nextDouble() * 100;
 
       balancerConfiguration.setThreshold(randomThreshold);
       containerBalancer.start(balancerConfiguration);
@@ -208,7 +211,7 @@ public class TestContainerBalancer {
    */
   @Test
   public void unBalancedNodesListShouldBeEmptyWhenClusterIsBalanced() {
-    balancerConfiguration.setThreshold(0.99);
+    balancerConfiguration.setThreshold(99.99);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -228,10 +231,12 @@ public class TestContainerBalancer {
    */
   @Test
   public void containerBalancerShouldObeyMaxDatanodesToInvolveLimit() {
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(0.3d);
+    int percent = 20;
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(
+        percent);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
-    balancerConfiguration.setThreshold(0.01);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setThreshold(1);
+    balancerConfiguration.setIterations(1);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -243,7 +248,7 @@ public class TestContainerBalancer {
 
     Assert.assertFalse(
         containerBalancer.getCountDatanodesInvolvedPerIteration() >
-            (int) (0.3 * numberOfNodes));
+            (percent * numberOfNodes / 100));
     containerBalancer.stop();
   }
 
@@ -253,7 +258,7 @@ public class TestContainerBalancer {
     for (ContainerInfo containerInfo : cidToInfoMap.values()) {
       containerInfo.setState(HddsProtos.LifeCycleState.OPEN);
     }
-    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setThreshold(10);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -295,9 +300,9 @@ public class TestContainerBalancer {
 
   @Test
   public void containerBalancerShouldObeyMaxSizeToMoveLimit() {
-    balancerConfiguration.setThreshold(0.01);
+    balancerConfiguration.setThreshold(1);
     balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setIterations(1);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -315,9 +320,9 @@ public class TestContainerBalancer {
 
   @Test
   public void targetDatanodeShouldNotAlreadyContainSelectedContainer() {
-    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -342,9 +347,9 @@ public class TestContainerBalancer {
 
   @Test
   public void containerMoveSelectionShouldFollowPlacementPolicy() {
-    balancerConfiguration.setThreshold(0.1);
+    balancerConfiguration.setThreshold(10);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -384,10 +389,10 @@ public class TestContainerBalancer {
   @Test
   public void targetDatanodeShouldBeInServiceHealthy()
       throws NodeNotFoundException {
-    balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
     containerBalancer.start(balancerConfiguration);
 
     // waiting for balance completed.
@@ -411,10 +416,10 @@ public class TestContainerBalancer {
 
   @Test
   public void selectedContainerShouldNotAlreadyHaveBeenSelected() {
-    balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
 
     containerBalancer.start(balancerConfiguration);
 
@@ -437,10 +442,10 @@ public class TestContainerBalancer {
 
   @Test
   public void balancerShouldNotSelectConfiguredExcludeContainers() {
-    balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeEnteringTarget(5 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * OzoneConsts.GB);
     balancerConfiguration.setExcludeContainers("1, 4, 5");
 
     containerBalancer.start(balancerConfiguration);
@@ -464,30 +469,21 @@ public class TestContainerBalancer {
 
   @Test
   public void balancerShouldObeyMaxSizeEnteringTargetLimit() {
-    balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0d);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
 
     // no containers should be selected when the limit is zero
     balancerConfiguration.setMaxSizeEnteringTarget(0);
-    containerBalancer.start(balancerConfiguration);
+    boolean startResult = containerBalancer.start(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(500);
-    } catch (InterruptedException e) {}
-
-    containerBalancer.stop();
-    // balancer should have identified unbalanced nodes
-    Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
-    // no container should have been selected
-    Assert.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
+    Assert.assertFalse(startResult);
 
     // some containers should be selected when using default values
-    containerBalancer.start(
-        new ContainerBalancerConfiguration(new OzoneConfiguration()));
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ContainerBalancerConfiguration cbc = ozoneConfiguration.
+        getObject(ContainerBalancerConfiguration.class);
+    containerBalancer.start(cbc);
 
     // waiting for balance completed.
     // TODO: this is a temporary implementation for now
@@ -504,11 +500,11 @@ public class TestContainerBalancer {
 
   @Test
   public void testMetrics() {
-    balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
     balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     containerBalancer.start(balancerConfiguration);
 
@@ -539,11 +535,11 @@ public class TestContainerBalancer {
    */
   @Test
   public void balancerShouldFollowExcludeAndIncludeDatanodesConfigurations() {
-    balancerConfiguration.setThreshold(0.1);
-    balancerConfiguration.setIdleIteration(1);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
     balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
-    balancerConfiguration.setMaxDatanodesRatioToInvolvePerIteration(1.0);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     // only these nodes should be included
     // the ones also specified in excludeNodes should be excluded
@@ -589,16 +585,35 @@ public class TestContainerBalancer {
     }
   }
 
+  @Test
+  public void testContainerBalancerConfiguration() {
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set("ozone.scm.container.size", "5GB");
+    ozoneConfiguration.setDouble(
+        "hdds.container.balancer.utilization.threshold", 1);
+
+    ContainerBalancerConfiguration cbConf =
+        ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
+    Assert.assertEquals(1, cbConf.getThreshold(), 0.001);
+
+    Assert.assertEquals(26 * 1024 * 1024 * 1024L,
+        cbConf.getMaxSizeLeavingSource());
+
+    Assert.assertEquals(30 * 60 * 1000,
+        cbConf.getMoveTimeout().toMillis());
+  }
+
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
    *
-   * @param threshold A fraction from range 0 to 1.
+   * @param threshold A percentage in the range 0 to 100
    * @return List of DatanodeUsageInfo containing the expected(correct)
    * unBalanced nodes.
    */
   private List<DatanodeUsageInfo> determineExpectedUnBalancedNodes(
       double threshold) {
+    threshold /= 100;
     double lowerLimit = averageUtilization - threshold;
     double upperLimit = averageUtilization + threshold;
 

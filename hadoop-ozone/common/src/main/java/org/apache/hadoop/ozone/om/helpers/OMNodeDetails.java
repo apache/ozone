@@ -24,13 +24,14 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.NodeState;
 import org.apache.hadoop.hdds.NodeDetails;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
@@ -40,6 +41,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
  */
 public final class OMNodeDetails extends NodeDetails {
   private int rpcPort;
+  private boolean isDecommissioned = false;
 
   /**
    * Constructs OMNodeDetails object.
@@ -59,6 +61,14 @@ public final class OMNodeDetails extends NodeDetails {
     super(serviceId, nodeId, hostAddr, rpcPort, ratisPort, httpAddress,
         httpsAddress);
     this.rpcPort = rpcPort;
+  }
+
+  public void setDecommissioningState() {
+    isDecommissioned = true;
+  }
+
+  public boolean isDecommissioned() {
+    return isDecommissioned;
   }
 
   @Override
@@ -153,13 +163,13 @@ public final class OMNodeDetails extends NodeDetails {
     if (isHttpPolicy) {
       if (StringUtils.isNotEmpty(getHttpAddress())) {
         return "http://" + getHttpAddress() +
-            OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT +
+            OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
             "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     } else {
       if (StringUtils.isNotEmpty(getHttpsAddress())) {
         return "https://" + getHttpsAddress() +
-            OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT +
+            OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
             "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     }
@@ -218,15 +228,22 @@ public final class OMNodeDetails extends NodeDetails {
         .setHostAddress(getHostAddress())
         .setRpcPort(getRpcPort())
         .setRatisPort(getRatisPort())
+        .setNodeState(isDecommissioned ?
+            NodeState.DECOMMISSIONED : NodeState.ACTIVE)
         .build();
   }
 
   public static OMNodeDetails getFromProtobuf(OMNodeInfo omNodeInfo) {
-    return new Builder()
+    OMNodeDetails nodeDetails = new Builder()
         .setOMNodeId(omNodeInfo.getNodeID())
         .setHostAddress(omNodeInfo.getHostAddress())
         .setRpcPort(omNodeInfo.getRpcPort())
         .setRatisPort(omNodeInfo.getRatisPort())
         .build();
+    if (omNodeInfo.hasNodeState() &&
+        omNodeInfo.getNodeState().equals(NodeState.DECOMMISSIONED)) {
+      nodeDetails.setDecommissioningState();
+    }
+    return nodeDetails;
   }
 }

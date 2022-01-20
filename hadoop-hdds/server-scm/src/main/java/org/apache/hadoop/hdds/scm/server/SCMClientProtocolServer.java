@@ -744,18 +744,18 @@ public class SCMClientProtocolServer implements
 
   @Override
   public boolean startContainerBalancer(
-      Optional<Double> threshold, Optional<Integer> idleiterations,
-      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Double> threshold, Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTarget,
       Optional<Long> maxSizeLeavingSource) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     ContainerBalancerConfiguration cbc =
-        new ContainerBalancerConfiguration(scm.getConfiguration());
+        scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     if (threshold.isPresent()) {
       double tsd = threshold.get();
-      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
-          "threshold should to be specified in range [0.0, 1.0).");
+      Preconditions.checkState(tsd >= 0.0D && tsd < 100.0D,
+          "threshold should be specified in range [0.0, 100.0).");
       cbc.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {
@@ -764,22 +764,22 @@ public class SCMClientProtocolServer implements
           "maxSizeToMovePerIterationInGB must be positive.");
       cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
     }
-    if (maxDatanodesRatioToInvolvePerIteration.isPresent()) {
-      double mdti = maxDatanodesRatioToInvolvePerIteration.get();
-      Preconditions.checkState(mdti >= 0.0,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
+    if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
+      int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
+      Preconditions.checkState(mdti >= 0,
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
               "greater than equal to zero.");
-      Preconditions.checkState(mdti <= 1,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
-              "lesser than or equal to one.");
-      cbc.setMaxDatanodesRatioToInvolvePerIteration(mdti);
+      Preconditions.checkState(mdti <= 100,
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
+              "lesser than or equal to 100.");
+      cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
     }
-    if (idleiterations.isPresent()) {
-      int idi = idleiterations.get();
-      Preconditions.checkState(idi > 0 || idi == -1,
-          "idleiterations must be positive or" +
-              " -1(infinitly run container balancer).");
-      cbc.setIdleIteration(idi);
+    if (iterations.isPresent()) {
+      int i = iterations.get();
+      Preconditions.checkState(i > 0 || i == -1,
+          "number of iterations must be positive or" +
+              " -1 (for running container balancer infinitely).");
+      cbc.setIterations(i);
     }
 
     if (maxSizeEnteringTarget.isPresent()) {
@@ -807,7 +807,7 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteFailure(buildAuditMessageForSuccess(
           SCMAction.START_CONTAINER_BALANCER, null));
     }
-    return  isStartedSuccessfully;
+    return isStartedSuccessfully;
   }
 
   @Override
@@ -943,6 +943,11 @@ public class SCMClientProtocolServer implements
 
     return scm.getContainerTokenGenerator()
         .generateToken(remoteUser.getUserName(), containerID);
+  }
+
+  @Override
+  public long getContainerCount() throws IOException {
+    return scm.getContainerManager().getContainers().size();
   }
 
   /**

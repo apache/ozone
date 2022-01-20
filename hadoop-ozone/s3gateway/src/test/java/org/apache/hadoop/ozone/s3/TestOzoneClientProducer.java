@@ -132,6 +132,39 @@ public class TestOzoneClientProducer {
     }
   }
 
+  @Test
+  public void testGetClientFailureWithMultipleServiceIds() {
+    try {
+      OzoneConfiguration configuration = new OzoneConfiguration();
+      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
+      producer.setOzoneConfiguration(configuration);
+      producer.createClient();
+      fail("testGetClientFailureWithMultipleServiceIds");
+    } catch (Exception ex) {
+      Assert.assertTrue(ex instanceof IOException);
+      Assert.assertTrue(ex.getMessage().contains(
+          "More than 1 OzoneManager ServiceID"));
+    }
+  }
+
+  @Test
+  public void testGetClientFailureWithMultipleServiceIdsAndInternalServiceId() {
+    try {
+      OzoneConfiguration configuration = new OzoneConfiguration();
+      configuration.set(OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID, "ozone1");
+      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
+      producer.setOzoneConfiguration(configuration);
+      producer.createClient();
+      fail("testGetClientFailureWithMultipleServiceIdsAndInternalServiceId");
+    } catch (Exception ex) {
+      Assert.assertTrue(ex instanceof IOException);
+      // Still test will fail, as config is not complete. But it should pass
+      // the service id check.
+      Assert.assertFalse(ex.getMessage().contains(
+          "More than 1 OzoneManager ServiceID"));
+    }
+  }
+
   private void setupContext() throws Exception {
     headerMap.putSingle(AUTHORIZATION_HEADER, authHeader);
     headerMap.putSingle(CONTENT_MD5, contentMd5);
