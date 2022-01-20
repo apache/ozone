@@ -263,6 +263,7 @@ public final class OmUtils {
     case ListMultipartUploads:
     case FinalizeUpgradeProgress:
     case PrepareStatus:
+    case GetSupportedBucketLayouts:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

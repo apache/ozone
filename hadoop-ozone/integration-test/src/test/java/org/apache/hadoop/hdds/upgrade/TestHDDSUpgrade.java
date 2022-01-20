@@ -78,10 +78,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
@@ -485,46 +481,6 @@ public class TestHDDSUpgrade {
     store.getVolume("vol1").getBucket("buc1").createKey("key1", 100,
         ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
 
-  }
-
-  /**
-   * The {@code OzoneManager.getSupportedBucketLayouts()} method should return
-   * an empty list when the OM is in pre-finalize state.
-   * When the upgrade is finalized, the OM should return the list of supported
-   * bucket layouts.
-   *
-   * @throws Exception
-   */
-  @Test
-  public void testSupportedBucketLayoutsDuringUpgrade() throws Exception {
-    OzoneManager ozoneManager = cluster.getOzoneManager();
-    OMLayoutVersionManager versionManager = ozoneManager.getVersionManager();
-
-    // Transition into pre-finalization state.
-    versionManager.setUpgradeState(FINALIZATION_REQUIRED);
-
-    // Supported Bucket Layouts list should be empty in pre-finalization state.
-    Assert.assertEquals(0, ozoneManager.getSupportedBucketLayouts().size());
-
-    // finalize the upgrade.
-    versionManager.setUpgradeState(STARTING_FINALIZATION);
-    OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
-    finalizer.finalize(ozoneManager.getOMNodeId(), ozoneManager);
-
-    // Wait for the upgrade to finalize.
-    GenericTestUtils.waitFor(
-        () -> versionManager.getUpgradeState() != FINALIZATION_DONE, 100,
-        20000);
-
-    // Get the list of supported bucket layouts from OM.
-    List<BucketLayout> supportedLayouts =
-        ozoneManager.getSupportedBucketLayouts();
-
-    // After finalization, OM should support OBS and FSO bucket layouts.
-    Assert.assertEquals(2, supportedLayouts.size());
-    Assert.assertTrue(supportedLayouts.contains(BucketLayout.OBJECT_STORE));
-    Assert.assertTrue(
-        supportedLayouts.contains(BucketLayout.FILE_SYSTEM_OPTIMIZED));
   }
 
   /*

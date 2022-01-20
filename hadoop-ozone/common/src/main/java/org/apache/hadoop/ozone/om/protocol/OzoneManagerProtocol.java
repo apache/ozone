@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
@@ -698,6 +699,17 @@ public interface OzoneManagerProtocol
    */
   List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
+
+  /**
+   * Get supported Bucket Layouts based on upgrade state.
+   * Before finalization, the method returns an empty list. This leads to the
+   * new client's OzoneClientAdapter and CreateBucketHandler receiving an empty
+   * list - which causes them to continue with LEGACY layout.
+   * After finalization, the method returns a list with the new layouts.
+   *
+   * @return Supported Bucket Layouts.
+   */
+  List<BucketLayout> getSupportedBucketLayouts() throws IOException;
 
   /**
    * Recover trash allows the user to recover keys that were marked as deleted,

@@ -3907,6 +3907,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * new client's OzoneClientAdapter and CreateBucketHandler receiving an empty
    * list - which causes them to continue with LEGACY layout.
    * After finalization, the method returns a list with the new layouts.
+   *
    * @return Supported Bucket Layouts.
    */
   public List<BucketLayout> getSupportedBucketLayouts() {

@@ -102,6 +102,8 @@ enum Type {
   RevokeS3Secret = 93;
 
   PurgePaths = 94;
+
+  GetSupportedBucketLayouts = 95;
 }
 
 message OMRequest {
@@ -186,6 +188,8 @@ message OMRequest {
   optional PurgePathsRequest                purgePathsRequest              = 94;
 
   optional S3Authentication                 s3Authentication               = 95;
+
+  optional GetSupportedBucketLayoutsRequest getSupportedBucketLayoutsRequest = 96;
 }
 
 message OMResponse {
@@ -262,6 +266,8 @@ message OMResponse {
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
   optional PurgePathsResponse                 purgePathsResponse           = 93;
+
+  optional GetSupportedBucketLayoutsResponse  getSupportedBucketLayoutsResponse = 94;
 }
 
 enum Status {
@@ -1356,6 +1362,14 @@ message S3Authentication {
     optional string stringToSign = 1;
     optional string signature = 2;
     optional string accessId = 3;
+}
+
+message GetSupportedBucketLayoutsRequest {
+
+}
+
+message GetSupportedBucketLayoutsResponse {
+    repeated BucketLayoutProto supportedBucketLayouts = 1;
 }
 
 /**

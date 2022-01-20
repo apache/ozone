@@ -19,9 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -56,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
@@ -1706,5 +1705,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   public void setS3AuthCheck(boolean s3AuthCheck) {
     this.s3AuthCheck = s3AuthCheck;
+  }
+
+  /**
+   * Returns a list of supported bucket layouts based on the upgrade state.
+   *
+   * @return list of supported bucket layouts
+   * @throws IOException
+   */
+  @Override
+  public List<BucketLayout> getSupportedBucketLayouts() throws IOException {
+    GetSupportedBucketLayoutsRequest getSupportedBucketLayoutsRequest =
+        GetSupportedBucketLayoutsRequest.newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(
+        Type.GetSupportedBucketLayouts).setGetSupportedBucketLayoutsRequest(
+        getSupportedBucketLayoutsRequest).build();
+
+    GetSupportedBucketLayoutsResponse getSupportedBucketLayoutsResponse =
+        handleError(
+            submitRequest(omRequest)).getGetSupportedBucketLayoutsResponse();
+
+    List<BucketLayout> supportedLayouts = new ArrayList<>();
+
+    getSupportedBucketLayoutsResponse
+        .getSupportedBucketLayoutsList().forEach(
+            (BucketLayoutProto bucketLayoutProto) -> supportedLayouts.add(
+                BucketLayout.fromProto(bucketLayoutProto)));
+
+    return supportedLayouts;
   }
 }

@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
@@ -772,6 +773,13 @@ public interface ClientProtocol {
    * Clears the S3 Authentication information attached to the thread.
    */
   void clearTheadLocalS3Auth();
+
+  /**
+   * Get supported Bucket Layouts based on OM's upgrade state.
+   *
+   * @return Supported Bucket Layouts.
+   */
+  List<BucketLayout> getSupportedBucketLayouts() throws IOException;
 
   /**
    * Sets the owner of bucket.
