@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.multitenant;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -28,12 +27,10 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.jupiter.api.AfterAll;
 
 import java.util.UUID;
 
@@ -43,34 +40,23 @@ import java.util.UUID;
  * volume.
  */
 public class TestMultiTenantVolume {
-  private static MiniOzoneClusterProvider clusterProvider;
-  private MiniOzoneCluster cluster;
+  private static MiniOzoneCluster cluster;
   private static String s3VolumeName;
 
   @BeforeClass
-  public static void initClusterProvider() {
+  public static void initClusterProvider() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes();
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 2);
+    cluster = builder.build();
     s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
-  @Before
-  public void setup() throws Exception {
-    cluster = clusterProvider.provide();
-  }
-
-  @After
-  public void teardown() throws Exception {
-    clusterProvider.destroy(cluster);
-  }
-
-  @AfterAll
-  public static void shutdownClusterProvider() throws Exception {
-    clusterProvider.shutdown();
+  @AfterClass
+  public static void shutdownClusterProvider() {
+    cluster.shutdown();
   }
 
   @Test

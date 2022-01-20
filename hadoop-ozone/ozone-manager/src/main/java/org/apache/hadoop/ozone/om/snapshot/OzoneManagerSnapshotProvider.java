@@ -163,4 +163,11 @@ public class OzoneManagerSnapshotProvider {
   public void addNewPeerNode(OMNodeDetails newOMNode) {
     peerNodesMap.put(newOMNode.getNodeId(), newOMNode);
   }
+
+  /**
+   * When an OM is decommissioned, remove it from the peerNode map.
+   */
+  public void removeDecommissionedPeerNode(String decommNodeId) {
+    peerNodesMap.remove(decommNodeId);
+  }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.DUFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -72,7 +74,7 @@ public class ContainerBalancer {
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
   private long sizeMovedPerIteration;
-  private int idleIteration;
+  private int iterations;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
@@ -85,6 +87,8 @@ public class ContainerBalancer {
   private long clusterUsed;
   private long clusterRemaining;
   private double clusterAvgUtilisation;
+  private PlacementPolicy placementPolicy;
+  private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
   private volatile boolean balancerRunning;
@@ -115,12 +119,14 @@ public class ContainerBalancer {
       ReplicationManager replicationManager,
       OzoneConfiguration ozoneConfiguration,
       final SCMContext scmContext,
+      NetworkTopology networkTopology,
       PlacementPolicy placementPolicy) {
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
     this.replicationManager = replicationManager;
     this.ozoneConfiguration = ozoneConfiguration;
-    this.config = new ContainerBalancerConfiguration(ozoneConfiguration);
+    this.config = ozoneConfiguration.
+        getObject(ContainerBalancerConfiguration.class);
     this.metrics = ContainerBalancerMetrics.create();
     this.scmContext = scmContext;
 
@@ -129,10 +135,10 @@ public class ContainerBalancer {
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
+    this.placementPolicy = placementPolicy;
+    this.networkTopology = networkTopology;
 
     this.lock = new ReentrantLock();
-    findTargetStrategy = new FindTargetGreedy(
-        containerManager, placementPolicy, nodeManager);
     findSourceStrategy = new FindSourceGreedy(nodeManager);
   }
 
@@ -149,9 +155,12 @@ public class ContainerBalancer {
         return false;
       }
 
-      balancerRunning = true;
       this.config = balancerConfiguration;
-      this.ozoneConfiguration = config.getOzoneConfiguration();
+      if (!validateConfiguration(config)) {
+        return false;
+      }
+      ozoneConfiguration.setFromObject(balancerConfiguration);
+      balancerRunning = true;
       LOG.info("Starting Container Balancer...{}", this);
 
       //we should start a new balancer thread async
@@ -170,16 +179,12 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    this.idleIteration = config.getIdleIteration();
-    if(this.idleIteration == -1) {
+    this.iterations = config.getIterations();
+    if(this.iterations == -1) {
       //run balancer infinitely
-      this.idleIteration = Integer.MAX_VALUE;
+      this.iterations = Integer.MAX_VALUE;
     }
-    this.threshold = config.getThreshold();
-    this.maxDatanodesRatioToInvolvePerIteration =
-        config.getMaxDatanodesRatioToInvolvePerIteration();
-    this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
-    for (int i = 0; i < idleIteration && balancerRunning; i++) {
+    for (int i = 0; i < iterations && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
         stop();
@@ -202,7 +207,7 @@ public class ContainerBalancer {
 
       // wait for configured time before starting next iteration, unless
       // this was the final iteration
-      if (i != idleIteration - 1) {
+      if (i != iterations - 1) {
         synchronized (this) {
           try {
             wait(config.getBalancingInterval().toMillis());
@@ -243,6 +248,17 @@ public class ContainerBalancer {
             "Manager.");
       }
       return false;
+    }
+    this.threshold = config.getThresholdAsRatio();
+    this.maxDatanodesRatioToInvolvePerIteration =
+        config.getMaxDatanodesRatioToInvolvePerIteration();
+    this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
+    if (config.getNetworkTopologyEnable()) {
+      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
+          containerManager, placementPolicy, nodeManager, networkTopology);
+    } else {
+      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
+          placementPolicy, nodeManager);
     }
     this.excludeNodes = config.getExcludeNodes();
     this.includeNodes = config.getIncludeNodes();
@@ -367,11 +383,6 @@ public class ContainerBalancer {
     try {
       // match each overUtilized node with a target
       while (true) {
-        DatanodeDetails source =
-            findSourceStrategy.getNextCandidateSourceDataNode();
-        if (source == null) {
-          break;
-        }
         if (!isBalancerRunning()) {
           return IterationResult.ITERATION_INTERRUPTED;
         }
@@ -379,6 +390,12 @@ public class ContainerBalancer {
         IterationResult result = checkConditionsForBalancing();
         if (result != null) {
           return result;
+        }
+
+        DatanodeDetails source =
+            findSourceStrategy.getNextCandidateSourceDataNode();
+        if (source == null) {
+          break;
         }
 
         ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
@@ -506,7 +523,7 @@ public class ContainerBalancer {
   }
 
   /**
-   * Checks if limits maxDatanodesRatioToInvolvePerIteration and
+   * Checks if limits maxDatanodesPercentageToInvolvePerIteration and
    * maxSizeToMovePerIteration have not been hit.
    *
    * @return {@link IterationResult#MAX_DATANODES_TO_INVOLVE_REACHED} if reached
@@ -752,6 +769,35 @@ public class ContainerBalancer {
     LOG.info("Container Balancer stopped successfully.");
   }
 
+  private boolean validateConfiguration(ContainerBalancerConfiguration conf) {
+    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
+    // greater than container size
+    long size = (long) ozoneConfiguration.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    if (conf.getMaxSizeEnteringTarget() <= size) {
+      LOG.info("MaxSizeEnteringTarget should be larger than " +
+          "ozone.scm.container.size");
+      return false;
+    }
+    if (conf.getMaxSizeLeavingSource() <= size) {
+      LOG.info("MaxSizeLeavingSource should be larger than " +
+          "ozone.scm.container.size");
+      return false;
+    }
+
+    // balancing interval should be greater than DUFactory refresh period
+    DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
+    long balancingInterval = duConf.getRefreshPeriod().toMillis();
+    if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
+      LOG.info("balancing.iteration.interval should be larger than " +
+          "hdds.datanode.du.refresh.period.");
+      return false;
+    }
+    return true;
+  }
+
   public void setNodeManager(NodeManager nodeManager) {
     this.nodeManager = nodeManager;
   }
@@ -827,7 +873,7 @@ public class ContainerBalancer {
     return countDatanodesInvolvedPerIteration;
   }
 
-  long getSizeMovedPerIteration() {
+  public long getSizeMovedPerIteration() {
     return sizeMovedPerIteration;
   }
 

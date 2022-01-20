@@ -18,8 +18,10 @@
 package org.apache.hadoop.hdds.cli;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.NativeCodeLoader;
 
 import org.apache.log4j.ConsoleAppender;
@@ -43,6 +45,8 @@ public class OzoneAdmin extends GenericCli {
 
   private OzoneConfiguration ozoneConf;
 
+  private UserGroupInformation user;
+
   public OzoneAdmin() {
     super(OzoneAdmin.class);
   }
@@ -58,6 +62,13 @@ public class OzoneAdmin extends GenericCli {
       ozoneConf = createOzoneConfiguration();
     }
     return ozoneConf;
+  }
+
+  public UserGroupInformation getUser() throws IOException {
+    if (user == null) {
+      user = UserGroupInformation.getCurrentUser();
+    }
+    return user;
   }
 
   /**

@@ -63,8 +63,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
+                                     @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 

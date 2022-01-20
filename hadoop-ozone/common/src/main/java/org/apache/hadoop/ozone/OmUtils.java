@@ -39,7 +39,6 @@ import java.util.Set;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -60,6 +59,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_DEFAULT;
@@ -69,8 +69,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 import org.slf4j.Logger;
@@ -123,7 +121,7 @@ public final class OmUtils {
       if (!result.containsKey(serviceId)) {
         result.put(serviceId, new ArrayList<>());
       }
-      for (String nodeId : getOMNodeIds(conf, serviceId)) {
+      for (String nodeId : getActiveOMNodeIds(conf, serviceId)) {
         String rpcAddr = getOmRpcAddress(conf,
             ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
         if (rpcAddr != null) {
@@ -340,12 +338,47 @@ public final class OmUtils {
   }
 
   /**
-   * Get a collection of all omNodeIds for the given omServiceId.
+   * Get a collection of all active omNodeIds (excluding decommissioned nodes)
+   * for the given omServiceId.
    */
-  public static Collection<String> getOMNodeIds(ConfigurationSource conf,
+  public static Collection<String> getActiveOMNodeIds(ConfigurationSource conf,
       String omServiceId) {
-    String key = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
-    return conf.getTrimmedStringCollection(key);
+    String nodeIdsKey = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
+    Collection<String> nodeIds = conf.getTrimmedStringCollection(nodeIdsKey);
+    String decommNodesKey = ConfUtils.addKeySuffixes(
+        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId);
+    Collection<String> decommNodeIds = conf.getTrimmedStringCollection(
+        decommNodesKey);
+    nodeIds.removeAll(decommNodeIds);
+
+    return nodeIds;
+  }
+
+  /**
+   * Get a collection of all omNodeIds (active and decommissioned) for a
+   * gived omServiceId.
+   */
+  public static Collection<String> getAllOMNodeIds(ConfigurationSource conf,
+      String omServiceId) {
+    Set<String> nodeIds = new HashSet<>();
+    String nodeIdsKey = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
+    String decommNodesKey = ConfUtils.addKeySuffixes(
+        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId);
+
+    nodeIds.addAll(conf.getTrimmedStringCollection(nodeIdsKey));
+    nodeIds.addAll(conf.getTrimmedStringCollection(decommNodesKey));
+
+    return nodeIds;
+  }
+
+  /**
+   * Get a collection of nodeIds of all decommissioned OMs for a given
+   * omServideId.
+   */
+  public static Collection<String> getDecommissionedNodes(
+      ConfigurationSource conf, String omServiceId) {
+    return conf.getTrimmedStringCollection(ConfUtils.addKeySuffixes(
+        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId));
   }
 
   /**
@@ -668,14 +701,14 @@ public final class OmUtils {
 
 
   /**
-   * For a given service ID, return th of configured OM hosts.
+   * For a given service ID, return list of configured OM hosts.
    * @param conf configuration
    * @param omServiceId service id
    * @return Set of hosts.
    */
   public static Set<String> getOmHostsFromConfig(OzoneConfiguration conf,
                                                  String omServiceId) {
-    Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf,
+    Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
         omServiceId);
     Set<String> omHosts = new HashSet<>();
     for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
@@ -691,44 +724,33 @@ public final class OmUtils {
   /**
    * Get a list of all OM details (address and ports) from the specified config.
    */
-  public static List<OMNodeDetails> getAllOMAddresses(OzoneConfiguration conf,
-      String omServiceId, String currentOMNodeId) {
+  public static List<OMNodeDetails> getAllOMHAAddresses(OzoneConfiguration conf,
+      String omServiceId, boolean includeDecommissionedNodes) {
 
     List<OMNodeDetails> omNodesList = new ArrayList<>();
-    Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf, omServiceId);
+    Collection<String> omNodeIds;
+    if (includeDecommissionedNodes) {
+      omNodeIds = OmUtils.getAllOMNodeIds(conf, omServiceId);
+    } else {
+      omNodeIds = OmUtils.getActiveOMNodeIds(conf, omServiceId);
+    }
+    Collection<String> decommNodeIds = OmUtils.getDecommissionedNodes(conf,
+        omServiceId);
 
     String rpcAddrStr, hostAddr, httpAddr, httpsAddr;
     int rpcPort, ratisPort;
     if (omNodeIds.size() == 0) {
-      //Check if it is non-HA cluster
-      rpcAddrStr = OmUtils.getOmRpcAddress(conf, OZONE_OM_ADDRESS_KEY);
-      if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
-        return omNodesList;
-      }
-      hostAddr = HddsUtils.getHostName(rpcAddrStr).orElse(null);
-      rpcPort = HddsUtils.getHostPort(rpcAddrStr).orElse(0);
-      ratisPort = conf.getInt(OZONE_OM_RATIS_PORT_KEY,
-          OZONE_OM_RATIS_PORT_DEFAULT);
-      httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
-          null, null, hostAddr);
-      httpsAddr = OmUtils.getHttpsAddressForOMPeerNode(conf,
-          null, null, hostAddr);
-
-      omNodesList.add(new OMNodeDetails.Builder()
-          .setOMNodeId(currentOMNodeId)
-          .setHostAddress(hostAddr)
-          .setRpcPort(rpcPort)
-          .setRatisPort(ratisPort)
-          .setHttpAddress(httpAddr)
-          .setHttpsAddress(httpsAddr)
-          .build());
-      return omNodesList;
+      // If there are no nodeIds present, return empty list
+      return Collections.EMPTY_LIST;
     }
 
     for (String nodeId : omNodeIds) {
       try {
         OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
             conf, omServiceId, nodeId);
+        if (decommNodeIds.contains(omNodeDetails.getNodeId())) {
+          omNodeDetails.setDecommissioningState();
+        }
         omNodesList.add(omNodeDetails);
       } catch (IOException e) {
         String omRpcAddressStr = OMNodeDetails.getOMNodeAddressFromConf(conf,

@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 
@@ -106,7 +106,7 @@ public final class OzoneManagerRatisServer {
   private final RaftGroupId raftGroupId;
   private final RaftGroup raftGroup;
   private final RaftPeerId raftPeerId;
-  private final List<RaftPeer> raftPeers;
+  private final Map<String, RaftPeer> raftPeerMap;
 
   private final OzoneManager ozoneManager;
   private final OzoneManagerStateMachine omStateMachine;
@@ -144,8 +144,8 @@ public final class OzoneManagerRatisServer {
     this.raftPeerId = localRaftPeerId;
     this.raftGroupId = RaftGroupId.valueOf(
         getRaftGroupIdFromOmServiceId(raftGroupIdStr));
-    this.raftPeers = Lists.newArrayList();
-    this.raftPeers.addAll(peers);
+    this.raftPeerMap = Maps.newHashMap();
+    peers.forEach(e -> raftPeerMap.put(e.getId().toString(), e));
     this.raftGroup = RaftGroup.valueOf(raftGroupId, peers);
 
     if (isBootstrapping) {
@@ -311,7 +311,7 @@ public final class OzoneManagerRatisServer {
         newRaftPeer, raftGroup);
 
     List<RaftPeer> newPeersList = new ArrayList<>();
-    newPeersList.addAll(raftPeers);
+    newPeersList.addAll(raftPeerMap.values());
     newPeersList.add(newRaftPeer);
 
     checkLeaderStatus();
@@ -331,13 +331,44 @@ public final class OzoneManagerRatisServer {
   }
 
   /**
+   * Remove decommissioned OM node from Ratis ring.
+   */
+  public void removeOMFromRatisRing(OMNodeDetails removeOMNode)
+      throws IOException {
+    Preconditions.checkNotNull(removeOMNode);
+
+    String removeNodeId = removeOMNode.getNodeId();
+    LOG.info("{}: Submitting SetConfiguration request to Ratis server to " +
+            "remove OM peer {} from Ratis group {}", ozoneManager.getOMNodeId(),
+        removeNodeId, raftGroup);
+
+    List<RaftPeer> newPeersList = new ArrayList<>();
+    newPeersList.addAll(raftPeerMap.values());
+    newPeersList.remove(raftPeerMap.get(removeNodeId));
+
+    checkLeaderStatus();
+    SetConfigurationRequest request = new SetConfigurationRequest(clientId,
+        server.getId(), raftGroupId, nextCallId(), newPeersList);
+
+    RaftClientReply raftClientReply = server.setConfiguration(request);
+    if (raftClientReply.isSuccess()) {
+      LOG.info("Removed OM {} from Ratis group {}.", removeNodeId,
+          raftGroupId);
+    } else {
+      LOG.error("Failed to remove OM {} from Ratis group {}. Ratis " +
+              "SetConfiguration reply: {}", removeNodeId, raftGroupId,
+          raftClientReply);
+      throw new IOException("Failed to remove OM " + removeNodeId + " from " +
+          "Ratis ring.");
+    }
+  }
+
+  /**
    * Return a list of peer NodeIds.
    */
   public List<String> getPeerIds() {
     List<String> peerIds = new ArrayList<>();
-    for (RaftPeer raftPeer : raftPeers) {
-      peerIds.add(raftPeer.getId().toString());
-    }
+    peerIds.addAll(raftPeerMap.keySet());
     return peerIds;
   }
 
@@ -348,12 +379,7 @@ public final class OzoneManagerRatisServer {
    */
   @VisibleForTesting
   public boolean doesPeerExist(String peerId) {
-    for (RaftPeer raftPeer : raftPeers) {
-      if (raftPeer.getId().toString().equals(peerId)) {
-        return true;
-      }
-    }
-    return false;
+    return raftPeerMap.containsKey(peerId);
   }
 
   /**
@@ -363,12 +389,24 @@ public final class OzoneManagerRatisServer {
     InetSocketAddress newOMRatisAddr = new InetSocketAddress(
         omNodeDetails.getHostAddress(), omNodeDetails.getRatisPort());
 
-    raftPeers.add(RaftPeer.newBuilder()
-        .setId(RaftPeerId.valueOf(omNodeDetails.getNodeId()))
+    String newNodeId = omNodeDetails.getNodeId();
+    RaftPeerId newPeerId = RaftPeerId.valueOf(newNodeId);
+    RaftPeer raftPeer = RaftPeer.newBuilder()
+        .setId(newPeerId)
         .setAddress(newOMRatisAddr)
-        .build());
+        .build();
+    raftPeerMap.put(newNodeId, raftPeer);
 
-    LOG.info("Added OM {} to Ratis Peers list.", omNodeDetails.getNodeId());
+    LOG.info("Added OM {} to Ratis Peers list.", newNodeId);
+  }
+
+  /**
+   * Remove given node from list of RaftPeers.
+   */
+  public void removeRaftPeer(OMNodeDetails omNodeDetails) {
+    String removeNodeID = omNodeDetails.getNodeId();
+    raftPeerMap.remove(removeNodeID);
+    LOG.info("{}: Removed OM {} from Ratis Peers list.", this, removeNodeID);
   }
 
   /**
