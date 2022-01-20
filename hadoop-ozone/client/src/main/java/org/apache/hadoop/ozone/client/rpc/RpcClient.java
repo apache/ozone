@@ -1583,4 +1583,17 @@ public class RpcClient implements ClientProtocol {
   public void clearTheadLocalS3Auth() {
     ozoneManagerClient.clearThreadLocalS3Auth();
   }
+
+  @Override
+  public boolean setBucketOwner(String volumeName, String bucketName,
+      String owner) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(owner);
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
+    builder.setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setOwnerName(owner);
+    return ozoneManagerClient.setBucketOwner(builder.build());
+  }
 }
