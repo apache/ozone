@@ -3026,7 +3026,7 @@
 
   <property>
     <name>ozone.client.checksum.combine.mode</name>
-    <value>MD5MD5CRC</value>
+    <value>COMPOSITE_CRC</value>
     <tag>OZONE, CLIENT</tag>
     <description>
       The combined checksum type [MD5MD5CRC / COMPOSITE_CRC].
@@ -3035,7 +3035,7 @@
       lower-level chunk/block checksums are combined into file-level checksum.
 
       MD5MD5CRC calculates the MD5 of MD5 of checksums of individual chunks.
-      Default checksum type is MD5MD5CRC.
+      Default checksum type is COMPOSITE_CRC.
     </description>
   </property>
 </configuration>

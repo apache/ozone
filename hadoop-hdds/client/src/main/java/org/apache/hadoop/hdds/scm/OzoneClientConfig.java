@@ -126,13 +126,13 @@ public class OzoneClientConfig {
   private boolean checksumVerify = true;
 
   @Config(key = "checksum.combine.mode",
-      defaultValue = "MD5MD5CRC",
+      defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
           + "determines which algorithm would be used to compute checksum for "
-          + "file checksum. Default checksum type is MD5MD5CRC.",
+          + "file checksum. Default checksum type is COMPOSITE_CRC.",
       tags = ConfigTag.CLIENT)
   private String checksumCombineMode =
-      Options.ChecksumCombineMode.MD5MD5CRC.name();
+      Options.ChecksumCombineMode.COMPOSITE_CRC.name();
 
   @PostConstruct
   private void validate() {
@@ -243,9 +243,10 @@ public class OzoneClientConfig {
       return Options.ChecksumCombineMode.valueOf(checksumCombineMode);
     } catch(IllegalArgumentException iae) {
       LOG.warn("Bad checksum combine mode: {}. Using default {}",
-          checksumCombineMode, Options.ChecksumCombineMode.MD5MD5CRC.name());
+          checksumCombineMode,
+          Options.ChecksumCombineMode.COMPOSITE_CRC.name());
       return Options.ChecksumCombineMode.valueOf(
-          Options.ChecksumCombineMode.MD5MD5CRC.name());
+          Options.ChecksumCombineMode.COMPOSITE_CRC.name());
     }
   }
 }
