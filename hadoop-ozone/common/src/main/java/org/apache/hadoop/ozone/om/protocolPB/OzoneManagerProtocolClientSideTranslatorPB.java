@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;

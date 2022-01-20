@@ -28,13 +28,19 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.Rule;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.*;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
 /**
  * Client RPC test to validate supported bucket layouts during upgrades.
