@@ -25,6 +25,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
+import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -74,7 +75,7 @@ public class TestOMMultiTenantManagerImpl {
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
         new OmDBAccessIdInfo(tenantName, "seed-user1",
-            "sharedsecret1", false, false));
+            false, false));
 
     tenantManager = new OMMultiTenantManagerImpl(omMetadataManager, conf);
     assertEquals(1, tenantManager.getTenantCache().size());
@@ -129,10 +130,9 @@ public class TestOMMultiTenantManagerImpl {
 
   @Test
   public void testGetTenantForAccessID() throws Exception {
-    assertEquals(tenantName, tenantManager.getTenantForAccessID("seed" +
-        "-accessId1"));
-    LambdaTestUtils.intercept(OMException.class, () -> {
-      tenantManager.getTenantForAccessID("invalid-accessId1");
-    });
+    Optional<String> optionalTenant = tenantManager.getTenantForAccessID(
+        "seed-accessId1");
+    assertTrue(optionalTenant.isPresent());
+    assertEquals(tenantName, optionalTenant.get());
   }
 }

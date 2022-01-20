@@ -169,7 +169,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           new OmDBAccessIdInfo.Builder()
           .setTenantId(oldAccessIdInfo.getTenantId())
           .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
-          .setSharedSecret(oldAccessIdInfo.getSecretKey())
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
           .build();

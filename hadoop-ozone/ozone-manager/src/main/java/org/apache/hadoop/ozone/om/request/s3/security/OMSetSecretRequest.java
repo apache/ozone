@@ -144,16 +144,9 @@ public class OMSetSecretRequest extends OMClientRequest {
 
       // Intentionally set to final so they can only be set once.
       final S3SecretValue newS3SecretValue;
-      final OmDBAccessIdInfo newDBAccessIdInfo;
 
       // Update legacy S3SecretTable, if the accessId entry exists
-      if (omMetadataManager.getS3SecretTable().get(accessId) == null) {
-        // S3SecretTable will be deprecated.
-        // It is acceptable to not have an accessId entry in it.
-        LOG.debug("accessId '{}' not found in S3SecretTable", accessId);
-        newS3SecretValue = null;
-
-      } else {
+      if (omMetadataManager.getS3SecretTable().get(accessId) != null) {
         // accessId found in S3SecretTable. Update S3SecretTable
         LOG.debug("Updating S3SecretTable cache entry");
         // Update S3SecretTable cache entry in this case
@@ -163,42 +156,8 @@ public class OMSetSecretRequest extends OMClientRequest {
             new CacheKey<>(accessId),
             new CacheValue<>(Optional.of(newS3SecretValue),
                 transactionLogIndex));
-      }
-
-      // Get accessId entry from multi-tenant TenantAccessIdTable
-      final OmDBAccessIdInfo omDBAccessIdInfo =
-          omMetadataManager.getTenantAccessIdTable().get(accessId);
-
-      // Check accessId existence in TenantAccessIdTable
-      if (omDBAccessIdInfo == null) {
-        // At some point we need to migrate entries from S3SecretTable
-        //  to TenantAccessIdTable, and S3SecretTable should eventually become
-        //  empty.
-        LOG.warn("accessId '{}' not found in TenantAccessIdTable", accessId);
-        newDBAccessIdInfo = null;
-
       } else {
-        // Update TenantAccessIdTable
-        // Build new OmDBAccessIdInfo with updated secret
-        LOG.debug("Updating TenantAccessIdTable cache entry");
-        newDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
-            .setTenantId(omDBAccessIdInfo.getTenantId())
-            .setKerberosPrincipal(omDBAccessIdInfo.getUserPrincipal())
-            .setSharedSecret(secretKey)
-            .setIsAdmin(omDBAccessIdInfo.getIsAdmin())
-            .setIsDelegatedAdmin(omDBAccessIdInfo.getIsDelegatedAdmin())
-            .build();
-
-        // Update TenantAccessIdTable cache entry
-        omMetadataManager.getTenantAccessIdTable().addCacheEntry(
-            new CacheKey<>(accessId),
-            new CacheValue<>(Optional.of(newDBAccessIdInfo),
-                transactionLogIndex));
-      }
-
-      // If neither S3SecretTable nor TenantAccessIdTable is updated, throw
-      //  ACCESSID_NOT_FOUND exception.
-      if (newS3SecretValue == null && newDBAccessIdInfo == null) {
+        // If S3SecretTable is not updated, throw ACCESSID_NOT_FOUND exception.
         throw new OMException("accessId '" + accessId + "' not found.",
             OMException.ResultCodes.ACCESSID_NOT_FOUND);
       }
@@ -209,8 +168,7 @@ public class OMSetSecretRequest extends OMClientRequest {
               .setAccessId(accessId)
               .setSecretKey(secretKey);
 
-      omClientResponse = new OMSetSecretResponse(accessId,
-          newDBAccessIdInfo, newS3SecretValue,
+      omClientResponse = new OMSetSecretResponse(accessId, newS3SecretValue,
           omResponse.setSetS3SecretResponse(setSecretResponse).build());
 
     } catch (IOException ex) {

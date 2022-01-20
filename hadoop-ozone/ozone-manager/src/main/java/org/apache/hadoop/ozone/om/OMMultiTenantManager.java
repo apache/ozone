@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import java.util.List;
 
+import com.google.common.base.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
@@ -196,7 +197,7 @@ public interface OMMultiTenantManager {
    * @param accessID
    * @return String tenant name
    */
-  String getTenantForAccessID(String accessID) throws IOException;
+  Optional<String> getTenantForAccessID(String accessID) throws IOException;
 
   /**
    * Given a user, make him an admin of the corresponding Tenant.

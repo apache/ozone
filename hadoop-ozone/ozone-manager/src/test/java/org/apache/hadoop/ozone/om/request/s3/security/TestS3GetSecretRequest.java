@@ -382,6 +382,9 @@ public class TestS3GetSecretRequest {
     final OmDBAccessIdInfo omDBAccessIdInfo =
         omTenantAssignUserAccessIdResponse.getOmDBAccessIdInfo();
     Assert.assertNotNull(omDBAccessIdInfo);
+    final S3SecretValue originalS3Secret =
+        omTenantAssignUserAccessIdResponse.getS3Secret();
+    Assert.assertNotNull(originalS3Secret);
 
 
     // 3. S3GetSecretRequest: Get secret of "bob@EXAMPLE.COM" (as an admin).
@@ -419,7 +422,9 @@ public class TestS3GetSecretRequest {
         s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
     final S3Secret s3Secret = getS3SecretResponse.getS3Secret();
     Assert.assertEquals(ACCESS_ID_BOB, s3Secret.getKerberosID());
-    Assert.assertEquals(
-        omDBAccessIdInfo.getSecretKey(), s3Secret.getAwsSecret());
+    Assert.assertEquals(originalS3Secret.getAwsSecret(),
+        s3Secret.getAwsSecret());
+    Assert.assertEquals(originalS3Secret.getKerberosID(),
+        s3Secret.getKerberosID());
   }
 }

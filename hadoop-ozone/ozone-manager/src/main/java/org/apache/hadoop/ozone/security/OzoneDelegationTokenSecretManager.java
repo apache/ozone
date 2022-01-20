@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -72,7 +71,6 @@ public class OzoneDelegationTokenSecretManager
   private final long tokenRemoverScanInterval;
   private String omCertificateSerialId;
   private String omServiceId;
-  private OMMultiTenantManager multiTenantManager;
 
   /**
    * If the delegation token update thread holds this lock, it will not get
@@ -99,7 +97,6 @@ public class OzoneDelegationTokenSecretManager
     isRatisEnabled = b.ozoneConf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-    this.multiTenantManager = b.omMultiTenantManager;
     loadTokenSecretState(store.loadState());
 
   }
@@ -114,7 +111,6 @@ public class OzoneDelegationTokenSecretManager
     private long tokenRemoverScanInterval;
     private Text service;
     private S3SecretManager s3SecretManager;
-    private OMMultiTenantManager omMultiTenantManager;
     private CertificateClient certClient;
     private String omServiceId;
 
@@ -161,23 +157,11 @@ public class OzoneDelegationTokenSecretManager
       this.omServiceId = serviceId;
       return this;
     }
-
-    public Builder setOMMultiTenantManager(OMMultiTenantManager
-                                               multiTenantManager) {
-      this.omMultiTenantManager = multiTenantManager;
-      return this;
-    }
-
   }
 
   @Override
   public OzoneTokenIdentifier createIdentifier() {
-    OzoneTokenIdentifier tokenId = OzoneTokenIdentifier.newInstance();
-    if (multiTenantManager != null) {
-      tokenId.setGetUserForAccessId(
-          multiTenantManager::getUserNameGivenAccessId);
-    }
-    return tokenId;
+    return OzoneTokenIdentifier.newInstance();
   }
 
   /**
