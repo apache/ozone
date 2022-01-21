@@ -63,6 +63,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +88,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private boolean securityEnabled;
   private int configuredDnPort;
   private OzoneConfiguration config;
+  private long nextReplicationConfigRefreshTime;
+  private long repConfigRefreshPeriodMS = 300 * 1000;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -139,7 +143,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.securityEnabled = true;
     }
 
-    replicationConfig = ReplicationConfig.getDefault(conf);
+    replicationConfig =
+        OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
     if (OmUtils.isOmHAServiceId(conf, omHost)) {
       // omHost is listed as one of the service ids in the config,
@@ -156,6 +161,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
+    nextReplicationConfigRefreshTime = Time.monotonicNow();
 
     // resolve the bucket layout in case of Link Bucket
     BucketLayout resolvedBucketLayout =
@@ -211,35 +217,36 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
-      OzoneOutputStream ozoneOutputStream = null;
-      ReplicationConfig replConfig = this.replicationConfig;
-      // Since the bucket has the right default replication, we are using it.
-      if (bucket.getReplicationConfig() != null) {
-        replConfig = bucket.getReplicationConfig();
-      }
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
+      ReplicationConfig clientConfiguredReplConfig = this.replicationConfig;
+      ReplicationConfig bucketReplConfig =
+          getReplicationConfigWithRefreshCheck();
 
-        ReplicationConfig customReplicationConfig =
-            ReplicationConfig.adjustReplication(
-                replConfig, replication, config);
-        ozoneOutputStream =
-            bucket.createFile(key, 0, customReplicationConfig, overWrite,
-                recursive);
-      } else {
-        ozoneOutputStream =
-            bucket.createFile(key, 0, replConfig, overWrite, recursive);
-      }
+      OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
+          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
+              clientConfiguredReplConfig, bucketReplConfig, config), overWrite,
+          recursive);
+
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
-          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS || ex
+          .getResult() == OMException.ResultCodes.NOT_A_FILE) {
         throw new FileAlreadyExistsException(
             ex.getResult().name() + ": " + ex.getMessage());
       } else {
         throw ex;
       }
     }
+  }
+
+  private ReplicationConfig getReplicationConfigWithRefreshCheck()
+      throws IOException {
+    OzoneBucket ozoneBucket = bucket;
+    if (Time.monotonicNow() > nextReplicationConfigRefreshTime) {
+      ozoneBucket = volume.getBucket(bucket.getName());
+      nextReplicationConfigRefreshTime =
+          Time.monotonicNow() + repConfigRefreshPeriodMS;
+    }
+    return ozoneBucket.getReplicationConfig();
   }
 
   @Override
