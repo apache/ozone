@@ -34,6 +34,7 @@ import java.util.Map;
 
 import com.google.common.net.HostAndPort;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.apache.hadoop.ipc.RemoteException;
 
 import org.apache.hadoop.hdds.conf.Config;
@@ -90,7 +91,8 @@ public class GrpcOmTransport implements OmTransport {
   private List<String> oms;
   private RetryPolicy retryPolicy;
   private int failoverCount = 0;
-  private GrpcOMFailoverProxyProvider omFailoverProxyProvider;
+  private GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
+      omFailoverProxyProvider;
 
   public GrpcOmTransport(ConfigurationSource conf,
                           UserGroupInformation ugi, String omServiceId)
@@ -113,7 +115,7 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   public void start() throws IOException {
-    if (!isRunning.compareAndSet(false, true)) {
+    if (isRunning.get()) {
       LOG.info("Ignore. already started.");
       return;
     }
@@ -142,6 +144,7 @@ public class GrpcOmTransport implements OmTransport {
 
 
     retryPolicy = omFailoverProxyProvider.getRetryPolicy(maxFailovers);
+    isRunning.set(true);
     LOG.info("{}: started", CLIENT_NAME);
   }
 
@@ -154,7 +157,7 @@ public class GrpcOmTransport implements OmTransport {
       tryOtherHost = false;
       try {
         resp = clients.get(host).submitRequest(payload);
-      } catch (io.grpc.StatusRuntimeException e) {
+      } catch (StatusRuntimeException e) {
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
           resultCode = ResultCodes.TIMEOUT;
         }

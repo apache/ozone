@@ -148,8 +148,6 @@ public class OMFailoverProxyProvider<T> implements
             rpcAddrStr);
 
         if (omProxyInfo.getAddress() != null) {
-
-
           // For a non-HA OM setup, nodeId might be null. If so, we assign it
           // the default value
           if (nodeId == null) {
@@ -551,26 +549,13 @@ public class OMFailoverProxyProvider<T> implements
     return null;
   }
 
-  @VisibleForTesting
-  protected void setProxiesForTesting(
+  protected void setProxies(
       Map<String, ProxyInfo<T>> testOMProxies,
       Map<String, OMProxyInfo> testOMProxyInfos,
       List<String> testOMNodeIDList) {
     this.omProxies = testOMProxies;
     this.omProxyInfos = testOMProxyInfos;
     this.omNodeIDList = testOMNodeIDList;
-  }
-
-  protected void setOmProxies(Map omProxies) {
-    this.omProxies = omProxies;
-  }
-
-  protected void setOmProxyInfos(Map omProxyInfos) {
-    this.omProxyInfos = omProxyInfos;
-  }
-
-  protected void setOmNodeIDList(List omNodeIDList) {
-    this.omNodeIDList = omNodeIDList;
   }
 
   protected List<String> getOmNodeIDList() {

@@ -50,10 +50,6 @@ public class GrpcOzoneManagerServer {
                                     omTranslator,
                                 OzoneDelegationTokenSecretManager
                                     delegationTokenMgr) {
-    this.port = config.getObject(
-        GrpcOzoneManagerServerConfig.class).
-        getPort();
-
     OptionalInt haPort = HddsUtils.getNumberFromConfigKeys(config,
         ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
@@ -61,7 +57,11 @@ public class GrpcOzoneManagerServer {
             config.get(OMConfigKeys.OZONE_OM_NODE_ID_KEY)),
         OMConfigKeys.OZONE_OM_GRPC_PORT_KEY);
     if (haPort.isPresent()) {
-      port = haPort.getAsInt();
+      this.port = haPort.getAsInt();
+    } else {
+      this.port = config.getObject(
+              GrpcOzoneManagerServerConfig.class).
+          getPort();
     }
 
     init(omTranslator,

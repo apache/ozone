@@ -100,7 +100,6 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
           request,
           ioe);
     }
-    responseObserver.onNext(omResponse);
     responseObserver.onCompleted();
   }
 
