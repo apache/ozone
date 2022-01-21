@@ -89,8 +89,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
     LOG.trace("Invoking method {} on target {}", method, ratisHandler);
-    // If we do want to track time taken by ratis,
-    // it should be done via a metric and not via Info logging.
+    // TODO: Add metric here to track time taken by Ratis
     Preconditions.checkNotNull(ratisHandler);
     SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
         method.getName(), method.getParameterTypes(), args);
