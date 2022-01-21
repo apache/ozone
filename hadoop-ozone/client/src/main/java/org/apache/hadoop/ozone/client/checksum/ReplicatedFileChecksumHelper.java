@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client;
+package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -28,11 +28,14 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
@@ -88,9 +91,10 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 
-    byte[] blockChecksum = getBlockChecksumFromChunkChecksums(
+    ByteBuffer blockChecksumByteBuffer = getBlockChecksumFromChunkChecksums(
         keyLocationInfo, chunkInfos);
-    String blockChecksumForDebug = populateBlockChecksumBuf(blockChecksum);
+    String blockChecksumForDebug =
+        populateBlockChecksumBuf(blockChecksumByteBuffer);
 
     LOG.debug("got reply from pipeline {} for block {}: blockChecksum={}, " +
             "blockChecksumType={}",
@@ -148,29 +152,31 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   // TODO: copy BlockChecksumHelper here
-  byte[] getBlockChecksumFromChunkChecksums(OmKeyLocationInfo keyLocationInfo,
+  ByteBuffer getBlockChecksumFromChunkChecksums(
+      OmKeyLocationInfo keyLocationInfo,
       List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
+    AbstractBlockChecksumComputer blockChecksumComputer =
+        new ReplicatedBlockChecksumComputer(chunkInfoList);
     // TODO: support composite CRC
-    final int lenOfZeroBytes = 32;
-    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
-    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-    return fileMD5.getDigest();
+    blockChecksumComputer.compute();
+
+    return blockChecksumComputer.getOutByteBuffer();
   }
 
   /**
-   * Parses out the raw blockChecksum bytes from {@code checksumData}
-   * according to the blockChecksumType and populates the cumulative
+   * Parses out the raw blockChecksum bytes from {@code checksumData} byte
+   * buffer according to the blockChecksumType and populates the cumulative
    * blockChecksumBuf with it.
    *
    * @return a debug-string representation of the parsed checksum if
    *     debug is enabled, otherwise null.
    */
-  String populateBlockChecksumBuf(byte[] checksumData)
+  String populateBlockChecksumBuf(ByteBuffer checksumData)
       throws IOException {
     String blockChecksumForDebug = null;
     //read md5
-    final MD5Hash md5 = new MD5Hash(checksumData);
+    final MD5Hash md5 = new MD5Hash(checksumData.array());
     md5.write(getBlockChecksumBuf());
     if (LOG.isDebugEnabled()) {
       blockChecksumForDebug = md5.toString();
