@@ -126,14 +126,13 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * @return Basically getS3VolumeInfo() but only return the OzoneVolume.
-   * @throws IOException
+   * @return The {@link OzoneVolume} that should be used to for this S3
+   * request based on its access ID. S3Auth user principal will be updated.
    */
   OzoneVolume getS3Volume() throws IOException;
 
   /**
-   * @return GetS3VolumeResponse includes the {@link OzoneVolume} that should
-   * be used to for this S3 request based on its access ID.
+   * @return Raw GetS3VolumeResponse. S3Auth won't be updated.
    * @throws IOException
    */
   GetS3VolumeResponse getS3VolumeInfo() throws IOException;

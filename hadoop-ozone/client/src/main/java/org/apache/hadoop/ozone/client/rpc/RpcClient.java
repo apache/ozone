@@ -440,6 +440,15 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneVolume getS3Volume() throws IOException {
     final GetS3VolumeResponse resp = getS3VolumeInfo();
+
+    // Update user principal, to be used for KMS
+    S3Auth s3Auth = getThreadLocalS3Auth();
+    if (s3Auth != null) {
+      LOG.info("Updating S3Auth->UserPrincipal");  // TODO: Switch to debug
+      s3Auth.setUserPrincipal(resp.getUserPrincipal());
+      setTheadLocalS3Auth(s3Auth);
+    }
+
     OmVolumeArgs volume = OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
     return buildOzoneVolume(volume);
   }
