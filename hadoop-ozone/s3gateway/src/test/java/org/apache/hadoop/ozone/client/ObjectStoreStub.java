@@ -29,8 +29,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
@@ -45,14 +43,11 @@ public class ObjectStoreStub extends ObjectStore {
 
   public ObjectStoreStub() {
     super();
-//    this.proxy = mock(RpcClient.class);
-//    when(proxy.buildOzoneVolume());
   }
 
   private Map<String, OzoneVolumeStub> volumes = new HashMap<>();
   private Map<String, Boolean> bucketEmptyStatus = new HashMap<>();
   private static OzoneConfiguration conf = new OzoneConfiguration();
-//  private ClientProtocol proxy;
 
   @Override
   public void createVolume(String volumeName) throws IOException {
@@ -134,33 +129,6 @@ public class ObjectStoreStub extends ObjectStore {
   }
 
   @Override
-  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
-    String volumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
-    OzoneVolume ozoneVolume = getVolume(volumeName);
-
-    final GetS3VolumeResponse.Builder resp = GetS3VolumeResponse.newBuilder();
-    resp.setVolumeInfo(buildVolumeInfo(ozoneVolume));
-    resp.setUserPrincipal("root");
-    return resp.build();
-  }
-
-  private VolumeInfo buildVolumeInfo(OzoneVolume volume) {
-    return VolumeInfo.newBuilder()
-        .setVolume(volume.getName())
-        .setAdminName(volume.getAdmin())
-        .setOwnerName(volume.getOwner())
-        .setQuotaInBytes(volume.getQuotaInBytes())
-        .setQuotaInNamespace(volume.getQuotaInNamespace())
-//        .getUsedNamespace(volume.getUsedNamespace())
-//        .getCreationTime(volume.getCreationTime())
-//        .getModificationTime(volume.getModificationTime())
-//        .setVolumeAcls(volume.getAcls())
-//        .setMetadata(volume.getMetadata())
-        .setRefCount(volume.getRefCount())
-        .build();
-  }
-
-  @Override
   public void createS3Bucket(String s3BucketName) throws
       IOException {
     if (!bucketEmptyStatus.containsKey(s3BucketName)) {
@@ -192,9 +160,4 @@ public class ObjectStoreStub extends ObjectStore {
   public void setBucketEmptyStatus(String bucketName, boolean status) {
     bucketEmptyStatus.computeIfPresent(bucketName, (k, v) -> status);
   }
-
-//  @Override
-//  public ClientProtocol getClientProxy() {
-//    return proxy;
-//  }
 }

@@ -79,7 +79,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testListS3Buckets() throws IOException {
-    doThrow(exception).when(objectStore).getS3VolumeInfo();
+    doThrow(exception).when(objectStore).getS3Volume();
     RootEndpoint rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(client);
 

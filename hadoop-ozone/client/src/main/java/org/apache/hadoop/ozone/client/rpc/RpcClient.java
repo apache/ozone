@@ -1078,7 +1078,6 @@ public class RpcClient implements ClientProtocol {
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
       UserGroupInformation proxyUser;
       if (getThreadLocalS3Auth() != null) {
-//        String userPrincipal = getThreadLocalS3Auth().getAccessID();
         String userPrincipal = getThreadLocalS3Auth().getUserPrincipal();
         Preconditions.checkNotNull(userPrincipal);
         UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(

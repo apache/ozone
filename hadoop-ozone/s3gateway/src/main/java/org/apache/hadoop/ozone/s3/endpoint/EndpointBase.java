@@ -99,24 +99,6 @@ public abstract class EndpointBase {
 
   protected OzoneVolume getVolume() throws IOException {
     return client.getObjectStore().getS3Volume();
-
-//    final GetS3VolumeResponse getS3VolumeResponse =
-//        client.getObjectStore().getS3VolumeInfo();
-//    final ClientProtocol proxy = client.getObjectStore().getClientProxy();
-//    Preconditions.checkNotNull(proxy);
-//
-//    if (proxy.getThreadLocalS3Auth() != null) {
-//      // Not 100% sure if this instance's s3Auth is set
-//      Preconditions.checkNotNull(s3Auth);
-//      Preconditions.checkArgument(s3Auth.equals(proxy.getThreadLocalS3Auth()));
-//      // Set to the correct user principal to be used for KMS operations
-//      s3Auth.setUserPrincipal(getS3VolumeResponse.getUserPrincipal());
-//      proxy.setTheadLocalS3Auth(s3Auth);
-//    }
-//
-//    final OmVolumeArgs omVolumeArgs =
-//        OmVolumeArgs.getFromProtobuf(getS3VolumeResponse.getVolumeInfo());
-//    return proxy.buildOzoneVolume(omVolumeArgs);
   }
 
   /**
