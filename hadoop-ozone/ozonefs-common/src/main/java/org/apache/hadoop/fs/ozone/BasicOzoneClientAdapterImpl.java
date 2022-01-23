@@ -21,6 +21,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -64,7 +66,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +91,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private OzoneConfiguration config;
   private long nextReplicationConfigRefreshTime;
   private long repConfigRefreshPeriodMS = 300 * 1000;
+  private java.time.Clock clock = new MonotonicClock(ZoneOffset.UTC);
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -161,7 +163,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
-    nextReplicationConfigRefreshTime = Time.monotonicNow();
+    nextReplicationConfigRefreshTime =
+        clock.millis() + repConfigRefreshPeriodMS;
 
     // resolve the bucket layout in case of Link Bucket
     BucketLayout resolvedBucketLayout =
@@ -241,10 +244,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private ReplicationConfig getReplicationConfigWithRefreshCheck()
       throws IOException {
     OzoneBucket ozoneBucket = bucket;
-    if (Time.monotonicNow() > nextReplicationConfigRefreshTime) {
+    if (clock.millis() > nextReplicationConfigRefreshTime) {
       ozoneBucket = volume.getBucket(bucket.getName());
       nextReplicationConfigRefreshTime =
-          Time.monotonicNow() + repConfigRefreshPeriodMS;
+          clock.millis() + repConfigRefreshPeriodMS;
     }
     return ozoneBucket.getReplicationConfig();
   }
