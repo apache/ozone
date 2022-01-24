@@ -460,7 +460,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       // served out of order over XceiverClientGrpc. This needs to be fixed
       // if this API is to be used for I/O path. Currently, this is not
       // used for Read/Write Operation but for tests.
-      if (!HddsUtils.isReadOnly(request)) {
+      if (shouldBlockAndWaitAsyncReply(request)) {
         asyncReply.getResponse().get();
       }
       return asyncReply;
@@ -468,6 +468,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } finally {
       span.finish();
     }
+  }
+
+  protected boolean shouldBlockAndWaitAsyncReply(
+      ContainerCommandRequestProto request) {
+    return !HddsUtils.isReadOnly(request);
   }
 
   @VisibleForTesting
