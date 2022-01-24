@@ -28,7 +28,7 @@ import java.util.UUID;
 /**
  * Test for the ContainerReplicaInfo class.
  */
-public class ContainerReplicaInfoTest {
+public class TestContainerReplicaInfo {
 
   @Test
   public void testObjectCreatedFromProto() {
