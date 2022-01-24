@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -732,6 +733,12 @@ public class SCMClientProtocolServer implements
     return scm.getReplicationManager().isRunning();
   }
 
+  @Override
+  public ReplicationManagerReport getReplicationManagerReport() {
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
+    return scm.getReplicationManager().getContainerReport();
+  }
   @Override
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
       IOException {

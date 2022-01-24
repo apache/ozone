@@ -146,16 +146,37 @@ public class ReplicationManagerReport {
     return reportTimeStamp;
   }
 
+  /**
+   * Get the stat for the given LifeCycleState. If there is no stat available
+   * for that stat -1 is returned.
+   * @param stat The requested stat.
+   * @return The stat value or -1 if it is not present
+   */
   public long getStat(HddsProtos.LifeCycleState stat) {
     return getStat(stat.toString());
   }
 
+  /**
+   * Get the stat for the given HealthState. If there is no stat available
+   * for that stat -1 is returned.
+   * @param stat The requested stat.
+   * @return The stat value or -1 if it is not present
+   */
   public long getStat(HealthState stat) {
     return getStat(stat.toString());
   }
 
+  /**
+   * Returns the stat requested, or -1 if it does not exist.
+   * @param stat The request stat
+   * @return The value of the stat or -1 if it does not exist.
+   */
   private long getStat(String stat) {
-    return stats.get(stat).longValue();
+    LongAdder val = stats.get(stat);
+    if (val == null) {
+      return -1;
+    }
+    return val.longValue();
   }
 
   protected void setTimestamp(long timestamp) {
