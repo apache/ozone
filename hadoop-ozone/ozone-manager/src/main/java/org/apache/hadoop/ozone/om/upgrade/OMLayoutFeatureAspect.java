@@ -25,6 +25,7 @@ import java.lang.reflect.Method;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
@@ -58,6 +59,11 @@ public class OMLayoutFeatureAspect {
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();
+      lvm = ozoneManager.getVersionManager();
+    } else if (joinPoint.getTarget() instanceof OMVolumeRequest) {
+      // Get OzoneManager instance from preExecute first arg
+      assert(joinPoint.getArgs()[0] instanceof OzoneManager);
+      OzoneManager ozoneManager = (OzoneManager) joinPoint.getArgs()[0];
       lvm = ozoneManager.getVersionManager();
     } else {
       try {
@@ -109,6 +115,10 @@ public class OMLayoutFeatureAspect {
     LayoutFeature lf = annotation.value();
     checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
         om.getVersionManager(), lf.name());
+  }
+
+  public static OMLayoutFeatureAspect aspectOf() {
+    return new OMLayoutFeatureAspect();
   }
 
 }

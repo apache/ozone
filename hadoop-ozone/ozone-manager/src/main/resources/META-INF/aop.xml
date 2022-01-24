@@ -1,0 +1,10 @@
+<aspectj>
+  <aspects>
+    <aspect name="org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureAspect"/>
+    <weaver options="-verbose -showWeaveInfo">
+      <include within="org.apache.hadoop.ozone.om.request.s3.tenant.*"/>
+      <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler"/>
+      <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB"/>
+    </weaver>
+  </aspects>
+</aspectj>

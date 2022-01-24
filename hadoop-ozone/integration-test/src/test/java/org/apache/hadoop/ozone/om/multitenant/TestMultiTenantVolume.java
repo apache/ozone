@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -49,7 +50,8 @@ public class TestMultiTenantVolume {
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
-        .withoutDatanodes();
+        .withoutDatanodes()
+        .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     cluster = builder.build();
     s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
   }

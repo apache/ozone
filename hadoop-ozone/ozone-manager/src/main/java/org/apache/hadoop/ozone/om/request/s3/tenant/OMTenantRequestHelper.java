@@ -236,4 +236,10 @@ public final class OMTenantRequestHelper {
         tenantManager.listUsersInTenant(tenantId, "").getUserAccessIds();
     return tenantUserAccessIdsList.size() == 0;
   }
+
+//  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
+//  public static void checkLayoutFeatureVersion() throws IOException {
+//    System.out.println("Testing: Passed check");
+//  }
+
 }
