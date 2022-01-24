@@ -320,12 +320,12 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // In this method, we have to assert the "GET" part and the "APPLY" path.
 
-    // Assert GET path --> verify if the OMDBUpdatesHandler picked up the 4
-    // events ( 1 Vol PUT + 1 Bucket PUT + 2 Key PUTs).
+    // Assert GET path --> verify if the OMDBUpdatesHandler picked up the first
+    // 3 of 4 events ( 1 Vol PUT + 1 Bucket PUT + 2 Key PUTs).
     assertEquals(3, updatesHandler.getEvents().size());
 
     // Assert APPLY path --> Verify if the OM service provider's RocksDB got
-    // the changes.
+    // the first 3 changes, last change not applied.
     String fullKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", "key_one");
     assertTrue(ozoneManagerServiceProvider.getOMMetadataManagerInstance()
