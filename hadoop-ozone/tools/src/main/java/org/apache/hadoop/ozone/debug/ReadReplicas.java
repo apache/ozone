@@ -84,6 +84,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
 
+    String directoryName = createDirectory(volumeName, bucketName, keyName);
+
     OzoneKeyDetails keyInfoDetails
         = clientProtocol.getKeyDetails(volumeName, bucketName, keyName);
 
@@ -93,8 +95,6 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         replicasWithoutChecksum = clientProtocolWithoutChecksum
         .getKeysEveryReplicas(volumeName, bucketName, keyName);
-
-    String directoryName = createDirectory(volumeName, bucketName, keyName);
 
     JsonObject result = new JsonObject();
     result.addProperty("filename",
@@ -199,7 +199,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
   @NotNull
   private String createDirectory(String volumeName, String bucketName,
-                                 String keyName) {
+                                 String keyName) throws IOException {
     String fileSuffix
         = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
     String directoryName = volumeName + "_" + bucketName + "_" + keyName +
@@ -210,7 +210,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       if(dir.mkdir()) {
         System.out.println("Successfully created!");
       } else {
-        System.out.println("Something went wrong.");
+        throw new IOException(String.format(
+            "Failed to create directory %s.", dir));
       }
     }
     return directoryName;
