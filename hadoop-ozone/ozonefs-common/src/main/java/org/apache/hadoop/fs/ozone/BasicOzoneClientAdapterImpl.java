@@ -21,12 +21,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.HashSet;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
@@ -85,12 +87,20 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private ObjectStore objectStore;
   private OzoneVolume volume;
   private OzoneBucket bucket;
-  private ReplicationConfig replicationConfig;
+  private ReplicationConfig bucketReplicationConfig;
+  // Client side configured replication config.
+  private ReplicationConfig clientConfiguredReplicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
   private OzoneConfiguration config;
   private long nextReplicationConfigRefreshTime;
-  private long repConfigRefreshPeriodMS = 300 * 1000;
+  //This is just an advanced config.
+  // TODO: dod we really need to expose this in config files?
+  private static final String BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS =
+      "bucket.replication.config.refresh.time.ms";
+  private static final long
+      BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS = 300 * 1000;
+  private long bucketRepConfigRefreshPeriodMS;
   private java.time.Clock clock = new MonotonicClock(ZoneOffset.UTC);
 
   /**
@@ -116,6 +126,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throws IOException {
 
     OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
+    bucketRepConfigRefreshPeriodMS =
+        conf.getLong(BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS,
+            BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS);
     if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
       // When the host name or service id isn't given
       // but ozone.om.service.ids is defined, declare failure.
@@ -145,7 +158,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.securityEnabled = true;
     }
 
-    replicationConfig =
+    clientConfiguredReplicationConfig =
         OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
     if (OmUtils.isOmHAServiceId(conf, omHost)) {
@@ -163,8 +176,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
+    bucketReplicationConfig = this.bucket.getReplicationConfig();
     nextReplicationConfigRefreshTime =
-        clock.millis() + repConfigRefreshPeriodMS;
+        clock.millis() + bucketRepConfigRefreshPeriodMS;
 
     // resolve the bucket layout in case of Link Bucket
     BucketLayout resolvedBucketLayout =
@@ -179,15 +193,20 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     this.config = conf;
   }
 
+  /**
+   * This API returns the value what is configured at client side only. It could
+   * differ from the server side default values. If no replication config
+   * configured at client, it will return 3.
+   */
   @Override
   public short getDefaultReplication() {
-    if (replicationConfig == null) {
+    if (clientConfiguredReplicationConfig == null) {
       // to provide backward compatibility, we are just retuning 3;
       // However we need to handle with the correct behavior.
       // TODO: Please see HDDS-5646
       return (short) ReplicationFactor.THREE.getValue();
     }
-    return (short) replicationConfig.getRequiredNodes();
+    return (short) clientConfiguredReplicationConfig.getRequiredNodes();
   }
 
   @Override
@@ -220,7 +239,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
-      ReplicationConfig clientConfiguredReplConfig = this.replicationConfig;
+      ReplicationConfig clientConfiguredReplConfig =
+          this.clientConfiguredReplicationConfig;
       ReplicationConfig bucketReplConfig =
           getReplicationConfigWithRefreshCheck();
 
@@ -243,13 +263,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   private ReplicationConfig getReplicationConfigWithRefreshCheck()
       throws IOException {
-    OzoneBucket ozoneBucket = bucket;
     if (clock.millis() > nextReplicationConfigRefreshTime) {
-      ozoneBucket = volume.getBucket(bucket.getName());
+      this.bucketReplicationConfig =
+          volume.getBucket(bucket.getName()).getReplicationConfig();
       nextReplicationConfigRefreshTime =
-          clock.millis() + repConfigRefreshPeriodMS;
+          clock.millis() + bucketRepConfigRefreshPeriodMS;
     }
-    return ozoneBucket.getReplicationConfig();
+    return this.bucketReplicationConfig;
   }
 
   @Override
@@ -415,6 +435,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public String getCanonicalServiceName() {
     return objectStore.getCanonicalServiceName();
+  }
+
+  @VisibleForTesting
+  public void setClock(Clock monotonicClock) {
+    this.clock = monotonicClock;
   }
 
   /**

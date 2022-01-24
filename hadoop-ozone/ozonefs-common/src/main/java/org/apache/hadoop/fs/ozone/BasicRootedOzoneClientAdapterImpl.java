@@ -99,7 +99,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private ClientProtocol proxy;
-  private ReplicationConfig replicationConfig;
+  private ReplicationConfig clientConfiguredReplicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
@@ -169,7 +169,7 @@ public class BasicRootedOzoneClientAdapterImpl
         this.securityEnabled = true;
       }
 
-      replicationConfig =
+      clientConfiguredReplicationConfig =
           OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
       if (OmUtils.isOmHAServiceId(conf, omHost)) {
@@ -289,13 +289,13 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public short getDefaultReplication() {
-    if (replicationConfig == null) {
+    if (clientConfiguredReplicationConfig == null) {
       // to provide backward compatibility, we are just retuning 3;
       // However we need to handle with the correct behavior.
       // TODO: Please see HDDS-5646
       return (short) ReplicationFactor.THREE.getValue();
     }
-    return (short) replicationConfig.getRequiredNodes();
+    return (short) clientConfiguredReplicationConfig.getRequiredNodes();
   }
 
   @Override
@@ -340,8 +340,8 @@ public class BasicRootedOzoneClientAdapterImpl
       OzoneBucket bucket = getBucket(ofsPath, recursive);
       OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
           OzoneClientUtils.resolveClientSideReplicationConfig(replication,
-              this.replicationConfig, bucket.getReplicationConfig(), config),
-          overWrite, recursive);
+              this.clientConfiguredReplicationConfig,
+              bucket.getReplicationConfig(), config), overWrite, recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
