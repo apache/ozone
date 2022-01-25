@@ -63,18 +63,18 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       defaultValue = "/opt/hadoop")
   private String outputDir;
 
-  private static final String FILENAME = "filename";
-  private static final String DATASIZE = "datasize";
-  private static final String BLOCKS = "blocks";
-  private static final String BLOCKINDEX = "blockIndex";
-  private static final String CONTAINERID = "containerId";
-  private static final String LOCALID = "localId";
-  private static final String LENGTH = "length";
-  private static final String OFFSET = "offset";
-  private static final String REPLICAS = "replicas";
-  private static final String HOSTNAME = "hostname";
-  private static final String UUID = "uuid";
-  private static final String EXCEPTION = "exception";
+  private static final String JSON_PROPERTY_FILE_NAME = "filename";
+  private static final String JSON_PROPERTY_FILE_SIZE = "datasize";
+  private static final String JSON_PROPERTY_FILE_BLOCKS = "blocks";
+  private static final String JSON_PROPERTY_BLOCK_INDEX = "blockIndex";
+  private static final String JSON_PROPERTY_BLOCK_CONTAINERID = "containerId";
+  private static final String JSON_PROPERTY_BLOCK_LOCALID = "localId";
+  private static final String JSON_PROPERTY_BLOCK_LENGTH = "length";
+  private static final String JSON_PROPERTY_BLOCK_OFFSET = "offset";
+  private static final String JSON_PROPERTY_BLOCK_REPLICAS = "replicas";
+  private static final String JSON_PROPERTY_REPLICA_HOSTNAME = "hostname";
+  private static final String JSON_PROPERTY_REPLICA_UUID = "uuid";
+  private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
   private ClientProtocol clientProtocol;
   private ClientProtocol clientProtocolWithoutChecksum;
@@ -88,11 +88,18 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
 
-    clientProtocol = client.getObjectStore().getClientProxy();
-
+    boolean isChecksumVerifyEnabled
+        = getConf().getBoolean("ozone.client.verify.checksum", true);
     OzoneConfiguration configuration = new OzoneConfiguration(getConf());
-    configuration.setBoolean("ozone.client.verify.checksum", false);
-    clientProtocolWithoutChecksum = new RpcClient(configuration, null);
+    configuration.setBoolean("ozone.client.verify.checksum", !isChecksumVerifyEnabled);
+
+    if(isChecksumVerifyEnabled) {
+      clientProtocol = client.getObjectStore().getClientProxy();
+      clientProtocolWithoutChecksum = new RpcClient(configuration, null);
+    } else {
+      clientProtocol = new RpcClient(configuration, null);
+      clientProtocolWithoutChecksum = client.getObjectStore().getClientProxy();
+    }
 
     address.ensureKeyAddress();
     String volumeName = address.getVolumeName();
@@ -112,14 +119,14 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         .getKeysEveryReplicas(volumeName, bucketName, keyName);
 
     JsonObject result = new JsonObject();
-    result.addProperty(FILENAME,
+    result.addProperty(JSON_PROPERTY_FILE_NAME,
         volumeName + "/" + bucketName + "/" + keyName);
-    result.addProperty(DATASIZE, keyInfoDetails.getDataSize());
+    result.addProperty(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
 
     JsonArray blocks = new JsonArray();
     downloadReplicasAndCreateManifest(keyName, replicas,
         replicasWithoutChecksum, directoryName, blocks);
-    result.add(BLOCKS, blocks);
+    result.add(JSON_PROPERTY_FILE_BLOCKS, blocks);
 
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String prettyJson = gson.toJson(result);
@@ -146,19 +153,19 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       JsonArray replicasJson = new JsonArray();
 
       blockIndex += 1;
-      blockJson.addProperty(BLOCKINDEX, blockIndex);
-      blockJson.addProperty(CONTAINERID, block.getKey().getContainerID());
-      blockJson.addProperty(LOCALID, block.getKey().getLocalID());
-      blockJson.addProperty(LENGTH, block.getKey().getLength());
-      blockJson.addProperty(OFFSET, block.getKey().getOffset());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_INDEX, blockIndex);
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_CONTAINERID, block.getKey().getContainerID());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_LOCALID, block.getKey().getLocalID());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_LENGTH, block.getKey().getLength());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_OFFSET, block.getKey().getOffset());
 
       for (Map.Entry<DatanodeDetails, OzoneInputStream>
           replica : block.getValue().entrySet()) {
         JsonObject replicaJson = new JsonObject();
 
-        replicaJson.addProperty(HOSTNAME,
+        replicaJson.addProperty(JSON_PROPERTY_REPLICA_HOSTNAME,
             replica.getKey().getHostName());
-        replicaJson.addProperty(UUID,
+        replicaJson.addProperty(JSON_PROPERTY_REPLICA_UUID,
             replica.getKey().getUuidString());
 
         OzoneInputStream is = replica.getValue();
@@ -173,7 +180,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
               StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
           Throwable cause = e.getCause();
-          replicaJson.addProperty(EXCEPTION, e.getMessage());
+          replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION, e.getMessage());
           if(cause instanceof OzoneChecksumException) {
             BlockID blockID = block.getKey().getBlockID();
             String datanodeUUID = replica.getKey().getUuidString();
@@ -189,7 +196,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         }
         replicasJson.add(replicaJson);
       }
-      blockJson.add(REPLICAS, replicasJson);
+      blockJson.add(JSON_PROPERTY_BLOCK_REPLICAS, replicasJson);
       blocks.add(blockJson);
     }
   }
