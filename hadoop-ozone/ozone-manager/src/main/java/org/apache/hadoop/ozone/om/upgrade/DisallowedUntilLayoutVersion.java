@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
  * not include the associated layout feature. Helps to keep the method logic
  * and upgrade related cross cutting concern separate.
  */
-@Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+@Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface DisallowedUntilLayoutVersion {
   OMLayoutFeature value();

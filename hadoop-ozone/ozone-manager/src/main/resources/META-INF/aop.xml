@@ -4,8 +4,6 @@
     <weaver options="-verbose -showWeaveInfo">
       <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler"/>
       <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB"/>
-<!--      <include within="org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils"/>-->
-<!--      <include within="org.apache.hadoop.ozone.om.request.s3.tenant.*"/>-->
     </weaver>
   </aspects>
 </aspectj>
