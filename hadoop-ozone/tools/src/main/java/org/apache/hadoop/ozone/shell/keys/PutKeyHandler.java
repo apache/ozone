@@ -41,8 +41,6 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -85,17 +83,6 @@ public class PutKeyHandler extends KeyHandler {
         String hash = DigestUtils.md5Hex(stream);
         out().printf("File Hash : %s%n", hash);
       }
-    }
-
-    String clientConfiguredDefaultType = getConf().get(OZONE_REPLICATION_TYPE);
-    if (replicationType == null && clientConfiguredDefaultType != null) {
-      replicationType = ReplicationType.valueOf(clientConfiguredDefaultType);
-    }
-
-    String clientConfiguredDefaultReplication =
-        getConf().get(OZONE_REPLICATION);
-    if (replication == null && clientConfiguredDefaultReplication != null) {
-      replication = clientConfiguredDefaultReplication;
     }
 
     ReplicationConfig replicationConfig = OzoneClientUtils
