@@ -79,11 +79,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
     clientProtocol = client.getObjectStore().getClientProxy();
 
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    OzoneClientConfig clientConfig = configuration
-        .getObject(OzoneClientConfig.class);
-    clientConfig.setChecksumVerify(false);
-    configuration.setFromObject(clientConfig);
+    OzoneConfiguration configuration = new OzoneConfiguration(getConf());
+    configuration.setBoolean("ozone.client.verify.checksum", false);
     clientProtocolWithoutChecksum = new RpcClient(configuration, null);
 
     address.ensureKeyAddress();
