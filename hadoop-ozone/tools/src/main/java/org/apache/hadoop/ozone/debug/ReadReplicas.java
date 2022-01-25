@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.debug;
 
 import com.google.gson.*;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -57,6 +58,12 @@ import java.util.Map;
         "given key.")
 @MetaInfServices(SubcommandWithParent.class)
 public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
+
+  @CommandLine.Option(names = {"--outputDir", "-o"},
+      description = "Destination where the directory will be created" +
+          " for the downloaded replicas and the manifest file.",
+      defaultValue = "/opt/hadoop")
+  private String outputDir;
 
   private ClientProtocol clientProtocol;
   private ClientProtocol clientProtocolWithoutChecksum;
@@ -112,7 +119,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     String manifestFileName = keyName + "_manifest";
     System.out.println("Writing manifest file : " + manifestFileName);
     File manifestFile
-        = new File("/opt/hadoop/" + directoryName + "/" + manifestFileName);
+        = new File(outputDir + "/" + directoryName + "/" + manifestFileName);
     Files.write(manifestFile.toPath(),
         prettyJson.getBytes(StandardCharsets.UTF_8));
   }
@@ -151,7 +158,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
             replica.getKey().getHostName();
         System.out.println("Writing : " + fileName);
         File replicaFile
-            = new File("/opt/hadoop/" + directoryName + "/" + fileName);
+            = new File(outputDir + "/" + directoryName + "/" + fileName);
 
         try {
           Files.copy(is, replicaFile.toPath(),
@@ -205,7 +212,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     String directoryName = volumeName + "_" + bucketName + "_" + keyName +
         "_" + fileSuffix;
     System.out.println("Creating directory : " + directoryName);
-    File dir = new File("/opt/hadoop/" + directoryName);
+    File dir = new File(outputDir + "/" + directoryName);
     if (!dir.exists()){
       if(dir.mkdir()) {
         System.out.println("Successfully created!");
