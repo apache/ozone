@@ -82,10 +82,9 @@ This picture shows how the chunks will be layed out in data node blocks.
 ![EC Chunk Layout](EC-Chunk-Layout.png)
 
 Currently, the EC client re-used the data transfer end-points to transfer the data to data nodes.
-That XceiverGRPC client used for writing data and for sending putBlock info.
-Since EC client used the existing transfer protocols for transferring the data,
-we could implement the EC client without the need of any major changes in datanode.
-The data block at data nodes would be written same as any other block in non-EC mode.
+The XceiverClientGRPC client used for writing data and putBlock info.
+The datanode side changes are minimal as we reused the same existing transfer protocols.
+The EC data block written at the datanode is same as any other block in non-EC mode. 
 In a single block group, container id numbers are same in all nodes. A file can have multiple block groups.
 Each block group will have `d+p` number of block and all ids are same.
 
@@ -121,40 +120,37 @@ Below picture depicts how it uses parity replicas in reconstruction.
 
  ### Erasure Coding Replication Config
 
- Apache Ozone build with pure 'Object Storage' semantics. However, many big data
+ Apache Ozone built with the pure 'Object Storage' semantics. However, many big data
  eco system projects still uses file system APIs. To provide both worlds best access to Ozone,
  it's provided both faces of interfaces. In both cases, keys/files would be written into buckets under the hood.
- So, Erasure coding replication configurations can be set at bucket level.
- The erasure coding policy encapsulates how to encode/decode a file.
- Each replication config is defined by the following pieces of information: 
+ So, EC Replication Configs can be set at bucket level.
+ The EC policy encapsulates how to encode/decode a file.
+ Each EC Replication Config defined by the following pieces of information: 
   1. **data:** Data blocks number in an EC block group.
   2. **parity:** Parity blocks number in an EC block group.
   3. **ecChunkSize:** The size of a striping chunk. This determines the granularity of striped reads and writes.
-  4. **codec:** This is to indicate the type of erasure coding algorithms (e.g., `RS`(Reed-Solomon), `XOR`).
+  4. **codec:** This is to indicate the type of EC algorithms (e.g., `RS`(Reed-Solomon), `XOR`).
 
-To pass the EC replication config in command line or configuration files, we need to use the following format:
+To pass the EC Replication Config in command line or configuration files, we need to use the following format:
 *codec*-*num data blocks*-*num parity blocks*-*ec chunk size*
 
-Currently, there are three built-in EC configs supported: `RS-3-2-1024k`, `RS-6-3-1024k`, `XOR-2-1-1024k`.
-The most recommended option is `RS-6-3-1024k`. When a key/file created without specifying the replication config,
-it inherits the EC replication config of its bucket if it's available.
+Currently, there are three built-in EC Replication Configs supported: `RS-3-2-1024k`, `RS-6-3-1024k`, `XOR-2-1-1024k`.
+The most recommended option is `RS-6-3-1024k`. When a key/file created without specifying the Replication Config,
+it inherits the EC Replication Config of its bucket if it's available.
 
-Changing the bucket level EC config only affect new files createed within the bucket.
-Once a file has been created, its erasure coding config cannot be changed currently.
+Changing the bucket level EC Replication Config only affect new files created within the bucket.
+Once a file has been created, its EC Replication Config cannot be changed currently.
 
 Deployment
 ----------
 ### Cluster and Hardware Configuration
 
-Erasure coding places additional demands on the cluster in terms of CPU and network.
-
+EC places additional demands on the cluster in terms of CPU and network.
 Encoding and decoding work consumes additional CPU on both Ozone clients and DataNodes.
-
-Erasure coding requires a minimum of as many DataNodes in the cluster as
-the configured EC stripe width. For EC Replication Config `RS` (6,3), we need
+EC requires a minimum of as many DataNodes in the cluster as the configured EC stripe width. For the EC Replication Config `RS` (6,3), we need
 a minimum of 9 DataNodes.
 
-Erasure coded keys/files also spread across racks for rack fault-tolerance.
+Erasure Coded keys/files also spread across racks for rack fault-tolerance.
 This means that when reading and writing striped files, most operations are off-rack.
 Network bisection bandwidth is thus very important.
 
@@ -169,8 +165,8 @@ Due to this reason, it is recommended to setup racks with similar number of Data
 
 ### Configurations
 
-Erasure coding configuration can be enabled at bucket level as discussed above. 
-Cluster wide default replication config can be set with EC configuration by using
+EC Replication Config can be enabled at bucket level as discussed above. 
+Cluster wide default Replication Config can be set with EC Replication Config by using
 the configuration keys `ozone.server.default.replication.type` and `ozone.server.default.replication`.
 
 ```XML
