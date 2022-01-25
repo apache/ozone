@@ -944,7 +944,6 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
-        .setLatestVersionLocation(getLatestVersionLocation)
         .build();
 
     OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
