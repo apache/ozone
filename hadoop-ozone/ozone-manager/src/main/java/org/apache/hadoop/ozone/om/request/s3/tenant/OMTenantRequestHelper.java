@@ -237,9 +237,4 @@ public final class OMTenantRequestHelper {
     return tenantUserAccessIdsList.size() == 0;
   }
 
-//  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
-//  public static void checkLayoutFeatureVersion() throws IOException {
-//    System.out.println("Testing: Passed check");
-//  }
-
 }

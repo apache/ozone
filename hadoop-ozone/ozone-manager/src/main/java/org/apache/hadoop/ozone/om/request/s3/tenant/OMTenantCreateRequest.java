@@ -114,7 +114,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   @Override
   @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-//    OMTenantRequestHelper.checkLayoutFeatureVersion();
 
     // Check Ozone cluster admin privilege
     OMTenantRequestHelper.checkAdmin(ozoneManager);
