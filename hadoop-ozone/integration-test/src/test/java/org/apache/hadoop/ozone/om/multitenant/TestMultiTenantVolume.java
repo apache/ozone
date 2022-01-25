@@ -26,8 +26,11 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -79,14 +82,52 @@ public class TestMultiTenantVolume {
     assertS3BucketNotFound(store, bucketName);
   }
 
+  private void expectFailurePreFinalization(VoidCallable eval)
+      throws Exception {
+    LambdaTestUtils.intercept(OMException.class,
+        "cannot be invoked before finalization", eval);
+  }
+
   @Test
   public void testS3TenantVolume() throws Exception {
+
     final String tenant = "tenant";
     final String principal = "username";
     final String bucketName = "bucket";
     final String accessID = UUID.randomUUID().toString();
 
     ObjectStore store = getStoreForAccessID(accessID);
+
+    // None of the tenant APIs is usable before the upgrade finalization step
+    expectFailurePreFinalization(store::listTenant);
+    expectFailurePreFinalization(() -> store.listUsersInTenant(tenant, ""));
+    expectFailurePreFinalization(() -> store.tenantGetUserInfo(principal));
+    expectFailurePreFinalization(() -> store.createTenant(tenant));
+    expectFailurePreFinalization(() ->
+        store.tenantAssignUserAccessId(principal, tenant, accessID));
+    expectFailurePreFinalization(() ->
+        store.tenantAssignAdmin(principal, tenant, true));
+    expectFailurePreFinalization(() ->
+        store.tenantRevokeAdmin(accessID, tenant));
+    expectFailurePreFinalization(() ->
+        store.tenantRevokeUserAccessId(accessID));
+    expectFailurePreFinalization(() -> store.deleteTenant(tenant));
+
+    // S3 get/set/revoke secret APIs still work before finalization
+    final String accessId = "testUser1accessId1";
+    S3SecretValue s3SecretValue = store.getS3Secret(accessId);
+    Assert.assertEquals(accessId, s3SecretValue.getAwsAccessKey());
+    final String setSecret = "testsecret";
+    s3SecretValue = store.setS3Secret(accessId, setSecret);
+    Assert.assertEquals(accessId, s3SecretValue.getAwsAccessKey());
+    Assert.assertEquals(setSecret, s3SecretValue.getAwsSecret());
+    store.revokeS3Secret(accessId);
+
+
+    // Trigger OM finalization
+    cluster.getOzoneManager().finalizeUpgrade("clientId1");
+
+
     store.createTenant(tenant);
     store.tenantAssignUserAccessId(principal, tenant, accessID);
 
@@ -106,6 +147,9 @@ public class TestMultiTenantVolume {
     // Delete bucket.
     store.deleteS3Bucket(bucketName);
     assertS3BucketNotFound(store, bucketName);
+
+    store.tenantRevokeUserAccessId(accessID);
+    store.deleteTenant(tenant);
   }
 
   /**

@@ -25,7 +25,6 @@ import java.lang.reflect.Method;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
@@ -55,7 +54,7 @@ public class OMLayoutFeatureAspect {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
-    LayoutVersionManager lvm = null;
+    LayoutVersionManager lvm;
     final Object[] args = joinPoint.getArgs();
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
