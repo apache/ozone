@@ -470,6 +470,16 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
+  /**
+   * During data writes the ordering of WriteChunk and PutBlock is not ensured
+   * by any outside logic, therefore in this original implementation, all reads
+   * and writes are synchronized.
+   * This method is providing the possibility for subclasses to override this
+   * behaviour.
+   *
+   * @param request the request we need the decision about
+   * @return true if the request is a write request.
+   */
   protected boolean shouldBlockAndWaitAsyncReply(
       ContainerCommandRequestProto request) {
     return !HddsUtils.isReadOnly(request);

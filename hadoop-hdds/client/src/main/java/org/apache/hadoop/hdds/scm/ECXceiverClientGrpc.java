@@ -42,6 +42,16 @@ public class ECXceiverClientGrpc extends XceiverClientGrpc {
     super(pipeline, config, caCerts);
   }
 
+  /**
+   * For EC writes, due to outside syncronization points during writes, it is
+   * not necessary to block any async requests that are
+   * arriving via the
+   * {@link #sendCommandAsync(ContainerProtos.ContainerCommandRequestProto)}
+   * method.
+   *
+   * @param request the request we need the decision about
+   * @return false always to do not block async requests.
+   */
   @Override
   protected boolean shouldBlockAndWaitAsyncReply(
       ContainerProtos.ContainerCommandRequestProto request) {
