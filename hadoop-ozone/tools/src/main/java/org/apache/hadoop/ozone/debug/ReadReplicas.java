@@ -91,7 +91,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     boolean isChecksumVerifyEnabled
         = getConf().getBoolean("ozone.client.verify.checksum", true);
     OzoneConfiguration configuration = new OzoneConfiguration(getConf());
-    configuration.setBoolean("ozone.client.verify.checksum", !isChecksumVerifyEnabled);
+    configuration.setBoolean("ozone.client.verify.checksum",
+        !isChecksumVerifyEnabled);
 
     if(isChecksumVerifyEnabled) {
       clientProtocol = client.getObjectStore().getClientProxy();
@@ -154,10 +155,14 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
       blockIndex += 1;
       blockJson.addProperty(JSON_PROPERTY_BLOCK_INDEX, blockIndex);
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_CONTAINERID, block.getKey().getContainerID());
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_LOCALID, block.getKey().getLocalID());
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_LENGTH, block.getKey().getLength());
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_OFFSET, block.getKey().getOffset());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_CONTAINERID,
+          block.getKey().getContainerID());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_LOCALID,
+          block.getKey().getLocalID());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_LENGTH,
+          block.getKey().getLength());
+      blockJson.addProperty(JSON_PROPERTY_BLOCK_OFFSET,
+          block.getKey().getOffset());
 
       for (Map.Entry<DatanodeDetails, OzoneInputStream>
           replica : block.getValue().entrySet()) {
@@ -180,7 +185,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
               StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
           Throwable cause = e.getCause();
-          replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION, e.getMessage());
+          replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION,
+              e.getMessage());
           if(cause instanceof OzoneChecksumException) {
             BlockID blockID = block.getKey().getBlockID();
             String datanodeUUID = replica.getKey().getUuidString();
