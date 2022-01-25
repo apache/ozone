@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.debug;
 
 import com.google.gson.*;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -65,6 +63,19 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       defaultValue = "/opt/hadoop")
   private String outputDir;
 
+  private static final String FILENAME = "filename";
+  private static final String DATASIZE = "datasize";
+  private static final String BLOCKS = "blocks";
+  private static final String BLOCKINDEX = "blockIndex";
+  private static final String CONTAINERID = "containerId";
+  private static final String LOCALID = "localId";
+  private static final String LENGTH = "length";
+  private static final String OFFSET = "offset";
+  private static final String REPLICAS = "replicas";
+  private static final String HOSTNAME = "hostname";
+  private static final String UUID = "uuid";
+  private static final String EXCEPTION = "exception";
+
   private ClientProtocol clientProtocol;
   private ClientProtocol clientProtocolWithoutChecksum;
 
@@ -101,14 +112,14 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         .getKeysEveryReplicas(volumeName, bucketName, keyName);
 
     JsonObject result = new JsonObject();
-    result.addProperty("filename",
+    result.addProperty(FILENAME,
         volumeName + "/" + bucketName + "/" + keyName);
-    result.addProperty("datasize", keyInfoDetails.getDataSize());
+    result.addProperty(DATASIZE, keyInfoDetails.getDataSize());
 
     JsonArray blocks = new JsonArray();
     downloadReplicasAndCreateManifest(keyName, replicas,
         replicasWithoutChecksum, directoryName, blocks);
-    result.add("blocks", blocks);
+    result.add(BLOCKS, blocks);
 
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String prettyJson = gson.toJson(result);
@@ -135,19 +146,19 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       JsonArray replicasJson = new JsonArray();
 
       blockIndex += 1;
-      blockJson.addProperty("blockIndex", blockIndex);
-      blockJson.addProperty("containerId", block.getKey().getContainerID());
-      blockJson.addProperty("localId", block.getKey().getLocalID());
-      blockJson.addProperty("length", block.getKey().getLength());
-      blockJson.addProperty("offset", block.getKey().getOffset());
+      blockJson.addProperty(BLOCKINDEX, blockIndex);
+      blockJson.addProperty(CONTAINERID, block.getKey().getContainerID());
+      blockJson.addProperty(LOCALID, block.getKey().getLocalID());
+      blockJson.addProperty(LENGTH, block.getKey().getLength());
+      blockJson.addProperty(OFFSET, block.getKey().getOffset());
 
       for (Map.Entry<DatanodeDetails, OzoneInputStream>
           replica : block.getValue().entrySet()) {
         JsonObject replicaJson = new JsonObject();
 
-        replicaJson.addProperty("hostname",
+        replicaJson.addProperty(HOSTNAME,
             replica.getKey().getHostName());
-        replicaJson.addProperty("uuid",
+        replicaJson.addProperty(UUID,
             replica.getKey().getUuidString());
 
         OzoneInputStream is = replica.getValue();
@@ -162,7 +173,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
               StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
           Throwable cause = e.getCause();
-          replicaJson.addProperty("exception", e.getMessage());
+          replicaJson.addProperty(EXCEPTION, e.getMessage());
           if(cause instanceof OzoneChecksumException) {
             BlockID blockID = block.getKey().getBlockID();
             String datanodeUUID = replica.getKey().getUuidString();
@@ -178,7 +189,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         }
         replicasJson.add(replicaJson);
       }
-      blockJson.add("replicas", replicasJson);
+      blockJson.add(REPLICAS, replicasJson);
       blocks.add(blockJson);
     }
   }
