@@ -128,6 +128,17 @@ public class BaseFreonGenerator {
     reportAnyFailure();
   }
 
+  public void reinit() {
+    successCounter = new AtomicLong(0);
+    failureCounter = new AtomicLong(0);
+    attemptCounter = new AtomicLong(0);
+    executor = Executors.newFixedThreadPool(threadNo);
+    startTime = System.currentTimeMillis();
+    progressBar = new ProgressBar(System.out, testNo, successCounter::get,
+        freonCommand.isInteractive());
+    progressBar.start();
+  }
+
   /**
    * Performs {@code provider}-specific initialization.
    */

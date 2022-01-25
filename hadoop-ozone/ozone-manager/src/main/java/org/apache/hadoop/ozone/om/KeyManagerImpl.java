@@ -495,7 +495,7 @@ public class KeyManagerImpl implements KeyManager {
       Set<Long> containerIDs) throws IOException {
     // TODO: fix Some tests that may not initialize container client
     // The production should always have containerClient initialized.
-    if (scmClient.getContainerClient() == null ||
+    if (scmClient.getContainerClient() == null || preallocateBlocksMax < 1 ||
         containerIDs == null || containerIDs.isEmpty()) {
       return Collections.EMPTY_MAP;
     }

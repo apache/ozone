@@ -132,6 +132,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       int preallocateBlocksMax, boolean grpcBlockTokenEnabled, String omID)
       throws IOException {
 
+    // avoid contact with scm for OMThroughputBenchmark test
+    if (preallocateBlocksMax < 1) {
+      LOG.debug("preallocateBlocksMax smaller than 1, skip allocateBlock");
+      return new ArrayList<>();
+    }
+
     int numBlocks = Math.min((int) ((requestedSize - 1) / scmBlockSize + 1),
         preallocateBlocksMax);
 

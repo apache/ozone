@@ -63,7 +63,8 @@ import picocli.CommandLine.Option;
         GeneratorDatanode.class,
         ClosedContainerReplicator.class,
         StreamingGenerator.class,
-        SCMThroughputBenchmark.class},
+        SCMThroughputBenchmark.class,
+        OMThroughputBenchmark.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {
