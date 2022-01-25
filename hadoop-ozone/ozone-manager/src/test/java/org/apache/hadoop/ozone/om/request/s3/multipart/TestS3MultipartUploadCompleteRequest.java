@@ -59,10 +59,11 @@ public class TestS3MultipartUploadCompleteRequest
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
+    addVolumeAndBucket(volumeName, bucketName);
+
     checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName);
     checkDeleteTableCount(volumeName, bucketName, keyName, 0);
 
-    addVolumeAndBucket(volumeName, bucketName);
     // Do it twice to test overwrite
     checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName);
     // After overwrite, one entry must be in delete table
@@ -89,10 +90,6 @@ public class TestS3MultipartUploadCompleteRequest
 
   private void checkValidateAndUpdateCacheSuccess(String volumeName,
       String bucketName, String keyName) throws Exception {
-
-    addVolumeAndBucket(volumeName, bucketName);
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
