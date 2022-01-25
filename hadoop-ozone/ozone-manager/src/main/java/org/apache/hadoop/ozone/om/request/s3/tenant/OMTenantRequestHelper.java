@@ -236,5 +236,4 @@ public final class OMTenantRequestHelper {
         tenantManager.listUsersInTenant(tenantId, "").getUserAccessIds();
     return tenantUserAccessIdsList.size() == 0;
   }
-
 }

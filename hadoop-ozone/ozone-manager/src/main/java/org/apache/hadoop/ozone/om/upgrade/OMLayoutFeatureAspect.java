@@ -56,14 +56,14 @@ public class OMLayoutFeatureAspect {
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
     LayoutVersionManager lvm = null;
+    final Object[] args = joinPoint.getArgs();
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();
       lvm = ozoneManager.getVersionManager();
-    } else if (joinPoint.getTarget() instanceof OMVolumeRequest) {
+    } else if (args.length > 0 && args[0] instanceof OzoneManager) {
       // Get OzoneManager instance from preExecute first arg
-      assert(joinPoint.getArgs()[0] instanceof OzoneManager);
-      OzoneManager ozoneManager = (OzoneManager) joinPoint.getArgs()[0];
+      OzoneManager ozoneManager = (OzoneManager) args[0];
       lvm = ozoneManager.getVersionManager();
     } else {
       try {
