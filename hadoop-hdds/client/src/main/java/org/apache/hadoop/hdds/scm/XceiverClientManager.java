@@ -232,7 +232,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
               client = new XceiverClientGrpc(pipeline, conf, caCerts);
               break;
             case EC:
-              client = new XceiverClientGrpc(pipeline, conf, caCerts);
+              client = new ECXceiverClientGrpc(pipeline, conf, caCerts);
               break;
             case CHAINED:
             default:
