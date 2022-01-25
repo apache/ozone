@@ -65,12 +65,12 @@ public class GrpcOMFailoverProxyProvider<T> extends
       throws IOException {
     // to be used for base class omProxies,
     // ProxyInfo not applicable for gRPC, just need key set
-    Map omProxiesNodeIdKeyset = new HashMap<String, ProxyInfo<T>>();
+    Map<String, ProxyInfo<T>> omProxiesNodeIdKeyset = new HashMap<>();
     // to be used for base class omProxyInfos
     // OMProxyInfo not applicable for gRPC, just need key set
-    Map omProxyInfosNodeIdKeyset = new HashMap<String, OMProxyInfo>();
-    List omNodeIDList = new ArrayList<String>();
-    omAddresses = new HashMap<String, String>();
+    Map<String, OMProxyInfo> omProxyInfosNodeIdKeyset = new HashMap<>();
+    List<String> omNodeIDList = new ArrayList<>();
+    omAddresses = new HashMap<>();
 
     Collection<String> omServiceIds = Collections.singletonList(omSvcId);
 

@@ -115,14 +115,14 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   public void start() throws IOException {
-    if (isRunning.get()) {
-      LOG.info("Ignore. already started.");
-      return;
-    }
-
     host = omFailoverProxyProvider
         .getGrpcProxyAddress(
             omFailoverProxyProvider.getCurrentProxyOMNodeId());
+
+    if (!isRunning.compareAndSet(false, true)) {
+      LOG.info("Ignore. already started.");
+      return;
+    }
 
     List<String> nodes = omFailoverProxyProvider.getGrpcOmNodeIDList();
     for (String nodeId : nodes) {
@@ -144,7 +144,6 @@ public class GrpcOmTransport implements OmTransport {
 
 
     retryPolicy = omFailoverProxyProvider.getRetryPolicy(maxFailovers);
-    isRunning.set(true);
     LOG.info("{}: started", CLIENT_NAME);
   }
 
