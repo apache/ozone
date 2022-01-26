@@ -21,11 +21,11 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -48,7 +48,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
     String ozoneKey = addKeyToTable();
@@ -89,7 +89,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     // Add only volume and bucket entry to DB.
     // In actual implementation we don't check for bucket/volume exists
     // during delete key.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
     OMClientResponse omClientResponse =
@@ -125,7 +125,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     OMKeyDeleteRequest omKeyDeleteRequest =
             getOmKeyDeleteRequest(modifiedOmRequest);
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse = omKeyDeleteRequest
         .validateAndUpdateCache(ozoneManager, 100L,
@@ -172,7 +172,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   protected String addKeyToTable() throws Exception {
-    TestOMRequestUtils.addKeyToTable(false, volumeName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName,
             bucketName, keyName, clientID, replicationType, replicationFactor,
             omMetadataManager);
 

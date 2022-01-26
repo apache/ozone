@@ -50,7 +50,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
@@ -107,7 +107,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true);
+    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     startCluster(conf);
   }
 

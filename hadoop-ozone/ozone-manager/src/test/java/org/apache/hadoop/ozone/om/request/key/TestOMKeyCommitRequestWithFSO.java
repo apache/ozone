@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
@@ -66,20 +66,20 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     if (getParentDir() == null) {
       parentID = getBucketID();
     } else {
-      parentID = TestOMRequestUtils.addParentsToDirTable(volumeName,
+      parentID = OMRequestTestUtils.addParentsToDirTable(volumeName,
               bucketName, getParentDir(), omMetadataManager);
     }
     long objectId = 100;
 
     OmKeyInfo omKeyInfoFSO =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, 100,
                     Time.now(), version);
     omKeyInfoFSO.appendNewBlocks(locationList, false);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    TestOMRequestUtils.addFileToKeyTable(true, false,
+    OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
 
     return omMetadataManager.getOzonePathKey(parentID, fileName);
