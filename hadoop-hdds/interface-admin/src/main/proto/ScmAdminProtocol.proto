@@ -75,6 +75,7 @@ message ScmContainerLocationRequest {
   optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 36;
   optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
   optional GetContainerCountRequestProto getContainerCountRequest = 38;
+  optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
 }
 
 message ScmContainerLocationResponse {
@@ -121,6 +122,7 @@ message ScmContainerLocationResponse {
   optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 36;
   optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
   optional GetContainerCountResponseProto getContainerCountResponse = 38;
+  optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
 
   enum Status {
     OK = 1;
@@ -165,6 +167,7 @@ enum Type {
   FinalizeScmUpgrade = 31;
   QueryUpgradeFinalizationProgress = 32;
   GetContainerCount = 33;
+  GetContainerReplicas = 34;
 }
 
 /**
@@ -211,6 +214,15 @@ message GetContainerWithPipelineRequestProto {
 
 message GetContainerWithPipelineResponseProto {
   required ContainerWithPipeline containerWithPipeline = 1;
+}
+
+message GetContainerReplicasRequestProto {
+  required int64 containerID = 1;
+  optional string traceID = 2;
+}
+
+message GetContainerReplicasResponseProto {
+  repeated SCMContainerReplicaProto containerReplica = 1;
 }
 
 message GetContainerWithPipelineBatchRequestProto {

@@ -290,6 +290,28 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public List<HddsProtos.SCMContainerReplicaProto>
+      getContainerReplicas(long containerId) throws IOException {
+    List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
+
+    Set<ContainerReplica> replicas = getScm().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerId));
+    for (ContainerReplica r : replicas) {
+      results.add(
+          HddsProtos.SCMContainerReplicaProto.newBuilder()
+              .setContainerID(containerId)
+              .setState(r.getState().toString())
+              .setDatanodeDetails(r.getDatanodeDetails().getProtoBufMessage())
+              .setBytesUsed(r.getBytesUsed())
+              .setPlaceOfBirth(r.getOriginDatanodeId().toString())
+              .setKeyCount(r.getKeyCount())
+              .setSequenceID(r.getSequenceId()).build()
+      );
+    }
+    return results;
+  }
+
+  @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       List<Long> containerIDs) throws IOException {
     getScm().checkAdminAccess(null);
