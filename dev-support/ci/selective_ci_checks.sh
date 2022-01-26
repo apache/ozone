@@ -239,20 +239,6 @@ function get_count_doc_files() {
     start_end::group_end
 }
 
-function get_count_junit_files() {
-    start_end::group_start "Count junit test files"
-    local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
-        "^hadoop-ozone/dev-support/checks/unit.sh"
-        "src/test/java"
-        "src/test/resources"
-    )
-    filter_changed_files true
-    COUNT_JUNIT_CHANGED_FILES=${match_count}
-    readonly COUNT_JUNIT_CHANGED_FILES
-    start_end::group_end
-}
-
 function get_count_integration_files() {
     start_end::group_start "Count integration test files"
     local pattern_array=(
@@ -408,18 +394,17 @@ function check_needs_unit_test() {
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/unit.sh"
-        "pom.xml"
-        "src/..../java"
-        "src/..../resources"
+        "src/test/java"
+        "src/test/resources"
     )
     local ignore_array=(
         "^hadoop-ozone/integration-test"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
     )
-    filter_changed_files
+    filter_changed_files true
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} unit"
+        set_unit_tests_needed
     fi
 
     start_end::group_end
@@ -446,6 +431,12 @@ function get_count_misc_files() {
     start_end::group_end
 }
 
+function set_unit_tests_needed() {
+    if [[ "$BASIC_CHECKS" != *unit* ]]; then
+        BASIC_CHECKS="${BASIC_CHECKS} unit"
+    fi
+}
+
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
     verbosity::store_exit_on_error_status
@@ -465,6 +456,7 @@ function calculate_test_types_to_run() {
         compose_tests_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
+        set_unit_tests_needed
     else
         echo "All ${COUNT_ALL_CHANGED_FILES} changed files are known to be handled by specific checks."
         echo
@@ -527,7 +519,6 @@ check_if_tests_are_needed_at_all
 get_count_all_files
 get_count_compose_files
 get_count_doc_files
-get_count_junit_files
 get_count_integration_files
 get_count_kubernetes_files
 get_count_robot_files
