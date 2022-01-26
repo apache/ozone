@@ -309,7 +309,7 @@ function check_needs_author() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} author"
+        add_basic_check author
     fi
 
     start_end::group_end
@@ -325,7 +325,7 @@ function check_needs_bats() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} bats"
+        add_basic_check bats
     fi
 
     start_end::group_end
@@ -342,7 +342,7 @@ function check_needs_checkstyle() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} checkstyle"
+        add_basic_check checkstyle
     fi
 
     start_end::group_end
@@ -350,7 +350,7 @@ function check_needs_checkstyle() {
 
 function check_needs_docs() {
     if [[ ${COUNT_DOC_CHANGED_FILES} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} docs"
+        add_basic_check docs
     fi
 }
 
@@ -383,7 +383,7 @@ function check_needs_findbugs() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} findbugs"
+        add_basic_check findbugs
     fi
 
     start_end::group_end
@@ -404,7 +404,7 @@ function check_needs_unit_test() {
     filter_changed_files true
 
     if [[ ${match_count} != "0" ]]; then
-        set_unit_tests_needed
+        add_basic_check unit
     fi
 
     start_end::group_end
@@ -431,9 +431,10 @@ function get_count_misc_files() {
     start_end::group_end
 }
 
-function set_unit_tests_needed() {
-    if [[ "$BASIC_CHECKS" != *unit* ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} unit"
+function add_basic_check() {
+    local check="$1"
+    if [[ "$BASIC_CHECKS" != *${check}* ]]; then
+        BASIC_CHECKS="${BASIC_CHECKS} ${check}"
     fi
 }
 
@@ -456,7 +457,7 @@ function calculate_test_types_to_run() {
         compose_tests_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
-        set_unit_tests_needed
+        add_basic_check unit
     else
         echo "All ${COUNT_ALL_CHANGED_FILES} changed files are known to be handled by specific checks."
         echo
