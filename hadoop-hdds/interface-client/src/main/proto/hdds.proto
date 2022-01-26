@@ -379,3 +379,12 @@ message ContainerReplicaHistoryProto {
     required int64 bcsId = 4;
 }
 
+message SCMContainerReplicaProto {
+    required int64 containerID = 1;
+    required string state = 2;
+    required DatanodeDetailsProto datanodeDetails = 3;
+    required string placeOfBirth = 4;
+    required int64 sequenceID = 5;
+    required int64 keyCount = 6;
+    required int64 bytesUsed = 7;
+}
