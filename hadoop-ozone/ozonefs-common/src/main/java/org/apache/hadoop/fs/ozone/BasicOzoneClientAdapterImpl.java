@@ -94,12 +94,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private int configuredDnPort;
   private OzoneConfiguration config;
   private long nextReplicationConfigRefreshTime;
-  //This is just an advanced config.
-  // TODO: dod we really need to expose this in config files?
-  private static final String BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS =
-      "bucket.replication.config.refresh.time.ms";
-  private static final long
-      BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS = 300 * 1000;
   private long bucketRepConfigRefreshPeriodMS;
   private java.time.Clock clock = new MonotonicClock(ZoneOffset.UTC);
 
@@ -126,9 +120,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throws IOException {
 
     OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
-    bucketRepConfigRefreshPeriodMS =
-        conf.getLong(BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS,
-            BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS);
+    bucketRepConfigRefreshPeriodMS = conf.getLong(
+        OzoneConfigKeys
+            .OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS,
+        OzoneConfigKeys
+            .OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS);
     if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
       // When the host name or service id isn't given
       // but ozone.om.service.ids is defined, declare failure.
@@ -239,20 +235,15 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
-      ReplicationConfig clientConfiguredReplConfig =
-          this.clientConfiguredReplicationConfig;
-      ReplicationConfig bucketReplConfig =
-          getReplicationConfigWithRefreshCheck();
-
       OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
           OzoneClientUtils.resolveClientSideReplicationConfig(replication,
-              clientConfiguredReplConfig, bucketReplConfig, config), overWrite,
+              this.clientConfiguredReplicationConfig,
+              getReplicationConfigWithRefreshCheck(), config), overWrite,
           recursive);
-
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS || ex
-          .getResult() == OMException.ResultCodes.NOT_A_FILE) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
+          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
         throw new FileAlreadyExistsException(
             ex.getResult().name() + ": " + ex.getMessage());
       } else {
@@ -438,7 +429,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @VisibleForTesting
-  public void setClock(Clock monotonicClock) {
+  void setClock(Clock monotonicClock) {
     this.clock = monotonicClock;
   }
 
