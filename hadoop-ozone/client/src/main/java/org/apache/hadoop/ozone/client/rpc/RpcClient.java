@@ -31,6 +31,8 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -55,6 +58,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -89,6 +94,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
@@ -918,6 +924,63 @@ public class RpcClient implements ClientProtocol {
         .build();
     OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
     return getInputStreamWithRetryFunction(keyInfo);
+  }
+
+  @Override
+  public Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> >
+      getKeysEveryReplicas(String volumeName,
+                         String bucketName,
+                         String keyName) throws IOException {
+
+    Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> > result
+        = new LinkedHashMap<>();
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setRefreshPipeline(true)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
+        .build();
+
+    OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+    List<OmKeyLocationInfo> keyLocationInfos
+        = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
+
+    for(OmKeyLocationInfo keyLocationInfo : keyLocationInfos) {
+      Map<DatanodeDetails, OzoneInputStream> blocks = new HashMap<>();
+
+      Pipeline pipelineBefore = keyLocationInfo.getPipeline();
+      List<DatanodeDetails> datanodes = pipelineBefore.getNodes();
+
+      for(DatanodeDetails dn : datanodes) {
+        List<DatanodeDetails> nodes = new ArrayList<>();
+        nodes.add(dn);
+        Pipeline pipeline
+            = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
+            .setId(PipelineID.randomId()).build();
+        keyLocationInfo.setPipeline(pipeline);
+
+        List<OmKeyLocationInfo> keyLocationInfoList = new ArrayList<>();
+        keyLocationInfoList.add(keyLocationInfo);
+        OmKeyLocationInfoGroup keyLocationInfoGroup
+            = new OmKeyLocationInfoGroup(0, keyLocationInfoList);
+        List<OmKeyLocationInfoGroup> keyLocationInfoGroups = new ArrayList<>();
+        keyLocationInfoGroups.add(keyLocationInfoGroup);
+
+        keyInfo.setKeyLocationVersions(keyLocationInfoGroups);
+        OzoneInputStream is = createInputStream(keyInfo, Function.identity());
+
+        blocks.put(dn, is);
+      }
+
+      result.put(keyLocationInfo, blocks);
+    }
+
+    return result;
   }
 
   @Override

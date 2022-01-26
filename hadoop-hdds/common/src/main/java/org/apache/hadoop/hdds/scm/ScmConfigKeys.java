@@ -138,8 +138,8 @@ public final class ScmConfigKeys {
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT =
       "64KB";
 
-  public static final String OZONE_SCM_CHUNK_LAYOUT_KEY =
-      "ozone.scm.chunk.layout";
+  public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
+      "ozone.scm.container.layout";
 
   public static final String OZONE_SCM_CLIENT_PORT_KEY =
       "ozone.scm.client.port";
