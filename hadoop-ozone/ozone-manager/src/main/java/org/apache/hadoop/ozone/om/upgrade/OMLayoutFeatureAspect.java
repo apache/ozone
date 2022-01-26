@@ -60,7 +60,8 @@ public class OMLayoutFeatureAspect {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();
       lvm = ozoneManager.getVersionManager();
-    } else if (args.length > 0 && args[0] instanceof OzoneManager) {
+    } else if (args != null && args.length > 0 &&
+        args[0] instanceof OzoneManager) {
       // Get OzoneManager instance from preExecute first arg
       OzoneManager ozoneManager = (OzoneManager) args[0];
       lvm = ozoneManager.getVersionManager();
