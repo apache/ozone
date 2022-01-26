@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
@@ -101,20 +101,20 @@ public class TestKeyValueContainer {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
   // Use one configuration object across parameterized runs of tests.
   // This preserves the column family options in the container options
   // cache for testContainersShareColumnFamilyOptions.
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
-  public TestKeyValueContainer(ChunkLayOutVersion layout) {
+  public TestKeyValueContainer(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -179,7 +179,7 @@ public class TestKeyValueContainer {
     //create a new one
     KeyValueContainerData containerData =
         new KeyValueContainerData(containerId,
-            keyValueContainerData.getLayOutVersion(),
+            keyValueContainerData.getLayoutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
@@ -200,8 +200,8 @@ public class TestKeyValueContainer {
         containerData.getState());
     assertEquals(numberOfKeysToWrite,
         containerData.getKeyCount());
-    assertEquals(keyValueContainerData.getLayOutVersion(),
-        containerData.getLayOutVersion());
+    assertEquals(keyValueContainerData.getLayoutVersion(),
+        containerData.getLayoutVersion());
     assertEquals(keyValueContainerData.getMaxSize(),
         containerData.getMaxSize());
     assertEquals(keyValueContainerData.getBytesUsed(),
@@ -221,7 +221,7 @@ public class TestKeyValueContainer {
     //Import failure should cleanup the container directory
     containerData =
         new KeyValueContainerData(containerId + 1,
-            keyValueContainerData.getLayOutVersion(),
+            keyValueContainerData.getLayoutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
     container = new KeyValueContainer(containerData, CONF);

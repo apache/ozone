@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
@@ -249,6 +250,26 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         response.getGetContainerWithPipelineResponse()
             .getContainerWithPipeline());
 
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<HddsProtos.SCMContainerReplicaProto>
+      getContainerReplicas(long containerID) throws IOException {
+    Preconditions.checkState(containerID >= 0,
+        "Container ID cannot be negative");
+
+    GetContainerReplicasRequestProto request =
+        GetContainerReplicasRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .setContainerID(containerID).build();
+
+    ScmContainerLocationResponse response =
+        submitRequest(Type.GetContainerReplicas,
+            (builder) -> builder.setGetContainerReplicasRequest(request));
+    return response.getGetContainerReplicasResponse().getContainerReplicaList();
   }
 
   /**

@@ -18,21 +18,21 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.junit.Test;
 
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.junit.Assert.assertEquals;
 
 /**
- * This class tests ChunkLayOutVersion.
+ * This class tests ContainerLayoutVersion.
  */
-public class TestChunkLayOutVersion {
+public class TestContainerLayoutVersion {
 
   @Test
   public void testVersionCount() {
-    assertEquals(2, ChunkLayOutVersion.getAllVersions().size());
+    assertEquals(2, ContainerLayoutVersion.getAllVersions().size());
   }
 
   @Test

@@ -722,11 +722,11 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.chunk.layout</name>
+    <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
-      Chunk layout defines how chunks, blocks and containers are stored on disk.
+      Container layout defines how chunks, blocks and containers are stored on disk.
       Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
       block are stored in the same file with FILE_PER_BLOCK.  The default is
       FILE_PER_BLOCK.
