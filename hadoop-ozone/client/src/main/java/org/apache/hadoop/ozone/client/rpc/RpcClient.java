@@ -444,7 +444,10 @@ public class RpcClient implements ClientProtocol {
     // Update user principal, to be used for KMS
     S3Auth s3Auth = getThreadLocalS3Auth();
     if (s3Auth != null) {
-      LOG.info("Updating S3Auth->UserPrincipal");  // TODO: Switch to debug
+      // Update userPrincipal field with the value returned from OM. So that
+      //  in multi-tenancy, KMS client can use the correct identity
+      //  (instead of using accessId) to communicate with KMS.
+      LOG.debug("Updating S3Auth.userPrincipal to {}", resp.getUserPrincipal());
       s3Auth.setUserPrincipal(resp.getUserPrincipal());
       setTheadLocalS3Auth(s3Auth);
     }

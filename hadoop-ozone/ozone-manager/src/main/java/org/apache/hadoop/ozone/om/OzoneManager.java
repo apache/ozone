@@ -2234,7 +2234,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     UserGroupInformation user;
     if (getS3Auth() != null) {
       String principal =
-          OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId());
+          OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId());
       user = UserGroupInformation.createRemoteUser(principal);
     } else {
       user = ProtobufRpcEngine.Server.getRemoteUser();
@@ -3115,7 +3115,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
 
         // Inject user name to the response to be used for KMS on the client
-        userPrincipal = OzoneAclUtils.principalToAccessID(accessID);
+        userPrincipal = OzoneAclUtils.accessIdToUserPrincipal(accessID);
       } else if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
             "requests to default s3 volume {}.", accessID, s3Volume);
@@ -3873,7 +3873,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (getS3Auth() != null) {
         ugi = UserGroupInformation
             .createRemoteUser(
-                OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId()));
+                OzoneAclUtils.accessIdToUserPrincipal(
+                    getS3Auth().getAccessId()));
       }
       InetAddress remoteIp = Server.getRemoteIp();
       resolved = resolveBucketLink(requested, new HashSet<>(),

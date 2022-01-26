@@ -47,8 +47,8 @@ public final class OzoneAclUtils {
    * If the access ID does not belong to a tenant, the access ID is returned
    * as is to be used as the principal.
    */
-  // TODO: Should be named accessIdToPrincipal instead?
-  public static String principalToAccessID(String accessID) throws IOException {
+  public static String accessIdToUserPrincipal(String accessID)
+      throws IOException {
     String principal = multiTenantManager.getUserNameGivenAccessId(accessID);
     if (principal == null) {
       principal = accessID;

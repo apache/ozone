@@ -141,7 +141,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
     // If S3 Authentication is set, determine user based on access ID.
     if (omRequest.hasS3Authentication()) {
-      String principal = OzoneAclUtils.principalToAccessID(
+      String principal = OzoneAclUtils.accessIdToUserPrincipal(
           omRequest.getS3Authentication().getAccessId());
       userInfo.setUserName(principal);
     } else if (user != null) {

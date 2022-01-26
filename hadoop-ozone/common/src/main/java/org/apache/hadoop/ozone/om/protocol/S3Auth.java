@@ -32,11 +32,12 @@ public class S3Auth {
                 final String signature,
                 final String accessID,
                 final String userPrincipal) {
-    this.accessID = accessID;
     this.stringToSign = stringToSign;
     this.signature = signature;
+    this.accessID = accessID;
     this.userPrincipal = userPrincipal;
   }
+
   public String getStringTosSign() {
     return stringToSign;
   }
