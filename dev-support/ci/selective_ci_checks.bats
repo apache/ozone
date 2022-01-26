@@ -88,7 +88,18 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=false
 }
 
-@test "integration and unit" {
+@test "integration and unit: script change" {
+  run dev-support/ci/selective_ci_checks.sh c6850484f
+
+  assert_output -p 'basic-checks=["rat","bats","unit"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "integration and unit: java change" {
   run dev-support/ci/selective_ci_checks.sh 9aebf6e25
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
