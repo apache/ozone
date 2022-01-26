@@ -84,7 +84,7 @@ This picture shows how the chunks will be layed out in data node blocks.
 Currently, the EC client re-used the data transfer end-points to transfer the data to data nodes.
 The XceiverClientGRPC client used for writing data and putBlock info.
 The datanode side changes are minimal as we reused the same existing transfer protocols.
-The EC data block written at the datanode is same as any other block in non-EC mode. 
+The EC data block written at the datanode is same as any other block in non-EC mode.
 In a single block group, container id numbers are same in all nodes. A file can have multiple block groups.
 Each block group will have `d+p` number of block and all ids are same.
 
@@ -125,7 +125,7 @@ Below picture depicts how it uses parity replicas in reconstruction.
  it's provided both faces of interfaces. In both cases, keys/files would be written into buckets under the hood.
  So, EC Replication Configs can be set at bucket level.
  The EC policy encapsulates how to encode/decode a file.
- Each EC Replication Config defined by the following pieces of information: 
+ Each EC Replication Config defined by the following pieces of information:
   1. **data:** Data blocks number in an EC block group.
   2. **parity:** Parity blocks number in an EC block group.
   3. **ecChunkSize:** The size of a striping chunk. This determines the granularity of striped reads and writes.
@@ -165,7 +165,7 @@ Due to this reason, it is recommended to setup racks with similar number of Data
 
 ### Configurations
 
-EC Replication Config can be enabled at bucket level as discussed above. 
+EC Replication Config can be enabled at bucket level as discussed above.
 Cluster wide default Replication Config can be set with EC Replication Config by using
 the configuration keys `ozone.server.default.replication.type` and `ozone.server.default.replication`.
 
