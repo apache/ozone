@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -130,6 +131,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -577,8 +579,9 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(int count) throws IOException {
-    return metadataManager.getExpiredOpenKeys(count);
+  public List<String> getExpiredOpenKeys(Duration expireThreshold,
+      int count) throws IOException {
+    return metadataManager.getExpiredOpenKeys(expireThreshold, count);
   }
 
   @Override

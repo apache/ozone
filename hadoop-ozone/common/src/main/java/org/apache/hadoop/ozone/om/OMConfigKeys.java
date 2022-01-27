@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -82,6 +83,22 @@ public final class OMConfigKeys {
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.open.key.cleanup.service.interval";
+  public static final Duration
+      OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT =
+      Duration.ofHours(24);
+
+  public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD =
+      "ozone.om.open.key.expire.threshold";
+  public static final Duration OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT =
+      Duration.ofDays(7);
+
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.open.key.cleanup.limit.per.task";
+  public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      1000;
 
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
