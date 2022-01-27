@@ -116,8 +116,7 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -860,7 +859,7 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName = UUID.randomUUID().toString();
 
       OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, STAND_ALONE,
+          value.getBytes(UTF_8).length, RATIS,
           ONE, new HashMap<>());
       out.write(value.getBytes(UTF_8));
       out.close();
@@ -870,7 +869,7 @@ public abstract class TestOzoneRpcClientAbstract {
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
       is.read(fileContent);
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, STAND_ALONE,
+          keyName, RATIS,
           ONE));
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -934,7 +933,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     try {
       OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
-          valueLength, STAND_ALONE, ONE, new HashMap<>());
+          valueLength, RATIS, ONE, new HashMap<>());
       for (int i = 0; i <= (4 * blockSize) / value.length(); i++) {
         out.write(value.getBytes(UTF_8));
       }
@@ -959,7 +958,7 @@ public abstract class TestOzoneRpcClientAbstract {
     bucket.setQuota(OzoneQuota.parseQuota(
         5 * blockSize + " B", "100"));
     OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
-        valueLength, STAND_ALONE, ONE, new HashMap<>());
+        valueLength, RATIS, ONE, new HashMap<>());
     out.close();
     Assert.assertEquals(4 * blockSize,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
@@ -1093,7 +1092,7 @@ public abstract class TestOzoneRpcClientAbstract {
   private void writeKey(OzoneBucket bucket, String keyName,
       ReplicationFactor replication, String value, int valueLength)
       throws IOException{
-    OzoneOutputStream out = bucket.createKey(keyName, valueLength, STAND_ALONE,
+    OzoneOutputStream out = bucket.createKey(keyName, valueLength, RATIS,
         replication, new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
@@ -1102,7 +1101,7 @@ public abstract class TestOzoneRpcClientAbstract {
   private void writeFile(OzoneBucket bucket, String keyName,
       ReplicationFactor replication, String value, int valueLength)
       throws IOException{
-    OzoneOutputStream out = bucket.createFile(keyName, valueLength, STAND_ALONE,
+    OzoneOutputStream out = bucket.createFile(keyName, valueLength, RATIS,
         replication, true, true);
     out.write(value.getBytes(UTF_8));
     out.close();
@@ -1124,7 +1123,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        RATIS, ONE);
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -1162,7 +1161,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // create the initial key with size 0, write will allocate the first block.
     OzoneOutputStream out = bucket.createKey(keyName, 0,
-        STAND_ALONE, ONE, new HashMap<>());
+        RATIS, ONE, new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
@@ -1428,7 +1427,7 @@ public abstract class TestOzoneRpcClientAbstract {
     //String keyValue = "this is a test value.glx";
     // create the initial key with size 0, write will allocate the first block.
     OzoneOutputStream out = bucket.createKey(keyName,
-        keyValue.getBytes(UTF_8).length, STAND_ALONE,
+        keyValue.getBytes(UTF_8).length, RATIS,
         ONE, new HashMap<>());
     out.write(keyValue.getBytes(UTF_8));
     out.close();
@@ -1780,7 +1779,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, STAND_ALONE,
+        value.getBytes(UTF_8).length, RATIS,
         ONE, new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
@@ -2057,25 +2056,25 @@ public abstract class TestOzoneRpcClientAbstract {
       byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
       OzoneOutputStream one = volAbucketA.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       one.write(value);
       one.close();
       OzoneOutputStream two = volAbucketB.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       two.write(value);
       two.close();
       OzoneOutputStream three = volBbucketA.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       three.write(value);
       three.close();
       OzoneOutputStream four = volBbucketB.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       four.write(value);
       four.close();
@@ -2090,25 +2089,25 @@ public abstract class TestOzoneRpcClientAbstract {
       byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
       OzoneOutputStream one = volAbucketA.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       one.write(value);
       one.close();
       OzoneOutputStream two = volAbucketB.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       two.write(value);
       two.close();
       OzoneOutputStream three = volBbucketA.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       three.write(value);
       three.close();
       OzoneOutputStream four = volBbucketB.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, RATIS, ONE,
           new HashMap<>());
       four.write(value);
       four.close();
@@ -2189,7 +2188,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        RATIS, ONE);
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -2201,7 +2200,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // Call initiate multipart upload for the same key again, this should
     // generate a new uploadID.
     multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        RATIS, ONE);
 
     assertNotNull(multipartInfo);
     Assert.assertEquals(volumeName, multipartInfo.getVolumeName());
@@ -2256,7 +2255,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        RATIS, ONE);
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -2293,7 +2292,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        RATIS, ONE);
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -2562,7 +2561,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
 
     // Upload Parts
@@ -2595,7 +2594,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
 
     // We have not uploaded any parts, but passing some list it should throw
@@ -2620,7 +2619,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
 
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
@@ -2645,7 +2644,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
 
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
@@ -2685,7 +2684,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        RATIS, ONE);
 
     Assert.assertNotNull(omMultipartInfo.getUploadID());
 
@@ -2720,7 +2719,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        RATIS, ONE);
 
     Assert.assertNotNull(omMultipartInfo.getUploadID());
 
@@ -2782,7 +2781,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
     bucket.abortMultipartUpload(keyName, uploadID);
   }
@@ -2798,7 +2797,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
     bucket.abortMultipartUpload(keyName, uploadID);
@@ -2816,7 +2815,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     Map<Integer, String> partsMap = new TreeMap<>();
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
     String partName1 = uploadPart(bucket, keyName, uploadID, 1,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
@@ -2833,7 +2832,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 3);
 
-    Assert.assertEquals(STAND_ALONE,
+    Assert.assertEquals(RATIS,
         ozoneMultipartUploadPartListParts.getReplicationType());
     Assert.assertEquals(3,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
@@ -2867,7 +2866,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     Map<Integer, String> partsMap = new TreeMap<>();
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
     String partName1 = uploadPart(bucket, keyName, uploadID, 1,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
@@ -2884,7 +2883,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 2);
 
-    Assert.assertEquals(STAND_ALONE,
+    Assert.assertEquals(RATIS,
         ozoneMultipartUploadPartListParts.getReplicationType());
 
     Assert.assertEquals(2,
@@ -2972,7 +2971,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
 
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
     uploadPart(bucket, keyName, uploadID, 1,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
@@ -2985,7 +2984,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     Assert.assertEquals(0,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
-    Assert.assertEquals(STAND_ALONE,
+    Assert.assertEquals(RATIS,
         ozoneMultipartUploadPartListParts.getReplicationType());
 
     // As we don't have any parts with greater than partNumberMarker and list
@@ -3331,7 +3330,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   private void writeKey(String key1, OzoneBucket bucket) throws IOException {
-    OzoneOutputStream out = bucket.createKey(key1, 1024, STAND_ALONE,
+    OzoneOutputStream out = bucket.createKey(key1, 1024, RATIS,
         ONE, new HashMap<>());
     out.write(RandomStringUtils.random(1024).getBytes(UTF_8));
     out.close();
@@ -3453,7 +3452,7 @@ public abstract class TestOzoneRpcClientAbstract {
   private void createTestKey(OzoneBucket bucket, String keyName,
                              String keyValue) throws IOException {
     OzoneOutputStream out = bucket.createKey(keyName,
-        keyValue.getBytes(UTF_8).length, STAND_ALONE,
+        keyValue.getBytes(UTF_8).length, RATIS,
         ONE, new HashMap<>());
     out.write(keyValue.getBytes(UTF_8));
     out.close();
@@ -3512,7 +3511,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     OzoneOutputStream out = bucket.createKey(keyName,
-        text.getBytes(UTF_8).length, STAND_ALONE, ONE, keyMetadata);
+        text.getBytes(UTF_8).length, RATIS, ONE, keyMetadata);
     out.write(text.getBytes(UTF_8));
     out.close();
     Assert.assertNull(keyMetadata.get(OzoneConsts.GDPR_SECRET));
@@ -3530,7 +3529,7 @@ public abstract class TestOzoneRpcClientAbstract {
     byte[] fileContent = new byte[text.getBytes(UTF_8).length];
     is.read(fileContent);
     Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-        keyName, STAND_ALONE,
+        keyName, RATIS,
         ONE));
     Assert.assertEquals(text, new String(fileContent, UTF_8));
 
@@ -3593,7 +3592,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     OzoneOutputStream out = bucket.createKey(keyName,
-        text.getBytes(UTF_8).length, STAND_ALONE, ONE, keyMetadata);
+        text.getBytes(UTF_8).length, RATIS, ONE, keyMetadata);
     out.write(text.getBytes(UTF_8));
     out.close();
 
@@ -3610,7 +3609,7 @@ public abstract class TestOzoneRpcClientAbstract {
     byte[] fileContent = new byte[text.getBytes(UTF_8).length];
     is.read(fileContent);
     Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-        keyName, STAND_ALONE,
+        keyName, RATIS,
         ONE));
     Assert.assertEquals(text, new String(fileContent, UTF_8));
 
@@ -3658,7 +3657,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     ReplicationConfig replicationConfig = ReplicationConfig
-        .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
+        .fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -3700,7 +3700,8 @@ public abstract class TestOzoneRpcClientAbstract {
       String bucketName, String keyName, boolean versioning) throws Exception {
 
     ReplicationConfig replicationConfig = ReplicationConfig
-        .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
+        .fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
 
     String value = "sample value";
     store.createVolume(volumeName);
