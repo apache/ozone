@@ -1180,6 +1180,18 @@
   </property>
 
   <property>
+    <name>ozone.client.bucket.replication.config.refresh.time.ms</name>
+    <value>30000</value>
+    <tag>OZONE</tag>
+    <description>
+      Default time period to refresh the bucket replication config in o3fs
+      clients. Until the bucket replication config refreshed, client will
+      continue to use existing replication config irrespective of whether bucket
+      replication config updated at OM or not.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.container.close.threshold</name>
     <value>0.9f</value>
     <tag>OZONE, DATANODE</tag>

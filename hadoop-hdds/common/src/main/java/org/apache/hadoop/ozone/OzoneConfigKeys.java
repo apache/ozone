@@ -472,6 +472,13 @@ public final class OzoneConfigKeys {
   // The protocol starts at 2.0.0 and a null or empty value for older versions.
   public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION = "2.0.0";
 
+  public static final String
+      OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS =
+      "ozone.client.bucket.replication.config.refresh.time.ms";
+  public static final long
+      OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
+      300 * 1000;
+
   /**
    * There is no need to instantiate this class.
    */

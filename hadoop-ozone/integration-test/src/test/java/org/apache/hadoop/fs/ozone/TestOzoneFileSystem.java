@@ -21,6 +21,8 @@ package org.apache.hadoop.fs.ozone;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,6 +31,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -42,8 +45,12 @@ import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -81,6 +88,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -164,7 +172,7 @@ public class TestOzoneFileSystem {
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         bucketLayout.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(3)
+            .setNumDatanodes(5)
             .build();
     cluster.waitForClusterToBeReady();
 
@@ -1183,6 +1191,66 @@ public class TestOzoneFileSystem {
     Path outPath1 = o3fs.getTrashRoot(inPath1);
     Path expectedOutPath1 = new Path(trashRoot, username);
     Assert.assertEquals(expectedOutPath1, outPath1);
+  }
+
+  @Test
+  public void testCreateKeyShouldUseRefreshedBucketReplicationConfig()
+      throws IOException {
+    OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    final TestClock testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
+
+    String rootPath = String
+        .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+            bucket.getVolumeName());
+
+    // Set the fs.defaultFS and start the filesystem
+    Configuration conf = new OzoneConfiguration(cluster.getConf());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // Set the number of keys to be processed during batch operate.
+    OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
+
+    //Let's reset the clock to control the time.
+    ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
+
+    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key"),
+        ReplicationType.RATIS);
+
+    bucket.setReplicationConfig(new ECReplicationConfig("rs-3-2-1024k"));
+
+    //After changing the bucket policy, it should create ec key, but o3fs will
+    // refresh after some time. So, it will be sill old type.
+    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key1"),
+        ReplicationType.RATIS);
+
+    testClock.fastForward(300 * 1000 + 1);
+
+    //After client bucket refresh time, it should create new type what is
+    // available on bucket at that moment.
+    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key2"),
+        ReplicationType.EC);
+
+    // Rechecking the same steps with changing to Ratis again to check the
+    // behavior is consistent.
+    bucket.setReplicationConfig(
+        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+
+    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key3"),
+        ReplicationType.EC);
+
+    testClock.fastForward(300 * 1000 + 1);
+
+    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key4"),
+        ReplicationType.RATIS);
+  }
+
+  private void createKeyAndAssertKeyType(OzoneBucket bucket,
+      OzoneFileSystem o3FS, Path keyPath, ReplicationType expectedType)
+      throws IOException {
+    o3FS.createFile(keyPath).build().close();
+    Assert.assertEquals(expectedType.name(),
+        bucket.getKey(o3FS.pathToKey(keyPath)).getReplicationConfig()
+            .getReplicationType().name());
   }
 
   @Test
