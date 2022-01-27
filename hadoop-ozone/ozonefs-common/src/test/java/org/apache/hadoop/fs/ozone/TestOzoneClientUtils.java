@@ -19,8 +19,10 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -128,4 +130,97 @@ public class TestOzoneClientUtils {
     // Configured value is ratis THREE
     Assert.assertEquals(ratis3ReplicationConfig, replicationConfig);
   }
+
+  /**
+   * Tests validateAndGetClientReplicationConfig with user passed valid config
+   * values.
+   */
+  @Test
+  public void testValidateAndGetRepConfWhenValidUserPassedValues() {
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(ReplicationType.RATIS, "1",
+            new OzoneConfiguration());
+    // Configured value is ratis ONE
+    Assert.assertEquals(ratis1ReplicationConfig, replicationConfig);
+  }
+
+  /**
+   * Tests validateAndGetClientReplicationConfig with user passed null values.
+   */
+  @Test
+  public void testValidateAndGetRepConfWhenValidUserPassedNullValues() {
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(null, null,
+            new OzoneConfiguration());
+    Assert.assertNull(replicationConfig);
+  }
+
+  /**
+   * Tests validateAndGetClientReplicationConfig with user passed null values
+   * but client config has valid values.
+   */
+  @Test
+  public void testValidateAndGetRepConfWhenValidConfigValues() {
+    OzoneConfiguration clientSideConfig = new OzoneConfiguration();
+    clientSideConfig.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE, "EC");
+    clientSideConfig.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024K");
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(null, null, clientSideConfig);
+    Assert.assertEquals(ecReplicationConfig, replicationConfig);
+  }
+
+  /**
+   * Tests validateAndGetClientReplicationConfig with user passed null values
+   * but client config has valid values.
+   */
+  @Test
+  public void testValidateAndGetRepConfWhenNullTypeFromUser() {
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(null, "3",
+            new OzoneConfiguration());
+    Assert.assertNull(replicationConfig);
+  }
+
+  /**
+   * Tests validateAndGetClientReplicationConfig with user passed null
+   * replication but valid type.
+   */
+  @Test
+  public void testValidateAndGetRepConfWhenNullReplicationFromUser() {
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(ReplicationType.EC, null,
+            new OzoneConfiguration());
+    Assert.assertNull(replicationConfig);
+  }
+
+  /**
+   * Tests validateAndGetClientReplicationConfig with user pass null values but
+   * config has only replication configured.
+   */
+  @Test
+  public void testValidateAndGetRepConfWhenNullTypeConfigValues() {
+    OzoneConfiguration clientSideConfig = new OzoneConfiguration();
+    clientSideConfig.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024K");
+    //By default config values are null. Let's don't set type to keep it as
+    // null.
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(null, null, clientSideConfig);
+    Assert.assertNull(replicationConfig);
+  }
+
+  /**
+   * Tests validateAndGetClientReplicationConfig with user pass null values but
+   * config has only type configured.
+   */
+  @Test
+  public void testValidateAndGetRepConfWhenNullReplicationConfigValues() {
+    OzoneConfiguration clientSideConfig = new OzoneConfiguration();
+    clientSideConfig.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE, "EC");
+    //By default config values are null. Let's don't set replication to keep it
+    // as null.
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(null, null, clientSideConfig);
+    Assert.assertNull(replicationConfig);
+  }
+
 }

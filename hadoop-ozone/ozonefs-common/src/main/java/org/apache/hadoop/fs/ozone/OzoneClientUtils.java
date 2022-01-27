@@ -165,8 +165,8 @@ public final class OzoneClientUtils {
      can pass null replication config to server. Now server will take the
      decision of finding the replication config( either from bucket defaults
      or server defaults). */
-    ReplicationType clientReplicationType = null;
-    String clientReplication = null;
+    ReplicationType clientReplicationType = userPassedType;
+    String clientReplication = userPassedReplication;
     String clientConfiguredDefaultType =
         clientSideConfig.get(OZONE_REPLICATION_TYPE);
     if (userPassedType == null && clientConfiguredDefaultType != null) {

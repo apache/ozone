@@ -928,16 +928,6 @@ public class TestOzoneShellHA {
     args = new String[] {"key", "put", bucketPath + Path.SEPARATOR + keyName,
         testFilePathString};
     execute(ozoneShell, args);
-    OzoneBucket bucket =
-        cluster.getClient().getObjectStore().getVolume(volumeName)
-            .getBucket(bucketName);
-    try (OzoneOutputStream out = bucket.createKey(keyName, 1024)) {
-      Assert.assertTrue(out.getOutputStream().getClass().getName()
-          .equals(ECKeyOutputStream.class.getName()));
-    }
-    String keyPath = bucketPath + Path.SEPARATOR + keyName;
-    args = new String[] {"key", "put", keyPath, testFilePathString};
-    execute(ozoneShell, args);
 
     OzoneKeyDetails key =
         cluster.getClient().getObjectStore().getVolume(volumeName)
