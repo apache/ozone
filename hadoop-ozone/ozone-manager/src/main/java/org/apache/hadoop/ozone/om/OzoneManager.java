@@ -2557,10 +2557,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumBucketInfos();
       final OmBucketInfo bucketInfo =
           bucketManager.getBucketInfo(volume, bucket);
-      if (bucketInfo != null && bucketInfo
-          .getDefaultReplicationConfig() == null) {
-        bucketInfo.setDefaultReplicationConfig(getDefaultReplicationConfig());
-      }
       return bucketInfo;
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
