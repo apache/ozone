@@ -31,9 +31,11 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -92,6 +94,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
+  private AtomicLong availPendingRequestNum;
+  private final Object monitor = new Object();
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -112,11 +116,16 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
+    long maxPendingReqCount = ozoneManager.getConfiguration()
+        .getLong(OzoneConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT,
+        OzoneConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT_DEFAULT);
+    this.availPendingRequestNum = new AtomicLong(maxPendingReqCount);
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
+
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
@@ -308,6 +317,16 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       CompletableFuture<Message> ratisFuture =
           new CompletableFuture<>();
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
+
+      //if there are too many pending requests, wait for doubleBuffer flushing
+      if (availPendingRequestNum.decrementAndGet() < 0) {
+        synchronized (monitor) {
+          while (availPendingRequestNum.get() < 0) {
+            monitor.wait();
+          }
+        }
+      }
+
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);
       future.thenApply(omResponse -> {
@@ -398,6 +417,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .setAvailPendingRequestNum(availPendingRequestNum)
+        .setMonitor(monitor)
         .setIndexToTerm(this::getTermForIndex)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
