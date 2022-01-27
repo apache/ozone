@@ -16,27 +16,18 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.keyvalue.impl;
+package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.statemachine.StateMachine;
 
-import java.io.File;
+import java.io.IOException;
 
 /**
- * This class is used to get the DataChannel for streaming.
+ * For write state machine data.
  */
-class KeyValueStreamDataChannel extends StreamDataChannelBase {
-  KeyValueStreamDataChannel(File file, ContainerData containerData,
-                            ContainerMetrics metrics)
-      throws StorageContainerException {
-    super(file, containerData, metrics);
-  }
+public interface StreamDataChannel extends StateMachine.DataChannel {
 
-  @Override
-  ContainerProtos.Type getType() {
-    return ContainerProtos.Type.StreamWrite;
+  default void link(RaftProtos.LogEntryProto entry) throws IOException {
   }
 }
