@@ -329,23 +329,21 @@ public final class OzoneManagerDoubleBuffer {
                 flushedTransactionsSize);
           }
 
+          // Clean up committed transactions.
+          cleanupCache(cleanupEpochs);
+
+          readyBuffer.clear();
           // When non-HA do the sort step here, as the sorted list is not
           // required for flush to DB. As in non-HA we want to complete
           // futures as quick as possible after flush to DB, to release rpc
           // handler threads.
-          if (!isRatisEnabled) {
+          if (isRatisEnabled) {
+            availPendingRequestNum.release(flushedTransactionsSize);
+          } else {
             flushedEpochs =
                 readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
                     .sorted().collect(Collectors.toList());
           }
-
-
-          // Clean up committed transactions.
-
-          cleanupCache(cleanupEpochs);
-
-          readyBuffer.clear();
-          availPendingRequestNum.release(flushedTransactionsSize);
 
           // update the last updated index in OzoneManagerStateMachine.
           ozoneManagerRatisSnapShot.updateLastAppliedIndex(
