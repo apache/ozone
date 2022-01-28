@@ -147,4 +147,46 @@ public final class OzoneClientUtils {
         config.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
         replication, config);
   }
+
+  /**
+   * Gets the client side replication config by checking user passed values vs
+   * client configured values.
+   * @param userPassedType - User provided replication type.
+   * @param userPassedReplication - User provided replication.
+   * @param clientSideConfig - Client side configuration.
+   * @return ReplicationConfig.
+   */
+  public static ReplicationConfig validateAndGetClientReplicationConfig(
+      ReplicationType userPassedType, String userPassedReplication,
+      OzoneConfiguration clientSideConfig) {
+    // Priority 1: User passed replication config values.
+    // Priority 2: Client side configured replication config values.
+    /* if above two are not available, we should just return null and clients
+     can pass null replication config to server. Now server will take the
+     decision of finding the replication config( either from bucket defaults
+     or server defaults). */
+    ReplicationType clientReplicationType = userPassedType;
+    String clientReplication = userPassedReplication;
+    String clientConfiguredDefaultType =
+        clientSideConfig.get(OZONE_REPLICATION_TYPE);
+    if (userPassedType == null && clientConfiguredDefaultType != null) {
+      clientReplicationType =
+          ReplicationType.valueOf(clientConfiguredDefaultType);
+    }
+
+    String clientConfiguredDefaultReplication =
+        clientSideConfig.get(OZONE_REPLICATION);
+    if (userPassedReplication == null
+        && clientConfiguredDefaultReplication != null) {
+      clientReplication = clientConfiguredDefaultReplication;
+    }
+
+    // if clientReplicationType or clientReplication is null, then we just pass
+    // replication config as null, so that server will take decision.
+    if (clientReplicationType == null || clientReplication == null) {
+      return null;
+    }
+    return ReplicationConfig
+        .parse(clientReplicationType, clientReplication, clientSideConfig);
+  }
 }
