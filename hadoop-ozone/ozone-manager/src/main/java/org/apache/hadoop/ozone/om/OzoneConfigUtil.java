@@ -44,12 +44,18 @@ public final class OzoneConfigUtil {
     } else {
       // type is NONE, so, let's look for the bucket defaults.
       if (bucketDefaultReplicationConfig != null) {
+        boolean hasECReplicationConfig = bucketDefaultReplicationConfig
+            .getType() == ReplicationType.EC && bucketDefaultReplicationConfig
+            .getEcReplicationConfig() != null;
         // Since Bucket defaults are available, let's inherit
         replicationConfig = ReplicationConfig.fromProto(
             ReplicationType.toProto(bucketDefaultReplicationConfig.getType()),
             ReplicationFactor
                 .toProto(bucketDefaultReplicationConfig.getFactor()),
-            bucketDefaultReplicationConfig.getEcReplicationConfig().toProto());
+            hasECReplicationConfig ?
+                bucketDefaultReplicationConfig.getEcReplicationConfig()
+                    .toProto() :
+                null);
       } else {
         // if bucket defaults also not available, then use server defaults.
         replicationConfig = omDefaultReplicationConfig;
