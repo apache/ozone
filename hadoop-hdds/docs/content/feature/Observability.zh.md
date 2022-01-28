@@ -1,10 +1,10 @@
 ---
-title: "Observability"
+title: "可观察性"
 weight: 8
 menu:
-   main:
-      parent: Features
-summary: Different tools for Ozone to increase Observability
+main:
+parent: 特性
+summary: Ozone 的不同工具来提高可观察性
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -23,17 +23,16 @@ summary: Different tools for Ozone to increase Observability
   limitations under the License.
 -->
 
-Ozone provides multiple tools to get more information about the current state of the cluster.
+Ozone 提供了多种工具来获取有关集群当前状态的更多信息。
 
 ## Prometheus
+Ozone 原生支持 Prometheus 集成。所有内部指标（由 Hadoop 指标框架收集）都发布在 `/prom` 的 HTTP 端点下。（例如，在 SCM 的 http://localhost:9876/prom）。
 
-Ozone has native support for Prometheus integration. All internal metrics (collected by Hadoop metrics framework) are published under the `/prom` HTTP endpoint. (For example under http://localhost:9876/prom for SCM).
+Prometheus 端点默认是打开的，但可以通过`hdds.prometheus.endpoint.enabled`配置变量把它关闭。
 
-The Prometheus endpoint is turned on by default but can be turned off by the `hdds.prometheus.endpoint.enabled` configuration variable.
+在安全环境中，该页面是用 SPNEGO 认证来保护的，但 Prometheus 不支持这种认证。为了在安全环境中启用监控，可以配置一个特定的认证令牌。
 
-In a secure environment the page is guarded with SPNEGO authentication which is not supported by Prometheus. To enable monitoring in a secure environment, a specific authentication token can be configured
-
-Example `ozone-site.xml`:
+`ozone-site.xml` 配置示例：
 
 ```XML
 <property>
@@ -42,8 +41,7 @@ Example `ozone-site.xml`:
 </property>
 ```
 
-Example prometheus configuration:
-
+prometheus 配置示例：
 ```YAML
 scrape_configs:
   - job_name: ozone
@@ -54,13 +52,12 @@ scrape_configs:
          - "127.0.0.1:9876" 
 ```
 
-## Distributed tracing
+## 分布式跟踪
+分布式跟踪可以通过可视化端到端的性能来帮助了解性能瓶颈。
 
-Distributed tracing can help to understand performance bottleneck with visualizing end-to-end performance.
+Ozone 使用 [jaeger](https://jaegertracing.io) 跟踪库收集跟踪，可以将跟踪数据发送到任何兼容的后端(Zipkin，…)。
 
-Ozone uses [jaeger](https://jaegertracing.io) tracing library to collect traces which can send tracing data to any compatible backend (Zipkin, ...).
-
-Tracing is turned off by default, but can be turned on with `hdds.tracing.enabled` from `ozone-site.xml`
+默认情况下，跟踪功能是关闭的，可以通过 `ozon-site.xml` 的 `hdds.tracing.enabled` 配置变量打开。
 
 ```XML
 <property>
@@ -69,9 +66,9 @@ Tracing is turned off by default, but can be turned on with `hdds.tracing.enable
 </property>
 ```
 
-Jaeger client can be configured with environment variables as documented [here](https://github.com/jaegertracing/jaeger-client-java/blob/master/jaeger-core/README.md):
+Jaeger 客户端可以用环境变量进行配置，如[这份](https://github.com/jaegertracing/jaeger-client-java/blob/master/jaeger-core/README.md)文档所述。
 
-For example:
+例如：
 
 ```shell
 JAEGER_SAMPLER_PARAM=0.01
@@ -79,13 +76,12 @@ JAEGER_SAMPLER_TYPE=probabilistic
 JAEGER_AGENT_HOST=jaeger
 ```
 
-This configuration will record 1% of the requests to limit the performance overhead. For more information about jaeger sampling [check the documentation](https://www.jaegertracing.io/docs/1.18/sampling/#client-sampling-configuration)
+此配置将记录1%的请求，以限制性能开销。有关 Jaeger 抽样的更多信息，请查看[文档](https://www.jaegertracing.io/docs/1.18/sampling/#client-sampling-configuration)。
 
-## ozone insight
+## Ozone Insight
+Ozone Insight 是一个用于检查 Ozone 集群当前状态的工具，它可以显示特定组件的日志记录、指标和配置。
 
-Ozone insight is a swiss-army-knife tool to for checking the current state of Ozone cluster. It can show logging, metrics and configuration for a particular component.
-
-To check the available components use `ozone insight list`:
+请使用`ozone insight list`命令检查可用的组件：
 
 ```shell
 > ozone insight list
@@ -103,9 +99,9 @@ Available insight points:
   datanode.pipeline                    More information about one ratis datanode ring.
 ```  
 
-### Configuration
+## 配置
 
-`ozone insight config` can show configuration related to a specific component (supported only for selected components).
+`ozone insight config` 可以显示与特定组件有关的配置（只支持选定的组件）。
 
 ```shell
 > ozone insight config scm.replica-manager
@@ -127,11 +123,8 @@ Timeout for the container replication/deletion commands sent  to datanodes. Afte
 
 ```
 
-### Metrics
-
-`ozone insight metrics` can show metrics related to a specific component (supported only for selected components).
-
-
+## 指标
+`ozone insight metrics` 可以显示与特定组件相关的指标（只支持选定的组件）。
 ```shell
 > ozone insight metrics scm.protocol.block-location
 Metrics for `scm.protocol.block-location` (SCM Block location protocol endpoint)
@@ -164,9 +157,9 @@ Message type counters
   Number of SortDatanodes: ???
 ```
 
-### Logs
+## 日志
 
-`ozone insight logs` can connect to the required service and show the DEBUG/TRACE log related to one specific component. For example to display RPC message:
+`ozone insights logs` 可以连接到所需的服务并显示与一个特定组件相关的DEBUG/TRACE日志。例如，显示RPC消息：
 
 ```shell
 >ozone insight logs om.protocol.client
@@ -175,7 +168,7 @@ Message type counters
 [OM] 2020-07-28 12:31:50,095 [DEBUG|org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB|OzoneProtocolMessageDispatcher] OzoneProtocol CreateVolume request is received
 ```
 
-Using `-v` flag the content of the protobuf message can also be displayed (TRACE level log):
+使用 `-v` 标志，也可以显示 protobuf 信息的内容（TRACE级别的日志）：
 
 ```shell
 ozone insight logs -v om.protocol.client
@@ -219,6 +212,6 @@ status: VOLUME_ALREADY_EXISTS
 
 <div class="alert alert-warning" role="alert">
 
-Under the hood `ozone insight` uses HTTP endpoints to retrieve the required information (`/conf`, `/prom` and `/logLevel` endpoints). It's not yet supported in secure environment.
+实际上 `ozone insight` 是通过 HTTP 端点来检索所需的信息（`/conf`、`/prom`和`/logLevel`端点），它在安全环境中还不被支持。
 
 </div>
