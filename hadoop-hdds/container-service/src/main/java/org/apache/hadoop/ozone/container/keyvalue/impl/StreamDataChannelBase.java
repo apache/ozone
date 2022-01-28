@@ -58,10 +58,6 @@ abstract class StreamDataChannelBase implements StreamDataChannel {
     this.metrics = metrics;
   }
 
-  protected File getFile() {
-    return file;
-  }
-
   abstract ContainerProtos.Type getType();
 
   private FileChannel getChannel() {
