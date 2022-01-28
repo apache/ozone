@@ -467,10 +467,6 @@ public final class OzoneConfigKeys {
   // The protocol starts at 2.0.0 and a null or empty value for older versions.
   public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION = "2.0.0";
 
-  public static final String OZONE_OM_MAX_PENDING_REQ_COUNT =
-      "ozone.om.max.pending.req.count";
-  public static final long OZONE_OM_MAX_PENDING_REQ_COUNT_DEFAULT = 100000;
-
   /**
    * There is no need to instantiate this class.
    */

@@ -1602,7 +1602,7 @@
 
   <property>
     <name>ozone.om.max.pending.req.count</name>
-    <value>100000</value>
+    <value>10000</value>
     <tag>OZONE, OM</tag>
     <description>the max pending om req count. the aim here is to limit the memory
       token by om double buffer and the task queue of thread pool, which may lead to

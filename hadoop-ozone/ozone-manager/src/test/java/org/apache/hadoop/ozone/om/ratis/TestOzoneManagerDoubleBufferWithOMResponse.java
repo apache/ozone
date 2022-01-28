@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -84,6 +85,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private final AtomicLong trxId = new AtomicLong(0);
   private OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot;
   private volatile long lastAppliedIndex;
+  private Semaphore availPendingRequestNum;
   private long term = 1L;
 
   @Rule
@@ -94,6 +96,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     ozoneManager = Mockito.mock(OzoneManager.class,
         Mockito.withSettings().stubOnly());
     omMetrics = OMMetrics.create();
+    availPendingRequestNum = new Semaphore(1);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
@@ -107,9 +110,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder().
-        setOmMetadataManager(omMetadataManager).
-        setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(omMetadataManager)
+        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .setAvailPendingRequestNum(availPendingRequestNum)
         .enableRatis(true)
         .setIndexToTerm((i) -> term)
         .build();

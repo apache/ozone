@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -64,12 +65,14 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   private final AtomicLong trxId = new AtomicLong(0);
   private long lastAppliedIndex;
   private long term = 1L;
+  private Semaphore availPendingRequestNum;
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Before
   public void setup() throws IOException {
+    availPendingRequestNum = new Semaphore(10000);
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
@@ -81,6 +84,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .setAvailPendingRequestNum(availPendingRequestNum)
         .enableRatis(true)
         .setIndexToTerm((val) -> term)
         .build();

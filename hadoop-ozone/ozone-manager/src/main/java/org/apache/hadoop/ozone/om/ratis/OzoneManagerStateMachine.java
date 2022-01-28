@@ -29,14 +29,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -94,8 +94,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
-  private AtomicLong availPendingRequestNum;
-  private final Object monitor = new Object();
+  private final Semaphore availPendingRequestNum;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -116,10 +115,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
-    long maxPendingReqCount = ozoneManager.getConfiguration()
-        .getLong(OzoneConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT,
-        OzoneConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT_DEFAULT);
-    this.availPendingRequestNum = new AtomicLong(maxPendingReqCount);
+    int maxPendingReqCount = ozoneManager.getConfiguration()
+        .getInt(OMConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT,
+            OMConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT_DEFAULT);
+    this.availPendingRequestNum = new Semaphore(maxPendingReqCount);
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
 
@@ -319,13 +318,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
 
       //if there are too many pending requests, wait for doubleBuffer flushing
-      if (availPendingRequestNum.decrementAndGet() < 0) {
-        synchronized (monitor) {
-          while (availPendingRequestNum.get() < 0) {
-            monitor.wait();
-          }
-        }
-      }
+      availPendingRequestNum.acquire();
 
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);
@@ -418,7 +411,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .setAvailPendingRequestNum(availPendingRequestNum)
-        .setMonitor(monitor)
         .setIndexToTerm(this::getTermForIndex)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)

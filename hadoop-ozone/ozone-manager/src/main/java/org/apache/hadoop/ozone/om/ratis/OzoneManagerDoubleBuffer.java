@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -103,8 +104,7 @@ public final class OzoneManagerDoubleBuffer {
 
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
-  private final AtomicLong availPendingRequestNum;
-  private final Object monitor;
+  private final Semaphore availPendingRequestNum;
 
   /**
    * function which will get term associated with the transaction index.
@@ -122,8 +122,7 @@ public final class OzoneManagerDoubleBuffer {
     private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
     private Function<Long, Long> indexToTerm = null;
-    private AtomicLong availPendingRequestNum;
-    private Object monitor;
+    private Semaphore availPendingRequestNum;
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -151,13 +150,8 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    public Builder setAvailPendingRequestNum(AtomicLong pendingReqNum) {
+    public Builder setAvailPendingRequestNum(Semaphore pendingReqNum) {
       this.availPendingRequestNum = pendingReqNum;
-      return this;
-    }
-
-    public Builder setMonitor(Object m) {
-      this.monitor = m;
       return this;
     }
 
@@ -171,18 +165,16 @@ public final class OzoneManagerDoubleBuffer {
             "when ratis is enable, availPendingRequestNum should not be null");
       }
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, availPendingRequestNum, monitor);
+          isTracingEnabled, indexToTerm, availPendingRequestNum);
     }
   }
 
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
-      Function<Long, Long> indexToTerm, AtomicLong availPendingRequestNum,
-      Object monitor) {
+      Function<Long, Long> indexToTerm, Semaphore availPendingRequestNum) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
-    this.monitor = monitor;
 
     this.isRatisEnabled = isRatisEnabled;
     this.isTracingEnabled = isTracingEnabled;
@@ -353,14 +345,7 @@ public final class OzoneManagerDoubleBuffer {
           cleanupCache(cleanupEpochs);
 
           readyBuffer.clear();
-
-          long currentPendingReqNum =
-              availPendingRequestNum.getAndAdd(flushedTransactionsSize);
-          if(currentPendingReqNum < 0) {
-            synchronized (monitor) {
-              monitor.notify();
-            }
-          }
+          availPendingRequestNum.release(flushedTransactionsSize);
 
           // update the last updated index in OzoneManagerStateMachine.
           ozoneManagerRatisSnapShot.updateLastAppliedIndex(
