@@ -81,9 +81,9 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 /**
  * Helper class to test OMClientRequest classes.
  */
-public final class TestOMRequestUtils {
+public final class OMRequestTestUtils {
 
-  private TestOMRequestUtils() {
+  private OMRequestTestUtils() {
     //Do nothing
   }
 
@@ -1042,7 +1042,7 @@ public final class TestOMRequestUtils {
   public static long addParentsToDirTable(String volumeName, String bucketName,
                                     String key, OMMetadataManager omMetaMgr)
           throws Exception {
-    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
+    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
             omMetaMgr);
     if (org.apache.commons.lang3.StringUtils.isBlank(key)) {
       return bucketId;
@@ -1053,9 +1053,9 @@ public final class TestOMRequestUtils {
     long txnID = 50;
     for (String pathElement : pathComponents) {
       OmDirectoryInfo omDirInfo =
-              TestOMRequestUtils.createOmDirectoryInfo(pathElement, ++objectId,
+              OMRequestTestUtils.createOmDirectoryInfo(pathElement, ++objectId,
                       parentId);
-      TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
+      OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
               txnID, omMetaMgr);
       parentId = omDirInfo.getObjectID();
     }

@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -203,7 +203,7 @@ public class TestOzoneNativeAuthorizer {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .build();
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
     buckObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setBucketName(buck)
@@ -218,7 +218,7 @@ public class TestOzoneNativeAuthorizer {
         .setAdminName(adminUgi.getUserName())
         .setOwnerName(testUgi.getUserName())
         .build();
-    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
+    OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
     volObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setResType(VOLUME)

@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -189,8 +189,8 @@ public class TestContainerPlacement {
 
     SCMNodeManager scmNodeManager = createNodeManager(conf);
     containerManager = createContainerManager();
-    List<DatanodeDetails> datanodes =
-        TestUtils.getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
+    List<DatanodeDetails> datanodes = HddsTestUtils
+        .getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
     LayoutVersionManager versionManager =
         scmNodeManager.getLayoutVersionManager();

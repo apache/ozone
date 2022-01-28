@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
@@ -56,12 +56,12 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     long parentId = checkIntermediatePaths(keyPath);
     String fileName = OzoneFSUtils.getFileName(keyName);
     OmKeyInfo omKeyInfo =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentId + 1,
                     parentId, 100, Time.now());
-    TestOMRequestUtils.addFileToKeyTable(false, false,
+    OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
   }
 

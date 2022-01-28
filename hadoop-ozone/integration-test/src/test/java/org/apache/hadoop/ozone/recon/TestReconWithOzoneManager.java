@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -351,7 +351,7 @@ public class TestReconWithOzoneManager {
    */
   private void addKeys(int start, int end) throws Exception {
     for(int i = start; i < end; i++) {
-      Pipeline pipeline = TestUtils.getRandomPipeline();
+      Pipeline pipeline = HddsTestUtils.getRandomPipeline();
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
       BlockID blockID = new BlockID(i, 1);
       OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID,
