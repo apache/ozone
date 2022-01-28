@@ -24,12 +24,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
@@ -177,7 +177,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
 
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
             clientID, replicationType, replicationFactor, omMetadataManager);
     return ozoneKey;
   }
