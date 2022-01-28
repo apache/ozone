@@ -734,11 +734,14 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ReplicationManagerReport getReplicationManagerReport() {
+  public ReplicationManagerReport getReplicationManagerReport()
+      throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
     return scm.getReplicationManager().getContainerReport();
   }
+
   @Override
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
       IOException {
