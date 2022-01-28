@@ -94,24 +94,24 @@ public class BlockManagerImpl implements BlockManager {
    * Puts or overwrites a block.
    *
    * @param container - Container for which block need to be added.
-   * @param data     - BlockData.
-   * @param incrKeyCount - for FilePerBlockStrategy, increase key count only
-   *                     when the whole block file is written.
+   * @param data - BlockData.
+   * @param incrBlockCount - Increment BlockCount only when the last chunk is
+   *                      written or the key is committed
    * @return length of the block.
    * @throws IOException
    */
   @Override
   public long putBlock(Container container, BlockData data,
-      boolean incrKeyCount) throws IOException {
+      boolean incrBlockCount) throws IOException {
     return persistPutBlock(
         (KeyValueContainer) container,
         data,
         config,
-        incrKeyCount);
+        incrBlockCount);
   }
 
   public static long persistPutBlock(KeyValueContainer container,
-      BlockData data, ConfigurationSource config, boolean incrKeyCount)
+      BlockData data, ConfigurationSource config, boolean incrBlockCount)
       throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
@@ -164,10 +164,10 @@ public class BlockManagerImpl implements BlockManager {
             container.getContainerData().getBytesUsed());
 
         // Set Block Count for a container.
-        if (incrKeyCount) {
+        if (incrBlockCount) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, OzoneConsts.BLOCK_COUNT,
-              container.getContainerData().getKeyCount() + 1);
+              container.getContainerData().getBlockCount() + 1);
         }
 
         db.getStore().getBatchHandler().commitBatchOperation(batch);
@@ -177,8 +177,8 @@ public class BlockManagerImpl implements BlockManager {
         container.updateBlockCommitSequenceId(bcsId);
       }
       // Increment block count finally here for in-memory.
-      if (incrKeyCount) {
-        container.getContainerData().incrKeyCount();
+      if (incrBlockCount) {
+        container.getContainerData().incrBlockCount();
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug(
@@ -296,14 +296,14 @@ public class BlockManagerImpl implements BlockManager {
         // Update DB to delete block and set block count.
         // No need to set bytes used here, as bytes used is taken care during
         // delete chunk.
-        long blockCount = container.getContainerData().getKeyCount() - 1;
+        long blockCount = container.getContainerData().getBlockCount() - 1;
         db.getStore().getMetadataTable()
             .putWithBatch(batch, OzoneConsts.BLOCK_COUNT, blockCount);
         db.getStore().getBatchHandler().commitBatchOperation(batch);
       }
 
       // Decrement block count here
-      container.getContainerData().decrKeyCount();
+      container.getContainerData().decrBlockCount();
     }
   }
 

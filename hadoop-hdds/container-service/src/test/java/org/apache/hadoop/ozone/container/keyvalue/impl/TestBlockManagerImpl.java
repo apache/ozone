@@ -142,7 +142,7 @@ public class TestBlockManagerImpl {
 
   @Test
   public void testPutBlock() throws Exception {
-    assertEquals(0, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block with bcsId != 0
     blockManager.putBlock(keyValueContainer, blockData1);
 
@@ -150,7 +150,7 @@ public class TestBlockManagerImpl {
     //Check Container's bcsId
     fromGetBlockData = blockManager.getBlock(keyValueContainer,
         blockData1.getBlockID());
-    assertEquals(1, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
     assertEquals(1,
         keyValueContainer.getContainerData().getBlockCommitSequenceId());
     assertEquals(1, fromGetBlockData.getBlockCommitSequenceId());
@@ -161,7 +161,7 @@ public class TestBlockManagerImpl {
     //Check Container's bcsId
     fromGetBlockData = blockManager.getBlock(keyValueContainer,
         blockData.getBlockID());
-    assertEquals(2, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(2, keyValueContainer.getContainerData().getBlockCount());
     assertEquals(0, fromGetBlockData.getBlockCommitSequenceId());
     assertEquals(1,
         keyValueContainer.getContainerData().getBlockCommitSequenceId());
@@ -170,11 +170,11 @@ public class TestBlockManagerImpl {
 
   @Test
   public void testPutAndGetBlock() throws Exception {
-    assertEquals(0, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block
     blockManager.putBlock(keyValueContainer, blockData);
 
-    assertEquals(1, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
     //Get Block
     BlockData fromGetBlockData = blockManager.getBlock(keyValueContainer,
         blockData.getBlockID());
@@ -191,15 +191,15 @@ public class TestBlockManagerImpl {
   @Test
   public void testDeleteBlock() throws Exception {
     assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
+        keyValueContainer.getContainerData().getBlockCount());
     //Put Block
     blockManager.putBlock(keyValueContainer, blockData);
     assertEquals(1,
-        keyValueContainer.getContainerData().getKeyCount());
+        keyValueContainer.getContainerData().getBlockCount());
     //Delete Block
     blockManager.deleteBlock(keyValueContainer, blockID);
     assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
+        keyValueContainer.getContainerData().getBlockCount());
     try {
       blockManager.getBlock(keyValueContainer, blockID);
       fail("testDeleteBlock");
@@ -240,15 +240,15 @@ public class TestBlockManagerImpl {
   @Test
   public void testGetNoSuchBlock() throws Exception {
     assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
+        keyValueContainer.getContainerData().getBlockCount());
     //Put Block
     blockManager.putBlock(keyValueContainer, blockData);
     assertEquals(1,
-        keyValueContainer.getContainerData().getKeyCount());
+        keyValueContainer.getContainerData().getBlockCount());
     //Delete Block
     blockManager.deleteBlock(keyValueContainer, blockID);
     assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
+        keyValueContainer.getContainerData().getBlockCount());
     try {
       //Since the block has been deleted, we should not be able to find it
       blockManager.getBlock(keyValueContainer, blockID);

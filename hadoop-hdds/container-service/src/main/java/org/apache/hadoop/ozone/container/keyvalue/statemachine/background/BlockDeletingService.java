@@ -362,7 +362,7 @@ public class BlockDeletingService extends BackgroundService {
           // update count of pending deletion blocks and block count in
           // in-memory container status.
           containerData.decrPendingDeletionBlocks(deleteBlockCount);
-          containerData.decrKeyCount(deleteBlockCount);
+          containerData.decrBlockCount(deleteBlockCount);
         }
 
         if (!succeedBlocks.isEmpty()) {
@@ -441,7 +441,7 @@ public class BlockDeletingService extends BackgroundService {
           // update count of pending deletion blocks and block count in
           // in-memory container status.
           containerData.decrPendingDeletionBlocks(totalBlocks);
-          containerData.decrKeyCount(totalBlocks);
+          containerData.decrBlockCount(totalBlocks);
         }
 
         LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",

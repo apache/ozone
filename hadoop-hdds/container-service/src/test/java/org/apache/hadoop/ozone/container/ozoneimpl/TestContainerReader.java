@@ -205,7 +205,7 @@ public class TestContainerReader {
 
       // Verify block related metadata.
       Assert.assertEquals(blockCount,
-          keyValueContainerData.getKeyCount());
+          keyValueContainerData.getBlockCount());
 
       Assert.assertEquals(blockCount * blockLen,
           keyValueContainerData.getBytesUsed());

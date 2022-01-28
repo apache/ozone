@@ -681,7 +681,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setWriteCount(containerData.getWriteCount())
         .setReadBytes(containerData.getReadBytes())
         .setWriteBytes(containerData.getWriteBytes())
-        .setKeyCount(containerData.getKeyCount())
+        .setKeyCount(containerData.getBlockCount())
         .setUsed(containerData.getBytesUsed())
         .setState(getHddsState())
         .setDeleteTransactionId(containerData.getDeleteTransactionId())

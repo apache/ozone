@@ -345,7 +345,7 @@ public class TestBlockDeletingService {
       int numOfChunksPerBlock) {
     long chunkLength = 100;
     try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-      container.getContainerData().setKeyCount(numOfBlocksPerContainer);
+      container.getContainerData().setBlockCount(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
           .put(OzoneConsts.BLOCK_COUNT, (long) numOfBlocksPerContainer);
