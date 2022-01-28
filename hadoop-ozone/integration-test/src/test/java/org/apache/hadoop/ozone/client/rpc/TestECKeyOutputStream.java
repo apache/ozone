@@ -26,6 +26,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -34,12 +37,14 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -48,8 +53,11 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
@@ -226,6 +234,40 @@ public class TestECKeyOutputStream {
       out.write(inputData);
     }
 
+    validateContent(inputData, bucket, bucket.getKey(keyName));
+  }
+
+  @Test
+  public void testECContainerKeysCount()
+      throws IOException, InterruptedException, TimeoutException,
+      AuthenticationException {
+    byte[] inputData = getInputBytes(1);
+    final OzoneBucket bucket = getOzoneBucket();
+    ContainerOperationClient containerOperationClient =
+        new ContainerOperationClient(conf);
+    List<ContainerInfo> containerInfos =
+        containerOperationClient.listContainer(1, 100);
+    Map<ContainerID, Long> containerKeys = new HashMap<>();
+    for (ContainerInfo info : containerInfos) {
+      containerKeys.put(info.containerID(),
+          containerKeys.getOrDefault(info.containerID(), 0L) + 1);
+    }
+
+    String keyName = UUID.randomUUID().toString();
+    try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      out.write(inputData);
+    }
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    cluster.restartStorageContainerManager(true);
+    long currentKeyContainerID =
+        key.getOzoneKeyLocations().get(0).getContainerID();
+    containerInfos =
+        containerOperationClient.listContainer(currentKeyContainerID, 100);
+    Long priorKeys = containerKeys.get(new ContainerID(currentKeyContainerID));
+    Assert.assertEquals((priorKeys != null ? priorKeys : 0) + 1L,
+        containerInfos.get(0).getNumberOfKeys());
     validateContent(inputData, bucket, bucket.getKey(keyName));
   }
 
