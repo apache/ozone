@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.stream.Collectors;
 
 /**
  * This class is used by ReplicationManager. Each time ReplicationManager runs,
@@ -96,6 +97,22 @@ public class ReplicationManagerReport {
   private final Map<String, List<ContainerID>> containerSample
       = new ConcurrentHashMap<>();
 
+  public static ReplicationManagerReport fromProtobuf(
+      HddsProtos.ReplicationManagerReportProto proto) {
+    ReplicationManagerReport report = new ReplicationManagerReport();
+    report.setTimestamp(proto.getTimestamp());
+    for (HddsProtos.KeyIntValue stat : proto.getStatList()) {
+      report.setStat(stat.getKey(), stat.getValue());
+    }
+    for (HddsProtos.KeyContainerIDList sample : proto.getStatSampleList()) {
+      report.setSample(sample.getKey(), sample.getContainerList()
+          .stream()
+          .map(c -> ContainerID.getFromProtobuf(c))
+          .collect(Collectors.toList()));
+    }
+    return report;
+  }
+
   public ReplicationManagerReport() {
     stats = createStatsMap();
   }
@@ -129,16 +146,62 @@ public class ReplicationManagerReport {
     return reportTimeStamp;
   }
 
+  /**
+   * Get the stat for the given LifeCycleState. If there is no stat available
+   * for that stat -1 is returned.
+   * @param stat The requested stat.
+   * @return The stat value or -1 if it is not present
+   */
   public long getStat(HddsProtos.LifeCycleState stat) {
     return getStat(stat.toString());
   }
 
+  /**
+   * Get the stat for the given HealthState. If there is no stat available
+   * for that stat -1 is returned.
+   * @param stat The requested stat.
+   * @return The stat value or -1 if it is not present
+   */
   public long getStat(HealthState stat) {
     return getStat(stat.toString());
   }
 
+  /**
+   * Returns the stat requested, or -1 if it does not exist.
+   * @param stat The request stat
+   * @return The value of the stat or -1 if it does not exist.
+   */
   private long getStat(String stat) {
-    return stats.get(stat).longValue();
+    LongAdder val = stats.get(stat);
+    if (val == null) {
+      return -1;
+    }
+    return val.longValue();
+  }
+
+  protected void setTimestamp(long timestamp) {
+    this.reportTimeStamp = timestamp;
+  }
+
+  protected void setStat(String stat, long value) {
+    LongAdder adder = getStatAndEnsurePresent(stat);
+    if (adder.longValue() != 0) {
+      throw new IllegalStateException(stat + " is expected to be zero");
+    }
+    adder.add(value);
+  }
+
+  protected void setSample(String stat, List<ContainerID> sample) {
+    // First get the stat, as we should not receive a sample for a stat which
+    // does not exist.
+    getStatAndEnsurePresent(stat);
+    // Now check there is not already a sample for this stat
+    List<ContainerID> existingSample = containerSample.get(stat);
+    if (existingSample != null) {
+      throw new IllegalStateException(stat
+          + " is not expected to have existing samples");
+    }
+    containerSample.put(stat, sample);
   }
 
   public List<ContainerID> getSample(HddsProtos.LifeCycleState stat) {
@@ -160,11 +223,15 @@ public class ReplicationManagerReport {
   }
 
   private void increment(String stat) {
+    getStatAndEnsurePresent(stat).increment();
+  }
+
+  private LongAdder getStatAndEnsurePresent(String stat) {
     LongAdder adder = stats.get(stat);
     if (adder == null) {
       throw new IllegalArgumentException("Unexpected stat " + stat);
     }
-    adder.increment();
+    return adder;
   }
 
   private void incrementAndSample(String stat, ContainerID container) {
@@ -187,6 +254,30 @@ public class ReplicationManagerReport {
       map.put(s.toString(), new LongAdder());
     }
     return map;
+  }
+
+  public HddsProtos.ReplicationManagerReportProto toProtobuf() {
+    HddsProtos.ReplicationManagerReportProto.Builder proto =
+        HddsProtos.ReplicationManagerReportProto.newBuilder();
+    proto.setTimestamp(getReportTimeStamp());
+
+    for (Map.Entry<String, LongAdder> e : stats.entrySet()) {
+      proto.addStat(HddsProtos.KeyIntValue.newBuilder()
+          .setKey(e.getKey())
+          .setValue(e.getValue().longValue())
+          .build());
+    }
+
+    for (Map.Entry<String, List<ContainerID>> e : containerSample.entrySet()) {
+      HddsProtos.KeyContainerIDList.Builder sample
+          = HddsProtos.KeyContainerIDList.newBuilder();
+      sample.setKey(e.getKey());
+      for (ContainerID container : e.getValue()) {
+        sample.addContainer(container.getProtobuf());
+      }
+      proto.addStatSample(sample.build());
+    }
+    return proto.build();
   }
 
 }
