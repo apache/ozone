@@ -16,6 +16,7 @@
   <aspects>
     <aspect name="org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureAspect"/>
     <weaver options="-verbose -showWeaveInfo">
+      <!-- TODO: Auto generate this class list later. The list should include whatever class that calls methods with the DisallowedUntilLayoutVersion annotation -->
       <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler"/>
       <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB"/>
     </weaver>
