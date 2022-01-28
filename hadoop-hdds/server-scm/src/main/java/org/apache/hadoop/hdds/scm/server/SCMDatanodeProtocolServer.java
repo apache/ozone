@@ -330,7 +330,8 @@ public class SCMDatanodeProtocolServer implements
       scm.getScmBlockManager().getDeletedBlockLog().incrementCount(txs);
       return builder
           .setCommandType(deleteBlocksCommand)
-          .setDeleteBlocksCommandProto(((DeleteBlocksCommand) cmd).getProto())
+          .setDeleteBlocksCommandProto(
+              ((DeleteBlocksCommand) cmd).getProto())
           .build();
     case closeContainerCommand:
       return builder
