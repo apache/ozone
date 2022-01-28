@@ -52,7 +52,7 @@ public class S3MultipartUploadAbortRequestWithFSO
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponseWithFSO(createErrorOMResponse(
-        omResponse, exception));
+        omResponse, exception), getBucketLayout());
   }
 
   @Override
@@ -65,7 +65,7 @@ public class S3MultipartUploadAbortRequestWithFSO
         omResponse.setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
         multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-        omBucketInfo.copyObject());
+        omBucketInfo.copyObject(), getBucketLayout());
     return omClientResp;
   }
 

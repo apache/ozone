@@ -67,7 +67,7 @@ public class TestOMAllocateBlockResponseWithFSO
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
           OMResponse omResponse) {
     return new OMAllocateBlockResponseWithFSO(omResponse, omKeyInfo, clientID,
-            omBucketInfo);
+            omBucketInfo, getBucketLayout());
   }
 
   @Override

@@ -89,7 +89,7 @@ public final class OzoneConsts {
   // OM Http server endpoints
   public static final String OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT =
       "/serviceList";
-  public static final String OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT =
+  public static final String OZONE_DB_CHECKPOINT_HTTP_ENDPOINT =
       "/dbCheckpoint";
 
   // Ozone File System scheme

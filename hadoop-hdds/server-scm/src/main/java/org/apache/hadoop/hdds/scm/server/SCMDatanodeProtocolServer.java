@@ -180,7 +180,8 @@ public class SCMDatanodeProtocolServer implements
   public void start() {
     LOG.info(
         StorageContainerManager.buildRpcServerStartMessage(
-            "RPC server for DataNodes", datanodeRpcAddress));
+            "ScmDatanodeProtocol RPC server for DataNodes",
+            datanodeRpcAddress));
     protocolMessageMetrics.register();
     datanodeRpcServer.start();
   }

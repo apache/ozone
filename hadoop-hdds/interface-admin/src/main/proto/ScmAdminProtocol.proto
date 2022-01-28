@@ -74,6 +74,8 @@ message ScmContainerLocationRequest {
   optional ContainerBalancerStatusRequestProto containerBalancerStatusRequest = 35;
   optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 36;
   optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
+  optional GetContainerCountRequestProto getContainerCountRequest = 38;
+  optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
 }
 
 message ScmContainerLocationResponse {
@@ -119,6 +121,8 @@ message ScmContainerLocationResponse {
   optional ContainerBalancerStatusResponseProto containerBalancerStatusResponse = 35;
   optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 36;
   optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
+  optional GetContainerCountResponseProto getContainerCountResponse = 38;
+  optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
 
   enum Status {
     OK = 1;
@@ -162,6 +166,8 @@ enum Type {
   GetContainerBalancerStatus = 30;
   FinalizeScmUpgrade = 31;
   QueryUpgradeFinalizationProgress = 32;
+  GetContainerCount = 33;
+  GetContainerReplicas = 34;
 }
 
 /**
@@ -208,6 +214,15 @@ message GetContainerWithPipelineRequestProto {
 
 message GetContainerWithPipelineResponseProto {
   required ContainerWithPipeline containerWithPipeline = 1;
+}
+
+message GetContainerReplicasRequestProto {
+  required int64 containerID = 1;
+  optional string traceID = 2;
+}
+
+message GetContainerReplicasResponseProto {
+  repeated SCMContainerReplicaProto containerReplica = 1;
 }
 
 message GetContainerWithPipelineBatchRequestProto {
@@ -383,6 +398,13 @@ message GetPipelineResponseProto {
   required Pipeline pipeline = 1;
 }
 
+message GetContainerCountRequestProto {
+}
+
+message GetContainerCountResponseProto {
+  required int64 containerCount = 1;
+}
+
 message ActivatePipelineRequestProto {
   required PipelineID pipelineID = 1;
   optional string traceID = 2;
@@ -479,11 +501,14 @@ message GetContainerTokenResponseProto {
 message StartContainerBalancerRequestProto {
   optional string traceID = 1;
   optional double threshold = 2;
-  optional int32 idleiterations = 3;
-  optional double maxDatanodesRatioToInvolvePerIteration = 4;
+  optional int32 idleiterations = 3 [deprecated = true];
+  optional double maxDatanodesRatioToInvolvePerIteration = 4 [deprecated =
+      true];
   optional int64 maxSizeToMovePerIterationInGB = 5;
   optional int64 maxSizeEnteringTargetInGB = 6;
   optional int64 maxSizeLeavingSourceInGB = 7;
+  optional int32 maxDatanodesPercentageToInvolvePerIteration = 8;
+  optional int32 iterations = 9;
 }
 
 message StartContainerBalancerResponseProto {

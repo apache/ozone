@@ -68,7 +68,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
@@ -693,7 +693,7 @@ public class TestObjectStoreWithFSO {
   private void createTestKey(OzoneBucket bucket, String keyName,
       String keyValue) throws IOException {
     OzoneOutputStream out = bucket.createKey(keyName,
-            keyValue.getBytes(StandardCharsets.UTF_8).length, STAND_ALONE,
+            keyValue.getBytes(StandardCharsets.UTF_8).length, RATIS,
             ONE, new HashMap<>());
     out.write(keyValue.getBytes(StandardCharsets.UTF_8));
     out.close();

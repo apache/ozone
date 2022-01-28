@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
@@ -53,6 +55,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
@@ -397,6 +400,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setDatanodeUsageInfoResponse(getDatanodeUsageInfo(
                 request.getDatanodeUsageInfoRequest()))
             .build();
+      case GetContainerCount:
+        return ScmContainerLocationResponse.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setStatus(Status.OK)
+          .setGetContainerCountResponse(getContainerCount(
+                  request.getGetContainerCountRequest()))
+          .build();
+      case GetContainerReplicas:
+        return ScmContainerLocationResponse.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setStatus(Status.OK)
+          .setGetContainerReplicasResponse(getContainerReplicas(
+              request.getGetContainerReplicasRequest()))
+          .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -406,6 +423,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId());
       throw new ServiceException(e);
     }
+  }
+
+  public GetContainerReplicasResponseProto getContainerReplicas(
+      GetContainerReplicasRequestProto request) throws IOException {
+    List<HddsProtos.SCMContainerReplicaProto> replicas
+        = impl.getContainerReplicas(request.getContainerID());
+    return GetContainerReplicasResponseProto.newBuilder()
+        .addAllContainerReplica(replicas).build();
   }
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
@@ -710,8 +735,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StartContainerBalancerRequestProto request)
       throws IOException {
     Optional<Double> threshold = Optional.empty();
-    Optional<Integer> idleiterations = Optional.empty();
-    Optional<Double> maxDatanodesRatioToInvolvePerIteration = Optional.empty();
+    Optional<Integer> iterations = Optional.empty();
+    Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
+        Optional.empty();
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
     Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
     Optional<Long> maxSizeLeavingSourceInGB = Optional.empty();
@@ -719,13 +745,23 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     if(request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
     }
-    if(request.hasIdleiterations()) {
-      idleiterations = Optional.of(request.getIdleiterations());
+
+    if (request.hasIterations()) {
+      iterations = Optional.of(request.getIterations());
+    } else if (request.hasIdleiterations()) {
+      iterations = Optional.of(request.getIdleiterations());
     }
-    if(request.hasMaxDatanodesRatioToInvolvePerIteration()) {
-      maxDatanodesRatioToInvolvePerIteration =
-          Optional.of(request.getMaxDatanodesRatioToInvolvePerIteration());
+
+    if (request.hasMaxDatanodesPercentageToInvolvePerIteration()) {
+      maxDatanodesPercentageToInvolvePerIteration =
+          Optional.of(request.getMaxDatanodesPercentageToInvolvePerIteration());
+    } else if (request.hasMaxDatanodesRatioToInvolvePerIteration()) {
+      maxDatanodesPercentageToInvolvePerIteration =
+          Optional.of(
+              (int) (request.getMaxDatanodesRatioToInvolvePerIteration() *
+                  100));
     }
+
     if(request.hasMaxSizeToMovePerIterationInGB()) {
       maxSizeToMovePerIterationInGB =
           Optional.of(request.getMaxSizeToMovePerIterationInGB());
@@ -739,11 +775,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           Optional.of(request.getMaxSizeLeavingSourceInGB());
     }
 
-
-
     return StartContainerBalancerResponseProto.newBuilder().
         setStart(impl.startContainerBalancer(threshold,
-            idleiterations, maxDatanodesRatioToInvolvePerIteration,
+            iterations, maxDatanodesPercentageToInvolvePerIteration,
             maxSizeToMovePerIterationInGB,
             maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB)).build();
   }
@@ -831,4 +865,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  public GetContainerCountResponseProto getContainerCount(
+      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
+      request) throws IOException {
+
+    return GetContainerCountResponseProto.newBuilder()
+      .setContainerCount(impl.getContainerCount())
+      .build();
+  }
 }

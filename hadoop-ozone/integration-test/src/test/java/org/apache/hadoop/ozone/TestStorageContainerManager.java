@@ -369,6 +369,7 @@ public class TestStorageContainerManager {
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
     try {
       DeletedBlockLog delLog = cluster.getStorageContainerManager()
@@ -477,6 +478,7 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMInitialization() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     final String path = GenericTestUtils.getTempPath(
         UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
@@ -517,6 +519,7 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMReinitialization() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     final String path = GenericTestUtils.getTempPath(
         UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
@@ -541,6 +544,7 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMReinitializationWithHAUpgrade() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     final String path = GenericTestUtils.getTempPath(
         UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
@@ -743,6 +747,7 @@ public class TestStorageContainerManager {
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
     try {
       TestStorageContainerManagerHelper helper =

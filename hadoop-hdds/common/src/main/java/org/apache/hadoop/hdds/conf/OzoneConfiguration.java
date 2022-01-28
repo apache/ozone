@@ -37,6 +37,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -108,6 +109,7 @@ public class OzoneConfiguration extends Configuration
     setClassLoader(conf.getClassLoader());
     if (!(conf instanceof OzoneConfiguration)) {
       loadDefaults();
+      addResource(conf);
     }
   }
 
@@ -125,6 +127,7 @@ public class OzoneConfiguration extends Configuration
     } catch (IOException e) {
       e.printStackTrace();
     }
+    addResource("ozone-default.xml");
     // Adding core-site here because properties from core-site are
     // distributed to executors by spark driver. Ozone properties which are
     // added to core-site, will be overridden by properties from adding Resource
@@ -241,7 +244,6 @@ public class OzoneConfiguration extends Configuration
     // adds the default resources
     Configuration.addDefaultResource("hdfs-default.xml");
     Configuration.addDefaultResource("hdfs-site.xml");
-    Configuration.addDefaultResource("ozone-default.xml");
   }
 
   /**
@@ -301,7 +303,11 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta(HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpcslowness.timeout",
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
-           + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout")
+           + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
+        new DeprecationDelta("dfs.datanode.keytab.file",
+            DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+        new DeprecationDelta("ozone.scm.chunk.layout",
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY)
     });
   }
 }

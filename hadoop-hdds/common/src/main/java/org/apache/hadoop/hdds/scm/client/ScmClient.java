@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.client;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -69,6 +70,16 @@ public interface ScmClient extends Closeable {
    */
   ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException;
+
+  /**
+   * Gets the list of ReplicaInfo known by SCM for a given container.
+   * @param containerId - The Container ID
+   * @return List of ContainerReplicaInfo for the container or an empty list
+   *         if none.
+   * @throws IOException
+   */
+  List<ContainerReplicaInfo> getContainerReplicas(
+      long containerId) throws IOException;
 
   /**
    * Close a container.
@@ -312,8 +323,8 @@ public interface ScmClient extends Closeable {
    * Start ContainerBalancer.
    */
   boolean startContainerBalancer(Optional<Double> threshold,
-      Optional<Integer> idleiterations,
-      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB) throws IOException;

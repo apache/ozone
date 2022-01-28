@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
@@ -52,6 +53,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -247,6 +250,26 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         response.getGetContainerWithPipelineResponse()
             .getContainerWithPipeline());
 
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<HddsProtos.SCMContainerReplicaProto>
+      getContainerReplicas(long containerID) throws IOException {
+    Preconditions.checkState(containerID >= 0,
+        "Container ID cannot be negative");
+
+    GetContainerReplicasRequestProto request =
+        GetContainerReplicasRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .setContainerID(containerID).build();
+
+    ScmContainerLocationResponse response =
+        submitRequest(Type.GetContainerReplicas,
+            (builder) -> builder.setGetContainerReplicasRequest(request));
+    return response.getGetContainerReplicasResponse().getContainerReplicaList();
   }
 
   /**
@@ -737,8 +760,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public boolean startContainerBalancer(
-      Optional<Double> threshold, Optional<Integer> idleiterations,
-      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
+      Optional<Double> threshold, Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB) throws IOException{
@@ -749,8 +772,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     //make balancer configuration optional
     if (threshold.isPresent()) {
       double tsd = threshold.get();
-      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
-          "threshold should to be specified in range [0.0, 1.0).");
+      Preconditions.checkState(tsd >= 0.0D && tsd < 100D,
+          "threshold should be specified in range [0.0, 100.0).");
       builder.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {
@@ -759,22 +782,22 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
           "maxSizeToMovePerIterationInGB must be positive.");
       builder.setMaxSizeToMovePerIterationInGB(mstm);
     }
-    if (maxDatanodesRatioToInvolvePerIteration.isPresent()) {
-      double mdti = maxDatanodesRatioToInvolvePerIteration.get();
+    if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
+      int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
       Preconditions.checkState(mdti >= 0,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
               "greater than equal to zero.");
-      Preconditions.checkState(mdti <= 1,
-          "maxDatanodesRatioToInvolvePerIteration must be " +
-              "lesser than equal to one.");
-      builder.setMaxDatanodesRatioToInvolvePerIteration(mdti);
+      Preconditions.checkState(mdti <= 100,
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
+              "lesser than equal to hundred.");
+      builder.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
     }
-    if (idleiterations.isPresent()) {
-      int idi = idleiterations.get();
-      Preconditions.checkState(idi > 0 || idi == -1,
-          "idleiterations must be positive or" +
-              " -1(infinitly run container balancer).");
-      builder.setIdleiterations(idi);
+    if (iterations.isPresent()) {
+      int i = iterations.get();
+      Preconditions.checkState(i > 0 || i == -1,
+          "number of iterations must be positive or" +
+              " -1 (for running container balancer infinitely).");
+      builder.setIterations(i);
     }
 
     if (maxSizeEnteringTargetInGB.isPresent()) {
@@ -929,6 +952,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setContainerTokenRequest(request))
         .getContainerTokenResponse();
     return OzonePBHelper.tokenFromProto(response.getToken());
+  }
+
+  @Override
+  public long getContainerCount() throws IOException {
+    GetContainerCountRequestProto request =
+        GetContainerCountRequestProto.newBuilder().build();
+
+    GetContainerCountResponseProto response =
+        submitRequest(Type.GetContainerCount,
+          builder -> builder.setGetContainerCountRequest(request))
+        .getGetContainerCountResponse();
+    return response.getContainerCount();
   }
 
   @Override
