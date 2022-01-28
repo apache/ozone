@@ -84,6 +84,12 @@ message ScmNodeDetailsProto {
     required string hostName = 3;      // Hostname of SCM.
 }
 
+message ReconDetailsProto {
+    required string uuid = 1;
+    required string clusterId = 2;
+    required string hostName = 3;
+}
+
 message Port {
     required string name = 1;
     required uint32 value = 2;

@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReconDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
@@ -151,6 +152,16 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     return getEncodedCertToString(certSignReq, NodeType.DATANODE);
   }
 
+  @Override
+  public String getReconCertificate(
+      ReconDetailsProto reconDetails,
+      String certSignReq) throws IOException {
+    LOGGER.info("Processing CSR for Recon {}, UUID: {}",
+        reconDetails.getHostName(), reconDetails.getUuid());
+    Objects.requireNonNull(reconDetails);
+    return getEncodedCertToString(certSignReq, NodeType.RECON);
+  }
+
   /**
    * Get SCM signed certificate for OM.
    *
@@ -245,8 +256,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       errorCode = SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
     } else if (role == NodeType.OM) {
       errorCode = SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
-    } else {
+    } else if (role == NodeType.DATANODE) {
       errorCode = SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
+    } else {
+      errorCode = SCMSecurityException.ErrorCode.GET_RECON_CERTIFICATE_FAILED;
     }
     return new SCMSecurityException("generate " + role.toString() +
         " Certificate operation failed", ex, errorCode);

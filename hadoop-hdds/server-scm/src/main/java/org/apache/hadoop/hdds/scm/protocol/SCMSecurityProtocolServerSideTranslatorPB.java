@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetReconCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
@@ -149,6 +150,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setRevokeCertificatesResponseProto(revokeCertificates(
                 request.getRevokeCertificatesRequest()))
             .build();
+      case GetReconCertificate:
+        return scmSecurityResponse.setGetCertResponseProto(
+            getReconCertificate(request.getGetReconCertRequest()))
+            .build();
+
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -209,6 +215,28 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
     return builder.build();
 
+  }
+
+  /**
+   * Get SCM signed certificate for Recon.
+   *
+   * @param request
+   * @return SCMGetDataNodeCertResponseProto.
+   */
+  public SCMGetCertResponseProto getReconCertificate(
+      SCMGetReconCertRequestProto request) throws IOException {
+    String certificate = impl
+        .getReconCertificate(request.getReconDetails(),
+            request.getCSR());
+    SCMGetCertResponseProto.Builder builder =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(ResponseCode.success)
+            .setX509Certificate(certificate)
+            .setX509CACertificate(impl.getCACertificate());
+    setRootCAIfNeeded(builder);
+
+    return builder.build();
   }
 
   /**
