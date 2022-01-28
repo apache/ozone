@@ -55,7 +55,7 @@ public class TestOzoneConfigUtil {
   }
 
   /**
-   * Tests server defaults
+   * Tests server defaults.
    */
   @Test
   public void testResolveClientSideRepConfigWithNoClientAndBucketDefaults() {
