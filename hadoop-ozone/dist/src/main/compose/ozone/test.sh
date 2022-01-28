@@ -31,6 +31,8 @@ start_docker_env
 execute_robot_test scm lib
 execute_robot_test scm ozone-lib
 
+execute_robot_test om auditparser
+
 execute_robot_test scm basic
 
 execute_robot_test scm gdpr
