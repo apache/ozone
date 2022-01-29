@@ -19,14 +19,23 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
 
 
@@ -64,5 +73,24 @@ public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
   @AfterClass
   public static void shutdown() throws IOException {
     shutdownCluster();
+  }
+
+  @Test
+  public void testCreateAndListBucketReturnsCorrectRepConfigf()
+      throws Exception {
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(repConfig))
+        .build();
+    volume.createBucket(bucketName, bucketArgs);
+
+    Iterator<? extends OzoneBucket> iterator = volume.listBuckets(null);
+    OzoneBucket bucket = iterator.next();
+    Assert.assertEquals(repConfig, bucket.getReplicationConfig());
   }
 }

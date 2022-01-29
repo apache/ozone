@@ -842,7 +842,8 @@ public class RpcClient implements ClientProtocol {
         bucket.getQuotaInBytes(),
         bucket.getQuotaInNamespace(),
         bucket.getBucketLayout(),
-        bucket.getOwner()))
+        bucket.getOwner(),
+        bucket.getDefaultReplicationConfig()))
         .collect(Collectors.toList());
   }
 
