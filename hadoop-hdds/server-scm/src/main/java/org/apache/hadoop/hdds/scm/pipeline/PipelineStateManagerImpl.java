@@ -273,7 +273,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
           + " may have been deleted already.", pipelineID);
     } catch (IOException ex) {
-      LOG.warn("Pipeline {} state update failed", pipelineID);
+      LOG.error("Pipeline {} state update failed", pipelineID);
       throw ex;
     } finally {
       lock.writeLock().unlock();
