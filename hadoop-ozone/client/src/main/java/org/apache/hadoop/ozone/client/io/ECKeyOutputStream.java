@@ -539,10 +539,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
                       .getCurrentPosition());
         }
 
-      } else {
-        ECBlockOutputStreamEntry streamEntry =
-            blockOutputStreamEntryPool.getCurrentStreamEntry();
-        streamEntry.executePutBlock(true);
       }
 
       closeCurrentStreamEntry();
