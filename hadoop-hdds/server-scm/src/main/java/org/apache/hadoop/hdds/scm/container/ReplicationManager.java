@@ -1269,10 +1269,11 @@ public class ReplicationManager implements SCMService {
    *                   current replica count and inflight adds and deletes
    */
   private void handleOverReplicatedContainer(final ContainerInfo container,
-      final ContainerReplicaCount replicaSet) {
-
-    final Set<ContainerReplica> replicas = replicaSet.getReplica();
+      final ContainerReplicaCount replicaSet)
+      throws ContainerNotFoundException {
     final ContainerID id = container.containerID();
+    final Set<ContainerReplica> replicas =
+        containerManager.getContainerReplicas(id);
     final int replicationFactor =
         container.getReplicationConfig().getRequiredNodes();
     int excess = replicaSet.additionalReplicaNeeded() * -1;
