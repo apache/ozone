@@ -248,7 +248,7 @@ public class TestOzoneManagerServiceProviderImpl {
         metrics.getAverageNumUpdatesInDeltaRequest().value(), 0.0);
     assertEquals(1, metrics.getNumNonZeroDeltaRequests().value());
 
-    // In this method, we have to assert the "GET" part and the "APPLY" path.
+    // In this method, we have to assert the "GET" path and the "APPLY" path.
 
     // Assert GET path --> verify if the OMDBUpdatesHandler picked up the 4
     // events ( 1 Vol PUT + 1 Bucket PUT + 2 Key PUTs).
@@ -318,7 +318,7 @@ public class TestOzoneManagerServiceProviderImpl {
         metrics.getAverageNumUpdatesInDeltaRequest().value(), 0.0);
     assertEquals(3, metrics.getNumNonZeroDeltaRequests().value());
 
-    // In this method, we have to assert the "GET" part and the "APPLY" path.
+    // In this method, we have to assert the "GET" path and the "APPLY" path.
 
     // Assert GET path --> verify if the OMDBUpdatesHandler picked up the first
     // 3 of 4 events ( 1 Vol PUT + 1 Bucket PUT + 2 Key PUTs).
