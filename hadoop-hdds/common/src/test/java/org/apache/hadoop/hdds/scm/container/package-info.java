@@ -15,7 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container;
+
 /**
- Test cases for SCM Container classes.
+ Test cases for SCM container client classes.
  */
+package org.apache.hadoop.hdds.scm.container;

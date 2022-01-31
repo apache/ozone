@@ -462,11 +462,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+
+        // Get the DB key name for looking up keyInfo in OpenKeyTable with
+        // resolved volume/bucket.
+        String dbMultipartOpenKey =
+            getDBMultipartOpenKey(resolvedBucket.realVolume(),
+                resolvedBucket.realBucket(), keyArgs.getKeyName(),
+                keyArgs.getMultipartUploadID(), omMetadataManager);
+
         OmKeyInfo omKeyInfo =
-            omMetadataManager.getOpenKeyTable(getBucketLayout()).get(
-                omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
-                    resolvedBucket.realBucket(), keyArgs.getKeyName(),
-                    keyArgs.getMultipartUploadID()));
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
+                .get(dbMultipartOpenKey);
+
         if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
@@ -735,5 +742,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID);
+  }
+
+  /**
+   * Returns the DB key name of a multipart open key in OM metadata store.
+   *
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @param uploadID          - Multi part upload ID for this key.
+   * @param omMetadataManager
+   * @return
+   * @throws IOException
+   */
+  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
+                                         String keyName, String uploadID,
+                                         OMMetadataManager omMetadataManager)
+      throws IOException {
+
+    return omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, uploadID);
   }
 }

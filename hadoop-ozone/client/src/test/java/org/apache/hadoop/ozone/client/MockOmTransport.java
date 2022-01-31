@@ -83,6 +83,10 @@ public class MockOmTransport implements OmTransport {
     this.blockAllocator = allocator;
   }
 
+  public MockOmTransport() {
+    this(new SinglePipelineBlockAllocator(new OzoneConfiguration()));
+  }
+
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     switch (payload.getCmdType()) {

@@ -193,7 +193,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyCommitResponseWithFSO(createErrorOMResponse(
-              omResponse, exception));
+              omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);

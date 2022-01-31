@@ -35,8 +35,11 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.BucketManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
@@ -151,9 +154,8 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     }
 
     BucketLayout bucketLayout =
-        new BucketManagerImpl(metadataManager)
-            .resolveLinkBucketLayout(info, new HashSet<>())
-            .getBucketLayout();
+        OzoneManagerUtils.resolveLinkBucketLayout(info, metadataManager,
+            new HashSet<>()).getBucketLayout();
 
     if (!bucketLayout.isFileSystemOptimized()) {
       System.out.println("Prefix tool only works for FileSystem Optimized" +

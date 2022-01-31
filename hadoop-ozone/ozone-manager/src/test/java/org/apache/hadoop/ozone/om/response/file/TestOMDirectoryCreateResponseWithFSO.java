@@ -23,8 +23,9 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -63,7 +64,7 @@ public class TestOMDirectoryCreateResponseWithFSO {
 
     long parentID = 100;
     OmDirectoryInfo omDirInfo =
-            TestOMRequestUtils.createOmDirectoryInfo(keyName, 500, parentID);
+            OMRequestTestUtils.createOmDirectoryInfo(keyName, 500, parentID);
 
     OMResponse omResponse = OMResponse.newBuilder().setCreateDirectoryResponse(
         OzoneManagerProtocolProtos.CreateDirectoryResponse.getDefaultInstance())
@@ -73,7 +74,8 @@ public class TestOMDirectoryCreateResponseWithFSO {
 
     OMDirectoryCreateResponseWithFSO omDirectoryCreateResponseWithFSO =
         new OMDirectoryCreateResponseWithFSO(omResponse, omDirInfo,
-            new ArrayList<>(), OMDirectoryCreateRequestWithFSO.Result.SUCCESS);
+            new ArrayList<>(), OMDirectoryCreateRequestWithFSO.Result.SUCCESS,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     omDirectoryCreateResponseWithFSO
         .addToDBBatch(omMetadataManager, batchOperation);

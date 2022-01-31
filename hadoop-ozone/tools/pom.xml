@@ -42,11 +42,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Genesis requires server side components -->
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-scm</artifactId>
-    </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-tools</artifactId>
@@ -92,16 +87,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>javax.activation</groupId>
       <artifactId>activation</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.openjdk.jmh</groupId>
-      <artifactId>jmh-core</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.openjdk.jmh</groupId>
-      <artifactId>jmh-generator-annprocess</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>

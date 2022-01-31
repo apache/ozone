@@ -230,7 +230,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           .setKeyLocation(blockLocation).build());
       OmBucketInfo shortBucketInfo = omBucketInfo.copyObject();
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, shortBucketInfo);
+          openKeyInfo, clientID, shortBucketInfo, getBucketLayout());
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
@@ -238,7 +238,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
             "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {

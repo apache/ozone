@@ -51,10 +51,11 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -94,17 +95,18 @@ public class TestReadRetries {
       storageContainerLocationClient;
 
   private static final String SCM_ID = UUID.randomUUID().toString();
-  private String layoutVersion;
+  private String bucketLayout;
 
-  public TestReadRetries(String layoutVersion) {
-    this.layoutVersion = layoutVersion;
+  public TestReadRetries(String bucketLayout) {
+    this.bucketLayout = bucketLayout;
   }
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-            new Object[]{OMConfigKeys.OZONE_OM_METADATA_LAYOUT_DEFAULT },
-            new Object[]{OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX });
+        new Object[]{OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT},
+        new Object[]{OMConfigKeys.
+              OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED});
   }
 
   /**
@@ -115,8 +117,8 @@ public class TestReadRetries {
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    TestOMRequestUtils.configureFSOptimizedPaths(conf,
-            true, layoutVersion);
+    OMRequestTestUtils.configureFSOptimizedPaths(conf,
+            true, BucketLayout.fromString(bucketLayout));
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setScmId(SCM_ID)

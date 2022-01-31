@@ -221,7 +221,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    */
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception));
+    return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception),
+        getBucketLayout());
   }
 
   /**

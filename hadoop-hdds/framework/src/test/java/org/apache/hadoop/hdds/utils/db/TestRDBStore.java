@@ -349,6 +349,30 @@ public class TestRDBStore {
   }
 
   @Test
+  public void testGetDBUpdatesSinceWithLimitCount() throws Exception {
+
+    try (RDBStore newStore =
+             new RDBStore(folder.newFolder(), options, configSet)) {
+
+      try (Table firstTable = newStore.getTable(families.get(1))) {
+        firstTable.put(
+            org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key1"),
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("Value1"));
+        firstTable.put(
+            org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("Value2"));
+      }
+      Assert.assertTrue(
+          newStore.getDb().getLatestSequenceNumber() == 2);
+
+      DBUpdatesWrapper dbUpdatesSince = newStore.getUpdatesSince(0, 1);
+      Assert.assertEquals(1, dbUpdatesSince.getData().size());
+    }
+  }
+
+  @Test
   public void testDowngrade() throws Exception {
 
     // Write data to current DB which has 6 column families at the time of
