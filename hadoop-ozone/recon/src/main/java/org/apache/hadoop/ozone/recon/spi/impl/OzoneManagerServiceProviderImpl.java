@@ -58,7 +58,7 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -151,11 +151,11 @@ public class OzoneManagerServiceProviderImpl
     HttpConfig.Policy policy = HttpConfig.getHttpPolicy(configuration);
 
     omDBSnapshotUrl = "http://" + ozoneManagerHttpAddress +
-        OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 
     if (policy.isHttpsEnabled()) {
       omDBSnapshotUrl = "https://" + ozoneManagerHttpsAddress +
-          OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+          OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     }
 
     boolean flushParam = configuration.getBoolean(
@@ -271,7 +271,7 @@ public class OzoneManagerServiceProviderImpl
           omLeaderUrl = (policy.isHttpsEnabled() ?
               "https://" + info.getServiceAddress(Type.HTTPS) :
               "http://" + info.getServiceAddress(Type.HTTP)) +
-              OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+              OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
         }
       }
     }

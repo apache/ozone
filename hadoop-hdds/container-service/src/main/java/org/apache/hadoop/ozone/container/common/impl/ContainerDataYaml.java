@@ -272,9 +272,10 @@ public final class ContainerDataYaml {
         Map<Object, Object> nodes = constructMapping(mnode);
 
         //Needed this, as TAG.INT type is by default converted to Long.
-        long layOutVersion = (long) nodes.get(OzoneConsts.LAYOUTVERSION);
-        ChunkLayOutVersion layoutVersion =
-            ChunkLayOutVersion.getChunkLayOutVersion((int) layOutVersion);
+        long layoutVersion = (long) nodes.get(OzoneConsts.LAYOUTVERSION);
+        ContainerLayoutVersion containerLayoutVersion =
+            ContainerLayoutVersion.getContainerLayoutVersion(
+                (int) layoutVersion);
 
         long size = (long) nodes.get(OzoneConsts.MAX_SIZE);
 
@@ -284,8 +285,8 @@ public final class ContainerDataYaml {
 
         //When a new field is added, it needs to be added here.
         KeyValueContainerData kvData = new KeyValueContainerData(
-            (long) nodes.get(OzoneConsts.CONTAINER_ID), layoutVersion, size,
-            originPipelineId, originNodeId);
+            (long) nodes.get(OzoneConsts.CONTAINER_ID), containerLayoutVersion,
+            size, originPipelineId, originNodeId);
 
         kvData.setContainerDBType((String)nodes.get(
             OzoneConsts.CONTAINER_DB_TYPE));

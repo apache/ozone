@@ -109,7 +109,7 @@ Based on the `ozone.scm.primordial.node.id`, the init process will be ignored on
 
 ## SCM HA Security
 
-![Overview](scm-secure-ha.png)
+{{< image src="scm-secure-ha.png">}}
 
 In a secure SCM HA cluster on the SCM where we perform init, we call this SCM as a primordial SCM. 
 Primordial SCM starts root-CA with self-signed certificates and is used to issue a signed certificate 

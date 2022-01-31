@@ -28,7 +28,7 @@ import java.io.IOException;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -62,12 +62,6 @@ public class OzoneClientProducer {
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
-
-  @Inject
-  private Text omService;
-
-  @Inject
-  private String omServiceID;
 
   @Context
   private ContainerRequestContext context;
@@ -119,6 +113,7 @@ public class OzoneClientProducer {
     // Set the expected OM version if not set via config.
     ozoneConfiguration.setIfUnset(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
         OZONE_OM_CLIENT_PROTOCOL_VERSION);
+    String omServiceID = OmUtils.getOzoneManagerServiceId(ozoneConfiguration);
     if (omServiceID == null) {
       return OzoneClientFactory.getRpcClient(ozoneConfiguration);
     } else {

@@ -161,7 +161,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       OzoneManagerProtocolProtos.OMResponse.Builder omResp,
       IOException exception) {
     return new OMKeyAclResponseWithFSO(
-        createErrorOMResponse(omResp, exception));
+        createErrorOMResponse(omResp, exception), getBucketLayout());
   }
 
   abstract OMClientResponse onSuccess(

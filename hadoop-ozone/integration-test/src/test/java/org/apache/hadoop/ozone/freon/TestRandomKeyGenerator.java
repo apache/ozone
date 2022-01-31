@@ -178,6 +178,7 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
+  @org.junit.Ignore("HDDS-5993")
   public void cleanObjectsTest() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());

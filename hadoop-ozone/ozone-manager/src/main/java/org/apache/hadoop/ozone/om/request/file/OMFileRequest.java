@@ -1012,6 +1012,31 @@ public final class OMFileRequest {
   }
 
   /**
+   * Get parent ID for the user given keyName.
+   *
+   * @param omMetadataManager
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @return
+   * @throws IOException
+   */
+  public static long getParentId(OMMetadataManager omMetadataManager,
+                                 String volumeName, String bucketName,
+                                 String keyName)
+      throws IOException {
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+
+    long bucketId = omBucketInfo.getObjectID();
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    return OMFileRequest
+        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
+  }
+
+  /**
    * Validates volume and bucket existence.
    *
    * @param metadataManager

@@ -66,6 +66,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 import org.apache.hadoop.util.Timer;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -253,6 +254,12 @@ public class OzoneContainer {
       }
       this.metadataScanner.start();
 
+      if (c.getBandwidthPerVolume() == 0L) {
+        LOG.warn(VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
+            "so background container data scanner will not start.");
+        return;
+      }
+
       dataScanners = new ArrayList<>();
       for (StorageVolume v : volumeSet.getVolumesList()) {
         ContainerDataScanner s = new ContainerDataScanner(c, controller,
@@ -272,6 +279,10 @@ public class OzoneContainer {
     }
     metadataScanner.shutdown();
     metadataScanner = null;
+
+    if (dataScanners == null) {
+      return;
+    }
     for (ContainerDataScanner s : dataScanners) {
       s.shutdown();
     }

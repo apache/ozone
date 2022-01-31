@@ -98,6 +98,8 @@ ozone genconf <path>
 | ozone.scm.client.address       | SCM 服务地址和端口 | 客户端使用                                        |
 | ozone.scm.datanode.address     | SCM 服务地址和端口 | Datanode 使用                            |
 | ozone.om.address               | OM 服务地址           | Ozone handler 和 Ozone 文件系统使用             |
+| hdds.datanode.dir               | 文件路径          | datanode中数据存储位置             |
+
 
 
 ## 启动集群

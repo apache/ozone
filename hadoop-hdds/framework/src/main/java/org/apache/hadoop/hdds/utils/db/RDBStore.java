@@ -382,7 +382,15 @@ public class RDBStore implements DBStore {
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
       throws SequenceNumberNotFoundException {
+    return getUpdatesSince(sequenceNumber, Long.MAX_VALUE);
+  }
 
+  @Override
+  public DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
+      throws SequenceNumberNotFoundException {
+    if (limitCount <= 0) {
+      throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
+    }
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
     try {
       TransactionLogIterator transactionLogIterator =
@@ -415,6 +423,9 @@ public class RDBStore implements DBStore {
         }
         dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
             result.sequenceNumber());
+        if (currSequenceNumber - sequenceNumber >= limitCount) {
+          break;
+        }
         transactionLogIterator.next();
       }
     } catch (RocksDBException e) {

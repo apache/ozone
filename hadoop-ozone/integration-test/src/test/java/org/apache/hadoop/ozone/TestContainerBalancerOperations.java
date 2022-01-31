@@ -81,15 +81,17 @@ public class TestContainerBalancerOperations {
     boolean running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);
     Optional<Double> threshold = Optional.of(0.1);
-    Optional<Integer> idleiterations = Optional.of(10000);
-    Optional<Double> maxDatanodesRatioToInvolvePerIteration = Optional.of(1d);
+    Optional<Integer> iterations = Optional.of(10000);
+    Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
+        Optional.of(100);
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(1L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(1L);
 
-    containerBalancerClient.startContainerBalancer(threshold, idleiterations,
-        maxDatanodesRatioToInvolvePerIteration, maxSizeToMovePerIterationInGB,
-        maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB);
+    containerBalancerClient.startContainerBalancer(threshold, iterations,
+        maxDatanodesPercentageToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -104,9 +106,10 @@ public class TestContainerBalancerOperations {
     assertFalse(running);
 
     // test normally start , and stop it before balance is completed
-    containerBalancerClient.startContainerBalancer(threshold, idleiterations,
-        maxDatanodesRatioToInvolvePerIteration, maxSizeToMovePerIterationInGB,
-        maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB);
+    containerBalancerClient.startContainerBalancer(threshold, iterations,
+        maxDatanodesPercentageToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 

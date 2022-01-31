@@ -217,7 +217,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             Optional.of(missingParentInfos), trxnLogIndex);
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos, result);
+            dirKeyInfo, missingParentInfos, result, getBucketLayout());
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         result = Result.DIRECTORY_ALREADY_EXISTS;

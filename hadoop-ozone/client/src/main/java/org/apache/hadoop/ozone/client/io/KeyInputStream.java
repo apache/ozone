@@ -357,14 +357,14 @@ public class KeyInputStream extends ExtendedInputStream {
   }
 
   @Override
-  public int available() throws IOException {
+  public synchronized int available() throws IOException {
     checkOpen();
     long remaining = length - getPos();
     return remaining <= Integer.MAX_VALUE ? (int) remaining : Integer.MAX_VALUE;
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     closed = true;
     for (ExtendedInputStream blockStream : blockStreams) {
       blockStream.close();
@@ -394,7 +394,7 @@ public class KeyInputStream extends ExtendedInputStream {
   }
 
   @Override
-  public long skip(long n) throws IOException {
+  public synchronized long skip(long n) throws IOException {
     if (n <= 0) {
       return 0;
     }
@@ -405,7 +405,7 @@ public class KeyInputStream extends ExtendedInputStream {
   }
 
   @Override
-  public void unbuffer() {
+  public synchronized void unbuffer() {
     for (ExtendedInputStream is : blockStreams) {
       is.unbuffer();
     }

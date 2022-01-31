@@ -472,7 +472,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
-  public void unbuffer() {
+  public synchronized void unbuffer() {
     storePosition();
     releaseClient();
 

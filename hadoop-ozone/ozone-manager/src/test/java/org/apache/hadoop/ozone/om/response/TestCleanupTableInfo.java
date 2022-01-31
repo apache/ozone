@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -147,8 +148,10 @@ public class TestCleanupTableInfo {
 
     Set<String> tables = omMetadataManager.listTableNames();
     Set<Class<? extends OMClientResponse>> subTypes = responseClasses();
+    // OmKeyResponse is an abstract class that does not need CleanupTable.
+    subTypes.remove(OmKeyResponse.class);
     subTypes.forEach(aClass -> {
-      Assert.assertTrue(aClass + "does not have annotation of" +
+      Assert.assertTrue(aClass + " does not have annotation of" +
               " CleanupTableInfo",
           aClass.isAnnotationPresent(CleanupTableInfo.class));
       CleanupTableInfo annotation =
