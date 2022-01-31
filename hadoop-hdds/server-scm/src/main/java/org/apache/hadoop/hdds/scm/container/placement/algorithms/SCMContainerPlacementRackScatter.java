@@ -244,10 +244,11 @@ public final class SCMContainerPlacementRackScatter
       Node node = networkTopology.chooseRandom(scope, excludedNodes);
       if (node == null) {
         // cannot find the node which meets all constrains
-        LOG.warn("Failed to find the datanode for container. excludedNodes:" +
+        LOG.debug("Failed to find the datanode for container. excludedNodes:" +
             (excludedNodes == null ? "" : excludedNodes.toString()) +
             ", rack:" + scope);
-        return null;
+        maxRetry--;
+        continue;
       }
 
       DatanodeDetails datanodeDetails = (DatanodeDetails)node;
@@ -304,6 +305,9 @@ public final class SCMContainerPlacementRackScatter
       List<DatanodeDetails> excludedNodes) {
     Set<Node> lessPreferredRacks = excludedNodes.stream()
         .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
+        // Dead Nodes have been removed from the topology and so have a
+        // null rack. We need to exclude those from the rack list.
+        .filter(node -> node != null)
         .collect(Collectors.toSet());
     List <Node> result = new ArrayList<>();
     for (Node rack : racks) {
