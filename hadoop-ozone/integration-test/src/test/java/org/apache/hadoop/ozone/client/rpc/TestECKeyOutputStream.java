@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -44,7 +45,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -111,7 +112,10 @@ public class TestECKeyOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
-
+    conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 500,
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
+        TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)
@@ -239,8 +243,7 @@ public class TestECKeyOutputStream {
 
   @Test
   public void testECContainerKeysCount()
-      throws IOException, InterruptedException, TimeoutException,
-      AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException {
     byte[] inputData = getInputBytes(1);
     final OzoneBucket bucket = getOzoneBucket();
     ContainerOperationClient containerOperationClient =
@@ -260,14 +263,21 @@ public class TestECKeyOutputStream {
       out.write(inputData);
     }
     OzoneKeyDetails key = bucket.getKey(keyName);
-    cluster.restartStorageContainerManager(true);
     long currentKeyContainerID =
         key.getOzoneKeyLocations().get(0).getContainerID();
-    containerInfos =
-        containerOperationClient.listContainer(currentKeyContainerID, 100);
     Long priorKeys = containerKeys.get(new ContainerID(currentKeyContainerID));
-    Assert.assertEquals((priorKeys != null ? priorKeys : 0) + 1L,
-        containerInfos.get(0).getNumberOfKeys());
+    long expectedKeys = (priorKeys != null ? priorKeys : 0) + 1L;
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return containerOperationClient
+            .listContainer(currentKeyContainerID, 100).get(0)
+            .getNumberOfKeys() == expectedKeys;
+      } catch (IOException exception) {
+        Assert.fail("Unexpected exception " + exception);
+        return false;
+      }
+    }, 100, 10000);
     validateContent(inputData, bucket, bucket.getKey(keyName));
   }
 
