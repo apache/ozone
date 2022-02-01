@@ -231,18 +231,9 @@ public class TestOzoneContainer {
           getChunksCount();
       ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
 
-
-      // Delete Block
-      request =
-          ContainerTestHelper.getDeleteBlockRequest(
-              pipeline, putBlockRequest.getPutBlock());
-      response = client.sendCommand(request);
-      Assert.assertNotNull(response);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
-      //Delete Chunk
-      request = ContainerTestHelper.getDeleteChunkRequest(
-          pipeline, writeChunkRequest.getWriteChunk());
+      // Delete Block and Delete Chunk are handled by BlockDeletionService
+      // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
+      // are deprecated
 
       response = client.sendCommand(request);
       Assert.assertNotNull(response);

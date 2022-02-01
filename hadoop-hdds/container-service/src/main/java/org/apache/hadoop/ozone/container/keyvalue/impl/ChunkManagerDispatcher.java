@@ -102,9 +102,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
     Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
 
-    selectHandler(container)
-        .deleteChunk(container, blockID, info);
-    container.getContainerData().decrBytesUsed(info.getLen());
+    // Delete the chunk from disk.
+    // Do not decrement the ContainerData counters (usedBytes) here as it
+    // will be updated while deleting the block from the DB
+
+    selectHandler(container).deleteChunk(container, blockID, info);
+
   }
 
   @Override
@@ -113,11 +116,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
     Preconditions.checkNotNull(blockData, "Block data cannot be null.");
 
-    selectHandler(container).deleteChunks(container, blockData);
+    // Delete the chunks belonging to blockData.
+    // Do not decrement the ContainerData counters (usedBytes) here as it
+    // will be updated while deleting the block from the DB
 
-    container.getContainerData().decrBytesUsed(
-        blockData.getChunks().stream()
-            .mapToLong(ContainerProtos.ChunkInfo::getLen).sum());
+    selectHandler(container).deleteChunks(container, blockData);
   }
 
   @Override

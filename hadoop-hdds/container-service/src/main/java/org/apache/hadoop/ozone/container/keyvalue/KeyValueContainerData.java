@@ -288,14 +288,14 @@ public class KeyValueContainerData extends ContainerData {
    * @param deletedBlockCount - Number of blocks deleted.
    * @throws IOException
    */
-  public void updateAndCommitDBCounters(
-      ReferenceCountedDB db, BatchOperation batchOperation,
-      int deletedBlockCount) throws IOException {
+  public void updateAndCommitDBCounters(ReferenceCountedDB db,
+      BatchOperation batchOperation, int deletedBlockCount,
+      long releasedBytes) throws IOException {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
     metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED,
-            getBytesUsed());
+            getBytesUsed() - releasedBytes);
     metadataTable.putWithBatch(batchOperation, BLOCK_COUNT,
             getBlockCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, PENDING_DELETE_BLOCK_COUNT,

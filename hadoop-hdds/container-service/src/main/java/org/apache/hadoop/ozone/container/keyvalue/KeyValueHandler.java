@@ -1076,13 +1076,17 @@ public class KeyValueHandler extends Handler {
     deleteInternal(container, force);
   }
 
+  /**
+   * Called by BlockDeletionService to delete all the chunks in a block
+   * before proceeding to delete the block info from DB.
+   */
   @Override
   public void deleteBlock(Container container, BlockData blockData)
       throws IOException {
     chunkManager.deleteChunks(container, blockData);
-    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
-      if (LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
+      for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+        ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
         LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
       }
     }

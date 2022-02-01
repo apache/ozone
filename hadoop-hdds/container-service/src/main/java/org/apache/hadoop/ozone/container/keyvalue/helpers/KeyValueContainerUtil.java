@@ -318,7 +318,7 @@ public final class KeyValueContainerUtil {
     kvData.setBlockCount(blockCount);
   }
 
-  private static long getBlockLength(BlockData block) throws IOException {
+  public static long getBlockLength(BlockData block) throws IOException {
     long blockLen = 0;
     List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
 
