@@ -94,6 +94,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.InfoBucket;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.LookupKey;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
@@ -146,6 +148,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         InfoBucketResponse infoBucketResponse = infoBucket(
             request.getInfoBucketRequest());
         responseBuilder.setInfoBucketResponse(infoBucketResponse);
+        OMManagerClientVersionValidations.validateClientVersionPostProcess(
+            InfoBucket,
+            request,
+            infoBucketResponse);
         break;
       case ListBuckets:
         ListBucketsResponse listBucketsResponse = listBuckets(
@@ -156,6 +162,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         LookupKeyResponse lookupKeyResponse = lookupKey(
             request.getLookupKeyRequest(), request.getVersion());
         responseBuilder.setLookupKeyResponse(lookupKeyResponse);
+        OMManagerClientVersionValidations.validateClientVersionPostProcess(
+            LookupKey,
+            request,
+            lookupKeyResponse);
         break;
       case ListKeys:
         ListKeysResponse listKeysResponse = listKeys(
@@ -389,10 +399,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setHeadOp(keyArgs.getHeadOp())
         .build();
     OmKeyInfo keyInfo = impl.lookupKey(omKeyArgs);
-
     resp.setKeyInfo(keyInfo.getProtobuf(keyArgs.getHeadOp(), clientVersion));
-
-
     return resp.build();
   }
 

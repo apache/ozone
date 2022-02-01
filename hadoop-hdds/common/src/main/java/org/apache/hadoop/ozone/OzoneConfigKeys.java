@@ -30,6 +30,8 @@ import org.apache.ratis.util.TimeDuration;
 
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.OMProtocolVersion.OM_LATEST_VERSION;
+
 /**
  * This class contains constants for configuration keys used in Ozone.
  */
@@ -465,7 +467,8 @@ public final class OzoneConfigKeys {
       "ozone.om.client.protocol.version";
   // The version of the protocol for Client (S3G/OFS) to OM Communication.
   // The protocol starts at 2.0.0 and a null or empty value for older versions.
-  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION = "2.0.0";
+  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION =
+      OM_LATEST_VERSION;
 
   /**
    * There is no need to instantiate this class.

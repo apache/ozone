@@ -39,7 +39,7 @@ public class RpcClientTest {
         null, // Expected version
         null, // First OM Version
         null, // Second OM Version
-        true), // Should validation pass
+        false), // Should validation pass
     NULL_EXPECTED_ONE_OM(
         null,
         OZONE_OM_CLIENT_PROTOCOL_VERSION,
@@ -69,7 +69,7 @@ public class RpcClientTest {
         "",
         null,
         null,
-        true),
+        false),
     EMPTY_EXPECTED_ONE_OM(
         "",
         OZONE_OM_CLIENT_PROTOCOL_VERSION,
@@ -94,6 +94,11 @@ public class RpcClientTest {
         OZONE_OM_CLIENT_PROTOCOL_VERSION,
         null,
         null,
+        false),
+    VALID_EXPECTED_EMPTY_OM(
+        OZONE_OM_CLIENT_PROTOCOL_VERSION,
+        "",
+        "",
         false),
     VALID_EXPECTED_ONE_OM(
         OZONE_OM_CLIENT_PROTOCOL_VERSION,

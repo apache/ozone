@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.ozone.OMProtocolVersion;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -139,7 +140,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
-import org.apache.hadoop.util.ComparableVersion;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
 import org.jetbrains.annotations.NotNull;
@@ -292,18 +292,12 @@ public class RpcClient implements ClientProtocol {
 
   static boolean validateOmVersion(String expectedVersion,
                                    List<ServiceInfo> serviceInfoList) {
-    if (expectedVersion == null || expectedVersion.isEmpty()) {
-      // Empty strings assumes client is fine with any OM version.
-      return true;
-    }
     boolean found = false; // At min one OM should be present.
     for (ServiceInfo s: serviceInfoList) {
       if (s.getNodeType() == HddsProtos.NodeType.OM) {
-        ComparableVersion comparableExpectedVersion =
-            new ComparableVersion(expectedVersion);
-        ComparableVersion comparableOMVersion =
-            new ComparableVersion(s.getProtobuf().getOMProtocolVersion());
-        if (comparableOMVersion.compareTo(comparableExpectedVersion) < 0) {
+        if (!OMProtocolVersion.isOMNewerThan(
+            expectedVersion,
+            s.getProtobuf().getOMProtocolVersion())) {
           return false;
         } else {
           found = true;

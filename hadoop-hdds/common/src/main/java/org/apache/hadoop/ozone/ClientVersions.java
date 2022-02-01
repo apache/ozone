@@ -28,8 +28,27 @@ public final class ClientVersions {
   // DatanodeDetails#getFromProtobuf handles unknown types of ports
   public static final int VERSION_HANDLES_UNKNOWN_DN_PORTS = 1;
 
+  // TODO: Change the version of FSO/EC if one is released before the other.
+  // Client supports EC objects
+  public static final int CLIENT_EC_CAPABLE = 2;
+  // Client supports FSO buckets
+  public static final int CLIENT_FSO_CAPABLE = CLIENT_EC_CAPABLE;
+
   // this should always point to the latest version
-  public static final int CURRENT_VERSION = VERSION_HANDLES_UNKNOWN_DN_PORTS;
+  public static final int CURRENT_VERSION = CLIENT_EC_CAPABLE;
+
+  /**
+   * Validates if the client version is equal to or newer than the expected
+   * version supported. Client are expected to be backward compatible  if it
+   * is sending a request.
+   * @param desiredClientVersion Minimum version of the client expected.
+   * @param actualClientVersion Version of the client witnessed.
+   * @return true if client is at or newer than the desired version.
+   */
+  public static boolean isClientCompatible(int desiredClientVersion,
+                                                 int actualClientVersion)  {
+    return desiredClientVersion >= actualClientVersion;
+  }
 
   private ClientVersions() {
     // no instances
