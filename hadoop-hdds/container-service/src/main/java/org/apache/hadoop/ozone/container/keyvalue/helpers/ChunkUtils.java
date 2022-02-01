@@ -255,7 +255,6 @@ public final class ChunkUtils {
    */
   public static boolean isOverWriteRequested(File chunkFile, ChunkInfo
       chunkInfo) {
-
     if (!chunkFile.exists()) {
       return false;
     }

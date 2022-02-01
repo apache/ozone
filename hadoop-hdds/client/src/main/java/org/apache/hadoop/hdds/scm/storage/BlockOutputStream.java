@@ -26,6 +26,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -119,6 +120,12 @@ public class BlockOutputStream extends OutputStream {
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
+
+  // This config is updated to false after the first putBlock call on this
+  // block. It is used to track whether the blockCount needs to be updated in
+  // the container DB as the blockCount should be incremented only the first
+  // time the block is written to the container.
+  private AtomicBoolean updateBlockCount = new AtomicBoolean(true);
 
   /**
    * Creates a new BlockOutputStream.
@@ -415,40 +422,53 @@ public class BlockOutputStream extends OutputStream {
         ContainerCommandResponseProto> flushFuture = null;
     try {
       BlockData blockData = containerBlockData.build();
-      XceiverClientReply asyncReply =
-          putBlockAsync(xceiverClient, blockData, close, token);
+      boolean firstBlockPutCall = updateBlockCount.getAndSet(false);
+      XceiverClientReply asyncReply = putBlockAsync(xceiverClient, blockData,
+          firstBlockPutCall, close, token);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
-      flushFuture = future.thenApplyAsync(e -> {
+      flushFuture = future.thenApplyAsync(response -> {
         try {
-          validateResponse(e);
+          validateResponse(response);
         } catch (IOException sce) {
           throw new CompletionException(sce);
         }
         // if the ioException is not set, putBlock is successful
-        if (getIoException() == null && !force) {
-          BlockID responseBlockID = BlockID.getFromProtobuf(
-              e.getPutBlock().getCommittedBlockLength().getBlockID());
-          Preconditions.checkState(blockID.get().getContainerBlockID()
-              .equals(responseBlockID.getContainerBlockID()));
-          // updates the bcsId of the block
-          blockID.set(responseBlockID);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Adding index " + asyncReply.getLogIndex() + " flushLength "
-                    + flushPos + " numBuffers " + byteBufferList.size()
-                    + " blockID " + blockID + " bufferPool size" + bufferPool
-                    .getSize() + " currentBufferIndex " + bufferPool
-                    .getCurrentBufferIndex());
+        if (getIoException() == null) {
+          if (!force) {
+            BlockID responseBlockID = BlockID.getFromProtobuf(
+                response.getPutBlock().getCommittedBlockLength().getBlockID());
+            Preconditions.checkState(blockID.get().getContainerBlockID()
+                .equals(responseBlockID.getContainerBlockID()));
+            // updates the bcsId of the block
+            blockID.set(responseBlockID);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(
+                  "Adding index " + asyncReply.getLogIndex() + " flushLength "
+                      + flushPos + " numBuffers " + byteBufferList.size()
+                      + " blockID " + blockID + " bufferPool size" + bufferPool
+                      .getSize() + " currentBufferIndex " + bufferPool
+                      .getCurrentBufferIndex());
+            }
+            // for standalone protocol, logIndex will always be 0.
+            updateCommitInfo(asyncReply, byteBufferList);
           }
-          // for standalone protocol, logIndex will always be 0.
-          updateCommitInfo(asyncReply, byteBufferList);
+        } else {
+          // PutBlock not successful -> reset updateBlockCount if it was set
+          // to true
+          if (firstBlockPutCall) {
+            updateBlockCount.compareAndSet(true, false);
+          }
         }
-        return e;
+        return response;
       }, responseExecutor).exceptionally(e -> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("putBlock failed for blockID {} with exception {}",
                   blockID, e.getLocalizedMessage());
+        }
+        // Reset updateBlockCount if it was set to true
+        if (firstBlockPutCall) {
+          updateBlockCount.compareAndSet(true, false);
         }
         CompletionException ce =  new CompletionException(e);
         setIoException(ce);

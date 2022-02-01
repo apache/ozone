@@ -321,6 +321,7 @@ message BlockData {
 message  PutBlockRequestProto {
   required BlockData blockData = 1;
   optional bool eof = 2;
+  optional bool updateBlockCount = 3;
 }
 
 message  PutBlockResponseProto {
