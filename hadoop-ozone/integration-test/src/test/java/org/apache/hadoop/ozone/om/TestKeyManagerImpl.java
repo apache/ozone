@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -84,7 +84,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -185,7 +185,7 @@ public class TestKeyManagerImpl {
     configurator.setNetworkTopology(clusterMap);
     configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
-    scm = TestUtils.getScm(conf, configurator);
+    scm = HddsTestUtils.getScm(conf, configurator);
     scm.start();
     scm.exitSafeMode();
     scmBlockSize = (long) conf
@@ -268,7 +268,7 @@ public class TestKeyManagerImpl {
         .setIsVersionEnabled(isVersionEnabled)
         .build();
 
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
   }
 
   private static void createVolume(String volumeName) throws IOException {
@@ -277,7 +277,7 @@ public class TestKeyManagerImpl {
         .setAdminName("bilbo")
         .setOwnerName("bilbo")
         .build();
-    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
+    OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
   }
 
   @Test
@@ -951,12 +951,12 @@ public class TestKeyManagerImpl {
     // Add a total of 100 key entries to DB and TableCache (50 entries each)
     for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {  // Add to DB
-        TestOMRequestUtils.addKeyToTable(false,
+        OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
             ONE, metadataManager);
       } else {  // Add to TableCache
-        TestOMRequestUtils.addKeyToTableCache(
+        OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
             HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
@@ -1022,13 +1022,13 @@ public class TestKeyManagerImpl {
     String prefixKeyInCache = "key-c";
     for (int i = 1; i <= 10; i++) {
       if (i % 2 == 0) {  // Add to DB
-        TestOMRequestUtils.addKeyToTable(false,
+        OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
             ONE, metadataManager);
       } else {  // Add to TableCache
-        TestOMRequestUtils.addKeyToTableCache(
+        OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
             HddsProtos.ReplicationType.RATIS, ONE,
@@ -1067,13 +1067,13 @@ public class TestKeyManagerImpl {
 
     for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
-        TestOMRequestUtils.addKeyToTable(false,
+        OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
             1000L, HddsProtos.ReplicationType.RATIS,
             ONE, metadataManager);
         existKeySet.add(prefixKey + i);
       } else {
-        TestOMRequestUtils.addKeyToTableCache(
+        OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
             HddsProtos.ReplicationType.RATIS, ONE,
             metadataManager);
@@ -1289,7 +1289,7 @@ public class TestKeyManagerImpl {
     ScmClient scmClientMock = mock(ScmClient.class);
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
         "b1", "k1", ReplicationType.RATIS,
         ReplicationFactor.THREE);
 
@@ -1343,7 +1343,7 @@ public class TestKeyManagerImpl {
     ScmClient scmClientMock = mock(ScmClient.class);
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
         "b1", "k1", ReplicationType.RATIS,
         ReplicationFactor.THREE);
 

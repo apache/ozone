@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
@@ -61,15 +61,15 @@ public class TestContainerSet {
 
   private static final int FIRST_ID = 2;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestContainerSet(ChunkLayOutVersion layout) {
+  public TestContainerSet(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Test

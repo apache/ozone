@@ -722,11 +722,11 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.chunk.layout</name>
+    <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
-      Chunk layout defines how chunks, blocks and containers are stored on disk.
+      Container layout defines how chunks, blocks and containers are stored on disk.
       Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
       block are stored in the same file with FILE_PER_BLOCK.  The default is
       FILE_PER_BLOCK.
@@ -2014,7 +2014,7 @@
   </property>
   <property>
     <name>ozone.scm.ratis.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>Property to enable or disable Ratis server on SCM.
       Please note - this is a temporary property to disable SCM Ratis server.

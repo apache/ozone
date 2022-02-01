@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
+import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -61,7 +61,7 @@ public class TestScmStartupSlvLessThanMlv {
 
     // Create version file with MLV > SLV, which should fail the SCM
     // construction.
-    TestUpgradeUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv);
+    UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv);
 
     try {
       new StorageContainerManager(conf);

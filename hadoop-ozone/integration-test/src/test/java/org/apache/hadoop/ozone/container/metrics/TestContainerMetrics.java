@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -113,7 +112,7 @@ public class TestContainerMetrics {
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
                 containerSet, volumeSet, metrics,
-                TestHddsDispatcher.NO_OP_ICR_SENDER));
+                c -> {}));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
           volumeSet, handlers, context, metrics, null);

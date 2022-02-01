@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -89,7 +89,7 @@ public class TestOmLDBCli {
       .build();
     // insert 5 keys
     for (int i = 0; i<5; i++) {
-      OmKeyInfo value = TestOMRequestUtils.createOmKeyInfo("sampleVol",
+      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
           "sampleBuck", "key" + (i+1), HddsProtos.ReplicationType.STAND_ALONE,
           HddsProtos.ReplicationFactor.ONE);
       String key = "key"+ (i);
