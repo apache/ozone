@@ -278,7 +278,7 @@ public class TestECKeyOutputStream {
         return false;
       }
     }, 100, 10000);
-    validateContent(inputData, bucket, bucket.getKey(keyName));
+    validateContent(inputData, bucket, key);
   }
 
   private void validateContent(byte[] inputData, OzoneBucket bucket,
