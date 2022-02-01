@@ -103,19 +103,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   }
 
   @Test
-  public void testDeleteChunk() throws IOException {
-    KeyValueContainer container = getMockUnhealthyContainer();
-    KeyValueHandler handler = getDummyHandler();
-
-    ContainerProtos.ContainerCommandResponseProto response =
-        handler.handleDeleteChunk(
-            getDummyCommandRequestProto(
-                ContainerProtos.Type.DeleteChunk),
-            container);
-    assertThat(response.getResult(), is(CONTAINER_UNHEALTHY));
-  }
-
-  @Test
   public void testGetSmallFile() throws IOException {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();

@@ -231,7 +231,7 @@ public class TestOzoneContainer {
           getChunksCount();
       ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
 
-      // Delete Block and Delete Chunk are handled by BlockDeletionService
+      // Delete Block and Delete Chunk are handled by BlockDeletingService
       // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
       // are deprecated
 

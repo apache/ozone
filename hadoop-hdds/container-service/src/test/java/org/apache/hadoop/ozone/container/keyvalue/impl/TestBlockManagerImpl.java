@@ -189,27 +189,6 @@ public class TestBlockManagerImpl {
   }
 
   @Test
-  public void testDeleteBlock() throws Exception {
-    assertEquals(0,
-        keyValueContainer.getContainerData().getBlockCount());
-    //Put Block
-    blockManager.putBlock(keyValueContainer, blockData);
-    assertEquals(1,
-        keyValueContainer.getContainerData().getBlockCount());
-    //Delete Block
-    blockManager.deleteBlock(keyValueContainer, blockID);
-    assertEquals(0,
-        keyValueContainer.getContainerData().getBlockCount());
-    try {
-      blockManager.getBlock(keyValueContainer, blockID);
-      fail("testDeleteBlock");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains(
-          "Unable to find the block", ex);
-    }
-  }
-
-  @Test
   public void testListBlock() throws Exception {
     blockManager.putBlock(keyValueContainer, blockData);
     List<BlockData> listBlockData = blockManager.listBlock(
@@ -235,28 +214,5 @@ public class TestBlockManagerImpl {
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
     assertTrue(listBlockData.size() == 10);
-  }
-
-  @Test
-  public void testGetNoSuchBlock() throws Exception {
-    assertEquals(0,
-        keyValueContainer.getContainerData().getBlockCount());
-    //Put Block
-    blockManager.putBlock(keyValueContainer, blockData);
-    assertEquals(1,
-        keyValueContainer.getContainerData().getBlockCount());
-    //Delete Block
-    blockManager.deleteBlock(keyValueContainer, blockID);
-    assertEquals(0,
-        keyValueContainer.getContainerData().getBlockCount());
-    try {
-      //Since the block has been deleted, we should not be able to find it
-      blockManager.getBlock(keyValueContainer, blockID);
-      fail("testGetNoSuchBlock failed");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains(
-          "Unable to find the block", ex);
-      assertEquals(ContainerProtos.Result.NO_SUCH_BLOCK, ex.getResult());
-    }
   }
 }

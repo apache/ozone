@@ -324,6 +324,7 @@ public class BlockDeletingService extends BackgroundService {
         if (toDeleteBlocks.isEmpty()) {
           LOG.debug("No under deletion block found in container : {}",
               containerData.getContainerID());
+          return crr;
         }
 
         List<String> succeedBlocks = new LinkedList<>();
@@ -421,10 +422,8 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
         if (delBlocks.isEmpty()) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("No transaction found in container : {}",
-                containerData.getContainerID());
-          }
+          LOG.debug("No transaction found in container : {}",
+              containerData.getContainerID());
           return crr;
         }
 
