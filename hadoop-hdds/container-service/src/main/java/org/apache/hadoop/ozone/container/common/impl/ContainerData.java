@@ -89,17 +89,16 @@ public abstract class ContainerData {
   //ID of the datanode where this container is created
   private String originNodeId;
 
-  /** parameters for read/write statistics on the container. **/
-  private final AtomicLong readBytes;
-  private final AtomicLong writeBytes;
-  private final AtomicLong readCount;
-  private final AtomicLong writeCount;
-  private final AtomicLong bytesUsed;
+  // Total number of blocks in the container
   private final AtomicLong blockCount;
+  // Total number of bytes of all the blocks in the container
+  private final AtomicLong bytesUsed;
 
   private HddsVolume volume;
 
   private String checksum;
+
+  private ContainerDataStats stats;
 
   /** Timestamp of last data scan (milliseconds since Unix Epoch).
    * {@code null} if not yet scanned (or timestamp not recorded,
@@ -145,15 +144,12 @@ public abstract class ContainerData {
     this.layOutVersion = layoutVersion.getVersion();
     this.metadata = new TreeMap<>();
     this.state = ContainerDataProto.State.OPEN;
-    this.readCount = new AtomicLong(0L);
-    this.readBytes =  new AtomicLong(0L);
-    this.writeCount =  new AtomicLong(0L);
-    this.writeBytes =  new AtomicLong(0L);
     this.bytesUsed = new AtomicLong(0L);
     this.blockCount = new AtomicLong(0L);
     this.maxSize = size;
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
+    this.stats = new ContainerDataStats();
     setChecksumTo0ByteArray();
   }
 
@@ -183,7 +179,6 @@ public abstract class ContainerData {
   public ContainerType getContainerType() {
     return containerType;
   }
-
 
   /**
    * Returns the state of the container.
@@ -334,147 +329,6 @@ public abstract class ContainerData {
     setState(ContainerDataProto.State.CLOSED);
   }
 
-  private void releaseCommitSpace() {
-    long unused = getMaxSize() - getBytesUsed();
-
-    // only if container size < max size
-    if (unused > 0 && committedSpace) {
-      getVolume().incCommittedBytes(0 - unused);
-    }
-    committedSpace = false;
-  }
-
-  /**
-   * add available space in the container to the committed space in the volume.
-   * available space is the number of bytes remaining till max capacity.
-   */
-  public void commitSpace() {
-    long unused = getMaxSize() - getBytesUsed();
-    ContainerDataProto.State myState = getState();
-    HddsVolume cVol;
-
-    //we don't expect duplicate calls
-    Preconditions.checkState(!committedSpace);
-
-    // Only Open Containers have Committed Space
-    if (myState != ContainerDataProto.State.OPEN) {
-      return;
-    }
-
-    // junit tests do not always set up volume
-    cVol = getVolume();
-    if (unused > 0 && (cVol != null)) {
-      cVol.incCommittedBytes(unused);
-      committedSpace = true;
-    }
-  }
-
-  /**
-   * Get the number of bytes read from the container.
-   * @return the number of bytes read from the container.
-   */
-  public long getReadBytes() {
-    return readBytes.get();
-  }
-
-  /**
-   * Increase the number of bytes read from the container.
-   * @param bytes number of bytes read.
-   */
-  public void incrReadBytes(long bytes) {
-    this.readBytes.addAndGet(bytes);
-  }
-
-  /**
-   * Get the number of times the container is read.
-   * @return the number of times the container is read.
-   */
-  public long getReadCount() {
-    return readCount.get();
-  }
-
-  /**
-   * Increase the number of container read count by 1.
-   */
-  public void incrReadCount() {
-    this.readCount.incrementAndGet();
-  }
-
-  /**
-   * Get the number of bytes write into the container.
-   * @return the number of bytes write into the container.
-   */
-  public long getWriteBytes() {
-    return writeBytes.get();
-  }
-
-  /**
-   * Increase the number of bytes write into the container.
-   * Also decrement committed bytes against the bytes written.
-   * @param bytes the number of bytes write into the container.
-   */
-  public void incrWriteBytes(long bytes) {
-    long unused = getMaxSize() - getBytesUsed();
-
-    this.writeBytes.addAndGet(bytes);
-
-    // only if container size < max size
-    if (committedSpace && unused > 0) {
-      //with this write, container size might breach max size
-      long decrement = Math.min(bytes, unused);
-      this.getVolume().incCommittedBytes(0 - decrement);
-    }
-  }
-
-  /**
-   * Get the number of writes into the container.
-   * @return the number of writes into the container.
-   */
-  public long getWriteCount() {
-    return writeCount.get();
-  }
-
-  /**
-   * Increase the number of writes into the container by 1.
-   */
-  public void incrWriteCount() {
-    this.writeCount.incrementAndGet();
-  }
-
-  /**
-   * Sets the number of bytes used by the container.
-   * @param used
-   */
-  public void setBytesUsed(long used) {
-    this.bytesUsed.set(used);
-  }
-
-  /**
-   * Get the number of bytes used by the container.
-   * @return the number of bytes used by the container.
-   */
-  public long getBytesUsed() {
-    return bytesUsed.get();
-  }
-
-  /**
-   * Increase the number of bytes used by the container.
-   * @param used number of bytes used by the container.
-   * @return the current number of bytes used by the container afert increase.
-   */
-  public long incrBytesUsed(long used) {
-    return this.bytesUsed.addAndGet(used);
-  }
-
-  /**
-   * Decrease the number of bytes used by the container.
-   * @param reclaimed the number of bytes reclaimed from the container.
-   * @return the current number of bytes used by the container after decrease.
-   */
-  public long decrBytesUsed(long reclaimed) {
-    return this.bytesUsed.addAndGet(-1L * reclaimed);
-  }
-
   /**
    * Set the Volume for the Container.
    * This should be called only from the createContainer.
@@ -491,45 +345,6 @@ public abstract class ContainerData {
   @JsonIgnore
   public HddsVolume getVolume() {
     return volume;
-  }
-
-  /**
-   * Increments the number of blocks in the container.
-   */
-  public void incrBlockCount() {
-    this.blockCount.incrementAndGet();
-  }
-
-  /**
-   * Decrements number of blocks in the container.
-   */
-  public void decrBlockCount() {
-    this.blockCount.decrementAndGet();
-  }
-
-  /**
-   * Decrease the count of blocks (blocks) in the container.
-   *
-   * @param deletedBlockCount
-   */
-  public void decrBlockCount(long deletedBlockCount) {
-    this.blockCount.addAndGet(-1 * deletedBlockCount);
-  }
-
-  /**
-   * Returns number of blocks in the container.
-   * @return block count
-   */
-  public long getBlockCount() {
-    return this.blockCount.get();
-  }
-
-  /**
-   * Set's number of blocks in the container.
-   * @param count
-   */
-  public void setBlockCount(long count) {
-    this.blockCount.set(count);
   }
 
   public void setChecksumTo0ByteArray() {
@@ -620,17 +435,144 @@ public abstract class ContainerData {
    */
   public abstract long getBlockCommitSequenceId();
 
+  public ContainerDataStats getStats() {
+    return stats;
+  }
+
+  /**
+   * Increments the number of blocks in the container.
+   */
+  public void incrBlockCount() {
+    this.blockCount.incrementAndGet();
+  }
+
+  /**
+   * Decrements number of blocks in the container.
+   */
+  public void decrBlockCount() {
+    this.blockCount.decrementAndGet();
+  }
+
+  /**
+   * Decrease the count of blocks (blocks) in the container.
+   */
+  public void decrBlockCount(long deletedBlockCount) {
+    this.blockCount.addAndGet(-1 * deletedBlockCount);
+  }
+
+  /**
+   * Returns number of blocks in the container.
+   */
+  public long getBlockCount() {
+    return this.blockCount.get();
+  }
+
+  /**
+   * Set's number of blocks in the container.
+   */
+  public void setBlockCount(long count) {
+    this.blockCount.set(count);
+  }
+
+  /**
+   * Sets the number of bytes used by the container.
+   */
+  public void setBytesUsed(long used) {
+    this.bytesUsed.set(used);
+  }
+
+  /**
+   * Get the number of bytes used by the container.
+   * @return the number of bytes used by the container.
+   */
+  public long getBytesUsed() {
+    return bytesUsed.get();
+  }
+
+  /**
+   * Increase the number of bytes used by the container.
+   * @param used number of bytes used by the container.
+   * @return the current number of bytes used by the container afert increase.
+   */
+  public long incrBytesUsed(long used) {
+    return this.bytesUsed.addAndGet(used);
+  }
+
+  /**
+   * Decrease the number of bytes used by the container.
+   * @param reclaimed the number of bytes reclaimed from the container.
+   * @return the current number of bytes used by the container after decrease.
+   */
+  public long decrBytesUsed(long reclaimed) {
+    return this.bytesUsed.addAndGet(-1L * reclaimed);
+  }
+
+  /**
+   * Add available space in the container to the committed space in the volume.
+   * Available space is the number of bytes remaining till max capacity.
+   */
+  public void commitSpace() {
+    long unused = getMaxSize() - getBytesUsed();
+    ContainerDataProto.State myState = getState();
+    HddsVolume cVol;
+
+    //we don't expect duplicate calls
+    Preconditions.checkState(!committedSpace);
+
+    // Only Open Containers have Committed Space
+    if (myState != ContainerDataProto.State.OPEN) {
+      return;
+    }
+
+    // junit tests do not always set up volume
+    cVol = getVolume();
+    if (unused > 0 && (cVol != null)) {
+      cVol.incCommittedBytes(unused);
+      committedSpace = true;
+    }
+  }
+
+  /**
+   * Release commit space in the volume
+   */
+  private void releaseCommitSpace() {
+    long unused = getMaxSize() - getBytesUsed();
+
+    // only if container size < max size
+    if (unused > 0 && committedSpace) {
+      getVolume().incCommittedBytes(0 - unused);
+    }
+    committedSpace = false;
+  }
+
+  /**
+   * Increase the number of bytes write into the container.
+   * Also decrement committed bytes against the bytes written.
+   * @param bytes the number of bytes write into the container.
+   */
+  public void incrBytesWritten(long bytes) {
+    long unused = getMaxSize() - getBytesUsed();
+
+    stats.incrWriteBytes(bytes);
+
+    // only if container size < max size
+    if (committedSpace && unused > 0) {
+      //with this write, container size might breach max size
+      long decrement = Math.min(bytes, unused);
+      this.getVolume().incCommittedBytes(0 - decrement);
+    }
+  }
+
   public void updateReadStats(long length) {
-    incrReadCount();
-    incrReadBytes(length);
+    stats.incrReadCount();
+    stats.incrReadBytes(length);
   }
 
   public void updateWriteStats(long bytesWritten, boolean overwrite) {
     if (!overwrite) {
       incrBytesUsed(bytesWritten);
     }
-    incrWriteCount();
-    incrWriteBytes(bytesWritten);
+    stats.incrWriteCount();
+    incrBytesWritten(bytesWritten);
   }
-
 }

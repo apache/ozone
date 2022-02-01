@@ -476,7 +476,7 @@ public class TestContainerPersistence {
     long bytesUsed = container.getContainerData().getBytesUsed();
     Assert.assertEquals(datalen, bytesUsed);
 
-    long bytesWrite = container.getContainerData().getWriteBytes();
+    long bytesWrite = container.getContainerData().getStats().getWriteBytes();
     Assert.assertEquals(datalen * 3, bytesWrite);
   }
 
@@ -617,11 +617,11 @@ public class TestContainerPersistence {
 
     long bytesUsed = container.getContainerData().getBytesUsed();
     Assert.assertEquals(totalSize, bytesUsed);
-    long writeBytes = container.getContainerData().getWriteBytes();
+    long writeBytes = container.getContainerData().getStats().getWriteBytes();
     Assert.assertEquals(chunkCount * datalen, writeBytes);
-    long readCount = container.getContainerData().getReadCount();
+    long readCount = container.getContainerData().getStats().getReadCount();
     Assert.assertEquals(0, readCount);
-    long writeCount = container.getContainerData().getWriteCount();
+    long writeCount = container.getContainerData().getStats().getWriteCount();
     Assert.assertEquals(chunkCount, writeCount);
 
     BlockData blockData = new BlockData(blockID);

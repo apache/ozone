@@ -75,10 +75,10 @@ public class TestKeyValueContainerData {
         .getState());
     assertEquals(0, kvData.getMetadata().size());
     assertEquals(0, kvData.getNumPendingDeletionBlocks());
-    assertEquals(val.get(), kvData.getReadBytes());
-    assertEquals(val.get(), kvData.getWriteBytes());
-    assertEquals(val.get(), kvData.getReadCount());
-    assertEquals(val.get(), kvData.getWriteCount());
+    assertEquals(val.get(), kvData.getStats().getReadBytes());
+    assertEquals(val.get(), kvData.getStats().getWriteBytes());
+    assertEquals(val.get(), kvData.getStats().getReadCount());
+    assertEquals(val.get(), kvData.getStats().getWriteCount());
     assertEquals(val.get(), kvData.getBlockCount());
     assertEquals(val.get(), kvData.getNumPendingDeletionBlocks());
     assertEquals(MAXSIZE, kvData.getMaxSize());
@@ -87,10 +87,10 @@ public class TestKeyValueContainerData {
     kvData.setContainerDBType(containerDBType);
     kvData.setChunksPath(path);
     kvData.setMetadataPath(path);
-    kvData.incrReadBytes(10);
-    kvData.incrWriteBytes(10);
-    kvData.incrReadCount();
-    kvData.incrWriteCount();
+    kvData.getStats().incrReadBytes(10);
+    kvData.incrBytesWritten(10);
+    kvData.getStats().incrReadCount();
+    kvData.getStats().incrWriteCount();
     kvData.incrBlockCount();
     kvData.incrPendingDeletionBlocks(1);
     kvData.setSchemaVersion(
@@ -101,10 +101,10 @@ public class TestKeyValueContainerData {
     assertEquals(path, kvData.getChunksPath());
     assertEquals(path, kvData.getMetadataPath());
 
-    assertEquals(10, kvData.getReadBytes());
-    assertEquals(10, kvData.getWriteBytes());
-    assertEquals(1, kvData.getReadCount());
-    assertEquals(1, kvData.getWriteCount());
+    assertEquals(10, kvData.getStats().getReadBytes());
+    assertEquals(10, kvData.getStats().getWriteBytes());
+    assertEquals(1, kvData.getStats().getReadCount());
+    assertEquals(1, kvData.getStats().getWriteCount());
     assertEquals(1, kvData.getBlockCount());
     assertEquals(1, kvData.getNumPendingDeletionBlocks());
     assertEquals(pipelineId.toString(), kvData.getOriginPipelineId());
