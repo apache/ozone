@@ -394,6 +394,10 @@ public class SCMStateMachine extends BaseStateMachine {
     transactionBuffer.close();
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    if(!scm.isRunForTest()) {
+      ExitUtils.terminate(1, "ScmStateMachine is closed, shutdown SCM",
+        StateMachine.LOG);
+    }
   }
 
   @VisibleForTesting

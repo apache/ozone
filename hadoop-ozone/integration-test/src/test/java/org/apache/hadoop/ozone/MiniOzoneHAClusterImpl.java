@@ -100,6 +100,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       String clusterPath,
       ReconServer reconServer) {
     super(conf, hddsDatanodes, reconServer);
+    StorageContainerManager.setTestSCMStateMachineFlag(true);
     this.omhaService = omhaService;
     this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;

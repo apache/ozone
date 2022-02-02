@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
@@ -267,6 +268,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SCMHANodeDetails scmHANodeDetails;
 
   private ContainerBalancer containerBalancer;
+  private static boolean testSCMFlag = false;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -280,6 +282,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException {
     // default empty configurator means default managers will be used.
     this(conf, new SCMConfigurator());
+  }
+
+  public static void setTestSCMStateMachineFlag(boolean testSCMFlag) {
+    StorageContainerManager.testSCMFlag = testSCMFlag;
+  }
+
+  public boolean isRunForTest() {
+    return testSCMFlag;
   }
 
   /**
@@ -1485,13 +1495,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       jvmPauseMonitor.stop();
     }
 
-    try {
-      LOG.info("Stopping SCM HA services.");
-      scmHAManager.shutdown();
-    } catch (Exception ex) {
-      LOG.error("SCM HA Manager stop failed", ex);
-    }
-
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
@@ -1507,6 +1510,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmSafeModeManager.stop();
+
+    try {
+      LOG.info("Stopping SCM HA services.");
+      scmHAManager.shutdown();
+    } catch (Exception ex) {
+      LOG.error("SCM HA Manager stop failed", ex);
+    }
   }
 
   /**

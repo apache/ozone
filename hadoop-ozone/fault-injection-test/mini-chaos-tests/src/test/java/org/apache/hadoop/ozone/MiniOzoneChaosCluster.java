@@ -105,6 +105,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       List<HddsDatanodeService> hddsDatanodes, String clusterPath,
       Set<Class<? extends Failures>> clazzes) {
     super(conf, omService, scmService, hddsDatanodes, clusterPath, null);
+    StorageContainerManager.setTestSCMStateMachineFlag(true);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = omService.getServices().size();
     this.numStorageContainerManagers = scmService.getServices().size();
