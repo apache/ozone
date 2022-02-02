@@ -242,6 +242,10 @@ public final class ChunkUtils {
       }
       return true;
     }
+
+    // TODO: when overwriting a chunk, we should ensure that the new chunk
+    //  size is same as the old chunk size
+
     return false;
   }
 
