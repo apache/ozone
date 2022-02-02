@@ -95,15 +95,11 @@ public class TestMultiTenantVolume {
         "cannot be invoked before finalization", eval);
   }
 
-  @Test
-  public void testS3TenantVolume() throws Exception {
-
-    final String tenant = "tenant";
-    final String principal = "username";
-    final String bucketName = "bucket";
-    final String accessID = UUID.randomUUID().toString();
-
-    ObjectStore store = getStoreForAccessID(accessID);
+  /**
+   * Perform sanity checks before triggering upgrade finalization.
+   */
+  private void preFinalizationCheck(ObjectStore store, String tenant,
+      String principal, String accessID) throws Exception {
 
     // None of the tenant APIs is usable before the upgrade finalization step
     expectFailurePreFinalization(store::listTenant);
@@ -129,9 +125,21 @@ public class TestMultiTenantVolume {
     Assert.assertEquals(accessId, s3SecretValue.getAwsAccessKey());
     Assert.assertEquals(setSecret, s3SecretValue.getAwsSecret());
     store.revokeS3Secret(accessId);
+  }
 
+  @Test
+  public void testS3TenantVolume() throws Exception {
 
-    // Trigger OM finalization
+    final String tenant = "tenant";
+    final String principal = "username";
+    final String bucketName = "bucket";
+    final String accessID = UUID.randomUUID().toString();
+
+    ObjectStore store = getStoreForAccessID(accessID);
+
+    preFinalizationCheck(store, tenant, principal, accessID);
+
+    // Trigger OM upgrade finalization
     // Ref: org.apache.hadoop.ozone.admin.om.FinalizeUpgradeSubCommand.call
     final OzoneManagerProtocol client = cluster.getRpcClient().getObjectStore()
         .getClientProxy().getOzoneManagerClient();
@@ -141,14 +149,8 @@ public class TestMultiTenantVolume {
     // Not sure if the status transitions as soon as client call returns.
     // Can remove.
     Assert.assertTrue(isStarting(finalizationResponse.status()));
-/*
-    while (!isDone(finalizationResponse.status())) {
-      Thread.sleep(500);
-      finalizationResponse = client.queryUpgradeFinalizationProgress(
-              upgradeClientID, false, false);
-      System.out.println(finalizationResponse.status());
-    }
-*/
+    // Wait for the finalization to be marked as done.
+    // 10s timeout should be plenty.
     GenericTestUtils.waitFor(() -> {
       try {
         final UpgradeFinalizer.StatusAndMessages progress =
