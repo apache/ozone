@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
@@ -284,8 +283,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     this(conf, new SCMConfigurator());
   }
 
-  public static void setTestSCMStateMachineFlag(boolean testSCMFlag) {
-    StorageContainerManager.testSCMFlag = testSCMFlag;
+  public static void setTestSCMStateMachineFlag(boolean testFlag) {
+    StorageContainerManager.testSCMFlag = testFlag;
   }
 
   public boolean isRunForTest() {
