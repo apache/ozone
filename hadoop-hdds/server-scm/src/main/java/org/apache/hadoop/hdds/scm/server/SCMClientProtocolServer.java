@@ -306,7 +306,8 @@ public class SCMClientProtocolServer implements
               .setBytesUsed(r.getBytesUsed())
               .setPlaceOfBirth(r.getOriginDatanodeId().toString())
               .setKeyCount(r.getKeyCount())
-              .setSequenceID(r.getSequenceId()).build()
+              .setSequenceID(r.getSequenceId())
+              .setReplicaIndex(r.getReplicaIndex()).build()
       );
     }
     return results;

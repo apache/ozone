@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -81,8 +82,19 @@ public class TestInfoSubCommand {
 
   @Test
   public void testReplicasIncludedInOutput() throws Exception {
+    testReplicaIncludedInOutput(false);
+  }
+
+  @Test
+  public void testReplicaIndexInOutput() throws Exception {
+    testReplicaIncludedInOutput(true);
+  }
+
+
+  private void testReplicaIncludedInOutput(boolean includeIndex)
+      throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
-        .thenReturn(getReplicas());
+        .thenReturn(getReplicas(includeIndex));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");
@@ -94,7 +106,7 @@ public class TestInfoSubCommand {
         .filter(m -> m.getRenderedMessage().matches("(?s)^Replicas:.*"))
         .collect(Collectors.toList());
     Assert.assertEquals(1, replica.size());
-    
+
     // Ensure each DN UUID is mentioned in the message:
     for (DatanodeDetails dn : datanodes) {
       Pattern pattern = Pattern.compile(".*" + dn.getUuid().toString() + ".*",
@@ -102,6 +114,11 @@ public class TestInfoSubCommand {
       Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
       Assert.assertTrue(matcher.matches());
     }
+    // Ensure ReplicaIndex is not mentioned as it was not passed in the proto:
+    Pattern pattern = Pattern.compile(".*ReplicaIndex.*",
+        Pattern.DOTALL);
+    Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
+    Assert.assertEquals(includeIndex, matcher.matches());
   }
 
   @Test
@@ -151,7 +168,20 @@ public class TestInfoSubCommand {
   @Test
   public void testReplicasOutputWithJson() throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
-        .thenReturn(getReplicas());
+        .thenReturn(getReplicas(true));
+    testJsonOutput();
+  }
+
+  @Test
+  public void testECContainerReplicasOutputWithJson() throws IOException {
+    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicas(true));
+    Mockito.when(scmClient.getContainerWithPipeline(anyLong()))
+        .thenReturn(getECContainerWithPipeline());
+    testJsonOutput();
+  }
+
+  private void testJsonOutput() throws IOException {
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1", "--json");
@@ -169,20 +199,28 @@ public class TestInfoSubCommand {
       Matcher matcher = pattern.matcher(json);
       Assert.assertTrue(matcher.matches());
     }
+    Pattern pattern = Pattern.compile(".*replicaIndex.*",
+        Pattern.DOTALL);
+    Matcher matcher = pattern.matcher(json);
+    Assert.assertTrue(matcher.matches());
   }
 
-  private List<ContainerReplicaInfo> getReplicas() {
+
+    private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
-      ContainerReplicaInfo container =  new ContainerReplicaInfo.Builder()
+      ContainerReplicaInfo.Builder container =  new ContainerReplicaInfo.Builder()
           .setContainerID(1)
           .setBytesUsed(1234)
           .setState("CLOSED")
           .setPlaceOfBirth(dn.getUuid())
           .setDatanodeDetails(dn)
           .setKeyCount(1)
-          .setSequenceId(1).build();
-      replicas.add(container);
+          .setSequenceId(1);
+      if (includeIndex) {
+        container.setReplicaIndex(4);
+      }
+      replicas.add(container.build());
     }
     return replicas;
   }
@@ -191,6 +229,26 @@ public class TestInfoSubCommand {
     Pipeline pipeline = new Pipeline.Builder()
         .setState(Pipeline.PipelineState.CLOSED)
         .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setId(PipelineID.randomId())
+        .setNodes(datanodes)
+        .build();
+
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setSequenceId(1)
+        .setPipelineID(pipeline.getId())
+        .setUsedBytes(1234)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setNumberOfKeys(1)
+        .setState(CLOSED)
+        .build();
+
+    return new ContainerWithPipeline(container, pipeline);
+  }
+
+  private ContainerWithPipeline getECContainerWithPipeline() {
+    Pipeline pipeline = new Pipeline.Builder()
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setReplicationConfig(new ECReplicationConfig(3, 2))
         .setId(PipelineID.randomId())
         .setNodes(datanodes)
         .build();
