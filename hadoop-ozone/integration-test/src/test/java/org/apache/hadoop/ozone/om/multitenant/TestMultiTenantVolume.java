@@ -27,8 +27,11 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.AfterClass;
@@ -36,7 +39,11 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.UUID;
+
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 
 /**
  * Tests that S3 requests for a tenant are directed to that tenant's volume,
@@ -125,8 +132,35 @@ public class TestMultiTenantVolume {
 
 
     // Trigger OM finalization
-    cluster.getOzoneManager().finalizeUpgrade("clientId1");
-
+    // Ref: org.apache.hadoop.ozone.admin.om.FinalizeUpgradeSubCommand.call
+    final OzoneManagerProtocol client = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
+    final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
+    UpgradeFinalizer.StatusAndMessages finalizationResponse =
+        client.finalizeUpgrade(upgradeClientID);
+    // Not sure if the status transitions as soon as client call returns.
+    // Can remove.
+    Assert.assertTrue(isStarting(finalizationResponse.status()));
+/*
+    while (!isDone(finalizationResponse.status())) {
+      Thread.sleep(500);
+      finalizationResponse = client.queryUpgradeFinalizationProgress(
+              upgradeClientID, false, false);
+      System.out.println(finalizationResponse.status());
+    }
+*/
+    GenericTestUtils.waitFor(() -> {
+      try {
+        final UpgradeFinalizer.StatusAndMessages progress =
+            client.queryUpgradeFinalizationProgress(
+                upgradeClientID, false, false);
+        return isDone(progress.status());
+      } catch (IOException e) {
+        Assert.fail("Unexpected exception while waiting for "
+            + "the OM upgrade to finalize: " + e.getMessage());
+      }
+      return false;
+    }, 500, 10000);
 
     store.createTenant(tenant);
     store.tenantAssignUserAccessId(principal, tenant, accessID);
