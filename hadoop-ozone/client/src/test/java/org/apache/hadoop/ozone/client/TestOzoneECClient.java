@@ -74,8 +74,9 @@ public class TestOzoneECClient {
   private final XceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
   private OzoneConfiguration conf = new OzoneConfiguration();
-  private final MockOmTransport transportStub = new MockOmTransport(
-      new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks, 15));
+  private MultiNodePipelineBlockAllocator allocator =
+      new MultiNodePipelineBlockAllocator(conf, dataBlocks + parityBlocks, 15);
+  private final MockOmTransport transportStub = new MockOmTransport(allocator);
   private final RawErasureEncoder encoder =
       new RSRawErasureCoderFactory().createEncoder(
           new ECReplicationConfig(dataBlocks, parityBlocks));
@@ -426,24 +427,24 @@ public class TestOzoneECClient {
   @Test
   public void testWriteShouldFailIfMoreThanParityNodesFail()
       throws IOException {
-    testNodeFailuresWhileWriting(3, 3, 2);
+    testNodeFailuresWhileWriting(new int[] {0, 1, 2}, 3, 2);
   }
 
   @Test
   public void testWriteShouldSuccessIfLessThanParityNodesFail()
       throws IOException {
-    testNodeFailuresWhileWriting(1, 2, 2);
+    testNodeFailuresWhileWriting(new int[] {0}, 2, 2);
   }
 
   @Test
   public void testWriteShouldSuccessIf4NodesFailed() throws IOException {
-    testNodeFailuresWhileWriting(4, 1, 2);
+    testNodeFailuresWhileWriting(new int[] {0, 1, 2, 3}, 1, 2);
   }
 
   @Test
   public void testWriteShouldSuccessWithAdditional1BlockGroupAfterFailure()
       throws IOException {
-    testNodeFailuresWhileWriting(4, 10, 3);
+    testNodeFailuresWhileWriting(new int[] {0, 1, 2, 3}, 10, 3);
   }
 
   @Test
@@ -600,7 +601,7 @@ public class TestOzoneECClient {
     }
   }
 
-  public void testNodeFailuresWhileWriting(int numFailureToInject,
+  public void testNodeFailuresWhileWriting(int[] nodesIndexesToMarkFailure,
       int numChunksToWriteAfterFailure, int numExpectedBlockGrps)
       throws IOException {
     store.createVolume(volumeName);
@@ -609,19 +610,18 @@ public class TestOzoneECClient {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, 1024 * 3,
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        new ECReplicationConfig(3, 2,
+            ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i]);
       }
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
-      Map<DatanodeDetails, MockDatanodeStorage> storages =
-          ((MockXceiverClientFactory) factoryStub).getStorages();
-      DatanodeDetails[] dnDetails =
-          storages.keySet().toArray(new DatanodeDetails[storages.size()]);
-      for (int i = 0; i < numFailureToInject; i++) {
-        failedDNs.add(dnDetails[i]);
+      List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
+      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
+        failedDNs.add(DatanodeDetails
+            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
       }
 
       // First let's set storage as bad
