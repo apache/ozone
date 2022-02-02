@@ -241,12 +241,12 @@ public class BucketEndpoint extends EndpointBase {
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
     } catch (OMException exception) {
-      LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
-          exception);
       if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_BUCKET_NAME,
             bucketName);
       }
+      LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
+          exception);
       throw exception;
     }
   }
@@ -507,8 +507,6 @@ public class BucketEndpoint extends EndpointBase {
         volume.addAcl(acl);
       }
     } catch (OMException exception) {
-      LOG.error("Error in set ACL Request for bucket: {}", bucketName,
-          exception);
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET,
             bucketName);
@@ -516,6 +514,8 @@ public class BucketEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(S3ErrorTable
             .ACCESS_DENIED, bucketName);
       }
+      LOG.error("Error in set ACL Request for bucket: {}", bucketName,
+          exception);
       throw exception;
     }
     return Response.status(HttpStatus.SC_OK).build();
