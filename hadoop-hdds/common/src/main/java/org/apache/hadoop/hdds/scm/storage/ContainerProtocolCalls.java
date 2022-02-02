@@ -175,9 +175,9 @@ public final class ContainerProtocolCalls  {
    *
    * @param xceiverClient client to perform call
    * @param containerBlockData block data to identify container
+   * @param eof whether this is the last putBlock for the same block
    * @param firstPutBlock whether this is the first putBlock for the same
    *                      block
-   * @param eof whether this is the last putBlock for the same block
    * @param token a token for this block (may be null)
    * @return putBlockResponse
    * @throws IOException if there is an error while performing the call
@@ -185,7 +185,7 @@ public final class ContainerProtocolCalls  {
    * @throws ExecutionException
    */
   public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
-      BlockData containerBlockData, boolean eof, boolean firstPutBlock,
+      BlockData containerBlockData, boolean firstPutBlock, boolean eof,
       Token<? extends TokenIdentifier> token)
       throws IOException, InterruptedException, ExecutionException {
     PutBlockRequestProto.Builder putBlockRequest =

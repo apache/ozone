@@ -53,6 +53,11 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -60,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -201,8 +207,78 @@ public class TestFailureHandlingByClient {
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
+
     Assert.assertEquals(data.length, keyInfo.getDataSize());
     validateData(keyName, data);
+
+    // Verify that the block information is updated correctly in the DB on
+    // failures
+    testBlockCountOnFailures(keyInfo);
+  }
+
+  /**
+   * Test whether blockData and Container metadata (block count and used
+   * bytes) is updated correctly when there is a write failure.
+   * We can combine this test with {@link #testBlockWritesWithDnFailures()}
+   * as that test also simulates a write failure and client writes failed
+   * chunk writes to a new block.
+   */
+  private void testBlockCountOnFailures(OmKeyInfo omKeyInfo) throws Exception {
+    // testBlockWritesWithDnFailures writes chunkSize*1.5 size of data into
+    // KeyOutputStream. But before closing the outputStream, 2 of the DNs in
+    // the pipeline being written to are closed. This forces the client to
+    // write the uncommitted data in the buffer (first chunkSize of data will
+    // be committed before close as the flush size = chunkSize, the last 0
+    // .5*chunkSize of data will be in buffer) to another block in a
+    // different pipeline.
+
+    // Get information about the first and second block (in different pipelines)
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations()
+        .getLocationList();
+    long containerId1 = locationList.get(0).getContainerID();
+    long containerId2 = locationList.get(1).getContainerID();
+    List<DatanodeDetails> block1DNs = locationList.get(0).getPipeline()
+        .getNodes();
+    List<DatanodeDetails> block2DNs = locationList.get(1).getPipeline()
+        .getNodes();
+
+    // For the first block, first 2 DNs in the pipeline are shutdown (to
+    // simulate a failure).
+    KeyValueContainerData containerData1 =
+        ((KeyValueContainer) cluster.getHddsDatanode(block1DNs.get(2))
+            .getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(containerId1)).getContainerData();
+    try (ReferenceCountedDB containerDb1 = BlockUtils.getDB(containerData1,
+        conf)) {
+      BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
+          Long.toString(locationList.get(0).getBlockID().getLocalID()));
+      // The first Block should have 1 chunkSize of data
+      Assert.assertEquals(1, blockData1.getChunks().size());
+      Assert.assertEquals(chunkSize, blockData1.getChunks().get(0).getLen());
+      // The container having the first block should have only 1 block (the
+      // pipeline would be un-writable as 2 of it's DNs are down)
+      Assert.assertEquals(1, containerData1.getBlockCount());
+      Assert.assertEquals(chunkSize, containerData1.getBytesUsed());
+    }
+
+    // Verify that the second block has the remaining 0.5*chunkSize of data
+    KeyValueContainerData containerData2 =
+        ((KeyValueContainer) cluster.getHddsDatanode(block2DNs.get(0))
+            .getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(containerId2)).getContainerData();
+    try (ReferenceCountedDB containerDb2 = BlockUtils.getDB(containerData2,
+        conf)) {
+      BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
+          Long.toString(locationList.get(1).getBlockID().getLocalID()));
+      // The second Block should have 0.5 chunkSize of data
+      Assert.assertEquals(1, blockData2.getChunks().size());
+      Assert
+          .assertEquals(chunkSize / 2, blockData2.getChunks().get(0).getLen());
+      // The container having the second block should also have only 1 block
+      // (as only 0.5 chunk is written to it)
+      Assert.assertEquals(1, containerData2.getBlockCount());
+      Assert.assertEquals(chunkSize/2, containerData2.getBytesUsed());
+    }
   }
 
   @Test
