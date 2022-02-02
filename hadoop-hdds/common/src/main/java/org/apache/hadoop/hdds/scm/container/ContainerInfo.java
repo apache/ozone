@@ -154,10 +154,12 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return replicationConfig;
   }
 
+  @JsonIgnore
   public HddsProtos.ReplicationType getReplicationType() {
     return replicationConfig.getReplicationType();
   }
 
+  @JsonIgnore
   public HddsProtos.ReplicationFactor getReplicationFactor() {
     return ReplicationConfig.getLegacyFactor(replicationConfig);
   }
