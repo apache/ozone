@@ -21,12 +21,10 @@ import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -109,9 +107,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
       } else {
         pipeline = pipelines
-            .filter(
-                p -> ReplicationConfig.getLegacyFactor(p.getReplicationConfig())
-                    == HddsProtos.ReplicationFactor.THREE)
+              .filter(p -> p.getReplicationConfig().getRequiredNodes() == 3)
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException(
                       "Pipeline ID is NOT defined, and no pipeline " +
