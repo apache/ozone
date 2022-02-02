@@ -265,7 +265,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
         .build();
   }
 
-  void executePutBlock() throws IOException {
+  void executePutBlock(boolean isClose) {
     if (!isInitialized()) {
       return;
     }
@@ -274,7 +274,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
         continue;
       }
       try {
-        stream.executePutBlock(false, true);
+        stream.executePutBlock(isClose, true);
       } catch (Exception e) {
         stream.setIoException(e);
       }
