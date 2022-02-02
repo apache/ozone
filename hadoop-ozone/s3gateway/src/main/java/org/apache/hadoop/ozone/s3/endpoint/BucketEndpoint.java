@@ -291,12 +291,7 @@ public class BucketEndpoint extends EndpointBase {
   @HEAD
   public Response head(@PathParam("bucket") String bucketName)
       throws OS3Exception, IOException {
-    try {
-      getBucket(bucketName);
-    } catch (OS3Exception ex) {
-      LOG.error("Exception occurred in headBucket", ex);
-      throw ex;
-    }
+    getBucket(bucketName);
     return Response.ok().build();
   }
 
