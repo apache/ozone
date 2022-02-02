@@ -30,8 +30,7 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
-  // TODO: Have a better name / description? Create table action on upgrade?
-  MULTITENANCY_SCHEMA(1, "Multi-tenancy Schema");
+  MULTITENANCY_SCHEMA(1, "Multi-Tenancy Schema");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions
