@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -26,6 +27,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -34,12 +38,14 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -48,8 +54,11 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
@@ -103,7 +112,10 @@ public class TestECKeyOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
-
+    conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 500,
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
+        TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)
@@ -227,6 +239,46 @@ public class TestECKeyOutputStream {
     }
 
     validateContent(inputData, bucket, bucket.getKey(keyName));
+  }
+
+  @Test
+  public void testECContainerKeysCount()
+      throws IOException, InterruptedException, TimeoutException {
+    byte[] inputData = getInputBytes(1);
+    final OzoneBucket bucket = getOzoneBucket();
+    ContainerOperationClient containerOperationClient =
+        new ContainerOperationClient(conf);
+    List<ContainerInfo> containerInfos =
+        containerOperationClient.listContainer(1, 100);
+    Map<ContainerID, Long> containerKeys = new HashMap<>();
+    for (ContainerInfo info : containerInfos) {
+      containerKeys.put(info.containerID(),
+          containerKeys.getOrDefault(info.containerID(), 0L) + 1);
+    }
+
+    String keyName = UUID.randomUUID().toString();
+    try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      out.write(inputData);
+    }
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    long currentKeyContainerID =
+        key.getOzoneKeyLocations().get(0).getContainerID();
+    Long priorKeys = containerKeys.get(new ContainerID(currentKeyContainerID));
+    long expectedKeys = (priorKeys != null ? priorKeys : 0) + 1L;
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return containerOperationClient
+            .listContainer(currentKeyContainerID, 100).get(0)
+            .getNumberOfKeys() == expectedKeys;
+      } catch (IOException exception) {
+        Assert.fail("Unexpected exception " + exception);
+        return false;
+      }
+    }, 100, 10000);
+    validateContent(inputData, bucket, key);
   }
 
   private void validateContent(byte[] inputData, OzoneBucket bucket,
