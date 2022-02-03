@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
-import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -77,7 +76,6 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
 
   @Override
-  @SuppressWarnings("java:S3864") // Stream.peek (for debug)
   public Void call() throws Exception {
 
     init();
@@ -91,29 +89,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
     try (StorageContainerLocationProtocol scmLocationClient =
                  createStorageContainerLocationClient(ozoneConf)) {
-      Stream<Pipeline> pipelines = scmLocationClient.listPipelines().stream();
-      if (LOG.isDebugEnabled()) {
-        pipelines = pipelines
-            .peek(p -> LOG.debug("Found pipeline {}", p.getId()));
-      }
-      Pipeline pipeline;
-      if (pipelineId != null && pipelineId.length() > 0) {
-        pipeline = pipelines
-              .filter(p -> p.getId().getId().toString().equals(pipelineId))
-              .findFirst()
-              .orElseThrow(() -> new IllegalArgumentException(
-                      "Pipeline ID is defined, but there is no such pipeline: "
-                              + pipelineId));
-
-      } else {
-        pipeline = pipelines
-              .filter(p -> p.getReplicationConfig().getRequiredNodes() == 3)
-              .findFirst()
-              .orElseThrow(() -> new IllegalArgumentException(
-                      "Pipeline ID is NOT defined, and no pipeline " +
-                              "has been found with factor=THREE"));
-        LOG.info("Using pipeline {}", pipeline.getId());
-      }
+      Pipeline pipeline = findPipelineForTest(pipelineId, scmLocationClient, LOG);
 
       try (XceiverClientManager xceiverClientManager =
                    new XceiverClientManager(ozoneConf)) {
