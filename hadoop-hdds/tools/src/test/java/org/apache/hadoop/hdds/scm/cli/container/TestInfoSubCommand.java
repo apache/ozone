@@ -206,10 +206,11 @@ public class TestInfoSubCommand {
   }
 
 
-    private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
+  private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
-      ContainerReplicaInfo.Builder container =  new ContainerReplicaInfo.Builder()
+      ContainerReplicaInfo.Builder container
+          = new ContainerReplicaInfo.Builder()
           .setContainerID(1)
           .setBytesUsed(1234)
           .setState("CLOSED")
