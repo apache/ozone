@@ -101,6 +101,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
         getChunkInfos(keyLocationInfo);
     ContainerProtos.ChecksumData checksumData =
         chunkInfos.get(0).getChecksumData();
+    setChecksumType(checksumData.getType());
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 
