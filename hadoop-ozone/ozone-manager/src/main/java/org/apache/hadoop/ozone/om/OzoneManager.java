@@ -2644,8 +2644,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     boolean auditSuccess = true;
-    Map<String, String> auditMap =
-        bucket.auditWithBucketLayout(args.toAuditMap(), this);
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
 
@@ -2678,7 +2677,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     boolean auditSuccess = true;
-    Map<String, String> auditMap = bucket.auditWithBucketLayout(this);
+    Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.START_KEY, startKey);
     auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
     auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
@@ -2929,7 +2928,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
 
-    Map<String, String> auditMap = bucket.auditWithBucketLayout(this);
+    Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.KEY, keyName);
     auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
     auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
@@ -2958,7 +2957,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
 
-    Map<String, String> auditMap = bucket.auditWithBucketLayout(this);
+    Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.PREFIX, prefix);
 
     metrics.incNumListMultipartUploads();
@@ -2984,8 +2983,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ResolvedBucket bucket = resolveBucketLink(args);
 
     boolean auditSuccess = true;
-    Map<String, String> auditMap =
-        bucket.auditWithBucketLayout(args.toAuditMap(), this);
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
 
@@ -3023,8 +3021,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     boolean auditSuccess = true;
-    Map<String, String> auditMap =
-        bucket.auditWithBucketLayout(args.toAuditMap(), this);
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
 
@@ -3057,8 +3054,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     boolean auditSuccess = true;
-    Map<String, String> auditMap =
-        bucket.auditWithBucketLayout(args.toAuditMap(), this);
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
 

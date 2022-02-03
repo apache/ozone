@@ -98,10 +98,6 @@ public class ResolvedBucket {
     return audit(new LinkedHashMap<>());
   }
 
-  public Map<String, String> auditWithBucketLayout(OzoneManager ozoneManager) {
-    return auditWithBucketLayout(new LinkedHashMap<>(), ozoneManager);
-  }
-
   /**
    * Adds audit information about the bucket (and if it's a link, then the
    * real bucket, too) to {@code auditMap}.
@@ -113,27 +109,6 @@ public class ResolvedBucket {
     if (isLink()) {
       auditMap.put(OzoneConsts.SOURCE_VOLUME, realVolume());
       auditMap.put(OzoneConsts.SOURCE_BUCKET, realBucket());
-    }
-    return auditMap;
-  }
-
-  /**
-   * Adds audit information about the bucket and its bucket layout (and if it's
-   * a link, then the real bucket, too) to {@code auditMap}.
-   *
-   * @return the same map for convenience
-   */
-  public Map<String, String> auditWithBucketLayout(Map<String, String> auditMap,
-                                                   OzoneManager om) {
-    audit(auditMap);
-    try {
-      // Add BucketLayout to auditMap from the resolved Bucket.
-      auditMap.put(OzoneConsts.BUCKET_LAYOUT, String.valueOf(
-          om.getBucketInfo(realVolume(), realBucket()).getBucketLayout()
-      ));
-    } catch (IOException ioe) {
-      LOG.error("Failed to get bucket layout for Volume: {}, Bucket: {}",
-          realVolume(), realBucket(), ioe);
     }
     return auditMap;
   }
