@@ -21,10 +21,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -39,8 +36,6 @@ public class ResolvedBucket {
 
   private final Pair<String, String> requested;
   private final Pair<String, String> resolved;
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ResolvedBucket.class);
 
   public ResolvedBucket(Pair<String, String> requested,
       Pair<String, String> resolved) {
