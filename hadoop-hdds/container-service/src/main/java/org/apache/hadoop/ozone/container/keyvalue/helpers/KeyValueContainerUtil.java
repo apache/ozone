@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.KeyValueContainerMetadataInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -254,6 +255,10 @@ public final class KeyValueContainerUtil {
       if (!isBlockMetadataSet) {
         initializeUsedBytesAndBlockCount(store, kvContainerData);
       }
+
+      // Run advanced container inspection/repair operations if specified on
+      // startup.
+      new KeyValueContainerMetadataInspector(kvContainerData, store).processMetadata();
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
