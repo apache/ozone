@@ -31,7 +31,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,41 +71,37 @@ public class GrpcOMFailoverProxyProvider<T> extends
     List<String> omNodeIDList = new ArrayList<>();
     omAddresses = new HashMap<>();
 
-    Collection<String> omServiceIds = Collections.singletonList(omSvcId);
+    Collection<String> omNodeIds = OmUtils.getOMNodeIds(config, omSvcId);
 
-    for (String serviceId : OmUtils.emptyAsSingletonNull(omServiceIds)) {
-      Collection<String> omNodeIds = OmUtils.getOMNodeIds(config, serviceId);
+    for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
 
-      for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
+      String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+          omSvcId, nodeId);
 
-        String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
-            serviceId, nodeId);
+      Optional<String> hostaddr = getHostNameFromConfigKeys(config,
+          rpcAddrKey);
 
-        Optional<String> hostaddr = getHostNameFromConfigKeys(config,
-            rpcAddrKey);
-
-        OptionalInt hostport = HddsUtils.getNumberFromConfigKeys(config,
-            ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
-                serviceId, nodeId),
-            OMConfigKeys.OZONE_OM_GRPC_PORT_KEY);
-        if (nodeId == null) {
-          nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
-        }
-        omProxiesNodeIdKeyset.put(nodeId, null);
-        omProxyInfosNodeIdKeyset.put(nodeId, null);
-        if (hostaddr.isPresent()) {
-          omAddresses.put(nodeId,
-              hostaddr.get() + ":"
-                  + hostport.orElse(config
-                  .getObject(GrpcOmTransport
-                      .GrpcOmTransportConfig.class)
-                  .getPort()));
-        } else {
-          LOG.error("expected host address not defined: {}", rpcAddrKey);
-          throw new ConfigurationException(rpcAddrKey + "is not defined");
-        }
-        omNodeIDList.add(nodeId);
+      OptionalInt hostport = HddsUtils.getNumberFromConfigKeys(config,
+          ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
+              omSvcId, nodeId),
+          OMConfigKeys.OZONE_OM_GRPC_PORT_KEY);
+      if (nodeId == null) {
+        nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
       }
+      omProxiesNodeIdKeyset.put(nodeId, null);
+      omProxyInfosNodeIdKeyset.put(nodeId, null);
+      if (hostaddr.isPresent()) {
+        omAddresses.put(nodeId,
+            hostaddr.get() + ":"
+                + hostport.orElse(config
+                .getObject(GrpcOmTransport
+                    .GrpcOmTransportConfig.class)
+                .getPort()));
+      } else {
+        LOG.error("expected host address not defined: {}", rpcAddrKey);
+        throw new ConfigurationException(rpcAddrKey + "is not defined");
+      }
+      omNodeIDList.add(nodeId);
     }
 
     if (omProxiesNodeIdKeyset.isEmpty()) {
