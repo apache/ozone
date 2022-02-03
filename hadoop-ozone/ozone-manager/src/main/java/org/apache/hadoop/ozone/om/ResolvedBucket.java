@@ -21,7 +21,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -36,6 +39,8 @@ public class ResolvedBucket {
 
   private final Pair<String, String> requested;
   private final Pair<String, String> resolved;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ResolvedBucket.class);
 
   public ResolvedBucket(Pair<String, String> requested,
       Pair<String, String> resolved) {
@@ -93,6 +98,10 @@ public class ResolvedBucket {
     return audit(new LinkedHashMap<>());
   }
 
+  public Map<String, String> auditWithBucketLayout(OzoneManager ozoneManager) {
+    return auditWithBucketLayout(new LinkedHashMap<>(), ozoneManager);
+  }
+
   /**
    * Adds audit information about the bucket (and if it's a link, then the
    * real bucket, too) to {@code auditMap}.
@@ -104,6 +113,27 @@ public class ResolvedBucket {
     if (isLink()) {
       auditMap.put(OzoneConsts.SOURCE_VOLUME, realVolume());
       auditMap.put(OzoneConsts.SOURCE_BUCKET, realBucket());
+    }
+    return auditMap;
+  }
+
+  /**
+   * Adds audit information about the bucket and its bucket layout (and if it's
+   * a link, then the real bucket, too) to {@code auditMap}.
+   *
+   * @return the same map for convenience
+   */
+  public Map<String, String> auditWithBucketLayout(Map<String, String> auditMap,
+                                                   OzoneManager om) {
+    audit(auditMap);
+    try {
+      // Add BucketLayout to auditMap from the resolved Bucket.
+      auditMap.put(OzoneConsts.BUCKET_LAYOUT, String.valueOf(
+          om.getBucketInfo(realVolume(), realBucket()).getBucketLayout()
+      ));
+    } catch (IOException ioe) {
+      LOG.error("Failed to get bucket layout for Volume: {}, Bucket: {}",
+          realVolume(), realBucket(), ioe);
     }
     return auditMap;
   }
