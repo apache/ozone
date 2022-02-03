@@ -87,9 +87,9 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
       );
     }
 
-    try (StorageContainerLocationProtocol scmLocationClient =
+    try (StorageContainerLocationProtocol scmClient =
                  createStorageContainerLocationClient(ozoneConf)) {
-      Pipeline pipeline = findPipelineForTest(pipelineId, scmLocationClient, LOG);
+      Pipeline pipeline = findPipelineForTest(pipelineId, scmClient, LOG);
 
       try (XceiverClientManager xceiverClientManager =
                    new XceiverClientManager(ozoneConf)) {
