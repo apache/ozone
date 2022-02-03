@@ -132,7 +132,7 @@ public final class S3ErrorTable {
     err.setResource(resource);
     if (e.getHttpCode() == HTTP_INTERNAL_ERROR) {
       LOG.error("Internal Error: {}", err.toXml(), e);
-    } else {
+    } else if (LOG.isDebugEnabled()) {
       LOG.debug(err.toXml(), e);
     }
     return err;
