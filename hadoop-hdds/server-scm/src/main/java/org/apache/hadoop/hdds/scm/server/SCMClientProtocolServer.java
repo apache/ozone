@@ -258,8 +258,7 @@ public class SCMClientProtocolServer implements
 
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
-          new StandaloneReplicationConfig(ReplicationConfig
-              .getLegacyFactor(container.getReplicationConfig())),
+          container.getReplicationConfig(),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
               .map(ContainerReplica::getDatanodeDetails)
