@@ -33,20 +33,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Registry that loads and stores the request validators to be applied by
+ * a service.
+ */
 public class ValidatorRegistry {
 
   EnumMap<ValidationCondition, EnumMap<Type, Pair<List<Method>, List<Method>>>>
       validators = new EnumMap<>(ValidationCondition.class);
 
-  public static void main(String[] args) {
-    new ValidatorRegistry("org.apache.hadoop.ozone");
-  }
-
+  /**
+   * Creates a {@link ValidatorRegistry} instance that discovers validation
+   * methods in the provided package and its sub-packages.
+   * A validation method is recognized by the {@link RequestFeatureValidator}
+   * annotation that contains important information about how and when to use
+   * the validator.
+   * @param validatorPackage the main package inside which validatiors should
+   *                         be discovered.
+   */
   public ValidatorRegistry(String validatorPackage) {
     initMaps(validatorPackage);
     System.out.println(validators.entrySet());
   }
 
+  /**
+   * Get the validators that has to be run in the given list of
+   * {@link ValidationCondition}s, for the given requestType and
+   * {@link RequestProcessingPhase}.
+   *
+   * @param conditions conditions that are present for the request
+   * @param requestType the type of the protocol message
+   * @param phase the request processing phase
+   * @return the list of validation methods that has to run.
+   */
   public List<Method> validationsFor(
       List<ValidationCondition> conditions,
       Type requestType,
@@ -65,6 +84,14 @@ public class ValidatorRegistry {
     return returnValue;
   }
 
+  /**
+   * Grabs validations for one particular condition.
+   *
+   * @param condition conditions that are present for the request
+   * @param requestType the type of the protocol message
+   * @param phase the request processing phase
+   * @return the list of validation methods that has to run.
+   */
   private List<Method> validationsFor(
       ValidationCondition condition,
       Type requestType,
@@ -92,6 +119,17 @@ public class ValidatorRegistry {
     return returnValue;
   }
 
+  /**
+   * Initializes the internal request validator store.
+   * The requests are stored in the following structure:
+   * - An EnumMap with the {@link ValidationCondition} as the key, and in which
+   *   - values are an EnumMap with the request type as the key, and in which
+   *     - values are Pair of lists, in which
+   *       - left side is the pre-processing validations list
+   *       - right side is the post-processing validations list
+   * @param validatorPackage the package in which the methods annotated with
+   *                         {@link RequestFeatureValidator} are gathered.
+   */
   private void initMaps(String validatorPackage) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(ClasspathHelper.forPackage(validatorPackage))
@@ -120,7 +158,6 @@ public class ValidatorRegistry {
     }
   }
 
-  @NotNull
   private EnumMap<Type, Pair<List<Method>, List<Method>>> newTypeMap() {
     return new EnumMap<>(Type.class);
   }

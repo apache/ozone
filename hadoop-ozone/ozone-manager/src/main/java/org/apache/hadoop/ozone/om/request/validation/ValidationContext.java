@@ -18,14 +18,40 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
+/**
+ * A context that contains useful information for request validator instances.
+ */
 public interface ValidationContext {
 
+  /**
+   * Gets the {@link LayoutVersionManager} of the service, so that a pre
+   * finalization validation can check if the layout version it belongs to
+   * is finalized already or not.
+   *
+   * @return the {@link LayoutVersionManager} of the service
+   */
   LayoutVersionManager versionManager();
 
+  /**
+   * Provides the protocol version of the server side running.
+   * @return the server side protocol version
+   */
   int serverVersion();
 
+  /**
+   * Provides the protocol version of the clients side sending the request.
+   * @return the client side protocol version
+   */
   int clientVersion();
 
+  /**
+   * Creates a context object based on the given parameters.
+   *
+   * @param versionManager the {@link LayoutVersionManager} of the service
+   * @param serverVersion the server side protocol version
+   * @param clientVersion the client side protocol version
+   * @return the {@link ValidationContext} specified by the parameters.
+   */
   static ValidationContext of(
       LayoutVersionManager versionManager,
       int serverVersion,

@@ -16,9 +16,35 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+/**
+ * Defines conditions for which validators can be assigned to.
+ *
+ * These conditions describe a situation where special request handling might
+ * be necessary. In these cases we do not override the actual request handling
+ * code, but based on certain request properties we might reject a request
+ * early, or we might modify the request, or the response received/sent from/to
+ * the client.
+ */
 public enum ValidationCondition {
+  /**
+   * Classifies validations that has to run after an upgrade until the cluster
+   * is in a pre-finalized state.
+   */
   CLUSTER_IS_PRE_FINALIZED,
+  /**
+   * Classifies validations that has to run, when the client uses an older
+   * protocol version than the server.
+   */
   OLDER_CLIENT_REQUESTS,
+  /**
+   * Classifies validations that has to run, when the client uses a newer
+   * protocol version than the server.
+   */
   NEWER_CLIENT_REQUESTS,
+  /**
+   * Classifies validations that has to run for every request.
+   * If you plan to use this, please justify why the validation code should not
+   * be part of the actual request handling code.
+   */
   UNCONDITIONAL;
 }
