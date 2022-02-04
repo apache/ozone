@@ -1,17 +1,14 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import jdk.internal.org.objectweb.asm.util.CheckFieldAdapter;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.filefilter.IOFileFilter;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
@@ -24,81 +21,85 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
-public class KeyValueContainerMetadataInspector {
+public class KeyValueContainerMetadataInspector implements ContainerInspector {
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
 
-  private KeyValueContainerData kvContainerData;
-  private DatanodeStore store;
-
   public enum Mode {
     REPAIR("repair"),
-    INSPECT("inspect");
+    INSPECT("inspect"),
+    OFF("off");
 
-    private String name;
+    private final String name;
 
     Mode(String name) {
       this.name = name;
     }
 
-    public String getName() {
+    public String toString() {
       return name;
     }
   }
 
-  private static Mode metadataMode = null;
+  private static Mode mode = Mode.OFF;
 
   public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
       ".metadata";
 
-  public KeyValueContainerMetadataInspector(KeyValueContainerData kvContainerData,
-                                            DatanodeStore store) {
-   this.kvContainerData = kvContainerData;
-   this.store = store;
-  }
+  public KeyValueContainerMetadataInspector() { }
 
   /**
-   * Should be called at least once before calling processMetadata.
-   *
-   * Reads the value of the system property enabling metadata
-   * inspection or repair for containers. This is done statically so that a
-   * configuration error does not spam the logs with identical error messages
-   * for each container.
+   * Validate configuration here so that an invalid config value is only
+   * logged once, and not once per container.
    */
-  public static boolean loadSystemProperty() {
+  @Override
+  public boolean load() {
     String propertyValue = System.getProperty(SYSTEM_PROPERTY);
     boolean propertySet = false;
 
     if (propertyValue != null && !propertyValue.isEmpty()) {
-      propertySet = true;
-      if (propertyValue.equals(Mode.REPAIR.getName())) {
-        metadataMode = Mode.REPAIR;
-      } else if (propertyValue.equals(Mode.INSPECT.getName())) {
-        metadataMode = Mode.INSPECT;
+      if (propertyValue.equals(Mode.REPAIR.toString())) {
+        mode = Mode.REPAIR;
+        propertySet = true;
+      } else if (propertyValue.equals(Mode.INSPECT.toString())) {
+        mode = Mode.INSPECT;
+        propertySet = true;
       } else {
         LOG.error("{} system property specified with invalid mode {}. " +
                 "Valid options are {} and {}. Container metadata repair will not " +
                 "be performed.", SYSTEM_PROPERTY, propertyValue,
-            Mode.REPAIR.getName(), Mode.INSPECT.getName());
-        propertySet = false;
+            Mode.REPAIR, Mode.INSPECT);
       }
     }
 
     return propertySet;
   }
 
-    public static void unloadSystemProperty() {
-      System.clearProperty(SYSTEM_PROPERTY);
-    }
+  @Override
+  public void unload() {
+    System.clearProperty(SYSTEM_PROPERTY);
+    mode = Mode.OFF;
+  }
 
-  public void processMetadata() {
+  @Override
+  public boolean isReadOnly() {
+    return mode != Mode.REPAIR;
+  }
+
+  @Override
+  public ContainerProtos.ContainerType getContainerType() {
+    return ContainerProtos.ContainerType.KeyValueContainer;
+  }
+
+  @Override
+  public void process(ContainerData containerData,
+                      DatanodeStore store) {
     // If the system property to process container metadata was not
     // specified, this method is a no-op.
-    if (metadataMode == null) {
+    if (mode == Mode.OFF) {
       return;
     }
 
@@ -107,7 +108,7 @@ public class KeyValueContainerMetadataInspector {
 
     try {
       messageBuilder.append(String.format("Audit of container %d metadata\n",
-          kvContainerData.getContainerID()));
+          containerData.getContainerID()));
 
       // Read metadata values.
       Table<String, Long> metadataTable = store.getMetadataTable();
@@ -138,7 +139,8 @@ public class KeyValueContainerMetadataInspector {
         }
       }
 
-      String schemaVersion = kvContainerData.getSchemaVersion();
+      String schemaVersion =
+          ((KeyValueContainerData) containerData).getSchemaVersion();
 
       // Count pending delete blocks.
       if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
@@ -153,17 +155,20 @@ public class KeyValueContainerMetadataInspector {
           }
         }
       } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-        pendingDeleteBlockCountTotal = countPendingDeletesSchemaV2();
+        DatanodeStoreSchemaTwoImpl schemaTwoStore =
+            (DatanodeStoreSchemaTwoImpl) store;
+        pendingDeleteBlockCountTotal =
+            countPendingDeletesSchemaV2(schemaTwoStore);
       } else {
         messageBuilder.append("Cannot process deleted blocks for unknown " +
             "container schema ").append(schemaVersion);
       }
 
       // Count number of files in chunks directory.
-      countFilesAndAppend(messageBuilder);
+      countFilesAndAppend(containerData.getChunksPath(), messageBuilder);
 
       messageBuilder.append("Schema Version: ")
-          .append(kvContainerData.getSchemaVersion()).append("\n");
+          .append(schemaVersion).append("\n");
       messageBuilder.append("Total block keys in DB: ").append(blockCountTotal)
           .append("\n");
       messageBuilder.append("Total pending delete block keys in DB: ")
@@ -171,16 +176,26 @@ public class KeyValueContainerMetadataInspector {
       messageBuilder.append("Total used bytes in DB: ").append(usedBytesTotal)
           .append("\n");
 
-      passed = checkMetadataMatchAndAppend(OzoneConsts.BLOCK_COUNT,
-          blockCount, blockCountTotal, messageBuilder) &&
-          checkMetadataMatchAndAppend(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
-              pendingDeleteBlockCount, pendingDeleteBlockCountTotal,
-              messageBuilder) &&
-          checkMetadataMatchAndAppend(OzoneConsts.CONTAINER_BYTES_USED,
+      boolean blockCountPassed =
+          checkMetadataMatchAndAppend(metadataTable, OzoneConsts.BLOCK_COUNT,
+              blockCount,
+              blockCountTotal, messageBuilder);
+      boolean bytesUsedPassed =
+          checkMetadataMatchAndAppend(metadataTable,
+              OzoneConsts.CONTAINER_BYTES_USED,
               bytesUsed, usedBytesTotal, messageBuilder);
+      // This value gets filled in when block deleting service first runs.
+      // Before that it is ok to be missing.
+      boolean pendingDeleteCountPassed =
+          pendingDeleteBlockCount != null &&
+              checkMetadataMatchAndAppend(metadataTable,
+                  OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+                  pendingDeleteBlockCount, pendingDeleteBlockCountTotal,
+              messageBuilder);
+      passed = blockCountPassed && pendingDeleteCountPassed && bytesUsedPassed;
     } catch(IOException ex) {
       LOG.error("Inspecting container {} failed",
-          kvContainerData.getContainerID(), ex);
+          containerData.getContainerID(), ex);
     }
 
     if (passed) {
@@ -190,10 +205,9 @@ public class KeyValueContainerMetadataInspector {
     }
   }
 
-  private long countPendingDeletesSchemaV2() throws IOException {
+  private long countPendingDeletesSchemaV2(DatanodeStoreSchemaTwoImpl
+      schemaTwoStore) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
-    DatanodeStoreSchemaTwoImpl schemaTwoStore =
-        (DatanodeStoreSchemaTwoImpl) store;
     Table<Long, DeletedBlocksTransaction> delTxTable =
         schemaTwoStore.getDeleteTransactionTable();
     try (TableIterator<Long, ? extends Table.KeyValue<Long,
@@ -221,31 +235,30 @@ public class KeyValueContainerMetadataInspector {
     return value;
   }
 
-  private boolean checkMetadataMatchAndAppend(String key, Long expected,
-      long actual, StringBuilder messageBuilder) throws IOException {
-    boolean match = (expected == null && actual == 0) ||
-        (expected != null && expected == actual);
+  private boolean checkMetadataMatchAndAppend(Table<String, Long> metadataTable,
+      String key, Long currentValue, long expectedValue,
+      StringBuilder messageBuilder) throws IOException {
+    boolean match = (currentValue != null && currentValue == expectedValue);
     if (!match) {
       messageBuilder.append(String.format("!Value of metadata key %s " +
-          "does not match DB total: %d != %d\n", key, expected, actual));
-      if (metadataMode == Mode.REPAIR) {
+          "does not match DB total: %d != %d\n", key, currentValue, expectedValue));
+      if (mode == Mode.REPAIR) {
         messageBuilder.append(String.format("!Repairing %s of %d to match " +
-           "database total: %d\n", key, actual, expected));
-        store.getMetadataTable().put(key, expected);
+           "database total: %d\n", key, currentValue, expectedValue));
+        metadataTable.put(key, expectedValue);
       }
     }
 
     return match;
   }
 
-  public void countFilesAndAppend(StringBuilder messageBuilder)
-      throws IOException {
-    String chunksDirStr = kvContainerData.getChunksPath();
+  private void countFilesAndAppend(String chunksDirStr,
+      StringBuilder messageBuilder) throws IOException {
     File chunksDirFile = new File(chunksDirStr);
     if (!FileUtils.isDirectory(chunksDirFile)) {
-      messageBuilder.append("!Missing chunks directory. Expected ")
+      messageBuilder.append("!Missing chunks directory: ")
           .append(chunksDirStr);
-      if (metadataMode == Mode.REPAIR) {
+      if (mode == Mode.REPAIR) {
         messageBuilder.append("!Creating empty chunks directory: ")
             .append(chunksDirStr);
         Files.createDirectories(chunksDirFile.toPath());

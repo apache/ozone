@@ -40,6 +40,8 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerInspector;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerInspectors;
 import org.apache.hadoop.ozone.container.ozoneimpl.KeyValueContainerMetadataInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -190,8 +192,10 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
+        boolean readOnly = ContainerInspectors.isReadOnly(
+            ContainerProtos.ContainerType.KeyValueContainer);
         store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, true);
+            kvContainerData, config, readOnly);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
@@ -258,7 +262,7 @@ public final class KeyValueContainerUtil {
 
       // Run advanced container inspection/repair operations if specified on
       // startup.
-      new KeyValueContainerMetadataInspector(kvContainerData, store).processMetadata();
+      ContainerInspectors.process(kvContainerData, store);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the

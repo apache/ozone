@@ -69,45 +69,11 @@ import static org.junit.Assert.assertFalse;
 /**
  * Basic sanity test for the KeyValueContainerCheck class.
  */
-@RunWith(Parameterized.class) public class TestKeyValueContainerCheck {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestKeyValueContainerCheck.class);
-
-  private final ChunkLayoutTestInfo chunkManagerTestInfo;
-  private KeyValueContainer container;
-  private KeyValueContainerData containerData;
-  private MutableVolumeSet volumeSet;
-  private OzoneConfiguration conf;
-  private File testRoot;
-  private ChunkManager chunkManager;
+public class TestKeyValueContainerCheck
+    extends TestKeyValueContainerIntegrityChecks {
 
   public TestKeyValueContainerCheck(ChunkLayoutTestInfo chunkManagerTestInfo) {
-    this.chunkManagerTestInfo = chunkManagerTestInfo;
-  }
-
-  @Parameterized.Parameters public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        {ChunkLayoutTestInfo.FILE_PER_CHUNK},
-        {ChunkLayoutTestInfo.FILE_PER_BLOCK}
-    });
-  }
-
-  @Before public void setUp() throws Exception {
-    LOG.info("Testing  layout:{}", chunkManagerTestInfo.getLayout());
-    this.testRoot = GenericTestUtils.getRandomizedTestDir();
-    conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
-    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
-    chunkManagerTestInfo.updateConfig(conf);
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
-    chunkManager = chunkManagerTestInfo.createChunkManager(true, null);
-  }
-
-  @After public void teardown() {
-    volumeSet.shutdown();
-    FileUtil.fullyDelete(testRoot);
+    super(chunkManagerTestInfo);
   }
 
   /**
@@ -118,13 +84,11 @@ import static org.junit.Assert.assertFalse;
     long containerID = 101;
     int deletedBlocks = 1;
     int normalBlocks = 3;
-    int chunksPerBlock = 4;
     ContainerScrubberConfiguration c = conf.getObject(
         ContainerScrubberConfiguration.class);
 
     // test Closed Container
-    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks,
-        chunksPerBlock);
+    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks);
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
@@ -150,13 +114,11 @@ import static org.junit.Assert.assertFalse;
     long containerID = 102;
     int deletedBlocks = 1;
     int normalBlocks = 3;
-    int chunksPerBlock = 4;
     ContainerScrubberConfiguration sc = conf.getObject(
         ContainerScrubberConfiguration.class);
 
     // test Closed Container
-    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks,
-        chunksPerBlock);
+    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks);
 
     container.close();
 
@@ -197,75 +159,4 @@ import static org.junit.Assert.assertFalse;
             sc.getBandwidthPerVolume()), null);
     assertFalse(valid);
   }
-
-  /**
-   * Creates a container with normal and deleted blocks.
-   * First it will insert normal blocks, and then it will insert
-   * deleted blocks.
-   */
-  private void createContainerWithBlocks(long containerId, int normalBlocks,
-      int deletedBlocks, int chunksPerBlock) throws Exception {
-    String strBlock = "block";
-    String strChunk = "-chunkFile";
-    long totalBlocks = normalBlocks + deletedBlocks;
-    int unitLen = 1024;
-    int chunkLen = 3 * unitLen;
-    int bytesPerChecksum = 2 * unitLen;
-    Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256,
-        bytesPerChecksum);
-    byte[] chunkData = RandomStringUtils.randomAscii(chunkLen).getBytes(UTF_8);
-    ChecksumData checksumData = checksum.computeChecksum(chunkData);
-    DispatcherContext writeStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
-        .build();
-    DispatcherContext commitStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-        .build();
-
-    containerData = new KeyValueContainerData(containerId,
-        chunkManagerTestInfo.getLayout(),
-        (long) chunksPerBlock * chunkLen * totalBlocks,
-        UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-        UUID.randomUUID().toString());
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
-        conf)) {
-      assertNotNull(containerData.getChunksPath());
-      File chunksPath = new File(containerData.getChunksPath());
-      chunkManagerTestInfo.validateFileCount(chunksPath, 0, 0);
-
-      List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
-      for (int i = 0; i < totalBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
-        BlockData blockData = new BlockData(blockID);
-
-        chunkList.clear();
-        for (long chunkCount = 0; chunkCount < chunksPerBlock; chunkCount++) {
-          String chunkName = strBlock + i + strChunk + chunkCount;
-          long offset = chunkCount * chunkLen;
-          ChunkInfo info = new ChunkInfo(chunkName, offset, chunkLen);
-          info.setChecksumData(checksumData);
-          chunkList.add(info.getProtoBufMessage());
-          chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), writeStage);
-          chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), commitStage);
-        }
-        blockData.setChunks(chunkList);
-
-        // normal key
-        String key = Long.toString(blockID.getLocalID());
-        if (i >= normalBlocks) {
-          // deleted key
-          key = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
-        }
-        metadataStore.getStore().getBlockDataTable().put(key, blockData);
-      }
-
-      chunkManagerTestInfo.validateFileCount(chunksPath, totalBlocks,
-          totalBlocks * chunksPerBlock);
-    }
-  }
-
 }
