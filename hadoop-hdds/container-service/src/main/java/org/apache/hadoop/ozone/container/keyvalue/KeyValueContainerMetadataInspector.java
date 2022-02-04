@@ -69,12 +69,14 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
   }
 
-  private static Mode mode = Mode.OFF;
-
   public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
       ".metadata.inspector";
 
-  public KeyValueContainerMetadataInspector() { }
+  private Mode mode;
+
+  public KeyValueContainerMetadataInspector() {
+    mode = Mode.OFF;
+  }
 
   /**
    * Validate configuration here so that an invalid config value is only
@@ -100,12 +102,15 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       }
     }
 
+    if (!propertySet) {
+      mode = Mode.OFF;
+    }
+
     return propertySet;
   }
 
   @Override
   public void unload() {
-    System.clearProperty(SYSTEM_PROPERTY);
     mode = Mode.OFF;
   }
 
@@ -126,7 +131,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     boolean passed = false;
 
     try {
-      messageBuilder.append(String.format("Audit of container %d metadata\n",
+      messageBuilder.append(String.format("Audit of container %d metadata%n",
           containerData.getContainerID()));
 
       // Read metadata values.
@@ -260,11 +265,11 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     boolean match = (currentValue != null && currentValue == expectedValue);
     if (!match) {
       messageBuilder.append(String.format("!Value of metadata key %s " +
-              "does not match DB total: %d != %d\n", key, currentValue,
+              "does not match DB total: %d != %d%n", key, currentValue,
           expectedValue));
       if (mode == Mode.REPAIR) {
         messageBuilder.append(String.format("!Repairing %s of %d to match " +
-            "database total: %d\n", key, currentValue, expectedValue));
+            "database total: %d%n", key, currentValue, expectedValue));
         metadataTable.put(key, expectedValue);
       }
     }

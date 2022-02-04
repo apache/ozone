@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -42,12 +44,24 @@ public class TestKeyValueContainerMetadataInspector
   }
 
   @Test
-  public void testRunWithoutSystemProperty() throws Exception {
-    System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
-    Assert.assertFalse(new KeyValueContainerMetadataInspector().load());
+  public void testRunDisabled() throws Exception {
+    // Create incorrect container.
     KeyValueContainer container = createClosedContainer(3);
+    setDBBlockAndByteCounts(container.getContainerData(), -2, -2);
     KeyValueContainerData containerData = container.getContainerData();
+
+    // No system property set, should not run.
+    System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
+    ContainerInspectorUtil.load();
     String log = runInspectorAndGetLog(containerData);
+    Assert.assertFalse(log.contains(KeyValueContainerMetadataInspector.class.
+        getSimpleName()));
+    ContainerInspectorUtil.unload();
+
+    // Unloaded, should not run even with system property.
+    System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
+        KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
+    log = runInspectorAndGetLog(containerData);
     Assert.assertFalse(log.contains(KeyValueContainerMetadataInspector.class.
         getSimpleName()));
   }
@@ -55,25 +69,28 @@ public class TestKeyValueContainerMetadataInspector
   @Test
   public void testSystemProperty() {
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
-    Assert.assertFalse(new KeyValueContainerMetadataInspector().load());
+    ContainerInspector inspector = new KeyValueContainerMetadataInspector();
+    Assert.assertFalse(inspector.load());
+    Assert.assertTrue(inspector.isReadOnly());
 
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
-    Assert.assertTrue(new KeyValueContainerMetadataInspector().load());
-    Assert.assertTrue(new KeyValueContainerMetadataInspector().isReadOnly());
-
-    new KeyValueContainerMetadataInspector().unload();
-    Assert.assertNull(
-        System.getProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY));
+    inspector = new KeyValueContainerMetadataInspector();
+    Assert.assertTrue(inspector.load());
+    Assert.assertTrue(inspector.isReadOnly());
 
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.REPAIR.toString());
-    Assert.assertTrue(new KeyValueContainerMetadataInspector().load());
-    Assert.assertFalse(new KeyValueContainerMetadataInspector().isReadOnly());
+    inspector = new KeyValueContainerMetadataInspector();
+    Assert.assertTrue(inspector.load());
+    Assert.assertFalse(inspector.isReadOnly());
 
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         "badvalue");
-    Assert.assertFalse(new KeyValueContainerMetadataInspector().load());
+    inspector = new KeyValueContainerMetadataInspector();
+    Assert.assertFalse(inspector.load());
+    Assert.assertTrue(inspector.isReadOnly());
+
     // Clean slate for other tests.
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
   }
@@ -249,7 +266,9 @@ public class TestKeyValueContainerMetadataInspector
       throws Exception {
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
+    ContainerInspectorUtil.load();
     String logOut = runInspectorAndGetLog(containerData);
+    ContainerInspectorUtil.unload();
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     return logOut;
   }
@@ -258,7 +277,9 @@ public class TestKeyValueContainerMetadataInspector
       throws Exception {
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.REPAIR.toString());
+    ContainerInspectorUtil.load();
     String logOut = runInspectorAndGetLog(containerData);
+    ContainerInspectorUtil.unload();
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     return logOut;
   }
@@ -268,9 +289,7 @@ public class TestKeyValueContainerMetadataInspector
     GenericTestUtils.LogCapturer capturer =
         GenericTestUtils.LogCapturer.captureLogs(
             KeyValueContainerMetadataInspector.LOG);
-    new KeyValueContainerMetadataInspector().load();
     KeyValueContainerUtil.parseKVContainerData(containerData, getConf());
-    new KeyValueContainerMetadataInspector().unload();
     capturer.stopCapturing();
     String output = capturer.getOutput();
     capturer.clearOutput();

@@ -58,7 +58,7 @@ public interface ContainerInspector {
    * involve logging information or fixing errors.
    *
    * Multiple containers may be processed in parallel by calling this method
-   * on the same inspector instance, but only one inspector will be invoked
+   * on the same inspector instance, but only one process call will be invoked
    * per container at a time. Implementations must ensure that:
    * 1. Information they log is batched so that log output from other
    * inspectors working on other containers is not interleaved.
