@@ -44,31 +44,20 @@ Test Bucket Creation
                     Should contain      ${result}       RATIS
     ${result} =     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /${prefix}vol1/${prefix}ec
                     Should not contain  ${result}       Failed
-    ${result} =     Execute             ozone sh bucket list /${prefix}vol1 | jq -r '.[] | select(.name | contains("${prefix}ec")) | .replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
-                    Should Match Regexp      ${result}       ^(?m)EC$
-                    Should Match Regexp      ${result}       ^(?m)RS$
-                    Should Match Regexp      ${result}       ^(?m)3$
-                    Should Match Regexp      ${result}       ^(?m)2$
-                    Should Match Regexp      ${result}       ^(?m)1048576$
+                    Verify Bucket EC Replication Config    /${prefix}vol1    RS    3    2    1048576
 
 Test key Creation
-                    Execute                       ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}1mb /tmp/1mb
-                    Execute                       ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}2mb /tmp/2mb
-                    Execute                       ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}3mb /tmp/3mb
-                    Execute                       ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}100mb /tmp/100mb
+                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}1mb /tmp/1mb
+                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}2mb /tmp/2mb
+                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}3mb /tmp/3mb
+                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}100mb /tmp/100mb
 
-                    Key Should Match Local File   /${prefix}vol1/${prefix}ec/${prefix}1mb      /tmp/1mb
-                    Key Should Match Local File   /${prefix}vol1/${prefix}ec/${prefix}2mb      /tmp/2mb
-                    Key Should Match Local File   /${prefix}vol1/${prefix}ec/${prefix}3mb      /tmp/3mb
-                    Key Should Match Local File   /${prefix}vol1/${prefix}ec/${prefix}100mb    /tmp/100mb
+                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}1mb      /tmp/1mb
+                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}2mb      /tmp/2mb
+                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}3mb      /tmp/3mb
+                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}100mb    /tmp/100mb
 
-    # Check one key has the correct replication details
-    ${result}       Execute                       ozone sh key info /${prefix}vol1/${prefix}ec/${prefix}1mb | jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
-                    Should Match Regexp      ${result}       ^(?m)EC$
-                    Should Match Regexp      ${result}       ^(?m)RS$
-                    Should Match Regexp      ${result}       ^(?m)3$
-                    Should Match Regexp      ${result}       ^(?m)2$
-                    Should Match Regexp      ${result}       ^(?m)1048576$
+                    Verify Key EC Replication Config    /${prefix}vol1/${prefix}ec/${prefix}1mb    RS    3    2    1048576
 
 Test Ratis Key EC Bucket
                     Execute                       ozone sh key put --replication=THREE --type=RATIS /${prefix}vol1/${prefix}ec/${prefix}1mbRatis /tmp/1mb
@@ -77,11 +66,6 @@ Test Ratis Key EC Bucket
                     Should Match Regexp           ${result}       ^(?m)RATIS$
 
 Test EC Key Ratis Bucket
-                    Execute                       ozone sh key put --replication=rs-3-2-1024k --type=EC /${prefix}vol1/${prefix}ratis/${prefix}1mbEC /tmp/1mb
-                    Key Should Match Local File   /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    /tmp/1mb
-    ${result}       Execute                       ozone sh key info /${prefix}vol1/${prefix}ratis/${prefix}1mbEC | jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
-                    Should Match Regexp      ${result}       ^(?m)EC$
-                    Should Match Regexp      ${result}       ^(?m)RS$
-                    Should Match Regexp      ${result}       ^(?m)3$
-                    Should Match Regexp      ${result}       ^(?m)2$
-                    Should Match Regexp      ${result}       ^(?m)1048576$
+                    Execute                             ozone sh key put --replication=rs-3-2-1024k --type=EC /${prefix}vol1/${prefix}ratis/${prefix}1mbEC /tmp/1mb
+                    Key Should Match Local File         /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    /tmp/1mb
+                    Verify Key EC Replication Config    /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    RS    3    2    1048576

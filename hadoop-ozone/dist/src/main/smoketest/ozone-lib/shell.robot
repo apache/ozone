@@ -61,3 +61,21 @@ Create Key
     ${output} =    Execute          ozone sh key put ${key} ${file}
                    Should not contain  ${output}       Failed
     Log            Uploaded ${file} to ${key}
+
+Verify Bucket EC Replication Config
+    [arguments]    ${volume}    ${encoding}    ${data}    ${parity}    ${chunksize}
+    ${result} =    Execute                      ozone sh bucket list ${volume} | jq -r '.[] | select(.name | contains("${prefix}ec")) | .replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
+                   Verify Replication Config    ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
+
+Verify Key EC Replication Config
+    [arguments]    ${key}    ${encoding}    ${data}    ${parity}    ${chunksize}
+    ${result} =    Execute                      ozone sh key info ${key} | jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
+                   Verify Replication Config    ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
+
+Verify Replication Config
+    [arguments]    ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
+                   Should Match Regexp      ${result}       ^(?m)EC$
+                   Should Match Regexp      ${result}       ^(?m)${encoding}$
+                   Should Match Regexp      ${result}       ^(?m)${data}$
+                   Should Match Regexp      ${result}       ^(?m)${parity}$
+                   Should Match Regexp      ${result}       ^(?m)${chunksize}$
