@@ -34,6 +34,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -987,7 +988,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantInfo deleteTenant(String tenantId) throws IOException {
     final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
         .setTenantId(tenantId)
         .build();
@@ -995,8 +996,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDeleteTenantRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-
-    return handleError(omResponse).getDeleteTenantResponse();
+    final DeleteTenantResponse resp =
+        handleError(omResponse).getDeleteTenantResponse();
+    return DeleteTenantInfo.fromProtobuf(resp);
   }
 
   /**

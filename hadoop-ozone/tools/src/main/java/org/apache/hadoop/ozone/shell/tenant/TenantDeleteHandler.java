@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -39,7 +39,7 @@ public class TenantDeleteHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
     try {
-      final DeleteTenantResponse resp =
+      final DeleteTenantInfo resp =
           client.getObjectStore().deleteTenant(tenantId);
       out().println("Deleted tenant '" + tenantId + "'.");
       long volumeRefCount = resp.getVolRefCount();
