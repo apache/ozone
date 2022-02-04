@@ -1,4 +1,21 @@
-package org.apache.hadoop.ozone.container.ozoneimpl;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -10,7 +27,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -69,8 +86,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         propertySet = true;
       } else {
         LOG.error("{} system property specified with invalid mode {}. " +
-                "Valid options are {} and {}. Container metadata repair will not " +
-                "be performed.", SYSTEM_PROPERTY, propertyValue,
+                "Valid options are {} and {}. Container metadata repair will" +
+                "not be performed.", SYSTEM_PROPERTY, propertyValue,
             Mode.REPAIR, Mode.INSPECT);
       }
     }
@@ -241,7 +258,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     boolean match = (currentValue != null && currentValue == expectedValue);
     if (!match) {
       messageBuilder.append(String.format("!Value of metadata key %s " +
-          "does not match DB total: %d != %d\n", key, currentValue, expectedValue));
+          "does not match DB total: %d != %d\n", key, currentValue,
+          expectedValue));
       if (mode == Mode.REPAIR) {
         messageBuilder.append(String.format("!Repairing %s of %d to match " +
            "database total: %d\n", key, currentValue, expectedValue));

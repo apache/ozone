@@ -140,11 +140,6 @@ public class ContainerReader implements Runnable {
       }
 
       LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-      // If advanced container repair/inspection was specified on startup,
-      // check that the property was given a valid value here to prevent
-      // identical error messages for each container.
-      // TODO: Move to version endpoint task so only runsonce for all volumes.
-      ContainerInspectors.load();
 
       File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
@@ -174,10 +169,6 @@ public class ContainerReader implements Runnable {
           }
         }
       }
-
-      // After startup, future calls to load container data (on container
-      // import, for example) should not trigger inspection.
-      ContainerInspectors.unload();
     }
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }

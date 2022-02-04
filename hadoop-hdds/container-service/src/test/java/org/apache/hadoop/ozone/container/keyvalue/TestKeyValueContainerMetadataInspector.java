@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.commons.io.FileUtils;
@@ -7,17 +24,18 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.ozoneimpl.KeyValueContainerMetadataInspector;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.File;
 
-public class TestKeyValueContainerMetadataInspector extends TestKeyValueContainerIntegrityChecks {
+public class TestKeyValueContainerMetadataInspector
+    extends TestKeyValueContainerIntegrityChecks {
   private static final long containerID = 102;
 
-  public TestKeyValueContainerMetadataInspector(ChunkLayoutTestInfo chunkManagerTestInfo) {
+  public TestKeyValueContainerMetadataInspector(ChunkLayoutTestInfo
+      chunkManagerTestInfo) {
     super(chunkManagerTestInfo);
   }
 
@@ -139,8 +157,8 @@ public class TestKeyValueContainerMetadataInspector extends TestKeyValueContaine
     // Now repair the container. Output should be a superset of inspect output.
     String repairOutput = repairContainerAndGetLog();
     if (setBlocks != createBlocks) {
-      String inspect = String.format("!Value of metadata key #BLOCKCOUNT does " +
-          "not match DB " +
+      String inspect = String.format(
+          "!Value of metadata key #BLOCKCOUNT does not match DB " +
           "total: %d != %d", setBlocks, createBlocks);
       String repair = String.format("!Repairing #BLOCKCOUNT of %d to match " +
           "database " +
@@ -150,12 +168,11 @@ public class TestKeyValueContainerMetadataInspector extends TestKeyValueContaine
       Assert.assertTrue(repairOutput.contains(repair));
     }
     if (setBytes != createBytes) {
-      String inspect = String.format("!Value of metadata key #BYTESUSED does " +
-          "not match DB total: %d" +
+      String inspect = String.format(
+          "!Value of metadata key #BYTESUSED does not match DB total: %d" +
           " != %d", setBytes, createBytes);
       String repair = String.format("!Repairing #BYTESUSED of %s to match " +
-          "database total: " +
-          "%s", setBytes, createBytes);
+          "database total: %s", setBytes, createBytes);
       Assert.assertTrue(inspectOutput.contains(inspect));
       Assert.assertTrue(repairOutput.contains(repair));
     }

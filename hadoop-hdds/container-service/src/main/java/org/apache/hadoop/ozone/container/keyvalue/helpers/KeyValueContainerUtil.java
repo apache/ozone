@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
@@ -40,9 +41,6 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerInspector;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerInspectors;
-import org.apache.hadoop.ozone.container.ozoneimpl.KeyValueContainerMetadataInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,7 +190,7 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
-        boolean readOnly = ContainerInspectors.isReadOnly(
+        boolean readOnly = ContainerInspectorUtil.isReadOnly(
             ContainerProtos.ContainerType.KeyValueContainer);
         store = BlockUtils.getUncachedDatanodeStore(
             kvContainerData, config, readOnly);
@@ -262,7 +260,7 @@ public final class KeyValueContainerUtil {
 
       // Run advanced container inspection/repair operations if specified on
       // startup.
-      ContainerInspectors.process(kvContainerData, store);
+      ContainerInspectorUtil.process(kvContainerData, store);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the

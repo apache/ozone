@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -218,7 +219,7 @@ public class OzoneContainer {
     // Load container inspectors that may be triggered at startup based on
     // system properties set. These can inspect and possibly repair
     // containers as we iterate them here.
-    ContainerInspectors.load();
+    ContainerInspectorUtil.load();
     //TODO: diskchecker should be run before this, to see how disks are.
     // And also handle disk failure tolerance need to be added
     while (volumeSetIterator.hasNext()) {
@@ -240,7 +241,7 @@ public class OzoneContainer {
 
     // After all containers have been processed, turn off container
     // inspectors so they are not hit during normal datanode execution.
-    ContainerInspectors.unload();
+    ContainerInspectorUtil.unload();
 
     LOG.info("Build ContainerSet costs {}s",
         (System.currentTimeMillis() - startTime) / 1000);
