@@ -533,7 +533,7 @@ public abstract class ContainerData {
   }
 
   /**
-   * Release commit space in the volume
+   * Release commit space in the volume.
    */
   private void releaseCommitSpace() {
     long unused = getMaxSize() - getBytesUsed();

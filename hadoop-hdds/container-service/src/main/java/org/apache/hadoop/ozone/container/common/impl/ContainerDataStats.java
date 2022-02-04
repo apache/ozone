@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
-import com.google.common.base.Preconditions;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 
+/**
+ * Tracks read/ write metrics in a container.
+ */
 public class ContainerDataStats {
 
   /** parameters for read/write statistics on the container. **/
@@ -29,8 +29,6 @@ public class ContainerDataStats {
   private final AtomicLong readCount;
   private final AtomicLong writeBytes;
   private final AtomicLong writeCount;
-
-
 
   protected ContainerDataStats() {
     this.readCount = new AtomicLong(0L);
