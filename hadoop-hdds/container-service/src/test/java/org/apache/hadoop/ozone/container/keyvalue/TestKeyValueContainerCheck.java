@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -54,11 +55,14 @@ public class TestKeyValueContainerCheck
     long containerID = 101;
     int deletedBlocks = 1;
     int normalBlocks = 3;
+    OzoneConfiguration conf = getConf();
     ContainerScrubberConfiguration c = conf.getObject(
         ContainerScrubberConfiguration.class);
 
     // test Closed Container
-    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks);
+    KeyValueContainer container = createContainerWithBlocks(containerID,
+        normalBlocks, deletedBlocks);
+    KeyValueContainerData containerData = container.getContainerData();
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
@@ -84,11 +88,14 @@ public class TestKeyValueContainerCheck
     long containerID = 102;
     int deletedBlocks = 1;
     int normalBlocks = 3;
+    OzoneConfiguration conf = getConf();
     ContainerScrubberConfiguration sc = conf.getObject(
         ContainerScrubberConfiguration.class);
 
     // test Closed Container
-    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks);
+    KeyValueContainer container = createContainerWithBlocks(containerID,
+        normalBlocks, deletedBlocks);
+    KeyValueContainerData containerData = container.getContainerData();
 
     container.close();
 

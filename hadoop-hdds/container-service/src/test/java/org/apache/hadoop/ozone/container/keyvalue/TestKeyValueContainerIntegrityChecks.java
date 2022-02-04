@@ -66,8 +66,6 @@ public class TestKeyValueContainerIntegrityChecks {
       LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
 
   private final ChunkLayoutTestInfo chunkManagerTestInfo;
-  private KeyValueContainer container;
-  private KeyValueContainerData containerData;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
@@ -110,13 +108,18 @@ public class TestKeyValueContainerIntegrityChecks {
     return chunkManagerTestInfo.getLayout();
   }
 
+  protected OzoneConfiguration getConf() {
+    return conf;
+  }
+
+
   /**
    * Creates a container with normal and deleted blocks.
    * First it will insert normal blocks, and then it will insert
    * deleted blocks.
    */
-  protected void createContainerWithBlocks(long containerId, int normalBlocks,
-      int deletedBlocks) throws Exception {
+  protected KeyValueContainer createContainerWithBlocks(long containerId,
+      int normalBlocks, int deletedBlocks) throws Exception {
     String strBlock = "block";
     String strChunk = "-chunkFile";
     long totalBlocks = normalBlocks + deletedBlocks;
@@ -132,11 +135,11 @@ public class TestKeyValueContainerIntegrityChecks {
         .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
         .build();
 
-    containerData = new KeyValueContainerData(containerId,
+    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
         chunkManagerTestInfo.getLayout(),
         (long) CHUNKS_PER_BLOCK * CHUNK_LEN * totalBlocks,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    container = new KeyValueContainer(containerData, conf);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
         UUID.randomUUID().toString());
     try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
@@ -176,6 +179,8 @@ public class TestKeyValueContainerIntegrityChecks {
       chunkManagerTestInfo.validateFileCount(chunksPath, totalBlocks,
           totalBlocks * CHUNKS_PER_BLOCK);
     }
+
+    return container;
   }
 
 }
