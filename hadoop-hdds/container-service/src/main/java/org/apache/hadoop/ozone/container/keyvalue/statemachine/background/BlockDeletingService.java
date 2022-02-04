@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import javafx.util.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -435,8 +435,8 @@ public class BlockDeletingService extends BackgroundService {
 
         Pair<Integer, Long> deleteBlocksResult =
             deleteTransactions(delBlocks, handler, blockDataTable, container);
-        int deletedBlocksCount = deleteBlocksResult.getKey();
-        long releasedBytes = deleteBlocksResult.getValue();
+        int deletedBlocksCount = deleteBlocksResult.getLeft();
+        long releasedBytes = deleteBlocksResult.getRight();
 
         // Once blocks are deleted... remove the blockID from blockDataTable
         // and also remove the transactions from txnTable.
@@ -510,7 +510,7 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
       }
-      return new Pair(blocksDeleted, bytesReleased);
+      return Pair.of(blocksDeleted, bytesReleased);
     }
 
     @Override
