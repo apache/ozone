@@ -370,6 +370,11 @@ public class ReplicationManager implements SCMService {
    * This in intended to be used in tests.
    */
   public synchronized void processAll() {
+    if (!shouldRun()) {
+      LOG.info("Replication Manager is not ready to run until {}ms after " +
+          "safemode exit", waitTimeInMillis);
+      return;
+    }
     final long start = clock.millis();
     final List<ContainerInfo> containers =
         containerManager.getContainers();

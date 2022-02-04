@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
@@ -107,7 +107,7 @@ public class TestVolumeOwner {
           .setAdminName("om")
           .setOwnerName(getTestVolOwnerName(i))
           .build();
-      TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
+      OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
     }
   }
 
@@ -119,7 +119,7 @@ public class TestVolumeOwner {
             .setVolumeName(getTestVolumeName(i))
             .setBucketName(getTestBucketName(j))
             .build();
-        TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+        OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
       }
     }
   }

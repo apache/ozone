@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -109,7 +109,7 @@ public class ChunkKeyHandler extends KeyHandler implements
       System.out.println("No Key Locations Found");
       return;
     }
-    ChunkLayOutVersion chunkLayOutVersion = ChunkLayOutVersion
+    ContainerLayoutVersion containerLayoutVersion = ContainerLayoutVersion
             .getConfiguredVersion(getConf());
     JsonArray responseArrayList = new JsonArray();
     for (OmKeyLocationInfo keyLocation:locationInfos) {
@@ -152,7 +152,7 @@ public class ChunkKeyHandler extends KeyHandler implements
                         keyLocation.getContainerID(),
                         keyLocation.getPipeline());
         for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
-          String fileName = chunkLayOutVersion.getChunkFile(new File(
+          String fileName = containerLayoutVersion.getChunkFile(new File(
               getChunkLocationPath(containerData.getContainerPath())),
                   keyLocation.getBlockID(),
                   ChunkInfo.getFromProtoBuf(chunkInfo)).toString();

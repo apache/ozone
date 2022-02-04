@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -65,7 +65,7 @@ public class TestKeyValueContainerIntegrityChecks {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
 
-  private final ChunkLayoutTestInfo chunkManagerTestInfo;
+  private final ContainerLayoutTestInfo containerLayoutTestInfo;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
@@ -75,28 +75,28 @@ public class TestKeyValueContainerIntegrityChecks {
   protected static final int CHUNK_LEN = 3 * UNIT_LEN;
   protected static final int CHUNKS_PER_BLOCK = 4;
 
-  public TestKeyValueContainerIntegrityChecks(ChunkLayoutTestInfo
-      chunkManagerTestInfo) {
-    this.chunkManagerTestInfo = chunkManagerTestInfo;
+  public TestKeyValueContainerIntegrityChecks(ContainerLayoutTestInfo
+      containerLayoutTestInfo) {
+    this.containerLayoutTestInfo = containerLayoutTestInfo;
   }
 
   @Parameterized.Parameters public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {ChunkLayoutTestInfo.FILE_PER_CHUNK},
-        {ChunkLayoutTestInfo.FILE_PER_BLOCK}
+        {ContainerLayoutTestInfo.FILE_PER_CHUNK},
+        {ContainerLayoutTestInfo.FILE_PER_BLOCK}
     });
   }
 
   @Before public void setUp() throws Exception {
-    LOG.info("Testing  layout:{}", chunkManagerTestInfo.getLayout());
+    LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
-    chunkManagerTestInfo.updateConfig(conf);
+    containerLayoutTestInfo.updateConfig(conf);
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    chunkManager = chunkManagerTestInfo.createChunkManager(true, null);
+    chunkManager = containerLayoutTestInfo.createChunkManager(true, null);
   }
 
   @After public void teardown() {
@@ -104,8 +104,8 @@ public class TestKeyValueContainerIntegrityChecks {
     FileUtil.fullyDelete(testRoot);
   }
 
-  protected ChunkLayOutVersion getChunkLayout() {
-    return chunkManagerTestInfo.getLayout();
+  protected ContainerLayoutVersion getChunkLayout() {
+    return containerLayoutTestInfo.getLayout();
   }
 
   protected OzoneConfiguration getConf() {
@@ -136,7 +136,7 @@ public class TestKeyValueContainerIntegrityChecks {
         .build();
 
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        chunkManagerTestInfo.getLayout(),
+        containerLayoutTestInfo.getLayout(),
         (long) CHUNKS_PER_BLOCK * CHUNK_LEN * totalBlocks,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
@@ -146,7 +146,7 @@ public class TestKeyValueContainerIntegrityChecks {
         conf)) {
       assertNotNull(containerData.getChunksPath());
       File chunksPath = new File(containerData.getChunksPath());
-      chunkManagerTestInfo.validateFileCount(chunksPath, 0, 0);
+      containerLayoutTestInfo.validateFileCount(chunksPath, 0, 0);
 
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
       for (int i = 0; i < totalBlocks; i++) {
@@ -176,7 +176,7 @@ public class TestKeyValueContainerIntegrityChecks {
         metadataStore.getStore().getBlockDataTable().put(key, blockData);
       }
 
-      chunkManagerTestInfo.validateFileCount(chunksPath, totalBlocks,
+      containerLayoutTestInfo.validateFileCount(chunksPath, totalBlocks,
           totalBlocks * CHUNKS_PER_BLOCK);
     }
 

@@ -26,7 +26,7 @@ import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
-import static java.net.HttpURLConnection.HTTP_SERVER_ERROR;
+import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
 
 /**
@@ -106,7 +106,7 @@ public final class S3ErrorTable {
 
   public static final OS3Exception INTERNAL_ERROR = new OS3Exception(
       "InternalError", "We encountered an internal error. Please try again.",
-      HTTP_SERVER_ERROR);
+      HTTP_INTERNAL_ERROR);
 
   public static final OS3Exception ACCESS_DENIED = new OS3Exception(
       "AccessDenied", "User doesn't have the right to access this " +
@@ -130,7 +130,11 @@ public final class S3ErrorTable {
     OS3Exception err =  new OS3Exception(e.getCode(), e.getErrorMessage(),
         e.getHttpCode());
     err.setResource(resource);
-    LOG.error(err.toXml(), e);
+    if (e.getHttpCode() == HTTP_INTERNAL_ERROR) {
+      LOG.error("Internal Error: {}", err.toXml(), e);
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug(err.toXml(), e);
+    }
     return err;
   }
 }
