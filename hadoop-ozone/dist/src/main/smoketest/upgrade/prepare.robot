@@ -19,7 +19,7 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
-** Test Cases ***
+*** Test Cases ***
 Prepare Ozone Manager
     ${result} =        Execute      ozone admin om prepare -id %{OM_SERVICE_ID}
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   OM Preparation successful!

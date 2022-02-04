@@ -31,3 +31,9 @@ Create a volume, bucket and key
                         Should not contain  ${output}       Failed
     ${output} =         Execute          ozone sh key put /${PREFIX}-volume/${PREFIX}-bucket/${PREFIX}-key /opt/hadoop/NOTICE.txt
                         Should not contain  ${output}       Failed
+
+Create a bucket and key in volume s3v
+    ${output} =         Execute          ozone sh bucket create /s3v/${PREFIX}-bucket
+                        Should not contain  ${output}       Failed
+    ${output} =         Execute          ozone sh key put /s3v/${PREFIX}-bucket/key1 /opt/hadoop/NOTICE.txt
+                        Should not contain  ${output}       Failed
