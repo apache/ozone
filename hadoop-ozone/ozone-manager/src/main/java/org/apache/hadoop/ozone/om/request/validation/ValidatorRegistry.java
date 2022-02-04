@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.jetbrains.annotations.NotNull;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
 import org.reflections.util.ClasspathHelper;
@@ -39,7 +38,9 @@ import java.util.Set;
  */
 public class ValidatorRegistry {
 
-  EnumMap<ValidationCondition, EnumMap<Type, Pair<List<Method>, List<Method>>>>
+  private
+      EnumMap<
+          ValidationCondition, EnumMap<Type, Pair<List<Method>, List<Method>>>>
       validators = new EnumMap<>(ValidationCondition.class);
 
   /**
@@ -162,7 +163,7 @@ public class ValidatorRegistry {
     return new EnumMap<>(Type.class);
   }
 
-  <K, V> V getAndInitialize(K key, V defaultValue, Map<K,V> from) {
+  <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
     if (defaultValue == null) {
       throw new NullPointerException(
           "Entry can not be initialized with null value.");

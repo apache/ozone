@@ -198,7 +198,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       // TODO: restrict the parameter list and return type of such annotated
       //       methods either at compile time, or via a test
       try {
-        if (method.getAnnotation(RequestFeatureValidator.class).contextAware()) {
+        if (method
+            .getAnnotation(RequestFeatureValidator.class).contextAware()) {
           validatedResponse = (OMResponse) method
               .invoke(null, originalRequest, validatedResponse, context);
         } else {
