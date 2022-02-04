@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -1124,15 +1125,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public GetS3VolumeInfoResponse getS3VolumeInfo() throws IOException {
+  public S3VolumeInfo getS3VolumeInfo() throws IOException {
     final GetS3VolumeRequest request = GetS3VolumeRequest.newBuilder()
         .build();
     final OMRequest omRequest = createOMRequest(Type.GetS3Volume)
         .setGetS3VolumeRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-
-    return handleError(omResponse).getGetS3VolumeInfoResponse();
+    final GetS3VolumeInfoResponse resp =
+        handleError(omResponse).getGetS3VolumeInfoResponse();
+    return S3VolumeInfo.fromProtobuf(resp);
   }
 
   /**

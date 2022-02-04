@@ -710,7 +710,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private GetS3VolumeInfoResponse getS3VolumeInfo()
       throws IOException {
-    return impl.getS3VolumeInfo();
+    return impl.getS3VolumeInfo().getProtobuf();
   }
 
   public OzoneManager getOzoneManager() {

@@ -35,12 +35,12 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeInfoResponse;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -164,10 +164,10 @@ public class ObjectStore {
   }
 
   public OzoneVolume getS3Volume() throws IOException {
-    final GetS3VolumeInfoResponse resp = proxy.getS3VolumeInfo();
+    final S3VolumeInfo resp = proxy.getS3VolumeInfo();
 
-    // Update user principal, to be used for KMS
     S3Auth s3Auth = proxy.getThreadLocalS3Auth();
+    // Update user principal if needed to be used for KMS client
     if (s3Auth != null) {
       // Update userPrincipal field with the value returned from OM. So that
       //  in multi-tenancy, KMS client can use the correct identity
@@ -177,11 +177,11 @@ public class ObjectStore {
       proxy.setTheadLocalS3Auth(s3Auth);
     }
 
-    OmVolumeArgs volume = OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
+    OmVolumeArgs volume = resp.getOmVolumeArgs();
     return proxy.buildOzoneVolume(volume);
   }
 
-  public GetS3VolumeInfoResponse getS3VolumeInfo() throws IOException {
+  public S3VolumeInfo getS3VolumeInfo() throws IOException {
     return proxy.getS3VolumeInfo();
   }
 

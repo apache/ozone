@@ -126,6 +126,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -151,7 +152,6 @@ import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -3078,7 +3078,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public GetS3VolumeInfoResponse getS3VolumeInfo() throws IOException {
+  public S3VolumeInfo getS3VolumeInfo() throws IOException {
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
     // to the default S3 volume.
@@ -3129,12 +3129,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // getVolumeInfo() performs acl checks and checks volume existence.
-    final GetS3VolumeInfoResponse resp = GetS3VolumeInfoResponse.newBuilder()
-        .setVolumeInfo(getVolumeInfo(s3Volume).getProtobuf())
-        .setUserPrincipal(userPrincipal)
-        .build();
+    final S3VolumeInfo.Builder s3VolumeInfo = S3VolumeInfo.newBuilder()
+        .setOmVolumeArgs(getVolumeInfo(s3Volume))
+        .setUserPrincipal(userPrincipal);
 
-    return resp;
+    return s3VolumeInfo.build();
   }
 
   @Override
