@@ -307,7 +307,7 @@ message OMResponse {
   optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 102;
   optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 103;
 
-  optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
+  optional GetS3VolumeInfoResponse           getS3VolumeInfoResponse       = 104;
   optional TenantListUserResponse            tenantListUserResponse        = 105;
 
   optional SetS3SecretResponse               SetS3SecretResponse           = 106;
@@ -1541,9 +1541,9 @@ message OmDBAccessInfo {
   optional bool isDelegatedAdmin = 4;
 }
 
-message GetS3VolumeResponse {
+message GetS3VolumeInfoResponse {
   optional VolumeInfo volumeInfo = 1;
-  // Piggybacked user name (principal) response to be used for KMS operations
+  // Piggybacked user name (principal) response to be used for KMS client operations
   optional string userPrincipal = 2;
 }
 

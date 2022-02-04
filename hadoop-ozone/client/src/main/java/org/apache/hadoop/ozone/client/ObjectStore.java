@@ -33,12 +33,14 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeInfoResponse;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -46,6 +48,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ObjectStore class is responsible for the client operations that can be
@@ -53,6 +57,10 @@ import org.apache.hadoop.security.token.Token;
  */
 public class ObjectStore {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ObjectStore.class);
+
+  private final ConfigurationSource conf;
   /**
    * The proxy used for connecting to the cluster and perform
    * client operations.
@@ -72,6 +80,7 @@ public class ObjectStore {
    * @param proxy ClientProtocol proxy.
    */
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
+    this.conf = conf;
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
@@ -80,7 +89,7 @@ public class ObjectStore {
   @VisibleForTesting
   protected ObjectStore() {
     // For the unit test
-    OzoneConfiguration conf = new OzoneConfiguration();
+    this.conf = new OzoneConfiguration();
     proxy = null;
     defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
@@ -155,10 +164,24 @@ public class ObjectStore {
   }
 
   public OzoneVolume getS3Volume() throws IOException {
-    return proxy.getS3Volume();
+    final GetS3VolumeInfoResponse resp = proxy.getS3VolumeInfo();
+
+    // Update user principal, to be used for KMS
+    S3Auth s3Auth = proxy.getThreadLocalS3Auth();
+    if (s3Auth != null) {
+      // Update userPrincipal field with the value returned from OM. So that
+      //  in multi-tenancy, KMS client can use the correct identity
+      //  (instead of using accessId) to communicate with KMS.
+      LOG.debug("Updating S3Auth.userPrincipal to {}", resp.getUserPrincipal());
+      s3Auth.setUserPrincipal(resp.getUserPrincipal());
+      proxy.setTheadLocalS3Auth(s3Auth);
+    }
+
+    OmVolumeArgs volume = OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
+    return proxy.buildOzoneVolume(volume);
   }
 
-  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
+  public GetS3VolumeInfoResponse getS3VolumeInfo() throws IOException {
     return proxy.getS3VolumeInfo();
   }
 

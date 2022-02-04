@@ -151,7 +151,7 @@ import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -3078,13 +3078,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
+  public GetS3VolumeInfoResponse getS3VolumeInfo() throws IOException {
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
     // to the default S3 volume.
     String s3Volume = HddsClientUtils.getDefaultS3VolumeName(configuration);
     S3Authentication s3Auth = getS3Auth();
-    // TODO: Double check return value
     String userPrincipal = Server.getRemoteUser().getShortUserName();
 
     if (s3Auth != null) {
@@ -3130,7 +3129,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // getVolumeInfo() performs acl checks and checks volume existence.
-    final GetS3VolumeResponse resp = GetS3VolumeResponse.newBuilder()
+    final GetS3VolumeInfoResponse resp = GetS3VolumeInfoResponse.newBuilder()
         .setVolumeInfo(getVolumeInfo(s3Volume).getProtobuf())
         .setUserPrincipal(userPrincipal)
         .build();

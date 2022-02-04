@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -126,16 +126,10 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * @return The {@link OzoneVolume} that should be used to for this S3
-   * request based on its access ID. S3Auth user principal will be updated.
-   */
-  OzoneVolume getS3Volume() throws IOException;
-
-  /**
-   * @return Raw GetS3VolumeResponse. S3Auth won't be updated.
+   * @return Raw GetS3VolumeInfoResponse. S3Auth won't be updated by this call.
    * @throws IOException
    */
-  GetS3VolumeResponse getS3VolumeInfo() throws IOException;
+  GetS3VolumeInfoResponse getS3VolumeInfo() throws IOException;
 
   OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 

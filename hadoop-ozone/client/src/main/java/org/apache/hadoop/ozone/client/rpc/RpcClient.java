@@ -116,7 +116,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -438,26 +438,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public OzoneVolume getS3Volume() throws IOException {
-    final GetS3VolumeResponse resp = getS3VolumeInfo();
-
-    // Update user principal, to be used for KMS
-    S3Auth s3Auth = getThreadLocalS3Auth();
-    if (s3Auth != null) {
-      // Update userPrincipal field with the value returned from OM. So that
-      //  in multi-tenancy, KMS client can use the correct identity
-      //  (instead of using accessId) to communicate with KMS.
-      LOG.debug("Updating S3Auth.userPrincipal to {}", resp.getUserPrincipal());
-      s3Auth.setUserPrincipal(resp.getUserPrincipal());
-      setTheadLocalS3Auth(s3Auth);
-    }
-
-    OmVolumeArgs volume = OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
-    return buildOzoneVolume(volume);
-  }
-
-  @Override
-  public GetS3VolumeResponse getS3VolumeInfo() throws IOException {
+  public GetS3VolumeInfoResponse getS3VolumeInfo() throws IOException {
     return ozoneManagerClient.getS3VolumeInfo();
   }
 
