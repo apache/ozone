@@ -41,10 +41,18 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
+/**
+ * Container inspector for key value container metadata. It is capable of
+ * logging metadata information about a container, and repairing the metadata
+ * database values of #BLOCKCOUNT and #BYTESUSED.
+ */
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
 
+  /**
+   * The mode to run the inspector in.
+   */
   public enum Mode {
     REPAIR("repair"),
     INSPECT("inspect"),
@@ -258,11 +266,11 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     boolean match = (currentValue != null && currentValue == expectedValue);
     if (!match) {
       messageBuilder.append(String.format("!Value of metadata key %s " +
-          "does not match DB total: %d != %d\n", key, currentValue,
+              "does not match DB total: %d != %d\n", key, currentValue,
           expectedValue));
       if (mode == Mode.REPAIR) {
         messageBuilder.append(String.format("!Repairing %s of %d to match " +
-           "database total: %d\n", key, currentValue, expectedValue));
+            "database total: %d\n", key, currentValue, expectedValue));
         metadataTable.put(key, expectedValue);
       }
     }

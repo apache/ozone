@@ -30,9 +30,12 @@ import org.junit.Test;
 
 import java.io.File;
 
+/**
+ * Tests for {@link KeyValueContainerMetadataInspector}.
+ */
 public class TestKeyValueContainerMetadataInspector
     extends TestKeyValueContainerIntegrityChecks {
-  private static final long containerID = 102;
+  private static final long CONTAINER_ID = 102;
 
   public TestKeyValueContainerMetadataInspector(ChunkLayoutTestInfo
       chunkManagerTestInfo) {
@@ -122,17 +125,17 @@ public class TestKeyValueContainerMetadataInspector
 
   public void inspectThenRepair(int createBlocks, int setBlocks,
       int setBytes) throws Exception {
-    int createBytes = chunkLen * chunksPerBlock * createBlocks;
+    int createBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
     int createFiles = 0;
-    switch (chunkManagerTestInfo.getLayout()) {
-      case FILE_PER_BLOCK:
-        createFiles = createBlocks;
-        break;
-      case FILE_PER_CHUNK:
-        createFiles = createBlocks * chunksPerBlock;
-        break;
-      default:
-        Assert.fail("Unrecognized chunk layout version.");
+    switch (getChunkLayout()) {
+    case FILE_PER_BLOCK:
+      createFiles = createBlocks;
+      break;
+    case FILE_PER_CHUNK:
+      createFiles = createBlocks * CHUNKS_PER_BLOCK;
+      break;
+    default:
+      Assert.fail("Unrecognized chunk layout version.");
     }
 
     createClosedContainer(createBlocks);
@@ -141,7 +144,7 @@ public class TestKeyValueContainerMetadataInspector
     // First inspect the container.
     String inspectOutput = inspectContainerAndGetLog();
     String[] expectedInspectMessages = new String[]{
-        "Audit of container " + containerID + " metadata",
+        "Audit of container " + CONTAINER_ID + " metadata",
         "#BLOCKCOUNT: " + setBlocks,
         "#BYTESUSED: " + setBytes,
         createFiles + " files in chunks directory",
@@ -242,7 +245,7 @@ public class TestKeyValueContainerMetadataInspector
 
   private void createOpenContainer(int normalBlocks)
       throws Exception {
-    super.createContainerWithBlocks(containerID, normalBlocks, 0);
+    super.createContainerWithBlocks(CONTAINER_ID, normalBlocks, 0);
   }
 
   private void containsAllStrings(String logOutput, String[] expectedMessages) {

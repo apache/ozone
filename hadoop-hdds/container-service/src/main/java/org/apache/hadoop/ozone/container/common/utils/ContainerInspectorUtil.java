@@ -32,29 +32,29 @@ import java.util.List;
  */
 public final class ContainerInspectorUtil {
 
-  private static final List<ContainerInspector> inspectors = new ArrayList<>();
+  private static final List<ContainerInspector> INSPECTORS = new ArrayList<>();
   static {
     // If new inspectors need to be added, they should be added to this list.
-    inspectors.add(new KeyValueContainerMetadataInspector());
+    INSPECTORS.add(new KeyValueContainerMetadataInspector());
   }
 
   private ContainerInspectorUtil() { }
 
   public static void load() {
-    for (ContainerInspector inspector: inspectors) {
+    for (ContainerInspector inspector: INSPECTORS) {
       inspector.load();
     }
   }
 
   public static void unload() {
-    for (ContainerInspector inspector: inspectors) {
+    for (ContainerInspector inspector: INSPECTORS) {
       inspector.unload();
     }
   }
 
   public static boolean isReadOnly(ContainerProtos.ContainerType type) {
     boolean readOnly = true;
-    for (ContainerInspector inspector: inspectors) {
+    for (ContainerInspector inspector: INSPECTORS) {
       if (inspector.getContainerType() == type) {
         if (!inspector.isReadOnly()) {
           readOnly = false;
@@ -66,7 +66,7 @@ public final class ContainerInspectorUtil {
   }
 
   public static void process(ContainerData data, DatanodeStore store) {
-    for (ContainerInspector inspector: inspectors) {
+    for (ContainerInspector inspector: INSPECTORS) {
       if (inspector.getContainerType() == data.getContainerType()) {
         inspector.process(data, store);
       }

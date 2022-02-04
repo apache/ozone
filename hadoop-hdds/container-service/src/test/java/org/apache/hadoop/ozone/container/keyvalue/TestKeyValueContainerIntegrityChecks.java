@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -64,16 +65,17 @@ public class TestKeyValueContainerIntegrityChecks {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
 
-  protected final ChunkLayoutTestInfo chunkManagerTestInfo;
-  protected KeyValueContainer container;
-  protected KeyValueContainerData containerData;
-  protected MutableVolumeSet volumeSet;
-  protected OzoneConfiguration conf;
-  protected File testRoot;
-  protected ChunkManager chunkManager;
-  protected static final int unitLen = 1024;
-  protected static final int chunkLen = 3 * unitLen;
-  protected static final int chunksPerBlock = 4;
+  private final ChunkLayoutTestInfo chunkManagerTestInfo;
+  private KeyValueContainer container;
+  private KeyValueContainerData containerData;
+  private MutableVolumeSet volumeSet;
+  private OzoneConfiguration conf;
+  private File testRoot;
+  private ChunkManager chunkManager;
+
+  protected static final int UNIT_LEN = 1024;
+  protected static final int CHUNK_LEN = 3 * UNIT_LEN;
+  protected static final int CHUNKS_PER_BLOCK = 4;
 
   public TestKeyValueContainerIntegrityChecks(ChunkLayoutTestInfo
       chunkManagerTestInfo) {
@@ -104,6 +106,10 @@ public class TestKeyValueContainerIntegrityChecks {
     FileUtil.fullyDelete(testRoot);
   }
 
+  protected ChunkLayOutVersion getChunkLayout() {
+    return chunkManagerTestInfo.getLayout();
+  }
+
   /**
    * Creates a container with normal and deleted blocks.
    * First it will insert normal blocks, and then it will insert
@@ -114,10 +120,10 @@ public class TestKeyValueContainerIntegrityChecks {
     String strBlock = "block";
     String strChunk = "-chunkFile";
     long totalBlocks = normalBlocks + deletedBlocks;
-    int bytesPerChecksum = 2 * unitLen;
+    int bytesPerChecksum = 2 * UNIT_LEN;
     Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256,
         bytesPerChecksum);
-    byte[] chunkData = RandomStringUtils.randomAscii(chunkLen).getBytes(UTF_8);
+    byte[] chunkData = RandomStringUtils.randomAscii(CHUNK_LEN).getBytes(UTF_8);
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
     DispatcherContext writeStage = new DispatcherContext.Builder()
         .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
@@ -128,7 +134,7 @@ public class TestKeyValueContainerIntegrityChecks {
 
     containerData = new KeyValueContainerData(containerId,
         chunkManagerTestInfo.getLayout(),
-        (long) chunksPerBlock * chunkLen * totalBlocks,
+        (long) CHUNKS_PER_BLOCK * CHUNK_LEN * totalBlocks,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
@@ -145,10 +151,10 @@ public class TestKeyValueContainerIntegrityChecks {
         BlockData blockData = new BlockData(blockID);
 
         chunkList.clear();
-        for (long chunkCount = 0; chunkCount < chunksPerBlock; chunkCount++) {
+        for (long chunkCount = 0; chunkCount < CHUNKS_PER_BLOCK; chunkCount++) {
           String chunkName = strBlock + i + strChunk + chunkCount;
-          long offset = chunkCount * chunkLen;
-          ChunkInfo info = new ChunkInfo(chunkName, offset, chunkLen);
+          long offset = chunkCount * CHUNK_LEN;
+          ChunkInfo info = new ChunkInfo(chunkName, offset, CHUNK_LEN);
           info.setChecksumData(checksumData);
           chunkList.add(info.getProtoBufMessage());
           chunkManager.writeChunk(container, blockID, info,
@@ -168,7 +174,7 @@ public class TestKeyValueContainerIntegrityChecks {
       }
 
       chunkManagerTestInfo.validateFileCount(chunksPath, totalBlocks,
-          totalBlocks * chunksPerBlock);
+          totalBlocks * CHUNKS_PER_BLOCK);
     }
   }
 
