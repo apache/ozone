@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.commons.collections.map.HashedMap;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
@@ -33,6 +34,7 @@ import java.util.Map;
 public class MockDatanodeStorage {
 
   private final Map<DatanodeBlockID, BlockData> blocks = new HashedMap();
+  private final Map<BlockID, String> fullBlockData = new HashMap<>();
 
   private final Map<String, ChunkInfo> chunks = new HashMap<>();
 
@@ -61,6 +63,10 @@ public class MockDatanodeStorage {
     data.put(createKey(blockID, chunkInfo),
         ByteString.copyFrom(bytes.toByteArray()));
     chunks.put(createKey(blockID, chunkInfo), chunkInfo);
+    fullBlockData
+        .put(new BlockID(blockID.getContainerID(), blockID.getLocalID()),
+            fullBlockData.getOrDefault(blockID, new String())
+                .concat(bytes.toStringUtf8()));
   }
 
   public ChunkInfo readChunkInfo(
@@ -83,6 +89,10 @@ public class MockDatanodeStorage {
 
   public Map<String, ByteString> getAllBlockData(){
     return this.data;
+  }
+
+  public String getFullBlockData(BlockID blockID) {
+    return this.fullBlockData.get(blockID);
   }
 
 }
