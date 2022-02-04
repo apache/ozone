@@ -145,9 +145,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         dispatcher.processRequest(validatedRequest, this::processRequest,
         request.getCmdType(), request.getTraceID());
     
-    return postValidate(conditions, context, request, response);
+    return postValidate(conditions, context, validatedRequest, response);
   }
 
+  //TODO: move this code out from here, and just call from a validation util
+  //      class or instead of gettign the validation from the registry we
+  //      might even use that to run the validations...
   private OMRequest preValidate(
       List<ValidationCondition> conditions,
       ValidationContext context,

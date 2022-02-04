@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -54,20 +70,20 @@ public class ValidatorRegistry {
       Type requestType,
       RequestProcessingPhase phase) {
 
-    List<Method> returnValue = new LinkedList<>();
 
     EnumMap<Type, Pair<List<Method>, List<Method>>> requestTypeMap =
         validators.get(condition);
     if (requestTypeMap == null || requestTypeMap.isEmpty()) {
-      returnValue = Collections.emptyList();
+      return Collections.emptyList();
     }
 
     Pair<List<Method>, List<Method>> phases = requestTypeMap.get(requestType);
     if (phases == null ||
         (phases.getLeft().isEmpty() && phases.getRight().isEmpty())) {
-      returnValue = Collections.emptyList();
+      return Collections.emptyList();
     }
 
+    List<Method> returnValue = new LinkedList<>();
     if (phase.equals(RequestProcessingPhase.PRE_PROCESS)) {
       returnValue = phases.getLeft();
     } else if (phase.equals(RequestProcessingPhase.POST_PROCESS)) {
@@ -95,13 +111,11 @@ public class ValidatorRegistry {
             getAndInitialize(condition, newTypeMap(), validators);
         Pair<List<Method>, List<Method>> phases = getAndInitialize(
             descriptor.requestType(), newListPair(), requestTypeMap);
-        List<Method> validationMethods = null;
         if (isPreProcessValidator(descriptor)) {
-          validationMethods = phases.getLeft();
+          phases.getLeft().add(m);
         } else if (isPostProcessValidator(descriptor)) {
-          validationMethods = phases.getRight();
+          phases.getRight().add(m);
         }
-        validationMethods.add(m);
       }
     }
   }
