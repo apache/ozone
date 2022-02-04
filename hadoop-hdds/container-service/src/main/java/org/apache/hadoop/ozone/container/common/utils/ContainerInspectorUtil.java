@@ -24,7 +24,10 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerMetadataInspector;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Utility class to manage container inspectors. New inspectors can be added
@@ -32,44 +35,55 @@ import java.util.List;
  */
 public final class ContainerInspectorUtil {
 
-  private static final List<ContainerInspector> INSPECTORS = new ArrayList<>();
+  private static final EnumMap<ContainerProtos.ContainerType,
+          List<ContainerInspector>> INSPECTORS =
+      new EnumMap<>(ContainerProtos.ContainerType.class);
+
   static {
-    // If new inspectors need to be added, they should be added to this list.
-    INSPECTORS.add(new KeyValueContainerMetadataInspector());
+    for (ContainerProtos.ContainerType type:
+        ContainerProtos.ContainerType.values()) {
+      INSPECTORS.put(type, new ArrayList<>());
+    }
+
+    // If new inspectors need to be added, put them here mapped by the type
+    // of containers they can operate on.
+    INSPECTORS.get(ContainerProtos.ContainerType.KeyValueContainer)
+        .add(new KeyValueContainerMetadataInspector());
   }
 
   private ContainerInspectorUtil() { }
 
   public static void load() {
-    for (ContainerInspector inspector: INSPECTORS) {
-      inspector.load();
+    for (List<ContainerInspector> inspectors: INSPECTORS.values()) {
+      for (ContainerInspector inspector: inspectors) {
+        inspector.load();
+      }
     }
   }
 
   public static void unload() {
-    for (ContainerInspector inspector: INSPECTORS) {
-      inspector.unload();
+    for (List<ContainerInspector> inspectors: INSPECTORS.values()) {
+      for (ContainerInspector inspector: inspectors) {
+        inspector.load();
+      }
     }
   }
 
   public static boolean isReadOnly(ContainerProtos.ContainerType type) {
     boolean readOnly = true;
-    for (ContainerInspector inspector: INSPECTORS) {
-      if (inspector.getContainerType() == type) {
-        if (!inspector.isReadOnly()) {
-          readOnly = false;
-          break;
-        }
+    for (ContainerInspector inspector: INSPECTORS.get(type)) {
+      if (!inspector.isReadOnly()) {
+        readOnly = false;
+        break;
       }
     }
     return readOnly;
   }
 
   public static void process(ContainerData data, DatanodeStore store) {
-    for (ContainerInspector inspector: INSPECTORS) {
-      if (inspector.getContainerType() == data.getContainerType()) {
-        inspector.process(data, store);
-      }
+    for (ContainerInspector inspector:
+        INSPECTORS.get(data.getContainerType())) {
+      inspector.process(data, store);
     }
   }
 }

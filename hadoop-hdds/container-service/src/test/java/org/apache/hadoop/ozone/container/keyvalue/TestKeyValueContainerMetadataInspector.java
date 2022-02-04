@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -37,9 +38,9 @@ public class TestKeyValueContainerMetadataInspector
     extends TestKeyValueContainerIntegrityChecks {
   private static final long CONTAINER_ID = 102;
 
-  public TestKeyValueContainerMetadataInspector(ChunkLayoutTestInfo
-      chunkManagerTestInfo) {
-    super(chunkManagerTestInfo);
+  public TestKeyValueContainerMetadataInspector(ContainerLayoutTestInfo
+      containerLayoutTestInfo) {
+    super(containerLayoutTestInfo);
   }
 
   @Test
@@ -55,8 +56,6 @@ public class TestKeyValueContainerMetadataInspector
 
   @Test
   public void testSystemProperty() {
-    Assert.assertEquals(ContainerProtos.ContainerType.KeyValueContainer,
-        new KeyValueContainerMetadataInspector().getContainerType());
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     Assert.assertFalse(new KeyValueContainerMetadataInspector().load());
 
@@ -106,43 +105,86 @@ public class TestKeyValueContainerMetadataInspector
 
   @Test
   public void testIncorrectTotalsNoData() throws Exception {
-    // Test incorrect totals on empty container.
-    inspectThenRepair(0, -3, -3);
+    int createBlocks = 0;
+    int setBlocks = -3;
+    int setBytes = -2;
+
+    KeyValueContainer container = createClosedContainer(createBlocks);
+    setDBBlockAndByteCounts(container.getContainerData(), setBlocks, setBytes);
+    inspectThenRepairOnIncorrectContainer(container.getContainerData(),
+        createBlocks, setBlocks, setBytes);
   }
 
   @Test
   public void testIncorrectTotalsWithData() throws Exception {
-    inspectThenRepair(3, 4, -2);
+    int createBlocks = 3;
+    int setBlocks = 4;
+    int setBytes = -2;
+
+    KeyValueContainer container = createClosedContainer(createBlocks);
+    setDBBlockAndByteCounts(container.getContainerData(), setBlocks, setBytes);
+    inspectThenRepairOnIncorrectContainer(container.getContainerData(),
+        createBlocks, setBlocks, setBytes);
   }
 
   @Test
   public void testCorrectTotalsNoData() throws Exception {
-    inspectThenRepair(0, 0, 0);
+    int createBlocks = 0;
+    int setBytes = 0;
+
+    KeyValueContainer container = createClosedContainer(createBlocks);
+    setDBBlockAndByteCounts(container.getContainerData(), createBlocks,
+        setBytes);
+    inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
   @Test
   public void testCorrectTotalsWithData() throws Exception {
-    inspectThenRepair(3, 3, 10);
+    int createBlocks = 3;
+    int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
+
+    // Make sure it runs on open containers too.
+    KeyValueContainer container = createOpenContainer(createBlocks);
+    setDBBlockAndByteCounts(container.getContainerData(), createBlocks,
+        setBytes);
+    inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
-  public void inspectThenRepair(int createBlocks, int setBlocks,
-      int setBytes) throws Exception {
-    int createBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
-    int createFiles = 0;
-    switch (getChunkLayout()) {
-    case FILE_PER_BLOCK:
-      createFiles = createBlocks;
-      break;
-    case FILE_PER_CHUNK:
-      createFiles = createBlocks * CHUNKS_PER_BLOCK;
-      break;
-    default:
-      Assert.fail("Unrecognized chunk layout version.");
-    }
+  public void inspectThenRepairOnCorrectContainer(
+      KeyValueContainerData containerData) throws Exception {
+    String inspectOutput = inspectContainerAndGetLog(containerData);
+    Assert.assertFalse(inspectOutput.contains(
+        KeyValueContainerMetadataInspector.class.getSimpleName()));
 
-    KeyValueContainer container = createClosedContainer(createBlocks);
-    KeyValueContainerData containerData = container.getContainerData();
-    setDBBlockAndByteCounts(containerData, setBlocks, setBytes);
+    String repairOutput = repairContainerAndGetLog(containerData);
+    Assert.assertFalse(repairOutput.contains(
+        KeyValueContainerMetadataInspector.class.getSimpleName()));
+  }
+
+  /**
+   * Creates a container as specified by the parameters.
+   * Runs the inspector in inspect mode and checks the output.
+   * Runs the inspector in repair mode and checks the output.
+   *
+   * @param createdBlocks Number of blocks to create in the container.
+   * @param setBlocks total block count value set in the database.
+   * @param setBytes total used bytes value set in the database.
+   */
+  public void inspectThenRepairOnIncorrectContainer(
+      KeyValueContainerData containerData, int createdBlocks, int setBlocks,
+      int setBytes) throws Exception {
+    int createdBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createdBlocks;
+    int createdFiles = 0;
+    switch (getChunkLayout()) {
+      case FILE_PER_BLOCK:
+        createdFiles = createdBlocks;
+        break;
+      case FILE_PER_CHUNK:
+        createdFiles = createdBlocks * CHUNKS_PER_BLOCK;
+        break;
+      default:
+        Assert.fail("Unrecognized chunk layout version.");
+    }
 
     // First inspect the container.
     String inspectOutput = inspectContainerAndGetLog(containerData);
@@ -150,41 +192,35 @@ public class TestKeyValueContainerMetadataInspector
         "Audit of container " + CONTAINER_ID + " metadata",
         "#BLOCKCOUNT: " + setBlocks,
         "#BYTESUSED: " + setBytes,
-        createFiles + " files in chunks directory",
-        "Total block keys in DB: " + createBlocks,
+        createdFiles + " files in chunks directory",
+        String.format(
+        "!Value of metadata key #BLOCKCOUNT does not match DB " +
+            "total: %d != %d", setBlocks, createdBlocks),
+        String.format(
+        "!Value of metadata key #BYTESUSED does not match DB total: %d" +
+            " != %d", setBytes, createdBytes),
+        "Total block keys in DB: " + createdBlocks,
         "Total pending delete block keys in DB: 0",
         "Schema Version: " + OzoneConsts.SCHEMA_V2,
-        "Total used bytes in DB: " + createBytes,
+        "Total used bytes in DB: " + createdBytes,
     };
     containsAllStrings(inspectOutput, expectedInspectMessages);
     // Container should not have been modified in inspect mode.
     checkDBBlockAndByteCounts(containerData, setBlocks, setBytes);
 
-    // Now repair the container. Output should be a superset of inspect output.
+    // Now repair the container.
     String repairOutput = repairContainerAndGetLog(containerData);
-    if (setBlocks != createBlocks) {
-      String inspect = String.format(
-          "!Value of metadata key #BLOCKCOUNT does not match DB " +
-          "total: %d != %d", setBlocks, createBlocks);
-      String repair = String.format("!Repairing #BLOCKCOUNT of %d to match " +
-          "database " +
-          "total: " +
-          "%d", setBlocks, createBlocks);
-      Assert.assertTrue(inspectOutput.contains(inspect));
-      Assert.assertTrue(repairOutput.contains(repair));
-    }
-    if (setBytes != createBytes) {
-      String inspect = String.format(
-          "!Value of metadata key #BYTESUSED does not match DB total: %d" +
-          " != %d", setBytes, createBytes);
-      String repair = String.format("!Repairing #BYTESUSED of %s to match " +
-          "database total: %s", setBytes, createBytes);
-      Assert.assertTrue(inspectOutput.contains(inspect));
-      Assert.assertTrue(repairOutput.contains(repair));
-    }
-
+    String[] expectedRepairMessages = new String[]{
+      String.format("!Repairing #BLOCKCOUNT of %d to match " +
+          "database total: %d", setBlocks, createdBlocks),
+      String.format("!Repairing #BYTESUSED of %s to match " +
+        "database total: %s", setBytes, createdBytes)
+    };
+    // Repair output should be a superset of inspect output.
     containsAllStrings(repairOutput, expectedInspectMessages);
-    checkDBBlockAndByteCounts(containerData, createBlocks, createBytes);
+    containsAllStrings(repairOutput, expectedRepairMessages);
+
+    checkDBBlockAndByteCounts(containerData, createdBlocks, createdBytes);
   }
 
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,

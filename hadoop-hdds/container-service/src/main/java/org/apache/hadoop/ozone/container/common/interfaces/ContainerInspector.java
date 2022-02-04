@@ -70,9 +70,4 @@ public interface ContainerInspector {
    * @param store The metadata store for this container.
    */
   void process(ContainerData data, DatanodeStore store);
-
-  /**
-   * @return The type container this inspector can operate on.
-   */
-  ContainerProtos.ContainerType getContainerType();
 }

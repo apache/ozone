@@ -72,7 +72,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   private static Mode mode = Mode.OFF;
 
   public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
-      ".metadata";
+      ".metadata.inspector";
 
   public KeyValueContainerMetadataInspector() { }
 
@@ -94,8 +94,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         propertySet = true;
       } else {
         LOG.error("{} system property specified with invalid mode {}. " +
-                "Valid options are {} and {}. Container metadata repair will" +
-                "not be performed.", SYSTEM_PROPERTY, propertyValue,
+                "Valid options are {} and {}. Container metadata inspection " +
+                "will not be run.", SYSTEM_PROPERTY, propertyValue,
             Mode.REPAIR, Mode.INSPECT);
       }
     }
@@ -115,13 +115,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   }
 
   @Override
-  public ContainerProtos.ContainerType getContainerType() {
-    return ContainerProtos.ContainerType.KeyValueContainer;
-  }
-
-  @Override
-  public void process(ContainerData containerData,
-                      DatanodeStore store) {
+  public void process(ContainerData containerData, DatanodeStore store) {
     // If the system property to process container metadata was not
     // specified, this method is a no-op.
     if (mode == Mode.OFF) {
@@ -212,7 +206,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       // This value gets filled in when block deleting service first runs.
       // Before that it is ok to be missing.
       boolean pendingDeleteCountPassed =
-          pendingDeleteBlockCount != null &&
+          pendingDeleteBlockCount == null ||
               checkMetadataMatchAndAppend(metadataTable,
                   OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
                   pendingDeleteBlockCount, pendingDeleteBlockCountTotal,
