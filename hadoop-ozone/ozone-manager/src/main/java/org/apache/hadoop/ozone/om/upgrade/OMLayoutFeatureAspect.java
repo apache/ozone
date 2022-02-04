@@ -118,6 +118,10 @@ public class OMLayoutFeatureAspect {
         om.getVersionManager(), lf.name());
   }
 
+  /**
+   * Note: Without this, it occasionally throws NoSuchMethodError when running
+   * the test.
+   */
   public static OMLayoutFeatureAspect aspectOf() {
     return new OMLayoutFeatureAspect();
   }
