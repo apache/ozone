@@ -122,7 +122,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   @Override
   public void process(ContainerData containerData, DatanodeStore store) {
     // If the system property to process container metadata was not
-    // specified, this method is a no-op.
+    // specified, or the inspector is unloaded, this method is a no-op.
     if (mode == Mode.OFF) {
       return;
     }
@@ -136,13 +136,15 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
       // Read metadata values.
       Table<String, Long> metadataTable = store.getMetadataTable();
-      Long pendingDeleteBlockCount = getAndAppend(metadataTable,
-          OzoneConsts.PENDING_DELETE_BLOCK_COUNT, messageBuilder);
       Long blockCount = getAndAppend(metadataTable,
           OzoneConsts.BLOCK_COUNT, messageBuilder);
       Long bytesUsed = getAndAppend(metadataTable,
           OzoneConsts.CONTAINER_BYTES_USED, messageBuilder);
       // No repair action taken on these values.
+      // Pending delete blocks could be repaired from the DB values in the
+      // future if necessary.
+      getAndAppend(metadataTable,
+          OzoneConsts.PENDING_DELETE_BLOCK_COUNT, messageBuilder);
       getAndAppend(metadataTable,
           OzoneConsts.DELETE_TRANSACTION_KEY, messageBuilder);
       getAndAppend(metadataTable,
@@ -191,14 +193,16 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       // Count number of files in chunks directory.
       countFilesAndAppend(containerData.getChunksPath(), messageBuilder);
 
+      messageBuilder.append("Container state: ")
+          .append(containerData.getState()).append("\n");
       messageBuilder.append("Schema Version: ")
           .append(schemaVersion).append("\n");
       messageBuilder.append("Total block keys in DB: ").append(blockCountTotal)
           .append("\n");
-      messageBuilder.append("Total pending delete block keys in DB: ")
-          .append(pendingDeleteBlockCountTotal).append("\n");
       messageBuilder.append("Total used bytes in DB: ").append(usedBytesTotal)
           .append("\n");
+      messageBuilder.append("Total pending delete block keys in DB: ")
+          .append(pendingDeleteBlockCountTotal).append("\n");
 
       boolean blockCountPassed =
           checkMetadataMatchAndAppend(metadataTable, OzoneConsts.BLOCK_COUNT,
@@ -208,15 +212,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           checkMetadataMatchAndAppend(metadataTable,
               OzoneConsts.CONTAINER_BYTES_USED,
               bytesUsed, usedBytesTotal, messageBuilder);
-      // This value gets filled in when block deleting service first runs.
-      // Before that it is ok to be missing.
-      boolean pendingDeleteCountPassed =
-          pendingDeleteBlockCount == null ||
-              checkMetadataMatchAndAppend(metadataTable,
-                  OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
-                  pendingDeleteBlockCount, pendingDeleteBlockCountTotal,
-              messageBuilder);
-      passed = blockCountPassed && pendingDeleteCountPassed && bytesUsedPassed;
+      passed = blockCountPassed && bytesUsedPassed;
     } catch(IOException ex) {
       LOG.error("Inspecting container {} failed",
           containerData.getContainerID(), ex);
@@ -282,10 +278,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     File chunksDirFile = new File(chunksDirStr);
     if (!FileUtils.isDirectory(chunksDirFile)) {
       messageBuilder.append("!Missing chunks directory: ")
-          .append(chunksDirStr);
+          .append(chunksDirStr).append("\n");
       if (mode == Mode.REPAIR) {
         messageBuilder.append("!Creating empty chunks directory: ")
-            .append(chunksDirStr);
+            .append(chunksDirStr).append("\n");
         Files.createDirectories(chunksDirFile.toPath());
       }
     } else {

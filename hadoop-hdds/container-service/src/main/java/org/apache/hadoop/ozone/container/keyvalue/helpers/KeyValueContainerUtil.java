@@ -259,7 +259,8 @@ public final class KeyValueContainerUtil {
       }
 
       // Run advanced container inspection/repair operations if specified on
-      // startup.
+      // startup. If this method is called but not as a part of startup,
+      // The inspectors will be unloaded and this will be a no-op.
       ContainerInspectorUtil.process(kvContainerData, store);
     } finally {
       if (cachedDB != null) {

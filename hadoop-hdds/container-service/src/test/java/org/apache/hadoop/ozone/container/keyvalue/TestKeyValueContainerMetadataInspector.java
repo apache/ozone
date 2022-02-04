@@ -50,8 +50,8 @@ public class TestKeyValueContainerMetadataInspector
   public void testRunDisabled() throws Exception {
     // Create incorrect container.
     KeyValueContainer container = createClosedContainer(3);
-    setDBBlockAndByteCounts(container.getContainerData(), -2, -2);
     KeyValueContainerData containerData = container.getContainerData();
+    setDBBlockAndByteCounts(containerData, -2, -2);
 
     // No system property set, should not run.
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
@@ -107,13 +107,15 @@ public class TestKeyValueContainerMetadataInspector
     FileUtils.deleteDirectory(chunksDirFile);
     Assert.assertFalse(chunksDirFile.exists());
 
-    String inspectOutput = inspectContainerAndGetLog(containerData);
+    String inspectOutput = runInspectorAndGetLog(containerData,
+        KeyValueContainerMetadataInspector.Mode.INSPECT);
     Assert.assertTrue(inspectOutput.contains("!Missing chunks directory: " +
         chunksDirStr));
     // No repair should have been done.
     Assert.assertFalse(chunksDirFile.exists());
 
-    String repairOutput = repairContainerAndGetLog(containerData);
+    String repairOutput = runInspectorAndGetLog(containerData,
+        KeyValueContainerMetadataInspector.Mode.REPAIR);
     Assert.assertTrue(repairOutput.contains("!Missing chunks directory: " +
         chunksDirStr));
     Assert.assertTrue(repairOutput.contains("!Creating empty " +
@@ -139,7 +141,8 @@ public class TestKeyValueContainerMetadataInspector
     int setBlocks = 4;
     int setBytes = -2;
 
-    KeyValueContainer container = createClosedContainer(createBlocks);
+    // Make sure it runs on open containers too.
+    KeyValueContainer container = createOpenContainer(createBlocks);
     setDBBlockAndByteCounts(container.getContainerData(), setBlocks, setBytes);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
         createBlocks, setBlocks, setBytes);
@@ -161,8 +164,7 @@ public class TestKeyValueContainerMetadataInspector
     int createBlocks = 3;
     int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
 
-    // Make sure it runs on open containers too.
-    KeyValueContainer container = createOpenContainer(createBlocks);
+    KeyValueContainer container = createClosedContainer(createBlocks);
     setDBBlockAndByteCounts(container.getContainerData(), createBlocks,
         setBytes);
     inspectThenRepairOnCorrectContainer(container.getContainerData());
@@ -170,11 +172,13 @@ public class TestKeyValueContainerMetadataInspector
 
   public void inspectThenRepairOnCorrectContainer(
       KeyValueContainerData containerData) throws Exception {
-    String inspectOutput = inspectContainerAndGetLog(containerData);
+    String inspectOutput = runInspectorAndGetLog(containerData,
+        KeyValueContainerMetadataInspector.Mode.INSPECT);
     Assert.assertFalse(inspectOutput.contains(
         KeyValueContainerMetadataInspector.class.getSimpleName()));
 
-    String repairOutput = repairContainerAndGetLog(containerData);
+    String repairOutput = runInspectorAndGetLog(containerData,
+        KeyValueContainerMetadataInspector.Mode.REPAIR);
     Assert.assertFalse(repairOutput.contains(
         KeyValueContainerMetadataInspector.class.getSimpleName()));
   }
@@ -205,17 +209,19 @@ public class TestKeyValueContainerMetadataInspector
     }
 
     // First inspect the container.
-    String inspectOutput = inspectContainerAndGetLog(containerData);
+    String inspectOutput = runInspectorAndGetLog(containerData,
+        KeyValueContainerMetadataInspector.Mode.INSPECT);
     String[] expectedInspectMessages = new String[]{
         "Audit of container " + CONTAINER_ID + " metadata",
         "#BLOCKCOUNT: " + setBlocks,
         "#BYTESUSED: " + setBytes,
         createdFiles + " files in chunks directory",
+        "Container state: " + containerData.getState(),
         String.format(
-        "!Value of metadata key #BLOCKCOUNT does not match DB " +
+            "!Value of metadata key #BLOCKCOUNT does not match DB " +
             "total: %d != %d", setBlocks, createdBlocks),
         String.format(
-        "!Value of metadata key #BYTESUSED does not match DB total: %d" +
+            "!Value of metadata key #BYTESUSED does not match DB total: %d" +
             " != %d", setBytes, createdBytes),
         "Total block keys in DB: " + createdBlocks,
         "Total pending delete block keys in DB: 0",
@@ -227,7 +233,8 @@ public class TestKeyValueContainerMetadataInspector
     checkDBBlockAndByteCounts(containerData, setBlocks, setBytes);
 
     // Now repair the container.
-    String repairOutput = repairContainerAndGetLog(containerData);
+    String repairOutput = runInspectorAndGetLog(containerData,
+        KeyValueContainerMetadataInspector.Mode.REPAIR);
     String[] expectedRepairMessages = new String[]{
       String.format("!Repairing #BLOCKCOUNT of %d to match " +
           "database total: %d", setBlocks, createdBlocks),
@@ -244,10 +251,8 @@ public class TestKeyValueContainerMetadataInspector
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
       long blockCount, long byteCount) throws Exception {
     try (ReferenceCountedDB db = BlockUtils.getDB(containerData, getConf())) {
-      Table<String, Long> metadataTable =
-          db.getStore().getMetadataTable();
-      // Don't care about in memory state. Just make the DB aggregates
-      // incorrect.
+      Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+      // Don't care about in memory state. Just change the DB values.
       metadataTable.put(OzoneConsts.BLOCK_COUNT, blockCount);
       metadataTable.put(OzoneConsts.CONTAINER_BYTES_USED, byteCount);
     }
@@ -256,8 +261,7 @@ public class TestKeyValueContainerMetadataInspector
   public void checkDBBlockAndByteCounts(KeyValueContainerData containerData,
       long expectedBlockCount, long expectedBytesUsed) throws Exception {
     try (ReferenceCountedDB db = BlockUtils.getDB(containerData, getConf())) {
-      Table<String, Long> metadataTable =
-          db.getStore().getMetadataTable();
+      Table<String, Long> metadataTable = db.getStore().getMetadataTable();
       long bytesUsed = metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED);
       Assert.assertEquals(expectedBytesUsed, bytesUsed);
       long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
@@ -265,21 +269,10 @@ public class TestKeyValueContainerMetadataInspector
     }
   }
 
-  private String inspectContainerAndGetLog(KeyValueContainerData containerData)
-      throws Exception {
+  private String runInspectorAndGetLog(KeyValueContainerData containerData,
+      KeyValueContainerMetadataInspector.Mode mode) throws Exception {
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
-        KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
-    ContainerInspectorUtil.load();
-    String logOut = runInspectorAndGetLog(containerData);
-    ContainerInspectorUtil.unload();
-    System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
-    return logOut;
-  }
-
-  private String repairContainerAndGetLog(KeyValueContainerData containerData)
-      throws Exception {
-    System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
-        KeyValueContainerMetadataInspector.Mode.REPAIR.toString());
+        mode.toString());
     ContainerInspectorUtil.load();
     String logOut = runInspectorAndGetLog(containerData);
     ContainerInspectorUtil.unload();

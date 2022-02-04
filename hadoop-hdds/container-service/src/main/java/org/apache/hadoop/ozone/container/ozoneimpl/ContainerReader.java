@@ -140,7 +140,6 @@ public class ContainerReader implements Runnable {
       }
 
       LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-
       File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null) {
@@ -191,9 +190,9 @@ public class ContainerReader implements Runnable {
   }
 
   /**
-   * verify ContainerData loaded from disk and fix-up stale members.
-   * Specifically blockCommitSequenceId, delete related metadata,
-   * bytesUsed and block count if they are not present.
+   * Verify ContainerData loaded from disk and fix-up stale members.
+   * Specifically the in memory values of blockCommitSequenceId, delete related
+   * metadata, bytesUsed and block count.
    * @param containerData
    * @throws IOException
    */

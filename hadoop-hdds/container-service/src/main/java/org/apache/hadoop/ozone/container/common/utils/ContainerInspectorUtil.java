@@ -62,7 +62,7 @@ public final class ContainerInspectorUtil {
   public static void unload() {
     for (List<ContainerInspector> inspectors: INSPECTORS.values()) {
       for (ContainerInspector inspector: inspectors) {
-        inspector.load();
+        inspector.unload();
       }
     }
   }
