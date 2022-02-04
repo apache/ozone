@@ -18,14 +18,12 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -176,14 +174,14 @@ public class TestKeyValueContainerMetadataInspector
     int createdBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createdBlocks;
     int createdFiles = 0;
     switch (getChunkLayout()) {
-      case FILE_PER_BLOCK:
-        createdFiles = createdBlocks;
-        break;
-      case FILE_PER_CHUNK:
-        createdFiles = createdBlocks * CHUNKS_PER_BLOCK;
-        break;
-      default:
-        Assert.fail("Unrecognized chunk layout version.");
+    case FILE_PER_BLOCK:
+      createdFiles = createdBlocks;
+      break;
+    case FILE_PER_CHUNK:
+      createdFiles = createdBlocks * CHUNKS_PER_BLOCK;
+      break;
+    default:
+      Assert.fail("Unrecognized chunk layout version.");
     }
 
     // First inspect the container.

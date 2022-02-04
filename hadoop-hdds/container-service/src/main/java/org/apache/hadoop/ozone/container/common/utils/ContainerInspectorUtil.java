@@ -25,9 +25,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerMetadataInspe
 
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Utility class to manage container inspectors. New inspectors can be added
