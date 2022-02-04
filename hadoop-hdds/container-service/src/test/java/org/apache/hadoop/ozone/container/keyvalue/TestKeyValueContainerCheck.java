@@ -30,6 +30,9 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
 import java.io.File;
 import java.io.RandomAccessFile;
 import static org.junit.Assert.assertEquals;
@@ -40,6 +43,7 @@ import static org.junit.Assert.assertFalse;
 /**
  * Basic sanity test for the KeyValueContainerCheck class.
  */
+@RunWith(Parameterized.class)
 public class TestKeyValueContainerCheck
     extends TestKeyValueContainerIntegrityChecks {
 

@@ -59,7 +59,6 @@ import static org.junit.Assert.assertNotNull;
 /**
  * Base class for tests identifying issues with key value container contents.
  */
-@RunWith(Parameterized.class)
 public class TestKeyValueContainerIntegrityChecks {
 
   private static final Logger LOG =
