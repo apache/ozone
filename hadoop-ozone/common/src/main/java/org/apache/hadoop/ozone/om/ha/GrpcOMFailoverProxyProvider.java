@@ -71,7 +71,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
     List<String> omNodeIDList = new ArrayList<>();
     omAddresses = new HashMap<>();
 
-    Collection<String> omNodeIds = OmUtils.getOMNodeIds(config, omSvcId);
+    Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config, omSvcId);
 
     for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
 

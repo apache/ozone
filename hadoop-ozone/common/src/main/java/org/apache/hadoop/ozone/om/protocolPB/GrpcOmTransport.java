@@ -18,17 +18,10 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
-<<<<<<< HEAD
-import java.util.Optional;
-=======
 import java.lang.reflect.Constructor;
-
->>>>>>> 1522fc225... Initial commit for grpc s3 gateway with retry proxy, GrpcOMFailoverProxyProvider with GrpcOmTransport invocationHandler.
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -60,12 +53,10 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
-import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 
 /**
  * Grpc transport for grpc between s3g and om.
@@ -173,8 +164,8 @@ public class GrpcOmTransport implements OmTransport {
   private Exception unwrapException(Exception ex) {
     Exception grpcException = null;
     try {
-      io.grpc.StatusRuntimeException srexp =
-          (io.grpc.StatusRuntimeException)ex.getCause();
+      StatusRuntimeException srexp =
+          (StatusRuntimeException)ex.getCause();
       Status status = srexp.getStatus();
       LOG.debug("GRPC exception wrapped: {}", status.getDescription());
       if (status.getCode() == Status.Code.INTERNAL) {

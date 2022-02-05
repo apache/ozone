@@ -550,12 +550,12 @@ public class OMFailoverProxyProvider<T> implements
   }
 
   protected void setProxies(
-      Map<String, ProxyInfo<T>> testOMProxies,
-      Map<String, OMProxyInfo> testOMProxyInfos,
-      List<String> testOMNodeIDList) {
-    this.omProxies = testOMProxies;
-    this.omProxyInfos = testOMProxyInfos;
-    this.omNodeIDList = testOMNodeIDList;
+      Map<String, ProxyInfo<T>> setOMProxies,
+      Map<String, OMProxyInfo> setOMProxyInfos,
+      List<String> setOMNodeIDList) {
+    this.omProxies = setOMProxies;
+    this.omProxyInfos = setOMProxyInfos;
+    this.omNodeIDList = setOMNodeIDList;
   }
 
   protected List<String> getOmNodeIDList() {
