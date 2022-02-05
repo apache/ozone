@@ -344,7 +344,7 @@ public class TestOzoneECClient {
     }
   }
 
-  private DatanodeDetails getMatchingStorage(
+  private static DatanodeDetails getMatchingStorage(
       Map<DatanodeDetails, MockDatanodeStorage> storages, String uuid) {
     Iterator<DatanodeDetails> iterator = storages.keySet().iterator();
     while (iterator.hasNext()) {

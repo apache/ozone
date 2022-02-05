@@ -65,7 +65,7 @@ public class MockDatanodeStorage {
     chunks.put(createKey(blockID, chunkInfo), chunkInfo);
     fullBlockData
         .put(new BlockID(blockID.getContainerID(), blockID.getLocalID()),
-            fullBlockData.getOrDefault(blockID, new String())
+            fullBlockData.getOrDefault(blockID, "")
                 .concat(bytes.toStringUtf8()));
   }
 
