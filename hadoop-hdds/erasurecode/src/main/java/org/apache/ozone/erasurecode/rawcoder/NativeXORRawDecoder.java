@@ -35,11 +35,11 @@ public class NativeXORRawDecoder extends AbstractNativeRawDecoder {
 
   public NativeXORRawDecoder(ECReplicationConfig ecReplicationConfig) {
     super(ecReplicationConfig);
-    getDecoderLock().writeLock().lock();
+    decoderLock.writeLock().lock();
     try {
       initImpl(ecReplicationConfig.getData(), ecReplicationConfig.getParity());
     } finally {
-      getDecoderLock().writeLock().unlock();
+      decoderLock.writeLock().unlock();
     }
   }
 
@@ -52,11 +52,11 @@ public class NativeXORRawDecoder extends AbstractNativeRawDecoder {
 
   @Override
   public void release() {
-    getDecoderLock().writeLock().lock();
+    decoderLock.writeLock().lock();
     try {
       destroyImpl();
     } finally {
-      getDecoderLock().writeLock().unlock();
+      decoderLock.writeLock().unlock();
     }
   }
 
