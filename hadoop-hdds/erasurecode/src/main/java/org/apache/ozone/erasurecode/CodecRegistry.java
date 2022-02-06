@@ -20,6 +20,8 @@ package org.apache.ozone.erasurecode;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureCoderFactory;
+import org.apache.ozone.erasurecode.rawcoder.NativeRSRawErasureCoderFactory;
+import org.apache.ozone.erasurecode.rawcoder.NativeXORRawErasureCoderFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,7 +89,12 @@ public final class CodecRegistry {
           }
         }
         if (!hasConflit) {
-          coders.add(coderFactory);
+          if (coderFactory instanceof NativeRSRawErasureCoderFactory
+              || coderFactory instanceof NativeXORRawErasureCoderFactory) {
+            coders.add(0, coderFactory);
+          } else {
+            coders.add(coderFactory);
+          }
           LOG.debug("Codec registered: codec = {}, coder = {}",
               coderFactory.getCodecName(), coderFactory.getCoderName());
         }

@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.erasurecode.CodecRegistry;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.util.Preconditions;
 import org.junit.Assert;
 
@@ -184,9 +184,8 @@ public final class ECStreamTestUtil {
     for (int i = 0; i < ecConfig.getParity(); i++) {
       parity[i] = ByteBuffer.allocate(cellSize);
     }
-    RawErasureEncoder encoder = CodecRegistry.getInstance()
-        .getCodecFactory(ecConfig.getCodec().toString())
-        .createEncoder(ecConfig);
+    RawErasureEncoder encoder =
+        CodecUtil.createRawEncoderWithFallback(ecConfig);
     encoder.encode(data, parity);
 
     data[0].flip();

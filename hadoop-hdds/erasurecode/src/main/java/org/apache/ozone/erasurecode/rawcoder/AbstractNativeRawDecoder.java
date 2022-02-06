@@ -106,4 +106,8 @@ abstract class AbstractNativeRawDecoder extends RawErasureDecoder {
   public boolean preferDirectBuffer() {
     return true;
   }
+
+  protected ReentrantReadWriteLock getDecoderLock() {
+    return decoderLock;
+  }
 }

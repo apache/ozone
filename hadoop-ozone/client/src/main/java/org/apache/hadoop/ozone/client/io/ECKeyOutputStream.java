@@ -40,8 +40,8 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.ozone.erasurecode.CodecRegistry;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,9 +112,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
             unsafeByteBufferConversion, xceiverClientManager, handler.getId());
 
     this.writeOffset = 0;
-    this.encoder = CodecRegistry.getInstance()
-        .getCodecFactory(replicationConfig.getCodec().name().toLowerCase())
-        .createEncoder(replicationConfig);
+    this.encoder = CodecUtil.createRawEncoderWithFallback(replicationConfig);
   }
 
   /**
