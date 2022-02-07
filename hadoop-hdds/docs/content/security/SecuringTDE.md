@@ -74,20 +74,43 @@ There are two ways to create an encrypted bucket that can be accessed via S3 Gat
 #### Option 1. Create a bucket using shell under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey --layout=FILE_SYSTEM_OPTIMIZED /s3v/encryptedbucket
+  ozone sh bucket create -k encKey --layout=OBJECT_STORE /s3v/encryptedbucket
   ```
 
 #### Option 2. Create a link to an encrypted bucket under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey --layout=FILE_SYSTEM_OPTIMIZED /vol/encryptedbucket
+  ozone sh bucket create -k encKey --layout=OBJECT_STORE /vol/encryptedbucket
   ozone sh bucket link /vol/encryptedbucket /s3v/linkencryptedbucket
   ```
 
 Note 1: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
 After creating an encrypted bucket, all the keys added to this bucket using s3g will be encrypted.
 
-Note 2: `--layout=FILE_SYSTEM_OPTIMIZED` is added in the command line above to allow HCFS (o3fs / ofs) access.
+Note 2: `--layout=OBJECT_STORE` is specified in the above examples
+for full compatibility with S3 (which is the default value for the `--layout`
+argument, but explicitly added here to make a point).
+
+Bucket created with the `OBJECT_STORE` type will NOT be accessible via
+HCFS (ofs or o3fs) at all. And such access will be rejected. For instance:
+
+  ```bash
+  $ ozone fs -ls ofs://ozone1/s3v/encryptedbucket/
+  -ls: Bucket: encryptedbucket has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
+  ```
+
+  ```bash
+  $ ozone fs -ls o3fs://encryptedbucket.s3v.ozone1/
+  22/02/07 00:00:00 WARN fs.FileSystem: Failed to initialize fileystem o3fs://encryptedbucket.s3v.ozone1/: java.lang.IllegalArgumentException: Bucket: encryptedbucket has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
+  -ls: Bucket: encryptedbucket has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
+  ```
+
+If one wants the bucket to be accessible from both S3G and HCFS (ofs and o3fs)
+at the same time, use `--layout=FILE_SYSTEM_OPTIMIZED` instead.
+
+However, in buckets with `FILE_SYSTEM_OPTIMIZED` layout, some irregular S3 key
+names may be rejected or normalized, which can be undesired.
+See [Prefix based File System Optimization]({{< relref "../feature/PrefixFSO.md" >}}) for more information.
 
 In non-secure mode, the user running the S3Gateway daemon process is the proxy user, 
 while in secure mode the S3Gateway Kerberos principal (ozone.s3g.kerberos.principal) is the proxy user. 
