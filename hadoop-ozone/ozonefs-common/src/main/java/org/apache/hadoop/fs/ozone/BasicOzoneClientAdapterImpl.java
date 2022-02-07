@@ -564,13 +564,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public FileChecksum getFileChecksum(Path f, long length) throws IOException {
-    OFSPath ofsPath = new OFSPath(f);
+  public FileChecksum getFileChecksum(String keyName, long length) throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
 
     return OzoneClientUtils.getFileChecksumWithCombineMode(
-        volume, bucket, ofsPath.getKeyName(),
+        volume, bucket, keyName,
         length, combineMode, ozoneClient.getObjectStore().getClientProxy());
 
   }

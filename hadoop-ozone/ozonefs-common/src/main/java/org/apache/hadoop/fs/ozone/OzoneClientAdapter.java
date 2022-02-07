@@ -80,5 +80,5 @@ public interface OzoneClientAdapter {
 
   boolean isFSOptimizedBucket();
 
-  FileChecksum getFileChecksum(Path f, long length) throws IOException;
+  FileChecksum getFileChecksum(String keyName, long length) throws IOException;
 }
