@@ -380,8 +380,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     for (int i =
          numDataBlks; i < (this.numDataBlks + this.numParityBlks); i++) {
       // Move the stream entry cursor to parity block index
-      handleParityWrite(i, parityBuffers[i - numDataBlks].array(), 0,
-          parityCellSize, true);
+      handleParityWrite(i, parityCellSize, true);
     }
   }
 
@@ -396,8 +395,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return pos;
   }
 
-  private void handleParityWrite(int currIdx, byte[] b, int off, long len,
-      boolean isFullCell) throws IOException {
+  private void handleParityWrite(int currIdx, long len, boolean isFullCell) {
     handleOutputStreamWrite(currIdx, len, isFullCell, true);
     blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
   }
@@ -418,7 +416,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       try {
         // Since it's a fullcell, let's write all content from buffer.
         writeToOutputStream(current, len, bytesToWrite.array(),
-            bytesToWrite.array().length, 0, isParity);
+            bytesToWrite.limit(), 0, isParity);
       } catch (Exception e) {
         markStreamAsFailed(e);
       }

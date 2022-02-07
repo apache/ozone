@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -49,6 +50,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -280,6 +282,78 @@ public class TestOzoneECClient {
       Assert.assertEquals(new String(inputData, UTF_8),
           new String(fileContent, UTF_8));
     }
+  }
+
+  @Test
+  public void testSmallerThanChunkSize() throws IOException {
+    byte[] firstSmallChunk = new byte[chunkSize - 1];
+    Arrays.fill(firstSmallChunk, 0, firstSmallChunk.length - 1,
+        Byte.parseByte("1"));
+
+    writeIntoECKey(firstSmallChunk, keyName,
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(dataBlocks, parityBlocks,
+                ECReplicationConfig.EcCodec.RS, chunkSize)));
+    OzoneManagerProtocolProtos.KeyLocationList blockList =
+        transportStub.getKeys().get(volumeName).get(bucketName).get(keyName)
+            .getKeyLocationListList().get(0);
+
+    Map<DatanodeDetails, MockDatanodeStorage> storages =
+        ((MockXceiverClientFactory) factoryStub).getStorages();
+    OzoneManagerProtocolProtos.KeyLocation keyLocations =
+        blockList.getKeyLocations(0);
+
+    List<MockDatanodeStorage> dns = new ArrayList<>();
+    for (int i = 0; i < dataBlocks + parityBlocks; i++) {
+      HddsProtos.DatanodeDetailsProto member =
+          blockList.getKeyLocations(0).getPipeline().getMembers(i);
+      MockDatanodeStorage mockDatanodeStorage =
+          storages.get(getMatchingStorage(storages, member.getUuid()));
+      dns.add(mockDatanodeStorage);
+    }
+    String firstBlockData = dns.get(0).getFullBlockData(new BlockID(
+        keyLocations.getBlockID().getContainerBlockID().getContainerID(),
+        keyLocations.getBlockID().getContainerBlockID().getLocalID()));
+
+    Assert.assertArrayEquals(firstSmallChunk, firstBlockData.getBytes(UTF_8));
+
+    final ByteBuffer[] dataBuffers = new ByteBuffer[dataBlocks];
+    dataBuffers[0] = ByteBuffer.wrap(firstSmallChunk);
+    //Let's pad the remaining length equal to firstSmall chunk len
+    for (int i = 1; i < dataBlocks; i++) {
+      dataBuffers[i] = ByteBuffer.allocate(firstSmallChunk.length);
+      Arrays.fill(dataBuffers[i].array(), 0, firstSmallChunk.length, (byte) 0);
+    }
+
+    final ByteBuffer[] parityBuffers = new ByteBuffer[parityBlocks];
+    for (int i = 0; i < parityBlocks; i++) {
+      parityBuffers[i] = ByteBuffer.allocate(firstSmallChunk.length);
+    }
+    encoder.encode(dataBuffers, parityBuffers);
+
+    //Lets assert the parity data.
+    for (int i = dataBlocks; i < dataBlocks + parityBlocks; i++) {
+      String parityBlockData = dns.get(i).getFullBlockData(new BlockID(
+          keyLocations.getBlockID().getContainerBlockID().getContainerID(),
+          keyLocations.getBlockID().getContainerBlockID().getLocalID()));
+      String expected =
+          new String(parityBuffers[i - dataBlocks].array(), UTF_8);
+      Assert.assertEquals(expected, parityBlockData);
+      Assert.assertEquals(expected.length(), parityBlockData.length());
+
+    }
+  }
+
+  private static DatanodeDetails getMatchingStorage(
+      Map<DatanodeDetails, MockDatanodeStorage> storages, String uuid) {
+    Iterator<DatanodeDetails> iterator = storages.keySet().iterator();
+    while (iterator.hasNext()) {
+      DatanodeDetails dn = iterator.next();
+      if (dn.getUuid().toString().equals(uuid)) {
+        return dn;
+      }
+    }
+    return null;
   }
 
   @Test
