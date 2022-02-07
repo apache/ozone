@@ -74,8 +74,8 @@ public final class OzoneClientUtils {
 
   public static FileChecksum getFileChecksumWithCombineMode(OzoneVolume volume,
       OzoneBucket bucket, String keyName, long length,
-      OzoneClientConfig.ChecksumCombineMode combineMode, ClientProtocol rpcClient)
-      throws IOException {
+      OzoneClientConfig.ChecksumCombineMode combineMode,
+      ClientProtocol rpcClient) throws IOException {
     Preconditions.checkArgument(length >= 0);
 
     if (keyName.length() == 0) {
