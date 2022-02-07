@@ -58,10 +58,10 @@ To create an encrypted bucket, client need to:
    * Assign the encryption key to a bucket.
 
   ```bash
-  ozone sh bucket create -k encKey /vol/encryptedBucket
+  ozone sh bucket create -k encKey /vol/encryptedbucket
   ```
 
-After this command, all data written to the _encryptedBucket_ will be encrypted
+After this command, all data written to the _encryptedbucket_ will be encrypted
 via the encKey and while reading the clients will talk to Key Management
 Server and read the key and decrypt it. In other words, the data stored
 inside Ozone is always encrypted. The fact that data is encrypted at rest
@@ -71,19 +71,23 @@ will be completely transparent to the clients and end users.
 
 There are two ways to create an encrypted bucket that can be accessed via S3 Gateway.
 
-####1. Create a bucket using shell under "/s3v" volume
+#### Option 1. Create a bucket using shell under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey /s3v/encryptedBucket
+  ozone sh bucket create -k encKey --layout=FILE_SYSTEM_OPTIMIZED /s3v/encryptedbucket
   ```
-####2. Create a link to an encrypted bucket under "/s3v" volume
+
+#### Option 2. Create a link to an encrypted bucket under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey /vol/encryptedBucket
-  ozone sh bucket link  /vol/encryptedBucket /s3v/linkencryptedbucket
+  ozone sh bucket create -k encKey --layout=FILE_SYSTEM_OPTIMIZED /vol/encryptedbucket
+  ozone sh bucket link /vol/encryptedbucket /s3v/linkencryptedbucket
   ```
-Note: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
+
+Note 1: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
 After creating an encrypted bucket, all the keys added to this bucket using s3g will be encrypted.
+
+Note 2: `--layout=FILE_SYSTEM_OPTIMIZED` is added in the command line above to allow HCFS (o3fs / ofs) access.
 
 In non-secure mode, the user running the S3Gateway daemon process is the proxy user, 
 while in secure mode the S3Gateway Kerberos principal (ozone.s3g.kerberos.principal) is the proxy user. 
@@ -111,12 +115,11 @@ The below two configurations must be added to the kms-site.xml to allow the S3Ga
          This is the host where the S3Gateway is running. Set this to '*' to allow
          requests from any hosts to be proxied.
   </description>
-
 </property>
-
 ```
 
-###KMS Authorization
+### KMS Authorization
+
 If Ranger authorization is enabled for KMS, then decrypt key permission should be given to
 access key id user(currently access key is kerberos principal) to decrypt the encrypted key 
 to read/write a key in the encrypted bucket.
