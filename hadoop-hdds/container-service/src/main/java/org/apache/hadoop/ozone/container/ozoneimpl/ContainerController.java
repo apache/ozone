@@ -112,7 +112,12 @@ public class ContainerController {
   public void markContainerUnhealthy(final long containerId)
           throws IOException {
     Container container = containerSet.getContainer(containerId);
-    getHandler(container).markContainerUnhealthy(container);
+    if (container != null) {
+      getHandler(container).markContainerUnhealthy(container);
+    } else {
+      LOG.warn("Container {} not found, may be deleted, skip mark UNHEALTHY",
+          containerId);
+    }
   }
 
   /**
@@ -206,7 +211,12 @@ public class ContainerController {
   void updateDataScanTimestamp(long containerId, Instant timestamp)
       throws IOException {
     Container container = containerSet.getContainer(containerId);
-    container.updateDataScanTimestamp(timestamp);
+    if (container != null) {
+      container.updateDataScanTimestamp(timestamp);
+    } else {
+      LOG.warn("Container {} not found, may be deleted, " +
+          "skip update DataScanTimestamp", containerId);
+    }
   }
 
 }

@@ -91,7 +91,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketLayout bucketLayout;
 
-  private final String owner;
+  private String owner;
 
   /**
    * Private constructor, constructed via builder.
@@ -295,6 +295,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   public String getOwner() {
     return owner;
+  }
+
+  public void setModificationTime(long modificationTime) {
+    this.modificationTime = modificationTime;
+  }
+
+  public void setOwner(String ownerName) {
+    this.owner = ownerName;
   }
 
   /**

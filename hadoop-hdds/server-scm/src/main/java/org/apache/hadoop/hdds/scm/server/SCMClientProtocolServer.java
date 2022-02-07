@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -287,6 +288,28 @@ public class SCMClientProtocolServer implements
               ContainerID.valueOf(containerID).toString()), ex));
       throw ex;
     }
+  }
+
+  @Override
+  public List<HddsProtos.SCMContainerReplicaProto>
+      getContainerReplicas(long containerId) throws IOException {
+    List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
+
+    Set<ContainerReplica> replicas = getScm().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerId));
+    for (ContainerReplica r : replicas) {
+      results.add(
+          HddsProtos.SCMContainerReplicaProto.newBuilder()
+              .setContainerID(containerId)
+              .setState(r.getState().toString())
+              .setDatanodeDetails(r.getDatanodeDetails().getProtoBufMessage())
+              .setBytesUsed(r.getBytesUsed())
+              .setPlaceOfBirth(r.getOriginDatanodeId().toString())
+              .setKeyCount(r.getKeyCount())
+              .setSequenceID(r.getSequenceId()).build()
+      );
+    }
+    return results;
   }
 
   @Override
@@ -708,6 +731,15 @@ public class SCMClientProtocolServer implements
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_STATUS, null));
     return scm.getReplicationManager().isRunning();
+  }
+
+  @Override
+  public ReplicationManagerReport getReplicationManagerReport()
+      throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
+    return scm.getReplicationManager().getContainerReport();
   }
 
   @Override

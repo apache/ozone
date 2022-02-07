@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
+import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 
 
 import org.apache.ozone.test.GenericTestUtils;
@@ -60,7 +60,7 @@ public class TestOmStartupSlvLessThanMlv {
     int mlv = largestSlv + 1;
 
     // Create version file with MLV > SLV, which should fail the cluster build.
-    TestUpgradeUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, mlv);
+    UpgradeTestUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, mlv);
 
     MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf)
         .setClusterId(UUID.randomUUID().toString())

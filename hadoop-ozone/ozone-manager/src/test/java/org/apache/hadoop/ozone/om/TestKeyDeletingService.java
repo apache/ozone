@@ -26,6 +26,10 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -37,7 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
@@ -66,6 +69,8 @@ public class TestKeyDeletingService {
   public TemporaryFolder folder = new TemporaryFolder();
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestKeyDeletingService.class);
 
   private OzoneConfiguration createConfAndInitValues() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -121,7 +126,7 @@ public class TestKeyDeletingService {
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), 0);
   }
 
-  @Test(timeout = 30000)
+  @Test(timeout = 40000)
   public void checkIfDeleteServiceWithFailingSCM()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -139,8 +144,22 @@ public class TestKeyDeletingService {
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    Assert.assertEquals(
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            int numPendingDeletionKeys =
+                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
+            if (numPendingDeletionKeys != keyCount) {
+              LOG.info("Expected {} keys to be pending deletion, but got {}",
+                  keyCount, numPendingDeletionKeys);
+              return false;
+            }
+            return true;
+          } catch (IOException e) {
+            LOG.error("Error while getting pending deletion keys.", e);
+            return false;
+          }
+        }, 100, 2000);
     // Make sure that we have run the background thread 5 times more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 5,
@@ -197,14 +216,14 @@ public class TestKeyDeletingService {
       // cheat here, just create a volume and bucket entry so that we can
       // create the keys, we put the same data for key and value since the
       // system does not decode the object
-      TestOMRequestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+      OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
           OmVolumeArgs.newBuilder()
               .setOwnerName("o")
               .setAdminName("a")
               .setVolume(volumeName)
               .build());
 
-      TestOMRequestUtils.addBucketToOM(keyManager.getMetadataManager(),
+      OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
           OmBucketInfo.newBuilder().setVolumeName(volumeName)
               .setBucketName(bucketName)
               .build());

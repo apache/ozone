@@ -23,10 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -54,13 +54,13 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
       bucket = bucketName;
     }
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucket,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket,
         omMetadataManager);
 
     List<String> ozoneKeyNames = new ArrayList<>(numKeys);
     for (int i = 1; i <= numKeys; i++) {
       String key = keyName + "-" + i;
-      TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucket,
+      OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucket,
           key, clientID, replicationType, replicationFactor, trxnIndex++,
           omMetadataManager);
       ozoneKeyNames.add(omMetadataManager.getOzoneKey(
@@ -69,7 +69,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     List<String> deletedKeyNames = new ArrayList<>(numKeys);
     for (String ozoneKey : ozoneKeyNames) {
-      String deletedKeyName = TestOMRequestUtils.deleteKey(
+      String deletedKeyName = OMRequestTestUtils.deleteKey(
           ozoneKey, omMetadataManager, trxnIndex++);
       deletedKeyNames.add(deletedKeyName);
     }
