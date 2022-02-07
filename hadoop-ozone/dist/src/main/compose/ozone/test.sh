@@ -26,7 +26,7 @@ export OZONE_REPLICATION_FACTOR=3
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env
+start_docker_env 5
 
 execute_robot_test scm lib
 execute_robot_test scm ozone-lib
@@ -58,6 +58,8 @@ execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-objectdele
 execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-objectcopy s3/objectcopy.robot
 execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-objectmultidelete s3/objectmultidelete.robot
 execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-MultipartUpload s3/MultipartUpload.robot
+
+execute_robot_test scm ec
 
 stop_docker_env
 
