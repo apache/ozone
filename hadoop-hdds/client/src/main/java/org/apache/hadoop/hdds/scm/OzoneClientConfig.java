@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -38,6 +37,18 @@ public class OzoneClientConfig {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientConfig.class);
+
+  /**
+   * Enum for indicating what mode to use when combining chunk and block
+   * checksums to define an aggregate FileChecksum. This should be considered
+   * a client-side runtime option rather than a persistent property of any
+   * stored metadata, which is why this is not part of ChecksumOpt, which
+   * deals with properties of files at rest.
+   */
+  public enum ChecksumCombineMode {
+    MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
+    COMPOSITE_CRC  // Block/chunk-independent composite CRC
+  }
 
   @Config(key = "stream.buffer.flush.size",
       defaultValue = "16MB",
@@ -132,7 +143,7 @@ public class OzoneClientConfig {
           + "file checksum. Default checksum type is COMPOSITE_CRC.",
       tags = ConfigTag.CLIENT)
   private String checksumCombineMode =
-      Options.ChecksumCombineMode.COMPOSITE_CRC.name();
+      ChecksumCombineMode.COMPOSITE_CRC.name();
 
   @PostConstruct
   private void validate() {
@@ -238,15 +249,15 @@ public class OzoneClientConfig {
     return bufferIncrement;
   }
 
-  public Options.ChecksumCombineMode getChecksumCombineMode() {
+  public ChecksumCombineMode getChecksumCombineMode() {
     try {
-      return Options.ChecksumCombineMode.valueOf(checksumCombineMode);
+      return ChecksumCombineMode.valueOf(checksumCombineMode);
     } catch(IllegalArgumentException iae) {
       LOG.warn("Bad checksum combine mode: {}. Using default {}",
           checksumCombineMode,
-          Options.ChecksumCombineMode.COMPOSITE_CRC.name());
-      return Options.ChecksumCombineMode.valueOf(
-          Options.ChecksumCombineMode.COMPOSITE_CRC.name());
+          ChecksumCombineMode.COMPOSITE_CRC.name());
+      return ChecksumCombineMode.valueOf(
+          ChecksumCombineMode.COMPOSITE_CRC.name());
     }
   }
 }

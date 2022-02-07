@@ -17,7 +17,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FileChecksum;
-import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -39,7 +39,7 @@ public class TestOzoneClientUtils {
     String keyName = "dummy";
     ClientProtocol clientProtocol = mock(ClientProtocol.class);
     OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
-        -1, Options.ChecksumCombineMode.MD5MD5CRC, clientProtocol);
+        -1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC, clientProtocol);
 
   }
 
@@ -51,7 +51,8 @@ public class TestOzoneClientUtils {
     ClientProtocol clientProtocol = mock(ClientProtocol.class);
     FileChecksum checksum =
         OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
-            1, Options.ChecksumCombineMode.MD5MD5CRC, clientProtocol);
+            1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC,
+            clientProtocol);
 
     assertNull(checksum);
   }

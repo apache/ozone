@@ -19,7 +19,7 @@ package org.apache.hadoop.fs.ozone;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
-import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -74,7 +74,7 @@ public final class OzoneClientUtils {
 
   public static FileChecksum getFileChecksumWithCombineMode(OzoneVolume volume,
       OzoneBucket bucket, String keyName, long length,
-      Options.ChecksumCombineMode combineMode, ClientProtocol rpcClient)
+      OzoneClientConfig.ChecksumCombineMode combineMode, ClientProtocol rpcClient)
       throws IOException {
     Preconditions.checkArgument(length >= 0);
 

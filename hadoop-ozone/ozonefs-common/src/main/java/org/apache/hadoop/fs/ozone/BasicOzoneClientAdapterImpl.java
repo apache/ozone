@@ -31,7 +31,6 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileChecksum;
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -567,7 +566,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     OFSPath ofsPath = new OFSPath(f);
-    Options.ChecksumCombineMode combineMode =
+    OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
 
     return OzoneClientUtils.getFileChecksumWithCombineMode(

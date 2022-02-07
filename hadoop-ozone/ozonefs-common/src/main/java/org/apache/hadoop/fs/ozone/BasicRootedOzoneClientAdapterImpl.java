@@ -39,7 +39,6 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -1072,7 +1071,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
-    Options.ChecksumCombineMode combineMode =
+    OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
 
     OFSPath ofsPath = new OFSPath(f);
