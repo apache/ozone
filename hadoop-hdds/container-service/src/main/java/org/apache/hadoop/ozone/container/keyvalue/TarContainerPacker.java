@@ -81,7 +81,7 @@ public class TarContainerPacker
       while (entry != null) {
         String name = entry.getName();
         long size = entry.getSize();
-        if (name.startsWith(DB_DIR_NAME)) {
+        if (name.startsWith(DB_DIR_NAME + "/")) {
           Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
           if (entry.isDirectory()) {
@@ -89,7 +89,7 @@ public class TarContainerPacker
           } else {
             extractFileEntry(archiveInput, size, dbRoot, destinationPath);
           }
-        } else if (name.startsWith(CHUNKS_DIR_NAME)) {
+        } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
           if (entry.isDirectory()) {
