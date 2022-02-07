@@ -221,6 +221,8 @@ public final class ECStreamTestUtil {
 
     private List<TestBlockInputStream> blockStreams = new ArrayList<>();
     private List<ByteBuffer> blockStreamData;
+    // List of EC indexes that should fail immediately on read
+    private List<Integer> failIndexes = new ArrayList<>();
 
     private Pipeline currentPipeline;
 
@@ -236,6 +238,10 @@ public final class ECStreamTestUtil {
       this.currentPipeline = pipeline;
     }
 
+    public void setFailIndexes(List<Integer> fail) {
+      failIndexes.addAll(fail);
+    }
+
     public BlockExtendedInputStream create(ReplicationConfig repConfig,
         OmKeyLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
@@ -246,6 +252,9 @@ public final class ECStreamTestUtil {
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
           blockStreamData.get(repInd - 1), repInd);
+      if (failIndexes.contains(repInd)) {
+        stream.setShouldError(true);
+      }
       blockStreams.add(stream);
       return stream;
     }
