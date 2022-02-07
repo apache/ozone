@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReconDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.security.KerberosInfo;
@@ -168,6 +168,6 @@ public interface SCMSecurityProtocol {
    * @return String      - pem encoded SCM signed
    *                         certificate.
    */
-  String getReconCertificate(ReconDetailsProto reconDetails,
+  String getReconCertificate(NodeDetailsProto reconDetails,
       String certSignReq) throws IOException;
 }

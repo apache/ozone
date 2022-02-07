@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
@@ -55,7 +54,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.security.KeyPair;
 import java.security.cert.CertificateException;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
@@ -207,14 +205,17 @@ public class ReconServer extends GenericCli {
    * */
   private void getSCMSignedCert(OzoneConfiguration config) {
     try {
-      PKCS10CertificationRequest csr = getCSR(config);
+      PKCS10CertificationRequest csr = ReconUtils.getCSR(config, certClient);
+      LOG.info("Creating CSR for Recon.");
+
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
           HddsServerUtil.getScmSecurityClientWithMaxRetry(config);
-      HddsProtos.ReconDetailsProto.Builder reconDetailsProtoBuilder =
-          HddsProtos.ReconDetailsProto.newBuilder()
+      HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
+          HddsProtos.NodeDetailsProto.newBuilder()
               .setHostName(InetAddress.getLocalHost().getHostName())
               .setClusterId(reconStorage.getClusterID())
-              .setUuid(reconStorage.getReconId());
+              .setUuid(reconStorage.getReconId())
+              .setNodeType(HddsProtos.NodeType.RECON);
 
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
           secureScmClient.getReconCertificateChain(
@@ -243,29 +244,6 @@ public class ReconServer extends GenericCli {
       LOG.error("Error while storing SCM signed certificate.", e);
       throw new RuntimeException(e);
     }
-  }
-
-  /**
-   * Creates CSR for Recon.
-   * @param config
-   * */
-  private PKCS10CertificationRequest getCSR(OzoneConfiguration config)
-      throws IOException{
-    CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(certClient.getPublicKey(),
-        certClient.getPrivateKey());
-
-    String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-    String subject = UserGroupInformation.getCurrentUser()
-        .getShortUserName() + "@" + hostname;
-
-    builder.setCA(false)
-        .setKey(keyPair)
-        .setConfiguration(config)
-        .setSubject(subject);
-
-    LOG.info("Creating csr for Recon-> subject:{}", subject);
-    return builder.build();
   }
 
   /**

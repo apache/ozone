@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetReconCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
@@ -224,9 +224,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
    * @return SCMGetDataNodeCertResponseProto.
    */
   public SCMGetCertResponseProto getReconCertificate(
-      SCMGetReconCertRequestProto request) throws IOException {
+      SCMGetCertRequestProto request) throws IOException {
     String certificate = impl
-        .getReconCertificate(request.getReconDetails(),
+        .getReconCertificate(request.getNodeDetails(),
             request.getCSR());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto

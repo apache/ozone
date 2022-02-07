@@ -55,7 +55,7 @@ message SCMSecurityRequest {
     optional SCMGetCrlsRequestProto getCrlsRequest = 10;
     optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
     optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
-    optional SCMGetReconCertRequestProto getReconCertRequest = 13;
+    optional SCMGetCertRequestProto getReconCertRequest = 13;
 }
 
 message SCMSecurityResponse {
@@ -116,7 +116,6 @@ enum Status {
     GET_ROOT_CA_CERTIFICATE_FAILED = 15;
     NOT_A_PRIMARY_SCM = 16;
     REVOKE_CERTIFICATE_FAILED = 17;
-    GET_RECON_CERTIFICATE_FAILED = 18;
 }
 /**
 * This message is send by data node to prove its identity and get an SCM
@@ -136,8 +135,8 @@ message SCMGetOMCertRequestProto {
     required string CSR = 2;
 }
 
-message SCMGetReconCertRequestProto {
-    required ReconDetailsProto reconDetails = 1;
+message SCMGetCertRequestProto {
+    required NodeDetailsProto nodeDetails = 1;
     required string CSR = 2;
 }
 

@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CRLInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReconDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetReconCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
@@ -183,7 +183,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    *                         certificate.
    */
   @Override
-  public String getReconCertificate(ReconDetailsProto reconDetails,
+  public String getReconCertificate(NodeDetailsProto reconDetails,
       String certSignReq) throws IOException {
     return getReconCertificateChain(reconDetails, certSignReq)
         .getX509Certificate();
@@ -287,18 +287,18 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   /**
    * Get SCM signed certificate for Recon.
    *
-   * @param reconDetails   - Recon Details.
+   * @param nodeDetails   - Recon Details.
    * @param certSignReq - Certificate signing request.
    * @return byte[]         - SCM signed certificate.
    */
   public SCMGetCertResponseProto getReconCertificateChain(
-      ReconDetailsProto reconDetails, String certSignReq)
+      NodeDetailsProto nodeDetails, String certSignReq)
       throws IOException {
 
-    SCMGetReconCertRequestProto request =
-        SCMGetReconCertRequestProto.newBuilder()
+    SCMGetCertRequestProto request =
+        SCMGetCertRequestProto.newBuilder()
             .setCSR(certSignReq)
-            .setReconDetails(reconDetails)
+            .setNodeDetails(nodeDetails)
             .build();
     return submitRequest(Type.GetReconCertificate,
         builder -> builder.setGetReconCertRequest(request))

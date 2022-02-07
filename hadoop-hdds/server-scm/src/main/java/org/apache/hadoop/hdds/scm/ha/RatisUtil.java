@@ -40,9 +40,9 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_RECON_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
 import static org.apache.ratis.server.RaftServerConfigKeys.Log;
@@ -260,7 +260,7 @@ public final class RatisUtil {
       } else if (ex.getErrorCode().equals(GET_SCM_CERTIFICATE_FAILED) ||
           ex.getErrorCode().equals(GET_OM_CERTIFICATE_FAILED) ||
           ex.getErrorCode().equals(GET_DN_CERTIFICATE_FAILED) ||
-          ex.getErrorCode().equals(GET_RECON_CERTIFICATE_FAILED)) {
+          ex.getErrorCode().equals(GET_CERTIFICATE_FAILED)) {
         throw new ServiceException(new RetriableWithNoFailoverException(e));
       }
     }
