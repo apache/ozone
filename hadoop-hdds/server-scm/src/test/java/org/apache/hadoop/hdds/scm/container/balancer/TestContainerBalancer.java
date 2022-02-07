@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -500,29 +501,22 @@ public class TestContainerBalancer {
 
   @Test
   public void testMetrics() {
+    conf.set("hdds.datanode.du.refresh.period", "1ms");
+    balancerConfiguration.setBalancingInterval(Duration.ofMillis(2));
     balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setIterations(2);
+    balancerConfiguration.setMaxSizeEnteringTarget(6 * OzoneConsts.GB);
+    // deliberately set max size per iteration to a low value, 6GB
+    balancerConfiguration.setMaxSizeToMovePerIteration(6 * OzoneConsts.GB);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     containerBalancer.start(balancerConfiguration);
+    sleepWhileBalancing(500);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(500);
-    } catch (InterruptedException e) {}
-
-    containerBalancer.stop();
     ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
-    Assert.assertEquals(determineExpectedUnBalancedNodes(
-            balancerConfiguration.getThreshold()).size(),
-        metrics.getDatanodesNumToBalance());
-    Assert.assertEquals(ContainerBalancer.ratioToPercent(
-            nodeUtilizations.get(nodeUtilizations.size() - 1)),
-        metrics.getMaxDatanodeUtilizedPercentage());
+    Assert.assertTrue(metrics.getDataSizeMovedGB() <= 6);
+    Assert.assertEquals(2, metrics.getCountIterations());
+    containerBalancer.stop();
   }
 
   /**

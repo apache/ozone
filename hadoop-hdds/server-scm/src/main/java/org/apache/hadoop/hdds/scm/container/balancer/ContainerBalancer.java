@@ -194,6 +194,7 @@ public class ContainerBalancer {
       //if no new move option is generated, it means the cluster can
       //not be balanced any more , so just stop
       IterationResult iR = doIteration();
+      metrics.incrementCountIterations(1);
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
         stop();
@@ -313,11 +314,6 @@ public class ContainerBalancer {
       }
       if (Double.compare(utilization, upperLimit) > 0) {
         overUtilizedNodes.add(datanodeUsageInfo);
-        metrics.incrementDatanodesNumToBalance(1);
-
-        metrics.setMaxDatanodeUtilizedPercentage(Math.max(
-            metrics.getMaxDatanodeUtilizedPercentage(),
-            ratioToPercent(utilization)));
 
         // amount of bytes greater than upper limit in this node
         Long overUtilizedBytes = ratioToBytes(
@@ -328,7 +324,6 @@ public class ContainerBalancer {
         totalOverUtilizedBytes += overUtilizedBytes;
       } else if (Double.compare(utilization, lowerLimit) < 0) {
         underUtilizedNodes.add(datanodeUsageInfo);
-        metrics.incrementDatanodesNumToBalance(1);
 
         // amount of bytes lesser than lower limit in this node
         Long underUtilizedBytes = ratioToBytes(
@@ -341,9 +336,6 @@ public class ContainerBalancer {
         withinThresholdUtilizedNodes.add(datanodeUsageInfo);
       }
     }
-    metrics.setDataSizeToBalanceGB(
-        Math.max(totalOverUtilizedBytes, totalUnderUtilizedBytes) /
-            OzoneConsts.GB);
     Collections.reverse(underUtilizedNodes);
 
     unBalancedNodes = new ArrayList<>(
@@ -364,6 +356,8 @@ public class ContainerBalancer {
         nodeManager, replicationManager, containerManager, findSourceStrategy);
     sourceToTargetMap = new HashMap<>(overUtilizedNodes.size() +
         withinThresholdUtilizedNodes.size());
+    metrics.resetDataSizeMovedGB();
+    metrics.resetMovedContainersNum();
     return true;
   }
 
