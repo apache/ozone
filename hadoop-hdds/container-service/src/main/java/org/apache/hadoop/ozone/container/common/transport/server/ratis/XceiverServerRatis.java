@@ -697,7 +697,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       ContainerData containerData = containerIt.next().getContainerData();
       if (containerData.getOriginPipelineId()
           .compareTo(pipelineID.getId()) == 0) {
-        bytesWritten += containerData.getStats().getWriteBytes();
+        bytesWritten += containerData.getWriteBytes();
       }
     }
     return bytesWritten;

@@ -677,10 +677,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     ContainerReplicaProto.Builder ciBuilder =
         ContainerReplicaProto.newBuilder();
     ciBuilder.setContainerID(containerData.getContainerID())
-        .setReadCount(containerData.getStats().getReadCount())
-        .setWriteCount(containerData.getStats().getWriteCount())
-        .setReadBytes(containerData.getStats().getReadBytes())
-        .setWriteBytes(containerData.getStats().getWriteBytes())
+        .setReadCount(containerData.getReadCount())
+        .setWriteCount(containerData.getWriteCount())
+        .setReadBytes(containerData.getReadBytes())
+        .setWriteBytes(containerData.getWriteBytes())
         .setKeyCount(containerData.getBlockCount())
         .setUsed(containerData.getBytesUsed())
         .setState(getHddsState())
