@@ -55,7 +55,7 @@ message SCMSecurityRequest {
     optional SCMGetCrlsRequestProto getCrlsRequest = 10;
     optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
     optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
-    optional SCMGetCertRequestProto getReconCertRequest = 13;
+    optional SCMGetCertRequestProto getCertRequest = 13;
 }
 
 message SCMSecurityResponse {
@@ -95,7 +95,7 @@ enum Type {
     GetCrls = 9;
     GetLatestCrlId = 10;
     RevokeCertificates = 11;
-    GetReconCertificate = 12;
+    GetCert = 12;
 }
 
 enum Status {

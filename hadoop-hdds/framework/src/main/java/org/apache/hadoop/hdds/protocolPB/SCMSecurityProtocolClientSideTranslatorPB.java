@@ -175,17 +175,17 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   /**
-   * Get SCM signed certificate for Recon.
+   * Get SCM signed certificate.
    *
-   * @param reconDetails - Recon Details.
+   * @param nodeDetails - Node Details.
    * @param certSignReq  - Certificate signing request.
    * @return String      - pem encoded SCM signed
    *                         certificate.
    */
   @Override
-  public String getReconCertificate(NodeDetailsProto reconDetails,
+  public String getCertificate(NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException {
-    return getReconCertificateChain(reconDetails, certSignReq)
+    return getCertificateChain(nodeDetails, certSignReq)
         .getX509Certificate();
   }
 
@@ -285,13 +285,13 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   /**
-   * Get SCM signed certificate for Recon.
+   * Get SCM signed certificate.
    *
-   * @param nodeDetails   - Recon Details.
+   * @param nodeDetails   - Node Details.
    * @param certSignReq - Certificate signing request.
    * @return byte[]         - SCM signed certificate.
    */
-  public SCMGetCertResponseProto getReconCertificateChain(
+  public SCMGetCertResponseProto getCertificateChain(
       NodeDetailsProto nodeDetails, String certSignReq)
       throws IOException {
 
@@ -300,8 +300,8 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
             .setCSR(certSignReq)
             .setNodeDetails(nodeDetails)
             .build();
-    return submitRequest(Type.GetReconCertificate,
-        builder -> builder.setGetReconCertRequest(request))
+    return submitRequest(Type.GetCert,
+        builder -> builder.setGetCertRequest(request))
         .getGetCertResponseProto();
   }
   /**

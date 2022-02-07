@@ -150,9 +150,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setRevokeCertificatesResponseProto(revokeCertificates(
                 request.getRevokeCertificatesRequest()))
             .build();
-      case GetReconCertificate:
+      case GetCert:
         return scmSecurityResponse.setGetCertResponseProto(
-            getReconCertificate(request.getGetReconCertRequest()))
+            getCertificate(request.getGetCertRequest()))
             .build();
 
       default:
@@ -218,15 +218,15 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   }
 
   /**
-   * Get SCM signed certificate for Recon.
+   * Get SCM signed certificate.
    *
    * @param request
-   * @return SCMGetDataNodeCertResponseProto.
+   * @return SCMGetCertResponseProto.
    */
-  public SCMGetCertResponseProto getReconCertificate(
+  public SCMGetCertResponseProto getCertificate(
       SCMGetCertRequestProto request) throws IOException {
     String certificate = impl
-        .getReconCertificate(request.getNodeDetails(),
+        .getCertificate(request.getNodeDetails(),
             request.getCSR());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto

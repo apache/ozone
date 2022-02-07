@@ -161,13 +161,13 @@ public interface SCMSecurityProtocol {
       throws IOException;
 
   /**
-   * Get SCM signed certificate for Recon.
+   * Get SCM signed certificate.
    *
-   * @param reconDetails - Recon Details.
+   * @param nodeDetails - Node Details.
    * @param certSignReq  - Certificate signing request.
    * @return String      - pem encoded SCM signed
    *                         certificate.
    */
-  String getReconCertificate(NodeDetailsProto reconDetails,
+  String getCertificate(NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException;
 }

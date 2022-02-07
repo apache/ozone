@@ -218,7 +218,7 @@ public class ReconServer extends GenericCli {
               .setNodeType(HddsProtos.NodeType.RECON);
 
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
-          secureScmClient.getReconCertificateChain(
+          secureScmClient.getCertificateChain(
               reconDetailsProtoBuilder.build(),
               getEncodedString(csr));
       // Persist certificates.

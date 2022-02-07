@@ -153,13 +153,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   }
 
   @Override
-  public String getReconCertificate(
-      NodeDetailsProto reconDetails,
+  public String getCertificate(
+      NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException {
-    LOGGER.info("Processing CSR for Recon {}, UUID: {}",
-        reconDetails.getHostName(), reconDetails.getUuid());
-    Objects.requireNonNull(reconDetails);
-    return getEncodedCertToString(certSignReq, NodeType.RECON);
+    LOGGER.info("Processing CSR for {} {}, UUID: {}",
+        nodeDetails.getNodeType(), nodeDetails.getHostName(),
+        nodeDetails.getUuid());
+    Objects.requireNonNull(nodeDetails);
+    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
   }
 
   /**
