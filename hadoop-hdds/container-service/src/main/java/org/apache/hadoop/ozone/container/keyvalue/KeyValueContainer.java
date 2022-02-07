@@ -510,6 +510,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       //fill in memory stat counter (keycount, byte usage)
       KeyValueContainerUtil.parseKVContainerData(containerData, config);
 
+      if (!scanMetaData()) {
+        String message = "Metadata scan of imported container " +
+            containerData.getContainerID() + " failed. attempting clean up.";
+        LOG.error(message);
+        throw new IOException(message);
+      }
     } catch (Exception ex) {
       if (ex instanceof StorageContainerException &&
           ((StorageContainerException) ex).getResult() ==
@@ -549,6 +555,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             "Only (quasi)closed containers can be exported, but " +
                 "ContainerId=" + getContainerData().getContainerID() +
                 " is in state " + state);
+      }
+
+      if (!scanMetaData()) {
+        markContainerUnhealthy();
+        String message = "Metadata scan failed before exporting " +
+            "container " + containerData.getContainerID() + ". Container " +
+            "export aborted and container marked unhealthy.";
+        LOG.error( message);
+        throw new IOException(message);
       }
 
       try {
