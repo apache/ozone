@@ -562,7 +562,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         String message = "Metadata scan failed before exporting " +
             "container " + containerData.getContainerID() + ". Container " +
             "export aborted and container marked unhealthy.";
-        LOG.error( message);
+        LOG.error(message);
         throw new IOException(message);
       }
 
