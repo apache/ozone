@@ -145,6 +145,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -2963,6 +2964,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
 
+    // Won't acquire VOLUME_LOCK here as no tenant or volume name is specified
+
     // TODO: Iterate cache first. See KeyManagerImpl#listStatus
 
     TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
@@ -3054,8 +3057,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     final Map<String, String> auditMap = new LinkedHashMap<>();
+    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
+            getMetadataManager(), tenantId);
+    // TODO: Use multiTenantManager.getTenantInfo(tenantId)
+    //  .getTenantBucketNameSpace() after refactoring.
+
     auditMap.put(OzoneConsts.TENANT, tenantId);
+    auditMap.put(OzoneConsts.VOLUME, volumeName);
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
+
+    boolean lockAcquired = metadataManager.getLock().acquireReadLock(
+            VOLUME_LOCK, volumeName);
     try {
       String userName = getRemoteUser().getUserName();
       if (!multiTenantManager.isTenantAdmin(userName, tenantId)
@@ -3063,7 +3075,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw new IOException("Only tenant and ozone admins can access this " +
             "API. '" + userName + "' is not an admin.");
       }
-
       final TenantUserList userList =
           multiTenantManager.listUsersInTenant(tenantId, prefix);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -3073,6 +3084,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           OMAction.TENANT_LIST_USER, auditMap, ex));
       throw ex;
+    } finally {
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+      }
     }
   }
 

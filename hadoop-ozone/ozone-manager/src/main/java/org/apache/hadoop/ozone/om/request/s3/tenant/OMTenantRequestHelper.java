@@ -99,8 +99,8 @@ public final class OMTenantRequestHelper {
   /**
    * Retrieve volume name of the tenant.
    */
-  static String getTenantVolumeName(OMMetadataManager omMetadataManager,
-      String tenantId) throws IOException {
+  public static String getTenantVolumeName(OMMetadataManager omMetadataManager,
+                                           String tenantId) throws IOException {
 
     final OmDBTenantInfo tenantInfo =
         omMetadataManager.getTenantStateTable().get(tenantId);

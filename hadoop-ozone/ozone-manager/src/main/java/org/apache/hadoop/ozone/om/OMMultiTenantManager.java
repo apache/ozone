@@ -178,6 +178,7 @@ public interface OMMultiTenantManager {
 
   /**
    * List all the user & accessIDs of all users that belong to this Tenant.
+   * Note this read is unprotected. See OzoneManager#listUserInTenant
    * @param tenantID
    * @return List of users
    */
