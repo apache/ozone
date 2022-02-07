@@ -145,9 +145,9 @@ public class BlockManagerImpl implements BlockManager {
         // or not. If it does not exist, increment the blockCount.
         if (!incrBlockCount.isPresent()) {
           if (db.getStore().getBlockDataTable().get(dbKeyForBlock) == null) {
-            incrBlockCount = Optional.of(false);
-          } else {
             incrBlockCount = Optional.of(true);
+          } else {
+            incrBlockCount = Optional.of(false);
           }
         }
 

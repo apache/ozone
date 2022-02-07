@@ -457,7 +457,7 @@ public class BlockOutputStream extends OutputStream {
           // PutBlock not successful -> reset updateBlockCount if it was set
           // to true
           if (firstBlockPutCall) {
-            updateBlockCount.compareAndSet(true, false);
+            updateBlockCount.set(true);
           }
         }
         return response;
@@ -468,7 +468,7 @@ public class BlockOutputStream extends OutputStream {
         }
         // Reset updateBlockCount if it was set to true
         if (firstBlockPutCall) {
-          updateBlockCount.compareAndSet(true, false);
+          updateBlockCount.set(true);
         }
         CompletionException ce =  new CompletionException(e);
         setIoException(ce);
