@@ -169,13 +169,7 @@ public class TestKeyValueContainer {
     long containerID = data.getContainerID();
 
     // Check state of original container.
-    File chunksDir = new File(data.getChunksPath());
-    Assert.assertTrue(Files.isDirectory(chunksDir.toPath()));
-    try (Stream<Path> stream = Files.list(chunksDir.toPath())) {
-      Assert.assertEquals(0, stream.count());
-    }
-    Assert.assertTrue(data.getDbFile().exists());
-    Assert.assertTrue(KeyValueContainer.getContainerFile(data.getMetadataPath(), containerID).exists());
+    checkContainerFilesPresent(data, 0);
 
     //destination path
     File exportTar = folder.newFile("exported.tar.gz");
@@ -193,16 +187,7 @@ public class TestKeyValueContainer {
     }
 
     // Make sure empty chunks dir was unpacked.
-    chunksDir = new File(data.getChunksPath());
-    Assert.assertTrue(Files.isDirectory(chunksDir.toPath()));
-    try (Stream<Path> stream = Files.list(chunksDir.toPath())) {
-      Assert.assertEquals(0, stream.count());
-    }
-
-    Assert.assertTrue(data.getDbFile().exists());
-    Assert.assertTrue(KeyValueContainer.getContainerFile(
-            data.getMetadataPath(),containerID)
-        .exists());
+    checkContainerFilesPresent(data, 0);
   }
 
   @Test
@@ -293,6 +278,18 @@ public class TestKeyValueContainer {
           new File(container.getContainerData().getContainerPath());
       assertFalse(directory.exists());
     }
+  }
+
+  private void checkContainerFilesPresent(KeyValueContainerData data,
+      long expectedNumFilesInChunksDir) throws IOException {
+    File chunksDir = new File(data.getChunksPath());
+    Assert.assertTrue(Files.isDirectory(chunksDir.toPath()));
+    try (Stream<Path> stream = Files.list(chunksDir.toPath())) {
+      Assert.assertEquals(expectedNumFilesInChunksDir, stream.count());
+    }
+    Assert.assertTrue(data.getDbFile().exists());
+    Assert.assertTrue(KeyValueContainer.getContainerFile(data.getMetadataPath(),
+        data.getContainerID()).exists());
   }
 
   /**

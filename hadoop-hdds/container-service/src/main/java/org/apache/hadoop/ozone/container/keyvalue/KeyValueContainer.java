@@ -512,7 +512,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       if (!scanMetaData()) {
         String message = "Metadata scan of imported container " +
-            containerData.getContainerID() + " failed. attempting clean up.";
+            containerData.getContainerID() + " failed. Attempting clean up.";
         LOG.error(message);
         throw new IOException(message);
       }

@@ -81,14 +81,22 @@ public class TarContainerPacker
       while (entry != null) {
         String name = entry.getName();
         long size = entry.getSize();
-        if (name.startsWith(DB_DIR_NAME + "/")) {
+        if (name.startsWith(DB_DIR_NAME)) {
           Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
-          extractEntry(archiveInput, size, dbRoot, destinationPath);
-        } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
+          if (entry.isDirectory()) {
+            Files.createDirectories(destinationPath);
+          } else {
+            extractFileEntry(archiveInput, size, dbRoot, destinationPath);
+          }
+        } else if (name.startsWith(CHUNKS_DIR_NAME)) {
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
-          extractEntry(archiveInput, size, chunksRoot, destinationPath);
+          if (entry.isDirectory()) {
+            Files.createDirectories(destinationPath);
+          } else {
+            extractFileEntry(archiveInput, size, chunksRoot, destinationPath);
+          }
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
@@ -109,8 +117,8 @@ public class TarContainerPacker
     }
   }
 
-  private void extractEntry(InputStream input, long size,
-                            Path ancestor, Path path) throws IOException {
+  private void extractFileEntry(InputStream input, long size,
+      Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);
     Path parent = path.getParent();
     if (parent != null) {
@@ -209,6 +217,12 @@ public class TarContainerPacker
   private void includePath(Path dir, String subdir,
       ArchiveOutputStream archiveOutput) throws IOException {
 
+    // Add a directory entry before adding files, in case the directory is
+    // empty.
+    ArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
+    archiveOutput.putArchiveEntry(entry);
+
+    // Add files in the directory.
     try (Stream<Path> dirEntries = Files.list(dir)) {
       for (Path path : dirEntries.collect(toList())) {
         String entryName = subdir + "/" + path.getFileName();
