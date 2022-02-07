@@ -44,7 +44,7 @@ Test Bucket Creation
                     Should contain      ${result}       RATIS
     ${result} =     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /${prefix}vol1/${prefix}ec
                     Should not contain  ${result}       Failed
-                    Verify Bucket EC Replication Config    /${prefix}vol1    RS    3    2    1048576
+                    Verify Bucket EC Replication Config    /${prefix}vol1/${prefix}ec    RS    3    2    1048576
 
 Test key Creation
                     Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}1mb /tmp/1mb

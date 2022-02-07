@@ -63,8 +63,8 @@ Create Key
     Log            Uploaded ${file} to ${key}
 
 Verify Bucket EC Replication Config
-    [arguments]    ${volume}    ${encoding}    ${data}    ${parity}    ${chunksize}
-    ${result} =    Execute                      ozone sh bucket list ${volume} | jq -r '.[] | select(.name | contains("${prefix}ec")) | .replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
+    [arguments]    ${bucket}    ${encoding}    ${data}    ${parity}    ${chunksize}
+    ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
                    Verify Replication Config    ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
 
 Verify Key EC Replication Config
