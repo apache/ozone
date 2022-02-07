@@ -406,6 +406,7 @@ message SCMContainerReplicaProto {
     required int64 sequenceID = 5;
     required int64 keyCount = 6;
     required int64 bytesUsed = 7;
+    optional int64 replicaIndex = 8;
 }
 
 message KeyContainerIDList {

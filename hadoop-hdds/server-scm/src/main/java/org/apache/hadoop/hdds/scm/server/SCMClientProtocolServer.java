@@ -29,7 +29,6 @@ import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -258,8 +257,7 @@ public class SCMClientProtocolServer implements
 
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
-          new StandaloneReplicationConfig(ReplicationConfig
-              .getLegacyFactor(container.getReplicationConfig())),
+          container.getReplicationConfig(),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
               .map(ContainerReplica::getDatanodeDetails)
@@ -306,7 +304,8 @@ public class SCMClientProtocolServer implements
               .setBytesUsed(r.getBytesUsed())
               .setPlaceOfBirth(r.getOriginDatanodeId().toString())
               .setKeyCount(r.getKeyCount())
-              .setSequenceID(r.getSequenceId()).build()
+              .setSequenceID(r.getSequenceId())
+              .setReplicaIndex(r.getReplicaIndex()).build()
       );
     }
     return results;
