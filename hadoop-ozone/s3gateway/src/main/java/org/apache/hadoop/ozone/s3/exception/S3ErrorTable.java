@@ -65,7 +65,7 @@ public final class S3ErrorTable {
 
   public static final OS3Exception MALFORMED_HEADER = new OS3Exception(
       "AuthorizationHeaderMalformed", "The authorization header you provided " +
-      "is invalid.", HTTP_NOT_FOUND);
+      "is invalid.", HTTP_BAD_REQUEST);
 
   public static final OS3Exception NO_SUCH_KEY = new OS3Exception(
       "NoSuchKey", "The specified key does not exist", HTTP_NOT_FOUND);
