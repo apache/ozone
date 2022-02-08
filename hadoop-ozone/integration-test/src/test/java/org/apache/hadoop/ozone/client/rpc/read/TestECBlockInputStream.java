@@ -230,6 +230,29 @@ public class TestECBlockInputStream {
     }
   }
 
+  /**
+   * This test is to ensure we can read a small key of 1 chunk or less when only
+   * the first replica index is available.
+   */
+  @Test
+  public void testSimpleReadUnderOneChunk() throws IOException {
+    OmKeyLocationInfo keyInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, 1, ONEMB);
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+
+      ByteBuffer buf = ByteBuffer.allocate(100);
+
+      int read = ecb.read(buf);
+      Assert.assertEquals(100, read);
+      validateBufferContents(buf, 0, 100, (byte) 0);
+      Assert.assertEquals(100, ecb.getPos());
+    }
+    for (TestBlockInputStream s : streamFactory.getBlockStreams()) {
+      Assert.assertTrue(s.isClosed());
+    }
+  }
+
   @Test
   public void testReadPastEOF() throws IOException {
     OmKeyLocationInfo keyInfo =
