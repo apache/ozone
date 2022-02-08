@@ -396,7 +396,7 @@ public class SCMStateMachine extends BaseStateMachine {
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
     if(!scm.isRunForTest()) {
       ExitUtils.terminate(1, "ScmStateMachine is closed, shutdown SCM",
-          StateMachine.LOG);
+        StateMachine.LOG);
     }
   }
 
