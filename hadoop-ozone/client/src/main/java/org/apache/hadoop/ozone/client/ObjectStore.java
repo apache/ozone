@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.helpers.S3VolumeInfo;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -164,7 +164,7 @@ public class ObjectStore {
   }
 
   public OzoneVolume getS3Volume() throws IOException {
-    final S3VolumeInfo resp = proxy.getS3VolumeInfo();
+    final S3VolumeContext resp = proxy.getS3VolumeContext();
 
     S3Auth s3Auth = proxy.getThreadLocalS3Auth();
     // Update user principal if needed to be used for KMS client
@@ -181,8 +181,8 @@ public class ObjectStore {
     return proxy.buildOzoneVolume(volume);
   }
 
-  public S3VolumeInfo getS3VolumeInfo() throws IOException {
-    return proxy.getS3VolumeInfo();
+  public S3VolumeContext getS3VolumeContext() throws IOException {
+    return proxy.getS3VolumeContext();
   }
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {

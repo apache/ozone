@@ -126,7 +126,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3VolumeInfo;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -3078,7 +3078,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public S3VolumeInfo getS3VolumeInfo() throws IOException {
+  public S3VolumeContext getS3VolumeContext() throws IOException {
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
     // to the default S3 volume.
@@ -3129,11 +3129,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // getVolumeInfo() performs acl checks and checks volume existence.
-    final S3VolumeInfo.Builder s3VolumeInfo = S3VolumeInfo.newBuilder()
+    final S3VolumeContext.Builder s3VolumeContext = S3VolumeContext.newBuilder()
         .setOmVolumeArgs(getVolumeInfo(s3Volume))
         .setUserPrincipal(userPrincipal);
 
-    return s3VolumeInfo.build();
+    return s3VolumeContext.build();
   }
 
   @Override
@@ -3970,7 +3970,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       // Add volume and user info to DB and cache.
 
-      OmVolumeArgs omVolumeArgs = createS3VolumeInfo(s3VolumeName, objectID);
+      OmVolumeArgs omVolumeArgs = createS3VolumeContext(s3VolumeName, objectID);
 
       String dbUserKey = metadataManager.getUserKey(userName);
       PersistedUserVolumeInfo userVolumeInfo =
@@ -4004,7 +4004,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private OmVolumeArgs createS3VolumeInfo(String s3Volume,
+  private OmVolumeArgs createS3VolumeContext(String s3Volume,
       long objectID) throws IOException {
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
     long time = Time.now();

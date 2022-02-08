@@ -18,12 +18,12 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 
 /**
- * A class that encapsulates GetS3VolumeInfoResponse protobuf message.
+ * A class that encapsulates GetS3VolumeContextResponse protobuf message.
  */
-public class S3VolumeInfo {
+public class S3VolumeContext {
 
   /**
    * Various volume arguments.
@@ -36,7 +36,7 @@ public class S3VolumeInfo {
    */
   private final String userPrincipal;
 
-  public S3VolumeInfo(OmVolumeArgs omVolumeArgs, String userPrincipal) {
+  public S3VolumeContext(OmVolumeArgs omVolumeArgs, String userPrincipal) {
     this.omVolumeArgs = omVolumeArgs;
     this.userPrincipal = userPrincipal;
   }
@@ -49,25 +49,25 @@ public class S3VolumeInfo {
     return userPrincipal;
   }
 
-  public static S3VolumeInfo fromProtobuf(GetS3VolumeInfoResponse resp) {
-    return new S3VolumeInfo(
+  public static S3VolumeContext fromProtobuf(GetS3VolumeContextResponse resp) {
+    return new S3VolumeContext(
         OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo()),
         resp.getUserPrincipal());
   }
 
-  public GetS3VolumeInfoResponse getProtobuf() {
-    return GetS3VolumeInfoResponse.newBuilder()
+  public GetS3VolumeContextResponse getProtobuf() {
+    return GetS3VolumeContextResponse.newBuilder()
         .setVolumeInfo(omVolumeArgs.getProtobuf())
         .setUserPrincipal(userPrincipal)
         .build();
   }
 
-  public static S3VolumeInfo.Builder newBuilder() {
-    return new S3VolumeInfo.Builder();
+  public static S3VolumeContext.Builder newBuilder() {
+    return new S3VolumeContext.Builder();
   }
 
   /**
-   * Builder for S3VolumeInfo.
+   * Builder for S3VolumeContext.
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
@@ -75,10 +75,6 @@ public class S3VolumeInfo {
     private String userPrincipal;
 
     private Builder() {
-    }
-
-    public static Builder aS3VolumeInfo() {
-      return new Builder();
     }
 
     public Builder setOmVolumeArgs(OmVolumeArgs omVolumeArgs) {
@@ -91,8 +87,8 @@ public class S3VolumeInfo {
       return this;
     }
 
-    public S3VolumeInfo build() {
-      return new S3VolumeInfo(omVolumeArgs, userPrincipal);
+    public S3VolumeContext build() {
+      return new S3VolumeContext(omVolumeArgs, userPrincipal);
     }
   }
 }

@@ -74,10 +74,6 @@ public class DeleteTenantInfo {
     private Builder() {
     }
 
-    public static Builder aTenantDeleted() {
-      return new Builder();
-    }
-
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
       return this;

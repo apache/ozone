@@ -105,7 +105,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.helpers.S3VolumeInfo;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -438,8 +438,8 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public S3VolumeInfo getS3VolumeInfo() throws IOException {
-    return ozoneManagerClient.getS3VolumeInfo();
+  public S3VolumeContext getS3VolumeContext() throws IOException {
+    return ozoneManagerClient.getS3VolumeContext();
   }
 
   public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {

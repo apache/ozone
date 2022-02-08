@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.helpers.S3VolumeInfo;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -618,7 +618,7 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach");
   }
 
-  S3VolumeInfo getS3VolumeInfo() throws IOException;
+  S3VolumeContext getS3VolumeContext() throws IOException;
 
   /**
    * Revoke user accessId to a tenant.
