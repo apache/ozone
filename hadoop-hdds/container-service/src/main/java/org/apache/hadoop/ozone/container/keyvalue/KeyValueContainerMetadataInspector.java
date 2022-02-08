@@ -49,6 +49,8 @@ import java.util.stream.Stream;
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
+  public static final Logger REPORT_LOG = LoggerFactory.getLogger(
+      "ContainerMetadataInspectorReport");
 
   /**
    * The mode to run the inspector in.
@@ -94,16 +96,18 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       } else if (propertyValue.equals(Mode.INSPECT.toString())) {
         mode = Mode.INSPECT;
         propertySet = true;
-      } else {
-        LOG.error("{} system property specified with invalid mode {}. " +
-                "Valid options are {} and {}. Container metadata inspection " +
-                "will not be run.", SYSTEM_PROPERTY, propertyValue,
-            Mode.REPAIR, Mode.INSPECT);
       }
     }
 
-    if (!propertySet) {
+    if (propertySet) {
+      LOG.info("Container metadata inspector enabled in {} mode. Report will " +
+          "be output to the {} log.", mode, REPORT_LOG.getName());
+    } else {
       mode = Mode.OFF;
+      LOG.error("{} system property specified with invalid mode {}. " +
+              "Valid options are {} and {}. Container metadata inspection " +
+              "will not be run.", SYSTEM_PROPERTY, propertyValue,
+          Mode.REPAIR, Mode.INSPECT);
     }
 
     return propertySet;
@@ -131,7 +135,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     boolean passed = false;
 
     try {
-      messageBuilder.append(String.format("Audit of container %d metadata%n",
+      messageBuilder.append(String.format("Audit of container #%d metadata%n",
           containerData.getContainerID()));
 
       // Read metadata values.
@@ -214,14 +218,14 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
               bytesUsed, usedBytesTotal, messageBuilder);
       passed = blockCountPassed && bytesUsedPassed;
     } catch(IOException ex) {
-      LOG.error("Inspecting container {} failed",
+      REPORT_LOG.error("Inspecting container {} failed",
           containerData.getContainerID(), ex);
     }
 
     if (passed) {
-      LOG.trace(messageBuilder.toString());
+      REPORT_LOG.trace(messageBuilder.toString());
     } else {
-      LOG.error(messageBuilder.toString());
+      REPORT_LOG.error(messageBuilder.toString());
     }
   }
 

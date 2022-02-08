@@ -212,7 +212,7 @@ public class TestKeyValueContainerMetadataInspector
     String inspectOutput = runInspectorAndGetLog(containerData,
         KeyValueContainerMetadataInspector.Mode.INSPECT);
     String[] expectedInspectMessages = new String[]{
-        "Audit of container " + CONTAINER_ID + " metadata",
+        "Audit of container #" + CONTAINER_ID + " metadata",
         "#BLOCKCOUNT: " + setBlocks,
         "#BYTESUSED: " + setBytes,
         createdFiles + " files in chunks directory",
@@ -284,7 +284,7 @@ public class TestKeyValueContainerMetadataInspector
       throws Exception {
     GenericTestUtils.LogCapturer capturer =
         GenericTestUtils.LogCapturer.captureLogs(
-            KeyValueContainerMetadataInspector.LOG);
+            KeyValueContainerMetadataInspector.REPORT_LOG);
     KeyValueContainerUtil.parseKVContainerData(containerData, getConf());
     capturer.stopCapturing();
     String output = capturer.getOutput();
