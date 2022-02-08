@@ -28,8 +28,8 @@ import java.util.UUID;
 /**
  * Upgrade related test utility methods.
  */
-public final class TestUpgradeUtils {
-  private TestUpgradeUtils() { }
+public final class UpgradeTestUtils {
+  private UpgradeTestUtils() { }
 
   /**
    * Creates a VERSION file for the specified node type under the directory

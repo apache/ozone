@@ -14,22 +14,15 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Write Compatibility
+Documentation       Setup for Compatibility Tests
+Library             OperatingSystem
 Resource            ../ozone-lib/shell.robot
-Resource            setup.robot
-Test Timeout        5 minutes
-Suite Setup         Create Local Test File
 
 *** Variables ***
 ${SUFFIX}    ${EMPTY}
 
 
-*** Test Cases ***
-Key Can Be Written
-    Create Key    /vol1/bucket1/key-${SUFFIX}    ${TESTFILE}
-
-Dir Can Be Created
-    Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${SUFFIX}
-
-File Can Be Put
-    Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX}
+*** Keywords ***
+Create Local Test File
+    Set Suite Variable    ${TESTFILE}    /tmp/test-data-${SUFFIX}.txt
+    Create File    ${TESTFILE}    Compatibility Test

@@ -23,6 +23,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -73,8 +74,7 @@ public class TestReconWithOzoneManagerFSO {
                     .includeRecon(true)
                     .build();
     cluster.waitForClusterToBeReady();
-
-    cluster.getStorageContainerManager().exitSafeMode();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
     store = cluster.getClient().getObjectStore();
   }
@@ -94,7 +94,7 @@ public class TestReconWithOzoneManagerFSO {
     byte[] data = ContainerTestHelper.getFixedLengthString(
             keyString, 100).getBytes(UTF_8);
     OzoneOutputStream keyStream = TestHelper.createKey(
-            keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+            keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
             100, store, volumeName, bucketName);
     keyStream.write(data);
     keyStream.close();

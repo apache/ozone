@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -282,7 +282,7 @@ public class TestNodeDecommissionManager {
 
   private SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
-    scm = TestUtils.getScm(config);
+    scm = HddsTestUtils.getScm(config);
     return (SCMNodeManager) scm.getScmNodeManager();
   }
 
