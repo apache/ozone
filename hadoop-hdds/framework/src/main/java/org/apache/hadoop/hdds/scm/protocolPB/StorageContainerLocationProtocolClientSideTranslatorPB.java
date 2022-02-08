@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
@@ -63,6 +64,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusRequestProto;
@@ -86,6 +89,7 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -249,6 +253,26 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         response.getGetContainerWithPipelineResponse()
             .getContainerWithPipeline());
 
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<HddsProtos.SCMContainerReplicaProto>
+      getContainerReplicas(long containerID) throws IOException {
+    Preconditions.checkState(containerID >= 0,
+        "Container ID cannot be negative");
+
+    GetContainerReplicasRequestProto request =
+        GetContainerReplicasRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .setContainerID(containerID).build();
+
+    ScmContainerLocationResponse response =
+        submitRequest(Type.GetContainerReplicas,
+            (builder) -> builder.setGetContainerReplicasRequest(request));
+    return response.getGetContainerReplicasResponse().getContainerReplicaList();
   }
 
   /**
@@ -735,6 +759,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             .getReplicationManagerStatusResponse();
     return response.getIsRunning();
 
+  }
+
+  @Override
+  public ReplicationManagerReport getReplicationManagerReport()
+      throws IOException {
+    ReplicationManagerReportRequestProto request =
+        ReplicationManagerReportRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .build();
+    ReplicationManagerReportResponseProto response =
+        submitRequest(Type.GetReplicationManagerReport,
+            builder -> builder.setReplicationManagerReportRequest(request))
+        .getGetReplicationManagerReportResponse();
+    return ReplicationManagerReport.fromProtobuf(response.getReport());
   }
 
   @Override

@@ -66,6 +66,17 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
+@test "runner image update" {
+  run dev-support/ci/selective_ci_checks.sh b95eeba82a
+
+  assert_output -p 'basic-checks=["rat"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-dependency-check=true
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=true
+}
+
 @test "check script" {
   run dev-support/ci/selective_ci_checks.sh 316899152
 

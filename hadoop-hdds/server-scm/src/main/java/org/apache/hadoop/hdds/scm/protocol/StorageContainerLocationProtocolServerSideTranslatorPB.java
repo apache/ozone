@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
@@ -68,6 +70,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
@@ -321,6 +325,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setReplicationManagerStatusResponse(getReplicationManagerStatus(
                 request.getSeplicationManagerStatusRequest()))
             .build();
+      case GetReplicationManagerReport:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetReplicationManagerReportResponse(getReplicationManagerReport(
+                request.getReplicationManagerReportRequest()))
+            .build();
       case StartContainerBalancer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -405,6 +416,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setGetContainerCountResponse(getContainerCount(
                   request.getGetContainerCountRequest()))
           .build();
+      case GetContainerReplicas:
+        return ScmContainerLocationResponse.newBuilder()
+          .setCmdType(request.getCmdType())
+          .setStatus(Status.OK)
+          .setGetContainerReplicasResponse(getContainerReplicas(
+              request.getGetContainerReplicasRequest()))
+          .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -414,6 +432,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId());
       throw new ServiceException(e);
     }
+  }
+
+  public GetContainerReplicasResponseProto getContainerReplicas(
+      GetContainerReplicasRequestProto request) throws IOException {
+    List<HddsProtos.SCMContainerReplicaProto> replicas
+        = impl.getContainerReplicas(request.getContainerID());
+    return GetContainerReplicasResponseProto.newBuilder()
+        .addAllContainerReplica(replicas).build();
   }
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
@@ -712,6 +738,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     return ReplicationManagerStatusResponseProto.newBuilder()
         .setIsRunning(impl.getReplicationManagerStatus()).build();
+  }
+
+  public ReplicationManagerReportResponseProto getReplicationManagerReport(
+      ReplicationManagerReportRequestProto request) throws IOException {
+    return ReplicationManagerReportResponseProto.newBuilder()
+        .setReport(impl.getReplicationManagerReport().toProtobuf())
+        .build();
   }
 
   public StartContainerBalancerResponseProto startContainerBalancer(

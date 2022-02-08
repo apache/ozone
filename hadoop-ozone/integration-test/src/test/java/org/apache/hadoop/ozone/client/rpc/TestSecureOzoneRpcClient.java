@@ -160,7 +160,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
       }
@@ -174,7 +174,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       }
 
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, ReplicationType.STAND_ALONE,
+          keyName, ReplicationType.RATIS,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -203,7 +203,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",

@@ -74,7 +74,7 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -235,7 +235,7 @@ public class TestOzoneAtRestEncryption {
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.STAND_ALONE,
+        ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>())) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -259,7 +259,7 @@ public class TestOzoneAtRestEncryption {
 
     Assert.assertEquals(len, value.length());
     Assert.assertTrue(verifyRatisReplication(bucket.getVolumeName(),
-        bucket.getName(), keyName, ReplicationType.STAND_ALONE,
+        bucket.getName(), keyName, ReplicationType.RATIS,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -323,7 +323,7 @@ public class TestOzoneAtRestEncryption {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.STAND_ALONE,
+        ReplicationType.RATIS,
         ReplicationFactor.ONE, keyMetadata)) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -340,7 +340,7 @@ public class TestOzoneAtRestEncryption {
 
     Assert.assertEquals(len, value.length());
     Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-        keyName, ReplicationType.STAND_ALONE,
+        keyName, ReplicationType.RATIS,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -463,7 +463,7 @@ public class TestOzoneAtRestEncryption {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
         ONE);
 
     // Upload Parts

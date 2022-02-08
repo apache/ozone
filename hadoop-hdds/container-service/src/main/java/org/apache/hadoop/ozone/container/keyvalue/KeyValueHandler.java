@@ -59,7 +59,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -266,8 +266,8 @@ public class KeyValueHandler extends Handler {
 
     long containerID = request.getContainerID();
 
-    ChunkLayOutVersion layoutVersion =
-        ChunkLayOutVersion.getConfiguredVersion(conf);
+    ContainerLayoutVersion layoutVersion =
+        ContainerLayoutVersion.getConfiguredVersion(conf);
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());

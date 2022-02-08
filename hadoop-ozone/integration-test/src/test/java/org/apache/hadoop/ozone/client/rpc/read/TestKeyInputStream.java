@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -62,7 +62,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
-  public TestKeyInputStream(ChunkLayOutVersion layout) {
+  public TestKeyInputStream(ContainerLayoutVersion layout) {
     super(layout);
   }
 

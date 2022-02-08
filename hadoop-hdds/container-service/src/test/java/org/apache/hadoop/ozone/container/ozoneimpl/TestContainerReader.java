@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
@@ -96,7 +96,7 @@ public class TestContainerReader {
 
     for (int i=0; i<2; i++) {
       KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_BLOCK,
+          ContainerLayoutVersion.FILE_PER_BLOCK,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           datanodeId.toString());
 
@@ -235,7 +235,7 @@ public class TestContainerReader {
     int containerCount = 3;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_BLOCK,
+          ContainerLayoutVersion.FILE_PER_BLOCK,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           datanodeId.toString());
       KeyValueContainer keyValueContainer =
@@ -285,7 +285,7 @@ public class TestContainerReader {
     blockCount = containerCount;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData keyValueContainerData =
-          new KeyValueContainerData(i, ChunkLayOutVersion.FILE_PER_BLOCK,
+          new KeyValueContainerData(i, ContainerLayoutVersion.FILE_PER_BLOCK,
               (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
               datanodeId.toString());
 
