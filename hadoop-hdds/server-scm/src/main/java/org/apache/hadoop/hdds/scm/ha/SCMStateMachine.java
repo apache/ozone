@@ -387,6 +387,11 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void close() throws IOException {
+    stop();
+    ExitUtils.terminate(1, "terminated by ratis", LOG);
+  }
+
+  public void stop() throws IOException {
     if (!isInitialized) {
       return;
     }
@@ -395,6 +400,7 @@ public class SCMStateMachine extends BaseStateMachine {
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }
+
 
   @VisibleForTesting
   public void setInstallingDBCheckpoint(DBCheckpoint checkpoint) {
