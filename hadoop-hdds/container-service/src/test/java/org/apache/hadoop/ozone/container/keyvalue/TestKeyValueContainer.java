@@ -164,7 +164,6 @@ public class TestKeyValueContainer {
     closeContainer();
 
     KeyValueContainerData data = keyValueContainer.getContainerData();
-    long containerID = data.getContainerID();
 
     // Check state of original container.
     checkContainerFilesPresent(data, 0);
