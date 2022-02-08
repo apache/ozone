@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -87,6 +88,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
 
     temporaryFolder.create();
     dataPath = temporaryFolder.newFolder().getAbsolutePath();
+    ExitUtils.disableSystemExit();
   }
 
   @Test
