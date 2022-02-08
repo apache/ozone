@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
