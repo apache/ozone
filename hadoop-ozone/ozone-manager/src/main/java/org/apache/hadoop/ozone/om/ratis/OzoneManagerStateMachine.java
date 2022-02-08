@@ -53,7 +53,6 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -472,8 +471,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         "already shutdown.");
     super.close();
     ozoneManager.stop();
-    ozoneManager.shutdown(new RaftException("RaftServer called shutdown on " +
-        "StateMachine"));
+    ExitUtils.terminate(1, "OM state machine is shutdown by Ratis server", LOG);
   }
 
   /**

@@ -401,7 +401,6 @@ public class SCMStateMachine extends BaseStateMachine {
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }
 
-
   @VisibleForTesting
   public void setInstallingDBCheckpoint(DBCheckpoint checkpoint) {
     Preconditions.checkArgument(installingDBCheckpoint == null);
