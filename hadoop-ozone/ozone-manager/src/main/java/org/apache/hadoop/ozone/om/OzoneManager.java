@@ -782,15 +782,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void shutdown(Exception ex) throws IOException {
     if (omState != State.STOPPED) {
       stop();
-      exitManager.exitSystem(1, ex.getLocalizedMessage(), ex, LOG);
     }
+    exitManager.exitSystem(1, ex.getLocalizedMessage(), ex, LOG);
   }
 
   public void shutdown(String errorMsg) throws IOException {
     if (omState != State.STOPPED) {
       stop();
-      exitManager.exitSystem(1, errorMsg, LOG);
     }
+    exitManager.exitSystem(1, errorMsg, LOG);
   }
 
   /**

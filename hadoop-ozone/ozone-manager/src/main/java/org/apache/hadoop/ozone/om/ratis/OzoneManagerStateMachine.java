@@ -471,6 +471,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     LOG.info("StateMachine has shutdown. Shutdown OzoneManager if not " +
         "already shutdown.");
     super.close();
+    ozoneManager.stop();
     ozoneManager.shutdown(new RaftException("RaftServer called shutdown on " +
         "StateMachine"));
   }
