@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -43,7 +42,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
@@ -448,28 +446,20 @@ public class KeyValueHandler extends Handler {
     try {
       checkContainerOpen(kvContainer);
 
-      PutBlockRequestProto putBlockRequest = request.getPutBlock();
-      ContainerProtos.BlockData data = putBlockRequest.getBlockData();
+      ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
 
-      if (!putBlockRequest.hasEof() || putBlockRequest.getEof()) {
+      boolean incrBlockCount = false;
+      if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
         chunkManager.finishWriteChunks(kvContainer, blockData);
+        incrBlockCount = true;
       }
 
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-
-      if (putBlockRequest.hasUpdateBlockCount()) {
-        blockManager.putBlock(kvContainer, blockData,
-            Optional.of(putBlockRequest.getUpdateBlockCount()));
-      } else {
-        // If the PutBlock request does not have updateBlockCount parameter,
-        // BlockManager will increment the blockCount only if the block does
-        // not exist in the in-memory container.
-        blockManager.putBlock(kvContainer, blockData, Optional.empty());
-      }
+      blockManager.putBlock(kvContainer, blockData, incrBlockCount);
 
       blockDataProto = blockData.getProtoBufMessage();
 

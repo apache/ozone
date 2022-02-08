@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 
-import java.util.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -32,7 +31,7 @@ import java.util.List;
 public interface BlockManager {
 
   /**
-   * Puts or overwrites a block (increments BlockCount).
+   * Puts or overwrites a block.
    *
    * @param container - Container for which block need to be added.
    * @param data     - Block Data.
@@ -45,17 +44,13 @@ public interface BlockManager {
    * Puts or overwrites a block.
    *
    * @param container - Container for which block need to be added.
-   * @param data      - Block Data.
-   * @param incrBlockCount - If set and true, increase container block count.
-   *                         If set and false, don't increment container block
-   *                         count.
-   *                         If absent, check if block exists in container
-   *                         before updating blockCount.
+   * @param data     - Block Data.
+   * @param incrKeyCount - Whether to increase container key count.
    * @return length of the Block.
    * @throws IOException
    */
-  long putBlock(Container container, BlockData data,
-      Optional<Boolean> incrBlockCount) throws IOException;
+  long putBlock(Container container, BlockData data, boolean incrKeyCount)
+      throws IOException;
 
   /**
    * Gets an existing block.

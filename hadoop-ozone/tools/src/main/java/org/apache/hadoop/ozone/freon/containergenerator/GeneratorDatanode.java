@@ -285,8 +285,7 @@ public class GeneratorDatanode extends BaseGenerator {
           writtenBytes += currentChunkSize;
         }
 
-        BlockManagerImpl.persistPutBlock(container, blockData, config,
-            Optional.of(true));
+        BlockManagerImpl.persistPutBlock(container, blockData, config, true);
 
       }
 

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Optional;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -89,22 +88,31 @@ public class BlockManagerImpl implements BlockManager {
    */
   @Override
   public long putBlock(Container container, BlockData data) throws IOException {
-    return putBlock(container, data, Optional.of(true));
+    return putBlock(container, data, true);
   }
-
   /**
-   * {@inheritDoc}
+   * Puts or overwrites a block.
+   *
+   * @param container - Container for which block need to be added.
+   * @param data - BlockData.
+   * @param incrBlockCount - Increment BlockCount only when the last chunk is
+   *                      written or the key is committed
+   * @return length of the block.
+   * @throws IOException
    */
   @Override
   public long putBlock(Container container, BlockData data,
-      Optional<Boolean> incrBlockCount) throws IOException {
-    return persistPutBlock((KeyValueContainer) container, data, config,
+      boolean incrBlockCount) throws IOException {
+    return persistPutBlock(
+        (KeyValueContainer) container,
+        data,
+        config,
         incrBlockCount);
   }
 
   public static long persistPutBlock(KeyValueContainer container,
-      BlockData data, ConfigurationSource config,
-      Optional<Boolean> incrBlockCount) throws IOException {
+      BlockData data, ConfigurationSource config, boolean incrBlockCount)
+      throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
@@ -135,24 +143,11 @@ public class BlockManagerImpl implements BlockManager {
             containerBCSId, bcsId);
         return data.getSize();
       }
-
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
-        String dbKeyForBlock = Long.toString(data.getLocalID());
-
-        // If incrBlockCount is absent, then check the DB if the block exists
-        // or not. If it does not exist, increment the blockCount.
-        if (!incrBlockCount.isPresent()) {
-          if (db.getStore().getBlockDataTable().get(dbKeyForBlock) == null) {
-            incrBlockCount = Optional.of(true);
-          } else {
-            incrBlockCount = Optional.of(false);
-          }
-        }
-
         db.getStore().getBlockDataTable().putWithBatch(
-            batch, dbKeyForBlock, data);
+            batch, Long.toString(data.getLocalID()), data);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
@@ -168,9 +163,8 @@ public class BlockManagerImpl implements BlockManager {
             batch, OzoneConsts.CONTAINER_BYTES_USED,
             container.getContainerData().getBytesUsed());
 
-        // Increment BlockCount of the container. This needs to be done only
-        // when the block is put into the DB for the first time.
-        if (incrBlockCount.get()) {
+        // Set Block Count for a container.
+        if (incrBlockCount) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, OzoneConsts.BLOCK_COUNT,
               container.getContainerData().getBlockCount() + 1);
@@ -182,8 +176,8 @@ public class BlockManagerImpl implements BlockManager {
       if (bcsId != 0) {
         container.updateBlockCommitSequenceId(bcsId);
       }
-      // Increment block count in-memory.
-      if (incrBlockCount.get()) {
+      // Increment block count finally here for in-memory.
+      if (incrBlockCount) {
         container.getContainerData().incrBlockCount();
       }
       if (LOG.isDebugEnabled()) {
