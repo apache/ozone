@@ -530,7 +530,7 @@ public class TestBlockDeletingService {
         mockDependencies(containerSet, keyValueHandler);
     BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.NANOSECONDS,
-        conf);
+        10, conf);
     svc.start();
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
@@ -552,7 +552,7 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        conf);
+        10, conf);
     svc.start();
 
     // get container meta data
