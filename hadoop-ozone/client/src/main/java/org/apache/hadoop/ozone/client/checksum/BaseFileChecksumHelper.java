@@ -161,12 +161,6 @@ public abstract class BaseFileChecksumHelper {
     }
   }
 
-  @VisibleForTesting
-  List<OmKeyLocationInfo> getKeyLocationInfos() {
-    return keyLocationInfos;
-  }
-
-
   /**
    * Compute block checksums block by block and append the raw bytes of the
    * block checksums into getBlockChecksumBuf().
