@@ -563,7 +563,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public FileChecksum getFileChecksum(String keyName, long length) throws IOException {
+  public FileChecksum getFileChecksum(String keyName, long length)
+      throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
 
