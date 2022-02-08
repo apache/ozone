@@ -29,17 +29,24 @@ Read data from previously created key
     ${random} =         Generate Random String  5  [NUMBERS]
     ${output} =         Execute          ozone sh key get /${PREFIX}-volume/${PREFIX}-bucket/${PREFIX}-key /tmp/key-${random}
                         Should not contain  ${output}       Failed
+    ${output} =         Execute and checkrc    cat /tmp/key-${random}    0
+                        Should contain    ${output}    ${PREFIX}: key created using Ozone Shell
+                        Execute and checkrc    rm /tmp/key-${random}    0
 
 Setup credentials for S3
     # TODO: Run "Setup secure v4 headers" instead when security is enabled
     Run Keyword         Setup dummy credentials for S3
 
 Read key created with Ozone Shell using S3 API
-    ${result} =         Execute AWSS3APICli and checkrc    get-object --bucket ${PREFIX}-bucket --key key1-shell /tmp/get-result    0
-                        Compare files    /opt/hadoop/LICENSE.txt    /tmp/get-result
+    ${output} =         Execute AWSS3APICli and checkrc    get-object --bucket ${PREFIX}-bucket --key key1-shell /tmp/get-result    0
+                        Should contain    ${output}    "ContentLength"
+    ${output} =         Execute and checkrc    cat /tmp/get-result    0
+                        Should contain    ${output}    ${PREFIX}: another key created using Ozone Shell
                         Execute and checkrc    rm /tmp/get-result    0
 
 Read key created with S3 API using S3 API
-    ${result} =         Execute AWSS3APICli and checkrc    get-object --bucket ${PREFIX}-bucket --key key2-s3api /tmp/get-result    0
-                        Compare files    /opt/hadoop/LICENSE.txt    /tmp/get-result
+    ${output} =         Execute AWSS3APICli and checkrc    get-object --bucket ${PREFIX}-bucket --key key2-s3api /tmp/get-result    0
+                        Should contain    ${output}    "ContentLength"
+    ${output} =         Execute and checkrc    cat /tmp/get-result    0
+                        Should contain    ${output}    ${PREFIX}: key created using S3 API
                         Execute and checkrc    rm /tmp/get-result    0
