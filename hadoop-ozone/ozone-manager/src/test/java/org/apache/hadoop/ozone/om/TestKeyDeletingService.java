@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,6 +108,7 @@ public class TestKeyDeletingService {
   public void checkIfDeleteServiceisDeletingKeys()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
+    ExitUtils.disableSystemExit();
     OzoneConfiguration conf = createConfAndInitValues();
     OmTestManagers omTestManagers
         = new OmTestManagers(conf);
@@ -130,6 +132,7 @@ public class TestKeyDeletingService {
   public void checkIfDeleteServiceWithFailingSCM()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
+    ExitUtils.disableSystemExit();
     OzoneConfiguration conf = createConfAndInitValues();
     ScmBlockLocationProtocol blockClient =
         //failCallsFrequency = 1 , means all calls fail.
@@ -174,6 +177,7 @@ public class TestKeyDeletingService {
   public void checkDeletionForEmptyKey()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
+    ExitUtils.disableSystemExit();
     OzoneConfiguration conf = createConfAndInitValues();
     ScmBlockLocationProtocol blockClient =
         //failCallsFrequency = 1 , means all calls fail.

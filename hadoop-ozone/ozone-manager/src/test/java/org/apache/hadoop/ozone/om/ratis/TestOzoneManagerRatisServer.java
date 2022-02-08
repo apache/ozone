@@ -46,6 +46,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.After;
 import org.junit.Assert;
@@ -84,6 +85,7 @@ public class TestOzoneManagerRatisServer {
 
   @Before
   public void init() throws Exception {
+    ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
     omID = UUID.randomUUID().toString();
     final String path = GenericTestUtils.getTempPath(omID);

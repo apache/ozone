@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -102,6 +103,7 @@ public class TestKeyManagerUnit {
   
   @Before
   public void setup() throws Exception {
+    ExitUtils.disableSystemExit();
     configuration = new OzoneConfiguration();
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
