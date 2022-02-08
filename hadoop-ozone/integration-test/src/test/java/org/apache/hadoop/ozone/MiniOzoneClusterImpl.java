@@ -148,7 +148,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
-    StorageContainerManager.setTestSCMStateMachineFlag(true);
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
   }

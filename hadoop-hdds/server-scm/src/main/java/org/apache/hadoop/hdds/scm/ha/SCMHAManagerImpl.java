@@ -337,8 +337,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
   public void shutdown() throws IOException {
     if (ratisServer != null) {
       ratisServer.stop();
-      grpcServer.stop();
       ratisServer.getSCMStateMachine().close();
+      grpcServer.stop();
     }
   }
 
