@@ -137,8 +137,7 @@ public class TestMultiTenantVolume {
     UpgradeFinalizer.StatusAndMessages finalizationResponse =
         client.finalizeUpgrade(upgradeClientID);
 
-    // Not sure if the status transitions as soon as client call returns.
-    // Can remove if this causes issue.
+    // The status should transition as soon as the client call above returns
     Assert.assertTrue(isStarting(finalizationResponse.status()));
 
     // Wait for the finalization to be marked as done.

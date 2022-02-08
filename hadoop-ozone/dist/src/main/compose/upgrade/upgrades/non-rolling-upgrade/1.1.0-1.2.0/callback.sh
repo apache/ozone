@@ -41,36 +41,35 @@ setup() {
 
 with_old_version() {
   generate old1
-  validate old1 old1
+  validate old1
 }
 
 with_new_version_pre_finalized() {
   _check_hdds_mlvs 0
   _check_om_mlvs 0
 
-  validate old1 old1
+  validate old1
 
   generate new1
-  validate new1 new1
+  validate new1
 }
 
 with_old_version_downgraded() {
-  # TODO: FIXME: HDDS-6261: OM will crash when overwriting key previously created by newer OM if S3PREFIX=old1
-  validate old1 old1-workaround
-  validate new1 new1
+  validate old1
+  validate new1
 
   generate old2
-  validate old2 old2
+  validate old2
 }
 
 with_new_version_finalized() {
   _check_hdds_mlvs 2
   _check_om_mlvs 1
 
-  validate old1 old1
-  validate new1 new1
-  validate old2 old2
+  validate old1
+  validate new1
+  validate old2
 
   generate new2
-  validate new2 news
+  validate new2
 }
