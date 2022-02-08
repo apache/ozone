@@ -140,7 +140,12 @@ public class OzoneClientConfig {
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
           + "determines which algorithm would be used to compute checksum for "
-          + "file checksum. Default checksum type is COMPOSITE_CRC.",
+          + "COMPOSITE_CRC calculates the combined CRC of the whole file, "
+          + "where the lower-level chunk/block checksums are combined into "
+          + "file-level checksum."
+          + "MD5MD5CRC calculates the MD5 of MD5 of checksums of individual "
+          + "chunks."
+          + "Default checksum type is COMPOSITE_CRC.",
       tags = ConfigTag.CLIENT)
   private String checksumCombineMode =
       ChecksumCombineMode.COMPOSITE_CRC.name();
