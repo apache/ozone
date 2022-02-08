@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
@@ -304,8 +303,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
 
     for (ContainerProtos.ChunkInfo chunk : chunkInfoList) {
-      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunk);
-      blockLen += info.getLen();
+      blockLen += chunk.getLen();
     }
 
     return blockLen;
