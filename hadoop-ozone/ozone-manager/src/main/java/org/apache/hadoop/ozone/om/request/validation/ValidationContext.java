@@ -39,23 +39,15 @@ public interface ValidationContext {
   int serverVersion();
 
   /**
-   * Provides the protocol version of the clients side sending the request.
-   * @return the client side protocol version
-   */
-  int clientVersion();
-
-  /**
    * Creates a context object based on the given parameters.
    *
    * @param versionManager the {@link LayoutVersionManager} of the service
    * @param serverVersion the server side protocol version
-   * @param clientVersion the client side protocol version
    * @return the {@link ValidationContext} specified by the parameters.
    */
   static ValidationContext of(
       LayoutVersionManager versionManager,
-      int serverVersion,
-      int clientVersion) {
+      int serverVersion) {
     return new ValidationContext() {
       @Override
       public LayoutVersionManager versionManager() {
@@ -65,11 +57,6 @@ public interface ValidationContext {
       @Override
       public int serverVersion() {
         return serverVersion;
-      }
-
-      @Override
-      public int clientVersion() {
-        return clientVersion;
       }
     };
   }

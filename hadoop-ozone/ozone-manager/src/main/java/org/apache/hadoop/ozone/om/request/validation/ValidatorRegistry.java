@@ -52,7 +52,7 @@ public class ValidatorRegistry {
    * @param validatorPackage the main package inside which validatiors should
    *                         be discovered.
    */
-  public ValidatorRegistry(String validatorPackage) {
+  ValidatorRegistry(String validatorPackage) {
     initMaps(validatorPackage);
     System.out.println(validators.entrySet());
   }
@@ -67,7 +67,7 @@ public class ValidatorRegistry {
    * @param phase the request processing phase
    * @return the list of validation methods that has to run.
    */
-  public List<Method> validationsFor(
+  List<Method> validationsFor(
       List<ValidationCondition> conditions,
       Type requestType,
       RequestProcessingPhase phase) {
@@ -131,7 +131,7 @@ public class ValidatorRegistry {
    * @param validatorPackage the package in which the methods annotated with
    *                         {@link RequestFeatureValidator} are gathered.
    */
-  private void initMaps(String validatorPackage) {
+  void initMaps(String validatorPackage) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(ClasspathHelper.forPackage(validatorPackage))
         .setScanners(new MethodAnnotationsScanner())
@@ -163,7 +163,7 @@ public class ValidatorRegistry {
     return new EnumMap<>(Type.class);
   }
 
-  <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
+  private <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
     if (defaultValue == null) {
       throw new NullPointerException(
           "Entry can not be initialized with null value.");
@@ -188,6 +188,19 @@ public class ValidatorRegistry {
 
   private Pair<List<Method>, List<Method>> newListPair() {
     return Pair.of(new ArrayList<>(), new ArrayList<>());
+  }
+
+  static ValidatorRegistry emptyRegistry() {
+    return new ValidatorRegistry("") {
+      @Override
+      List<Method> validationsFor(List<ValidationCondition> conditions,
+          Type requestType, RequestProcessingPhase phase) {
+        return Collections.emptyList();
+      }
+
+      @Override
+      void initMaps(String validatorPackage) {}
+    };
   }
 
 }

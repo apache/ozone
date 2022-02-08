@@ -30,7 +30,7 @@ public enum ValidationCondition {
    * Classifies validations that has to run after an upgrade until the cluster
    * is in a pre-finalized state.
    */
-  CLUSTER_IS_PRE_FINALIZED,
+  CLUSTER_NEEDS_FINALIZATION,
   /**
    * Classifies validations that has to run, when the client uses an older
    * protocol version than the server.

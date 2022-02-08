@@ -22,10 +22,6 @@ import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.crea
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,11 +38,8 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
-import org.apache.hadoop.ozone.om.request.validation.ValidatorRegistry;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -80,7 +73,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final AtomicLong transactionIndex;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
       ProtocolMessageEnum> dispatcher;
-  private final ValidatorRegistry validatorRegistry;
+  private final RequestValidations requestValidations;
 
   /**
    * Constructs an instance of the server handler.
@@ -124,7 +117,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
     // TODO: make this injectable for testing...
-    validatorRegistry = new ValidatorRegistry(OM_REQUESTS_PACKAGE);
+    requestValidations =
+        new RequestValidations()
+            .fromPackage(OM_REQUESTS_PACKAGE)
+            .withinContext(
+                ValidationContext.of(
+                    ozoneManager.getVersionManager(),
+                    getServerProtocolVersion()))
+            .load();
   }
 
   /**
@@ -135,101 +135,16 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   @Override
   public OMResponse submitRequest(RpcController controller,
       OMRequest request) throws ServiceException {
-    List<ValidationCondition> conditions = getConditions(request);
-    ValidationContext context = ValidationContext.of(
-        ozoneManager.getVersionManager(), 0, request.getVersion());
-
-    OMRequest validatedRequest = preValidate(conditions, context, request);
+    OMRequest validatedRequest = requestValidations.validateRequest(request);
 
     OMResponse response = 
         dispatcher.processRequest(validatedRequest, this::processRequest,
         request.getCmdType(), request.getTraceID());
     
-    return postValidate(conditions, context, validatedRequest, response);
+    return requestValidations.validateResponse(request, response);
   }
 
-  //TODO: move this code out from here, and just call from a validation util
-  //      class or instead of gettign the validation from the registry we
-  //      might even use that to run the validations...
-  private OMRequest preValidate(
-      List<ValidationCondition> conditions,
-      ValidationContext context,
-      OMRequest originalRequest) throws ServiceException {
-
-    List<Method> validations = validatorRegistry.validationsFor(
-        conditions,
-        originalRequest.getCmdType(),
-        RequestProcessingPhase.PRE_PROCESS);
-
-
-    OMRequest validatedRequest = originalRequest.toBuilder().build();
-    for (Method method : validations) {
-      // TODO: restrict the parameter list and return type of such annotated
-      //       methods either at compile time, or via a test
-      try {
-        if (method
-            .getAnnotation(RequestFeatureValidator.class).contextAware()) {
-          validatedRequest =
-              (OMRequest) method.invoke(null, validatedRequest, context);
-        } else {
-          validatedRequest =
-              (OMRequest) method.invoke(null, validatedRequest);
-        }
-      } catch (IllegalAccessException | InvocationTargetException e) {
-        throw new ServiceException(e);
-      }
-    }
-    return validatedRequest;
-  }
-
-  private OMResponse postValidate(
-      List<ValidationCondition> conditions,
-      ValidationContext context,
-      OMRequest originalRequest,
-      OMResponse originalResponse) throws ServiceException {
-
-    List<Method> validations = validatorRegistry.validationsFor(
-        conditions,
-        originalRequest.getCmdType(),
-        RequestProcessingPhase.POST_PROCESS);
-
-    OMResponse validatedResponse = originalResponse.toBuilder().build();
-    for (Method method : validations) {
-      // TODO: restrict the parameter list and return type of such annotated
-      //       methods either at compile time, or via a test
-      try {
-        if (method
-            .getAnnotation(RequestFeatureValidator.class).contextAware()) {
-          validatedResponse = (OMResponse) method
-              .invoke(null, originalRequest, validatedResponse, context);
-        } else {
-          validatedResponse = (OMResponse) method
-              .invoke(null, originalRequest, validatedResponse);
-        }
-      } catch (IllegalAccessException | InvocationTargetException e) {
-        throw new ServiceException(e);
-      }
-    }
-    return validatedResponse;
-  }
-
-  private List<ValidationCondition> getConditions(OMRequest request) {
-    List<ValidationCondition> conditions = new LinkedList<>();
-    conditions.add(ValidationCondition.UNCONDITIONAL);
-    int serverProtocolVersion = getServerProtocolVersion();
-    int clientProtocolVersion = request.getVersion();
-    if (serverProtocolVersion < clientProtocolVersion) {
-      conditions.add(ValidationCondition.NEWER_CLIENT_REQUESTS);
-    } else if (serverProtocolVersion > clientProtocolVersion) {
-      conditions.add(ValidationCondition.OLDER_CLIENT_REQUESTS);
-    }
-    if (ozoneManager.getVersionManager().needsFinalization()) {
-      conditions.add(ValidationCondition.CLUSTER_IS_PRE_FINALIZED);
-    }
-    return conditions;
-  }
-
-  //TODO fidn out versioning and where it comes from...
+  //TODO find out versioning and where it comes from...
   private int getServerProtocolVersion() {
     return 0;
   }
