@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -575,17 +576,22 @@ public class TestOzoneShellHA {
       Assert.assertEquals(0, res);
       // Verify key1 creation
       FileStatus statusPathKey1 = fs.getFileStatus(pathKey1);
+
+      FileChecksum previousFileChecksum = fs.getFileChecksum(pathKey1);
+
       Assert.assertEquals(strKey1, statusPathKey1.getPath().toString());
       // rm without -skipTrash. since trash interval > 0, should moved to trash
       res = ToolRunner.run(shell, new String[]{"-rm", strKey1});
       Assert.assertEquals(0, res);
+
+      FileChecksum afterFileChecksum = fs.getFileChecksum(trashPathKey1);
+
       // Verify that the file is moved to the correct trash location
       FileStatus statusTrashPathKey1 = fs.getFileStatus(trashPathKey1);
       // It'd be more meaningful if we actually write some content to the file
       Assert.assertEquals(
           statusPathKey1.getLen(), statusTrashPathKey1.getLen());
-      Assert.assertEquals(
-          fs.getFileChecksum(pathKey1), fs.getFileChecksum(trashPathKey1));
+      Assert.assertEquals(previousFileChecksum, afterFileChecksum);
 
       // Check delete skip trash behavior
       res = ToolRunner.run(shell, new String[]{"-touch", strKey2});
