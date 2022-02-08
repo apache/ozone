@@ -405,6 +405,8 @@ function check_needs_unit_test() {
     )
     local ignore_array=(
         "^hadoop-ozone/dist"
+        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
+        "^hadoop-ozone/integration-test"
     )
     filter_changed_files
 
