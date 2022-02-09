@@ -77,7 +77,7 @@ public class ChunkKeyHandler extends KeyHandler implements
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-          throws IOException, OzoneClientException{
+          throws IOException, OzoneClientException {
     containerOperationClient = new
             ContainerOperationClient(createOzoneConfiguration());
     xceiverClientManager = containerOperationClient
@@ -105,7 +105,7 @@ public class ChunkKeyHandler extends KeyHandler implements
     List<OmKeyLocationInfo> locationInfos = keyInfo
             .getLatestVersionLocations().getBlocksLatestVersionOnly();
     // for zero-sized key
-    if(locationInfos.isEmpty()){
+    if (locationInfos.isEmpty()) {
       System.out.println("No Key Locations Found");
       return;
     }
@@ -142,7 +142,7 @@ public class ChunkKeyHandler extends KeyHandler implements
       for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
               entry: responses.entrySet()) {
         JsonObject jsonObj = new JsonObject();
-        if(entry.getValue() == null){
+        if (entry.getValue() == null) {
           LOG.error("Cant execute getBlock on this node");
           continue;
         }

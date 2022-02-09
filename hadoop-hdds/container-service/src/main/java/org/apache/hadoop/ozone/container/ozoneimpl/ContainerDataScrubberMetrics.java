@@ -32,7 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * This class captures the container data scrubber metrics on the data-node.
  **/
 @InterfaceAudience.Private
-@Metrics(about="DataNode container data scrubber metrics", context="dfs")
+@Metrics(about = "DataNode container data scrubber metrics", context = "dfs")
 public final class ContainerDataScrubberMetrics {
 
   private final String name;
@@ -110,8 +110,8 @@ public final class ContainerDataScrubberMetrics {
 
   public static ContainerDataScrubberMetrics create(final String volumeName) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String name = "ContainerDataScrubberMetrics-"+ (volumeName.isEmpty()
-        ? "UndefinedDataNodeVolume"+ ThreadLocalRandom.current().nextInt()
+    String name = "ContainerDataScrubberMetrics-" + (volumeName.isEmpty()
+        ? "UndefinedDataNodeVolume" + ThreadLocalRandom.current().nextInt()
         : volumeName.replace(':', '-'));
 
     return ms.register(name, null, new ContainerDataScrubberMetrics(name, ms));

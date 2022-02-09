@@ -43,7 +43,7 @@ public class ReconPipelineFactory extends PipelineFactory {
       PipelineProvider<ReplicationConfig> {
 
     @Override
-    public Pipeline create(ReplicationConfig config){
+    public Pipeline create(ReplicationConfig config) {
       // We don't expect this to be called at all. But adding this as a red
       // flag for troubleshooting.
       throw new UnsupportedOperationException(

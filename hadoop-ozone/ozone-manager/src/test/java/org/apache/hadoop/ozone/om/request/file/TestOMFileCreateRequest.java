@@ -51,7 +51,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
   @Test
-  public void testPreExecute() throws Exception{
+  public void testPreExecute() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, false);
@@ -91,7 +91,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @Test
-  public void testPreExecuteWithBlankKey() throws Exception{
+  public void testPreExecuteWithBlankKey() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, "",
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, false);
@@ -404,7 +404,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @return OMFileCreateRequest reference
    */
   @NotNull
-  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest){
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
     return new OMFileCreateRequest(omRequest);
   }
 

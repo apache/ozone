@@ -58,7 +58,7 @@ import static java.util.Collections.emptyList;
 @RunWith(Parameterized.class)
 public class TestReplicationSupervisor {
 
-  private final ContainerReplicator noopReplicator = task -> {};
+  private final ContainerReplicator noopReplicator = task -> { };
   private final ContainerReplicator throwingReplicator = task -> {
     throw new RuntimeException("testing replication failure");
   };

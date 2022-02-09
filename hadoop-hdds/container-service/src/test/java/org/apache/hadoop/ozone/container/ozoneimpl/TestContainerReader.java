@@ -94,7 +94,7 @@ public class TestContainerReader {
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
-    for (int i=0; i<2; i++) {
+    for (int i = 0; i < 2; i++) {
       KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
           ContainerLayoutVersion.FILE_PER_BLOCK,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
@@ -124,7 +124,7 @@ public class TestContainerReader {
 
   private void markBlocksForDelete(KeyValueContainer keyValueContainer,
       boolean setMetaData, List<Long> blockNames, int count) throws Exception {
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
+    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
         .getContainerData(), conf)) {
 
       for (int i = 0; i < count; i++) {
@@ -154,7 +154,7 @@ public class TestContainerReader {
     long containerId = keyValueContainer.getContainerData().getContainerID();
 
     List<Long> blkNames = new ArrayList<>();
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
+    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
         .getContainerData(), conf)) {
 
       for (int i = 0; i < blockCount; i++) {
@@ -197,7 +197,7 @@ public class TestContainerReader {
 
     Assert.assertEquals(2, containerSet.containerCount());
 
-    for (int i=0; i < 2; i++) {
+    for (int i = 0; i < 2; i++) {
       Container keyValueContainer = containerSet.getContainer(i);
 
       KeyValueContainerData keyValueContainerData = (KeyValueContainerData)

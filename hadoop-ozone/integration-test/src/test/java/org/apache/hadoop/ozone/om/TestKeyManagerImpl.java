@@ -348,7 +348,7 @@ public class TestKeyManagerImpl {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyNameBuf.toString())
         .build();
-    for (int i =0; i< 5; i++) {
+    for (int i = 0; i < 5; i++) {
       keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
     String keyName = keyNameBuf.toString();
@@ -418,7 +418,7 @@ public class TestKeyManagerImpl {
     // recursive flag is set to false
     StringBuffer keyNameBuf = new StringBuffer();
     keyNameBuf.append(RandomStringUtils.randomAlphabetic(5));
-    for (int i =0; i< 5; i++) {
+    for (int i = 0; i < 5; i++) {
       keyNameBuf.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
     keyName = keyNameBuf.toString();
