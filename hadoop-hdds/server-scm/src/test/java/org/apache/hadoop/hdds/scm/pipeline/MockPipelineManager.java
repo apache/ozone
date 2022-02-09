@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -30,11 +31,14 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersions;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -90,6 +94,25 @@ public class MockPipelineManager implements PipelineManager {
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
+        .build();
+  }
+
+  @Override
+  public Pipeline createPipelineForRead(
+      final ReplicationConfig replicationConfig,
+      final Set<ContainerReplica> replicas) {
+    List<DatanodeDetails> dns = new ArrayList<>();
+    Map<DatanodeDetails, Integer> map = new HashMap<>();
+    for (ContainerReplica r : replicas) {
+      map.put(r.getDatanodeDetails(), r.getReplicaIndex());
+      dns.add(r.getDatanodeDetails());
+    }
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(dns)
+        .setReplicaIndexes(map)
+        .setState(Pipeline.PipelineState.CLOSED)
         .build();
   }
 

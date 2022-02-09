@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -36,6 +37,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Creates pipeline based on replication type.
@@ -93,6 +95,12 @@ public class PipelineFactory {
   ) {
     return providers.get(replicationConfig.getReplicationType())
         .create(replicationConfig, nodes);
+  }
+
+  public Pipeline createForRead(ReplicationConfig replicationConfig,
+      Set<ContainerReplica> replicas) {
+    return providers.get(replicationConfig.getReplicationType())
+        .createForRead(replicationConfig, replicas);
   }
 
   public void close(ReplicationType type, Pipeline pipeline)

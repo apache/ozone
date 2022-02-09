@@ -27,7 +27,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -217,13 +220,17 @@ public class TestRatisPipelineProvider {
     List<DatanodeDetails> healthyNodes = nodeManager
         .getNodes(NodeStatus.inServiceHealthy()).stream()
         .limit(3).collect(Collectors.toList());
+    Set<ContainerReplica> replicas = createContainerReplicas(healthyNodes);
 
     Pipeline pipeline1 = provider.create(
         new RatisReplicationConfig(ReplicationFactor.THREE), healthyNodes);
     Pipeline pipeline2 = provider.create(
         new RatisReplicationConfig(ReplicationFactor.THREE), healthyNodes);
+    Pipeline pipeline3 = provider.createForRead(
+        new RatisReplicationConfig(ReplicationFactor.THREE), replicas);
 
     Assert.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
+    Assert.assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
     cleanup();
   }
 
@@ -357,5 +364,25 @@ public class TestRatisPipelineProvider {
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);
+  }
+
+  private Set<ContainerReplica> createContainerReplicas(
+      List<DatanodeDetails> dns) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (DatanodeDetails dn : dns) {
+      ContainerReplica r = ContainerReplica.newBuilder()
+          .setBytesUsed(1)
+          .setContainerID(ContainerID.valueOf(1))
+          .setContainerState(StorageContainerDatanodeProtocolProtos
+              .ContainerReplicaProto.State.CLOSED)
+          .setKeyCount(1)
+          .setOriginNodeId(UUID.randomUUID())
+          .setSequenceId(1)
+          .setReplicaIndex(0)
+          .setDatanodeDetails(dn)
+          .build();
+      replicas.add(r);
+    }
+    return replicas;
   }
 }

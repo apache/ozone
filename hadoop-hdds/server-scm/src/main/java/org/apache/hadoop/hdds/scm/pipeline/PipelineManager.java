@@ -23,10 +23,12 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -48,6 +50,9 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       ReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes
   );
+
+  Pipeline createPipelineForRead(
+      ReplicationConfig replicationConfig, Set<ContainerReplica> replicas);
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
