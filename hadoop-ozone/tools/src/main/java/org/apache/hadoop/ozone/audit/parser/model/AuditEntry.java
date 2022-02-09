@@ -30,7 +30,7 @@ public class AuditEntry {
   private String result;
   private String exception;
 
-  public AuditEntry(){}
+  public AuditEntry(){ }
 
   public String getUser() {
     return user;
@@ -104,7 +104,7 @@ public class AuditEntry {
     this.exception = exception.trim();
   }
 
-  public void appendException(String text){
+  public void appendException(String text) {
     this.exception += "\n" + text.trim();
   }
 
@@ -126,47 +126,47 @@ public class AuditEntry {
 
     }
 
-    public Builder setTimestamp(String ts){
+    public Builder setTimestamp(String ts) {
       this.timestamp = ts;
       return this;
     }
 
-    public Builder setLevel(String lvl){
+    public Builder setLevel(String lvl) {
       this.level = lvl;
       return this;
     }
 
-    public Builder setLogger(String lgr){
+    public Builder setLogger(String lgr) {
       this.logger = lgr;
       return this;
     }
 
-    public Builder setUser(String usr){
+    public Builder setUser(String usr) {
       this.user = usr;
       return this;
     }
 
-    public Builder setIp(String ipAddress){
+    public Builder setIp(String ipAddress) {
       this.ip = ipAddress;
       return this;
     }
 
-    public Builder setOp(String operation){
+    public Builder setOp(String operation) {
       this.op = operation;
       return this;
     }
 
-    public Builder setParams(String prms){
+    public Builder setParams(String prms) {
       this.params = prms;
       return this;
     }
 
-    public Builder setResult(String res){
+    public Builder setResult(String res) {
       this.result = res;
       return this;
     }
 
-    public Builder setException(String exp){
+    public Builder setException(String exp) {
       this.exception = exp;
       return this;
     }

@@ -356,7 +356,7 @@ public class TestBlockDeletingService {
           .put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
               (long) numOfBlocksPerContainer);
     } catch (IOException exception) {
-      LOG.warn("Meta Data update was not successful for container: "+container);
+      LOG.warn("Meta Data update was not successful for container: " + container);
     }
   }
 
@@ -427,7 +427,7 @@ public class TestBlockDeletingService {
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
     Assert.assertEquals(1, containerData.size());
 
-    try(ReferenceCountedDB meta = BlockUtils.getDB(
+    try (ReferenceCountedDB meta = BlockUtils.getDB(
         (KeyValueContainerData) containerData.get(0), conf)) {
       Map<Long, Container<?>> containerMap = containerSet.getContainerMapCopy();
       // NOTE: this test assumes that all the container is KetValueContainer and
@@ -734,7 +734,7 @@ public class TestBlockDeletingService {
       // in all the containers are deleted)).
       deleteAndWait(service, 2);
 
-      long totalContainerBlocks = blocksPerContainer*containerCount;
+      long totalContainerBlocks = blocksPerContainer * containerCount;
       GenericTestUtils.waitFor(() ->
               totalContainerBlocks * blockSpace ==
                       (totalContainerSpace -

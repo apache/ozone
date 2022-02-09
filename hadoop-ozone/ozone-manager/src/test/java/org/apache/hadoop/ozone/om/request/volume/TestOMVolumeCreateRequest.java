@@ -84,7 +84,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
       Assert.assertEquals(expectedObjId, respone.getOmVolumeArgs()
           .getObjectID());
       Assert.assertEquals(txLogIndex, respone.getOmVolumeArgs().getUpdateID());
-    } catch (IllegalArgumentException ex){
+    } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("should be greater than zero",
           ex);
     }

@@ -198,7 +198,7 @@ public abstract class TestInputStreamBase {
     byte[] expectedData = new byte[readDataLen];
     System.arraycopy(inputData, (int) offset, expectedData, 0, readDataLen);
 
-    for (int i=0; i < readDataLen; i++) {
+    for (int i = 0; i < readDataLen; i++) {
       Assert.assertEquals("Read data at does not match the input data at " +
               "position " + (offset + i), expectedData[i], readData[i]);
     }

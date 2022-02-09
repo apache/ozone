@@ -63,7 +63,7 @@ public class TestRDBTableStore {
     count++;
     try {
       Assert.assertNotNull(keyValue.getKey());
-    } catch(IOException ex) {
+    } catch (IOException ex) {
       Assert.fail("Unexpected Exception " + ex.toString());
     }
     return true;
@@ -80,7 +80,7 @@ public class TestRDBTableStore {
     options = options.setStatistics(statistics);
 
     Set<TableConfig> configSet = new HashSet<>();
-    for(String name : families) {
+    for (String name : families) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }

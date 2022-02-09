@@ -758,7 +758,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
     Optional<Long> maxSizeLeavingSourceInGB = Optional.empty();
 
-    if(request.hasThreshold()) {
+    if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
     }
 
@@ -778,15 +778,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                   100));
     }
 
-    if(request.hasMaxSizeToMovePerIterationInGB()) {
+    if (request.hasMaxSizeToMovePerIterationInGB()) {
       maxSizeToMovePerIterationInGB =
           Optional.of(request.getMaxSizeToMovePerIterationInGB());
     }
-    if(request.hasMaxSizeEnteringTargetInGB()) {
+    if (request.hasMaxSizeEnteringTargetInGB()) {
       maxSizeEnteringTargetInGB =
           Optional.of(request.getMaxSizeEnteringTargetInGB());
     }
-    if(request.hasMaxSizeLeavingSourceInGB()) {
+    if (request.hasMaxSizeLeavingSourceInGB()) {
       maxSizeLeavingSourceInGB =
           Optional.of(request.getMaxSizeLeavingSourceInGB());
     }

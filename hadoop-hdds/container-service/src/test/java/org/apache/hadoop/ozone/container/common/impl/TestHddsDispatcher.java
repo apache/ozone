@@ -83,7 +83,7 @@ import static org.mockito.Mockito.verify;
 public class TestHddsDispatcher {
 
   public static final Consumer<ContainerReplicaProto> NO_OP_ICR_SENDER =
-      c -> {};
+      c -> { };
 
   private final ContainerLayoutVersion layout;
 

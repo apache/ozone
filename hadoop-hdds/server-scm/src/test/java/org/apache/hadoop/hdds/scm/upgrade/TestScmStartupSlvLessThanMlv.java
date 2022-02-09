@@ -66,7 +66,7 @@ public class TestScmStartupSlvLessThanMlv {
     try {
       new StorageContainerManager(conf);
       Assert.fail("Expected IOException due to incorrect MLV on SCM creation.");
-    } catch(IOException e) {
+    } catch (IOException e) {
       String expectedMessage = String.format("Metadata layout version (%s) > " +
           "software layout version (%s)", mlv, largestSlv);
       GenericTestUtils.assertExceptionContains(expectedMessage, e);
