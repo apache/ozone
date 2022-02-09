@@ -2964,12 +2964,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
 
-    // Won't acquire VOLUME_LOCK here as no tenant or volume name is specified
-
-    // TODO: Iterate cache first. See KeyManagerImpl#listStatus
-
-    TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
-        iterator = metadataManager.getTenantStateTable().iterator();
+    // Can't acquire VOLUME_LOCK here: no tenant is specified,
+    //  hence no volume name to acquire VOLUME_LOCK on.
+    // And we won't iterate cache here. See HDDS-6274.
+    final Table<String, OmDBTenantInfo> tenantStateTable =
+        metadataManager.getTenantStateTable();
+    final TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
+        iterator = tenantStateTable.iterator();
 
     while (iterator.hasNext()) {
       final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
