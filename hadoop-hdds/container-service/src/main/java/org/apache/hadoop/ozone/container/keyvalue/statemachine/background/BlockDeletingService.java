@@ -20,12 +20,14 @@ package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Set;
 import java.util.UUID;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -90,6 +92,8 @@ public class BlockDeletingService extends BackgroundService {
   // Core pool size for container tasks
   private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 10;
 
+  private final Set<Long> inDeletingContainer = new CopyOnWriteArraySet<>();
+
   public BlockDeletingService(OzoneContainer ozoneContainer,
       long serviceInterval, long serviceTimeout, TimeUnit timeUnit,
       ConfigurationSource conf) {
@@ -152,6 +156,8 @@ public class BlockDeletingService extends BackgroundService {
             new BlockDeletingTask(containerBlockInfo.containerData,
                 TASK_PRIORITY_DEFAULT, containerBlockInfo.numBlocksToDelete);
         queue.add(containerBlockInfos);
+        inDeletingContainer
+            .add(containerBlockInfo.getContainerData().getContainerID());
         totalBlocks += containerBlockInfo.numBlocksToDelete;
       }
       if (containers.size() > 0) {
@@ -186,6 +192,9 @@ public class BlockDeletingService extends BackgroundService {
 
   private boolean isDeletionAllowed(ContainerData containerData,
       ContainerDeletionChoosingPolicy deletionPolicy) {
+    if (inDeletingContainer.contains(containerData.getContainerID())) {
+      return false;
+    }
     if (!deletionPolicy
         .isValidContainerType(containerData.getContainerType())) {
       return false;
@@ -272,8 +281,9 @@ public class BlockDeletingService extends BackgroundService {
     @Override
     public BackgroundTaskResult call() throws Exception {
       ContainerBackgroundTaskResult crr;
+      long containerID = containerData.getContainerID();
       final Container container = ozoneContainer.getContainerSet()
-          .getContainer(containerData.getContainerID());
+          .getContainer(containerID);
       container.writeLock();
       File dataDir = new File(containerData.getChunksPath());
       long startTime = Time.monotonicNow();
@@ -290,6 +300,7 @@ public class BlockDeletingService extends BackgroundService {
         return crr;
       } finally {
         container.writeUnlock();
+        inDeletingContainer.remove(containerID);
       }
     }
 
