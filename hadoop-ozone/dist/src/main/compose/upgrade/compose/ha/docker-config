@@ -24,8 +24,8 @@ OZONE-SITE.XML_ozone.om.address.omservice.om1=om1
 OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
-// setting ozone.scm.ratis.enable to false for now, as scm ha upgrade is
-// not supported yet. This is supposed to work without SCM HA configuration
+# setting ozone.scm.ratis.enable to false for now, as scm ha upgrade is
+# not supported yet. This is supposed to work without SCM HA configuration
 OZONE-SITE.XML_ozone.scm.ratis.enable=false
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
