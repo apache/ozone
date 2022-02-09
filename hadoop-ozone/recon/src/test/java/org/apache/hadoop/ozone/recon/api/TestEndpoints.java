@@ -415,7 +415,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       Assert.assertEquals(pipelineId,
           datanodeMetadata.getPipelines().get(0).getPipelineID().toString());
       Assert.assertEquals(pipeline.getReplicationConfig().getRequiredNodes(),
-          datanodeMetadata.getPipelines().get(0).getReplicationFactor());
+          datanodeMetadata.getPipelines().get(0).getReplicationConfig()
+              .getRequiredNodes());
       Assert.assertEquals(pipeline.getType().toString(),
           datanodeMetadata.getPipelines().get(0).getReplicationType());
       Assert.assertEquals(pipeline.getLeaderNode().getHostName(),
