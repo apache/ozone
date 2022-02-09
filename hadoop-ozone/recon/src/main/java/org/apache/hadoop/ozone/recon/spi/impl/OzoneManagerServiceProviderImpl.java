@@ -198,7 +198,7 @@ public class OzoneManagerServiceProviderImpl
         OmSnapshotTaskName.OmDeltaRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OmDeltaRequest.name())){
+        OmSnapshotTaskName.OmDeltaRequest.name())) {
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
           OmSnapshotTaskName.OmDeltaRequest.name());
@@ -208,7 +208,7 @@ public class OzoneManagerServiceProviderImpl
         OmSnapshotTaskName.OmSnapshotRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OmSnapshotRequest.name())){
+        OmSnapshotTaskName.OmSnapshotRequest.name())) {
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
           OmSnapshotTaskName.OmSnapshotRequest.name());

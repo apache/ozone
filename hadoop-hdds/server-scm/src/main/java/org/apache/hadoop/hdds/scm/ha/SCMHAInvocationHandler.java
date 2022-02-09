@@ -68,7 +68,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
               invokeLocal(method, args);
       LOG.debug("Call: {} took {} ms", method, Time.monotonicNow() - startTime);
       return result;
-    } catch(InvocationTargetException iEx) {
+    } catch (InvocationTargetException iEx) {
       throw iEx.getCause();
     }
   }
@@ -100,7 +100,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     // via ratis. So, in this special scenario we use RaftClient.
     final SCMRatisResponse response;
     if (method.getName().equals("storeValidCertificate") &&
-        args[args.length -1].equals(HddsProtos.NodeType.SCM)) {
+        args[args.length - 1].equals(HddsProtos.NodeType.SCM)) {
       response =
           HASecurityUtils.submitScmCertsToRatis(
               ratisHandler.getDivision().getGroup(),

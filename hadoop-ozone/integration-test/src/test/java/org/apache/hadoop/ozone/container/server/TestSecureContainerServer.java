@@ -169,7 +169,7 @@ public class TestSecureContainerServer {
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(dd, conf,
-            hddsDispatcher, caClient), (dn, p) -> {}, (p) -> {});
+            hddsDispatcher, caClient), (dn, p) -> {  }, (p) -> { });
   }
 
   private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
@@ -194,7 +194,7 @@ public class TestSecureContainerServer {
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
               containerSet, volumeSet, metrics,
-              c -> {}));
+              c -> { }));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
@@ -234,7 +234,7 @@ public class TestSecureContainerServer {
         XceiverClientRatis::newXceiverClientRatis,
         TestSecureContainerServer::newXceiverServerRatis,
         (dn, p) -> RatisTestHelper.initXceiverServerRatis(rpc, dn, p),
-        (p) -> {});
+        (p) -> { });
   }
 
   private static void runTestClientServer(

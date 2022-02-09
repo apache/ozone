@@ -31,7 +31,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
  * Shared Utilities for Ozone FS and related classes.
  */
 public final class OzoneClientUtils {
-  private OzoneClientUtils(){
+  private OzoneClientUtils() {
     // Not used.
   }
   public static BucketLayout resolveLinkBucketLayout(OzoneBucket bucket,

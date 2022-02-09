@@ -264,7 +264,7 @@ public class ReconStorageContainerManagerFacade
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);
-    if(isSCMSnapshotEnabled) {
+    if (isSCMSnapshotEnabled) {
       initializeSCMDB();
       LOG.info("SCM DB initialized");
     } else {
@@ -335,7 +335,7 @@ public class ReconStorageContainerManagerFacade
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD,
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
 
-      if(Math.abs(scmContainersCount - reconContainerCount) > threshold) {
+      if (Math.abs(scmContainersCount - reconContainerCount) > threshold) {
         LOG.info("Recon Container Count: {}, SCM Container Count: {}",
             reconContainerCount, scmContainersCount);
         updateReconSCMDBWithNewSnapshot();

@@ -92,7 +92,7 @@ public class TestQueryNode {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfDatanodes)
-        .setTotalPipelineNumLimit(numOfDatanodes + numOfDatanodes/2)
+        .setTotalPipelineNumLimit(numOfDatanodes + numOfDatanodes / 2)
         .build();
     cluster.waitForClusterToBeReady();
     scmClient = new ContainerOperationClient(conf);

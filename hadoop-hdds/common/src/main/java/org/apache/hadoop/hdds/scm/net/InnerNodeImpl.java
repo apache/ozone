@@ -38,7 +38,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR;
  */
 public class InnerNodeImpl extends NodeImpl implements InnerNode {
   protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
-    protected Factory() {}
+    protected Factory() { }
 
     @Override
     public InnerNodeImpl newInnerNode(String name, String location,
@@ -93,7 +93,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     } else {
       for (Node node: childrenMap.values()) {
         if (node instanceof InnerNode) {
-          count += ((InnerNode)node).getNumOfNodes(level -1);
+          count += ((InnerNode)node).getNumOfNodes(level - 1);
         } else {
           throw new RuntimeException("Cannot support Level:" + level +
               " on this node " + this.toString());
@@ -119,7 +119,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     } else {
       for (Node node: childrenMap.values()) {
         if (node instanceof InnerNode) {
-          result.addAll(((InnerNode)node).getNodes(level -1));
+          result.addAll(((InnerNode)node).getNodes(level - 1));
         } else {
           throw new RuntimeException("Cannot support Level:" + level +
               " on this node " + this.toString());
@@ -265,7 +265,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     if (child == null) {
       return null;
     }
-    if (path.length == 1){
+    if (path.length == 1) {
       return child;
     }
     if (child instanceof InnerNode) {
@@ -292,7 +292,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       }
       return getChildNode(leafIndex);
     } else {
-      for(Node node : childrenMap.values()) {
+      for (Node node : childrenMap.values()) {
         InnerNodeImpl child = (InnerNodeImpl)node;
         int leafCount = child.getNumOfLeaves();
         if (leafIndex < leafCount) {
@@ -468,7 +468,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     if (leafIndex >= getNumOfChildren()) {
       return null;
     }
-    for(Node node : childrenMap.values()) {
+    for (Node node : childrenMap.values()) {
       if (excludedNodes != null && excludedNodes.contains(node)) {
         continue;
       }
@@ -519,7 +519,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   private Node getChildNode(int index) {
     Iterator iterator = childrenMap.values().iterator();
     Node node = null;
-    while(index >= 0 && iterator.hasNext()) {
+    while (index >= 0 && iterator.hasNext()) {
       node = (Node)iterator.next();
       index--;
     }

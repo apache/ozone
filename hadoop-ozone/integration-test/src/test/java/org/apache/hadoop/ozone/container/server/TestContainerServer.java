@@ -212,7 +212,7 @@ public class TestContainerServer {
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
                 containerSet, volumeSet, metrics,
-                c -> {}));
+                c -> { }));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);

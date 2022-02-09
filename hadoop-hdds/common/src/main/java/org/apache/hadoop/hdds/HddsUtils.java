@@ -632,7 +632,7 @@ public final class HddsUtils {
    * Utility method to round up bytes into the nearest MB.
    */
   public static int roundupMb(long bytes) {
-    return (int)Math.ceil((double) bytes/(double) ONE_MB);
+    return (int)Math.ceil((double) bytes / (double) ONE_MB);
   }
 
   /**

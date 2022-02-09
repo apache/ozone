@@ -332,7 +332,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       response = submitRequest(Type.GetExistContainerWithPipelinesInBatch,
           (builder) -> builder
               .setGetExistContainerWithPipelinesInBatchRequest(request));
-    } catch (IOException ex){
+    } catch (IOException ex) {
       return cps;
     }
 
@@ -781,7 +781,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
-      Optional<Long> maxSizeLeavingSourceInGB) throws IOException{
+      Optional<Long> maxSizeLeavingSourceInGB) throws IOException {
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());

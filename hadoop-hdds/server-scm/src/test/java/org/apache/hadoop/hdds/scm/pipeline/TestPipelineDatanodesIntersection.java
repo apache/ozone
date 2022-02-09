@@ -110,7 +110,7 @@ public class TestPipelineDatanodesIntersection {
 
   @Test
   public void testPipelineDatanodesIntersection() throws IOException {
-    NodeManager nodeManager= new MockNodeManager(true, nodeCount);
+    NodeManager nodeManager = new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     SCMHAManager scmhaManager = MockSCMHAManager.getInstance(true);
@@ -157,7 +157,7 @@ public class TestPipelineDatanodesIntersection {
           }
         }
         createdPipelineCount++;
-      } catch(SCMException e) {
+      } catch (SCMException e) {
         end = true;
       } catch (IOException e) {
         end = true;

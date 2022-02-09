@@ -100,15 +100,15 @@ public class ContainerReplicaCount {
 
   @Override
   public String toString() {
-    return "Container State: " +container.getState()+
-        " Replica Count: "+replica.size()+
-        " Healthy Count: "+healthyCount+
-        " Decommission Count: "+decommissionCount+
-        " Maintenance Count: "+maintenanceCount+
-        " inFlightAdd Count: "+inFlightAdd+
-        " inFightDel Count: "+inFlightDel+
-        " ReplicationFactor: "+repFactor+
-        " minMaintenance Count: "+minHealthyForMaintenance;
+    return "Container State: " + container.getState() +
+        " Replica Count: " + replica.size() +
+        " Healthy Count: " + healthyCount +
+        " Decommission Count: " + decommissionCount +
+        " Maintenance Count: " + maintenanceCount +
+        " inFlightAdd Count: " + inFlightAdd +
+        " inFightDel Count: " + inFlightDel +
+        " ReplicationFactor: " + repFactor +
+        " minMaintenance Count: " + minHealthyForMaintenance;
   }
 
   /**

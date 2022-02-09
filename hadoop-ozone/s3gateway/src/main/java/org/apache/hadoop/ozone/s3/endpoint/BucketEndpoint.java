@@ -212,7 +212,7 @@ public class BucketEndpoint extends EndpointBase {
 
     if (count < maxKeys) {
       response.setTruncated(false);
-    } else if(ozoneKeyIterator.hasNext()) {
+    } else if (ozoneKeyIterator.hasNext()) {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
@@ -498,7 +498,7 @@ public class BucketEndpoint extends EndpointBase {
         }
       }
       // Add new permission on Volume
-      for(OzoneAcl acl : ozoneAclListOnVolume) {
+      for (OzoneAcl acl : ozoneAclListOnVolume) {
         volume.addAcl(acl);
       }
     } catch (OMException exception) {
