@@ -422,3 +422,33 @@ prepare_for_runner_image() {
   export OZONE_IMAGE="${runner_image}:${v}"
 }
 
+## @description Executing the Ozone Debug CLI related robot tests
+execute_debug_tests() {
+
+  execute_robot_test datanode debug/ozone-debug-tests.robot
+
+  docker exec ozone_datanode_2 find /data/hdds/hdds/ -name *.block | sed -n '2p' | xargs docker exec ozone_datanode_2 sed -i -e '1s/^/a/'
+  execute_robot_test datanode debug/ozone-debug-corrupt-block.robot
+
+  docker stop ozone_datanode_2
+  execute_robot_test datanode debug/ozone-debug-modified-env.robot
+
+  docker start ozone_datanode_2
+
+  SECONDS=0
+  while [[ $SECONDS -lt 60 ]]; do
+    local command="ozone admin datanode list"
+    docker-compose exec -T ${SCM} bash -c "$command" | grep -A2 "datanode_2" > /tmp/dn_check
+    health=$(grep -c "State: HEALTHY" /tmp/dn_check)
+    operational=$(grep -c "State: IN_SERVICE" /tmp/dn_check)
+
+    if [[ "$health" -eq 1 && "$operational" -eq 1 ]]; then
+      echo "datanode_2 is HEALTHY and IN_SERVICE"
+      return
+    else
+      echo "Waiting for datanode_2"
+    fi
+    echo "SECONDS: $SECONDS"
+  done
+  echo "WARNING: datanode_2 is still not available"
+}
