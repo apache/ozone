@@ -74,8 +74,8 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   /**
-   * From ECReplicationConfig and Pipeline with the block locations and location
-   * indexes, determine the number of data locations available.
+   * From the Pipeline and expected number of locations, determine the number
+   * of data locations available.
    * @param pipeline The pipeline for the data block, givings its locations and
    *                 the index of each location.
    * @param expectedLocs The number of locations we expect for the block to have
