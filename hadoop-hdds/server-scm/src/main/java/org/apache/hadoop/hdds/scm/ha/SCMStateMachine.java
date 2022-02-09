@@ -388,7 +388,12 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void close() throws IOException {
     stop();
-    ExitUtils.terminate(1, "terminated by ratis", LOG);
+    try {
+      ExitUtils.terminate(1, "terminated by ratis", LOG);
+    } catch (ExitUtils.ExitException e) {
+      LOG.info("scm state machine is terminated by Ratis, " +
+          "but termination is disabled: {}", e.getMessage());
+    }
   }
 
   public void stop() throws IOException {
