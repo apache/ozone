@@ -389,7 +389,7 @@ public class SCMStateMachine extends BaseStateMachine {
   public void close() throws IOException {
     stop();
     try {
-      ExitUtils.terminate(1, "terminated by ratis", LOG);
+      ExitUtils.terminate(1, "scm state machine terminated by ratis", LOG);
     } catch (ExitUtils.ExitException e) {
       LOG.info("scm state machine is terminated by Ratis, " +
           "but termination is disabled: {}", e.getMessage());
