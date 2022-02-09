@@ -449,7 +449,7 @@ public class NSSummaryEndpoint {
 
       for (OmVolumeArgs volume: volumes) {
         final long quota = volume.getQuotaInBytes();
-        assert(quota >= -1L);
+        assert (quota >= -1L);
         if (quota == -1L) {
           // If one volume has unlimited quota, the "root" quota is unlimited.
           quotaInBytes = -1L;

@@ -282,7 +282,7 @@ public class TestDeleteContainerHandler {
   private Boolean isContainerClosed(HddsDatanodeService hddsDatanodeService,
       long containerID) {
     ContainerData containerData;
-    containerData =hddsDatanodeService
+    containerData = hddsDatanodeService
         .getDatanodeStateMachine().getContainer().getContainerSet()
         .getContainer(containerID).getContainerData();
     return !containerData.isOpen();

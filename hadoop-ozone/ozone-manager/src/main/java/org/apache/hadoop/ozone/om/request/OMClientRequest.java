@@ -155,7 +155,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
       OzoneManager ozoneManager) {
     OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
-    if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()){
+    if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()) {
       OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =
           OzoneManagerProtocolProtos.UserInfo.newBuilder();
       UserGroupInformation user;
@@ -164,7 +164,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         user = UserGroupInformation.getCurrentUser();
         remoteAddress = ozoneManager.getOmRpcServerAddr()
             .getAddress();
-      } catch (Exception e){
+      } catch (Exception e) {
         LOG.debug("Couldn't get om Rpc server address", e);
         return getUserInfo();
       }
@@ -517,7 +517,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (path.length() == 0) {
       throw new OMException("Invalid KeyPath, empty keyName" + path,
           INVALID_KEY_NAME);
-    } else if(path.startsWith("/")) {
+    } else if (path.startsWith("/")) {
       isValid = false;
     } else {
       // Check for ".." "." ":" "/"

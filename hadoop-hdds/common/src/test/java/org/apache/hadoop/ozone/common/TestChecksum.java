@@ -73,7 +73,7 @@ public class TestChecksum {
     // Change the data and check if new checksum matches the original checksum.
     // Modifying one byte of data should be enough for the checksum data to
     // mismatch
-    data[50] = (byte) (data[50]+1);
+    data[50] = (byte) (data[50] + 1);
     ChecksumData newChecksumData = checksum.computeChecksum(data);
     Assert.assertNotEquals("Checksums should not match for different data",
         originalChecksumData, newChecksumData);

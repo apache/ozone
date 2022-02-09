@@ -546,13 +546,13 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (ex.getResult() == ResultCodes.ENTITY_TOO_SMALL) {
         throw newError(ENTITY_TOO_SMALL, key, ex);
-      } else if(ex.getResult() == ResultCodes.INVALID_REQUEST) {
+      } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
         OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: You must " +
             "specify at least one part");
         throw os3Exception;
-      } else if(ex.getResult() == ResultCodes.NOT_A_FILE) {
+      } else if (ex.getResult() == ResultCodes.NOT_A_FILE) {
         OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: " +
@@ -871,7 +871,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     long currentDate = System.currentTimeMillis();
-    if  (ozoneDateInMs <= currentDate){
+    if  (ozoneDateInMs <= currentDate) {
       return OptionalLong.of(ozoneDateInMs);
     } else {
       // dates in the future are invalid, so return empty()

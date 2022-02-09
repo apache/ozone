@@ -293,7 +293,7 @@ public class DatanodeStateMachine implements Closeable {
 
       now = Time.monotonicNow();
       if (now < nextHB.get()) {
-        if(!Thread.interrupted()) {
+        if (!Thread.interrupted()) {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
@@ -379,7 +379,7 @@ public class DatanodeStateMachine implements Closeable {
       connectionManager.close();
     }
 
-    if(container != null) {
+    if (container != null) {
       container.stop();
     }
 
@@ -637,12 +637,12 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   public StatusAndMessages finalizeUpgrade()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
   }
 
   public StatusAndMessages queryUpgradeStatus()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         true);
   }

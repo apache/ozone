@@ -532,7 +532,7 @@ public class MockNodeManager implements NodeManager {
 
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
-    if(commandMap.containsKey(dnId)) {
+    if (commandMap.containsKey(dnId)) {
       List<SCMCommand> commandList = commandMap.get(dnId);
       Preconditions.checkNotNull(commandList);
       commandList.add(command);
@@ -601,7 +601,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   public void clearCommandQueue(UUID dnId) {
-    if(commandMap.containsKey(dnId)) {
+    if (commandMap.containsKey(dnId)) {
       commandMap.put(dnId, new LinkedList<>());
     }
   }
@@ -799,7 +799,7 @@ public class MockNodeManager implements NodeManager {
     if (uuids == null) {
       return results;
     }
-    for(String uuid : uuids) {
+    for (String uuid : uuids) {
       DatanodeDetails dn = getNodeByUuid(uuid);
       if (dn != null) {
         results.add(dn);

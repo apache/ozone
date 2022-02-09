@@ -74,7 +74,7 @@ public class TestRDBStore {
     statistics.setStatsLevel(StatsLevel.ALL);
     options = options.setStatistics(statistics);
     configSet = new HashSet<>();
-    for(String name : families) {
+    for (String name : families) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }
@@ -358,7 +358,7 @@ public class TestRDBStore {
     options.setCreateMissingColumnFamilies(true);
     configSet = new HashSet<>();
     List<String> familiesMinusOne = families.subList(0, families.size() - 1);
-    for(String name : familiesMinusOne) {
+    for (String name : familiesMinusOne) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }
