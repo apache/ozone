@@ -51,6 +51,7 @@ import org.apache.ratis.util.LifeCycle;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -83,9 +84,13 @@ public class TestOzoneManagerRatisServer {
   private SecurityConfig secConfig;
   private OMCertificateClient certClient;
 
+  @BeforeClass
+  public static void setup() {
+    ExitUtils.disableSystemExit();
+  }
+  
   @Before
   public void init() throws Exception {
-    ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
     omID = UUID.randomUUID().toString();
     final String path = GenericTestUtils.getTempPath(omID);

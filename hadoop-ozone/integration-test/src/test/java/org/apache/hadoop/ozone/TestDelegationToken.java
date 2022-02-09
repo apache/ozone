@@ -88,6 +88,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -131,9 +132,13 @@ public final class TestDelegationToken {
   private String omId;
   private OzoneManagerProtocolClientSideTranslatorPB omClient;
 
+  @BeforeClass
+  public static void setup() {
+    ExitUtils.disableSystemExit();
+  }
+
   @Before
   public void init() {
-    ExitUtils.disableSystemExit();
     try {
       conf = new OzoneConfiguration();
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
