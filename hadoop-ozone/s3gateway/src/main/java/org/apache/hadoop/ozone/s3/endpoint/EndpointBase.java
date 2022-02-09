@@ -38,6 +38,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+
 /**
  * Basic helpers for all the REST endpoints.
  */
@@ -57,7 +59,7 @@ public abstract class EndpointBase {
       bucket = volume.getBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName);
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else {
         throw ex;
       }
@@ -88,9 +90,9 @@ public abstract class EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName);
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         throw ex;
       }
@@ -117,7 +119,7 @@ public abstract class EndpointBase {
       client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
         // S3 does not return error for bucket already exists, it just
         // returns the location.
@@ -138,8 +140,7 @@ public abstract class EndpointBase {
       client.getObjectStore().deleteS3Bucket(s3BucketName);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
-            s3BucketName);
+        throw newError(S3ErrorTable.ACCESS_DENIED, s3BucketName, ex);
       }
       throw ex;
     }
@@ -182,8 +183,7 @@ public abstract class EndpointBase {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
-            "listBuckets");
+        throw newError(S3ErrorTable.ACCESS_DENIED, "listBuckets", e);
       } else {
         throw e;
       }
