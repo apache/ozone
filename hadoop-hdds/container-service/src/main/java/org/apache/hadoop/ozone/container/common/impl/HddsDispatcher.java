@@ -581,7 +581,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   private void audit(AuditAction action, EventType eventType,
-      Map<String, String> params, AuditEventStatus result, Throwable exception) {
+      Map<String, String> params, AuditEventStatus result,
+      Throwable exception) {
     AuditMessage amsg;
     switch (result) {
     case SUCCESS:

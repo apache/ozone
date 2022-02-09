@@ -356,7 +356,8 @@ public class TestBlockDeletingService {
           .put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
               (long) numOfBlocksPerContainer);
     } catch (IOException exception) {
-      LOG.warn("Meta Data update was not successful for container: " + container);
+      LOG.warn("Meta Data update was not successful for container: "
+          + container);
     }
   }
 

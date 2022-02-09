@@ -936,7 +936,8 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count) throws IOException, IllegalArgumentException {
+      boolean mostUsed, int count)
+      throws IOException, IllegalArgumentException {
 
     // check admin authorisation
     try {

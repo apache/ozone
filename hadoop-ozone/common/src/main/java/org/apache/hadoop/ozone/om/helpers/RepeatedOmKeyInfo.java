@@ -82,7 +82,7 @@ public class RepeatedOmKeyInfo {
   public static class Builder {
     private List<OmKeyInfo> omKeyInfos;
 
-    public Builder(){ }
+    public Builder() { }
 
     public Builder setOmKeyInfos(List<OmKeyInfo> infoList) {
       this.omKeyInfos = infoList;

@@ -191,8 +191,8 @@ public class TestOzoneClientRetriesOnExceptions {
   @Test
   public void testMaxRetriesByOzoneClient() throws Exception {
     String keyName = getKeyName();
-    OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize);
+    OzoneOutputStream key = createKey(
+        keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize);
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
     List<BlockOutputStreamEntry> entries = keyOutputStream.getStreamEntries();

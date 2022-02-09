@@ -130,7 +130,8 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testDirectTableIterationDisabled() throws Exception {
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       DatanodeStore store = refCountedDB.getStore();
 
       assertTableIteratorUnsupported(store.getMetadataTable());
@@ -158,7 +159,8 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testBlockIteration() throws IOException {
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       assertEquals(TestDB.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
 
       assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
@@ -278,7 +280,8 @@ public class TestSchemaOneBackwardsCompatibility {
     final long expectedRegularBlocks =
             TestDB.KEY_COUNT - numBlocksToDelete;
 
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       // Test results via block iteration.
 
       assertEquals(expectedDeletingBlocks,
@@ -320,7 +323,8 @@ public class TestSchemaOneBackwardsCompatibility {
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
             metrics, c -> {
         });
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       // Read blocks that were already deleted before the upgrade.
       List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
               refCountedDB.getStore()
@@ -370,7 +374,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
   @Test
   public void testReadBlockData() throws Exception {
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       Table<String, BlockData> blockDataTable =
           refCountedDB.getStore().getBlockDataTable();
 
@@ -412,7 +417,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
   @Test
   public void testReadDeletingBlockData() throws Exception {
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       Table<String, BlockData> blockDataTable =
           refCountedDB.getStore().getBlockDataTable();
 
@@ -463,7 +469,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
   @Test
   public void testReadMetadata() throws Exception {
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       Table<String, Long> metadataTable =
           refCountedDB.getStore().getMetadataTable();
 
@@ -479,7 +486,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
   @Test
   public void testReadDeletedBlocks() throws Exception {
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    try (ReferenceCountedDB refCountedDB =
+        BlockUtils.getDB(newKvData(), conf)) {
       Table<String, ChunkInfoList> deletedBlocksTable =
           refCountedDB.getStore().getDeletedBlocksTable();
 

@@ -219,7 +219,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
                 continue;
               }
               TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
-              Runnable task = ()-> {
+              Runnable task = () -> {
                 try {
                   om.getMetrics().incNumTrashRootsProcessed();
                   trash.deleteCheckpoint(trashRoot.getPath(), false);

@@ -27,7 +27,7 @@ import java.util.List;
  */
 public final class ITestOzoneContractUtils {
 
-  private ITestOzoneContractUtils(){ }
+  private ITestOzoneContractUtils() { }
 
   private static List<Object> fsoCombinations = Arrays.asList(new Object[] {
       // FSO configuration is a cluster level server side configuration.

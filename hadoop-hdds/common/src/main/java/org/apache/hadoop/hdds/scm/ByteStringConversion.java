@@ -32,7 +32,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
  * Ozone configuration.
  */
 public final class ByteStringConversion {
-  private ByteStringConversion(){ } // no instantiation.
+  private ByteStringConversion() { } // no instantiation.
 
   /**
    * Creates the conversion function to be used to convert ByteBuffers to

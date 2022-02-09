@@ -516,8 +516,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public void updateLastAppliedIndex(List<Long> flushedEpochs) {
     Preconditions.checkArgument(flushedEpochs.size() > 0);
-    computeAndUpdateLastAppliedIndex(flushedEpochs.get(flushedEpochs.size() - 1),
-        -1L, flushedEpochs, true);
+    computeAndUpdateLastAppliedIndex(
+        flushedEpochs.get(flushedEpochs.size() - 1), -1L, flushedEpochs, true);
   }
 
   /**

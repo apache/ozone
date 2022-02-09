@@ -34,7 +34,8 @@ public class QuotaList {
     sizeQuota = new ArrayList<Long>();
   }
 
-  public void addQuotaList(String oQuota, OzoneQuota.Units uQuota, Long sQuota) {
+  public void addQuotaList(
+      String oQuota, OzoneQuota.Units uQuota, Long sQuota) {
     ozoneQuota.add(oQuota);
     unitQuota.add(uQuota);
     sizeQuota.add(sQuota);

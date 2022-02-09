@@ -116,7 +116,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
-  public HddsDatanodeService(){ }
+  public HddsDatanodeService() { }
 
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;

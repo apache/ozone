@@ -58,7 +58,8 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     this.limit = limit;
     this.increment = increment;
     this.limitIndex = limit / increment;
-    this.buffers = new ArrayList<>(limitIndex + (limit % increment == 0 ? 0 : 1));
+    this.buffers = new ArrayList<>(
+        limitIndex + (limit % increment == 0 ? 0 : 1));
     this.isDuplicated = isDuplicated;
   }
 

@@ -30,7 +30,7 @@ public class AuditEntry {
   private String result;
   private String exception;
 
-  public AuditEntry(){ }
+  public AuditEntry() { }
 
   public String getUser() {
     return user;
