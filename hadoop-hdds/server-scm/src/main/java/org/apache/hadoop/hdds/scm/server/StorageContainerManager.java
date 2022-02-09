@@ -138,6 +138,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1028,6 +1029,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public static boolean scmInit(OzoneConfiguration conf,
       String clusterId) throws IOException {
+    ExitUtils.disableSystemExit();
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
