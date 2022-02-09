@@ -139,7 +139,7 @@ public class OzoneClientConfig {
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
-          + "determines which algorithm would be used to compute checksum for "
+          + "determines which algorithm would be used to compute file checksum."
           + "COMPOSITE_CRC calculates the combined CRC of the whole file, "
           + "where the lower-level chunk/block checksums are combined into "
           + "file-level checksum."
