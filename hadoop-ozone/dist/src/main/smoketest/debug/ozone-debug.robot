@@ -15,22 +15,48 @@
 
 *** Settings ***
 Documentation       Test ozone Debug CLI
-Library             OperatingSystem
+Library             Collections
 Resource            ../commonlib.robot
-Test Timeout        2 minute
-Suite Setup         Write key
+
 *** Variables ***
+${VOLUME}           vol1
+${BUCKET}           bucket1
+${TESTFILE}         testfile
 
 *** Keywords ***
-Write key
-    Execute             ozone sh volume create o3://om/vol1 --space-quota 100TB --namespace-quota 100
-    Execute             ozone sh bucket create o3://om/vol1/bucket1
-    Execute             ozone sh key put o3://om/vol1/bucket1/debugKey /opt/hadoop/NOTICE.txt
+Compare JSON
+    [arguments]                     ${json}
+    Should Be Equal                 ${json}[filename]                   ${VOLUME}/${BUCKET}/${TESTFILE}
+    ${file_size} =                  Get File Size                       ${TESTFILE}
+    Should Be Equal                 ${json}[datasize]                   ${file_size}
+    Should Be Equal As Integers     ${json}[blocks][0][blockIndex]      1
+    Should Not Be Empty             Convert To String       ${json}[blocks][0][containerId]
+    Should Not Be Empty             Convert To String       ${json}[blocks][0][localId]
+    Should Be Equal As Integers     ${json}[blocks][0][length]          1048576
+    Should Not Be Empty             Convert To String       ${json}[blocks][0][offset]
+    ${datanodes_b1} =               Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
+    ${datanodes_expected_b1} =      Create List  ozone_datanode_1.ozone_default  ozone_datanode_2.ozone_default  ozone_datanode_3.ozone_default
+    Lists Should Be Equal	        ${datanodes_b1}    ${datanodes_expected_b1}   ignore_order=True
+    Should Be Equal As Integers     ${json}[blocks][1][blockIndex]      2
+    Should Not Be Empty             Convert To String       ${json}[blocks][1][containerId]
+    Should Not Be Empty             Convert To String       ${json}[blocks][1][localId]
+    Should Be Equal As Integers     ${json}[blocks][1][length]          451424
+    Should Not Be Empty             Convert To String       ${json}[blocks][1][offset]
+    ${datanodes_b2} =               Create List   ${json}[blocks][1][replicas][0][hostname]    ${json}[blocks][1][replicas][1][hostname]   ${json}[blocks][1][replicas][2][hostname]
+    ${datanodes_expected_b2} =      Create List  ozone_datanode_1.ozone_default  ozone_datanode_2.ozone_default  ozone_datanode_3.ozone_default
+    Lists Should Be Equal	        ${datanodes_b2}    ${datanodes_expected_b2}   ignore_order=True
 
-*** Test Cases ***
-Test ozone debug
-    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.KeyLocations[0][0].Locations'
-                    Should contain      ${result}       files
-    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.KeyLocations[0][0].Locations.files[0]'
-                    File Should Exist   ${result}
+Check cheksum mismatch error
+    [arguments]                     ${json}     ${datanode}
+    ${datanodes} =                  Create List     ${json}[blocks][0][replicas][0][hostname]   ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
+    ${index} =                      Get Index From List         ${datanodes}        ${datanode}
+    Should Contain                  ${json}[blocks][0][replicas][${index}][exception]           Checksum mismatch
 
+Check unavailable datanode error
+    [arguments]                     ${json}     ${datanode}
+    ${datanodes_b1} =               Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
+    ${index_b1} =                   Get Index From List     ${datanodes_b1}        ${datanode}
+    Should Contain                  ${json}[blocks][0][replicas][${index_b1}][exception]           UNAVAILABLE
+    ${datanodes_b2} =               Create List   ${json}[blocks][1][replicas][0][hostname]    ${json}[blocks][1][replicas][1][hostname]   ${json}[blocks][1][replicas][2][hostname]
+    ${index_b2} =                   Get Index From List     ${datanodes_b2}        ${datanode}
+    Should Contain                  ${json}[blocks][0][replicas][${index_b2}][exception]           UNAVAILABLE
