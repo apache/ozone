@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -25,6 +30,7 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.log4j.PatternLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -53,41 +59,44 @@ public class TestKeyValueContainerMetadataInspector
     KeyValueContainerData containerData = container.getContainerData();
     setDBBlockAndByteCounts(containerData, -2, -2);
 
-    // No system property set, should not run.
+    // No system property set. Should not run.
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     ContainerInspectorUtil.load();
-    String log = runInspectorAndGetLog(containerData);
-    Assert.assertFalse(log.contains(KeyValueContainerMetadataInspector.class.
-        getSimpleName()));
+    Assert.assertNull(runInspectorAndGetReport(containerData));
     ContainerInspectorUtil.unload();
 
-    // Unloaded, should not run even with system property.
+    // Unloaded. Should not run even with system property.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
-    log = runInspectorAndGetLog(containerData);
-    Assert.assertFalse(log.contains(KeyValueContainerMetadataInspector.class.
-        getSimpleName()));
+    Assert.assertNull(runInspectorAndGetReport(containerData));
+
+    // Unloaded and no system property. Should not run.
+    System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
+    Assert.assertNull(runInspectorAndGetReport(containerData));
   }
 
   @Test
-  public void testSystemProperty() {
+  public void testSystemPropertyAndReadOnly() {
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     ContainerInspector inspector = new KeyValueContainerMetadataInspector();
     Assert.assertFalse(inspector.load());
     Assert.assertTrue(inspector.isReadOnly());
 
+    // Inspect mode: valid argument and readonly.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
     inspector = new KeyValueContainerMetadataInspector();
     Assert.assertTrue(inspector.load());
     Assert.assertTrue(inspector.isReadOnly());
 
+    // Repair mode: valid argument and not readonly.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.REPAIR.toString());
     inspector = new KeyValueContainerMetadataInspector();
     Assert.assertTrue(inspector.load());
     Assert.assertFalse(inspector.isReadOnly());
 
+    // Bad argument: invalid argument and readonly.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         "badvalue");
     inspector = new KeyValueContainerMetadataInspector();
@@ -100,6 +109,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @Test
   public void testMissingChunksDir() throws Exception {
+    // Create container with missing chunks dir.
+    // The metadata in the DB will not be set in this fake container.
     KeyValueContainer container = createClosedContainer(0);
     KeyValueContainerData containerData = container.getContainerData();
     String chunksDirStr = containerData.getChunksPath();
@@ -107,20 +118,26 @@ public class TestKeyValueContainerMetadataInspector
     FileUtils.deleteDirectory(chunksDirFile);
     Assert.assertFalse(chunksDirFile.exists());
 
-    String inspectOutput = runInspectorAndGetLog(containerData,
+    // In inspect mode, missing chunks dir should be detected but not fixed.
+    JsonObject inspectJson = runInspectorAndGetReport(containerData,
         KeyValueContainerMetadataInspector.Mode.INSPECT);
-    Assert.assertTrue(inspectOutput.contains("!Missing chunks directory: " +
-        chunksDirStr));
-    // No repair should have been done.
+    // The block count and used bytes should be null in this container, but
+    // because it has no block keys that should not be an error.
+    Assert.assertEquals(1,
+        inspectJson.getAsJsonArray("errors").size());
+    checkJsonErrorsReport(inspectJson, "chunksDirectory.present",
+        new JsonPrimitive(true), new JsonPrimitive(false), false);
     Assert.assertFalse(chunksDirFile.exists());
 
-    String repairOutput = runInspectorAndGetLog(containerData,
-        KeyValueContainerMetadataInspector.Mode.REPAIR);
-    Assert.assertTrue(repairOutput.contains("!Missing chunks directory: " +
-        chunksDirStr));
-    Assert.assertTrue(repairOutput.contains("!Creating empty " +
-        "chunks directory: " + chunksDirStr));
+    // In repair mode, missing chunks dir should be detected and fixed.
+    JsonObject repairJson = runInspectorAndGetReport(containerData,
+       KeyValueContainerMetadataInspector.Mode.REPAIR);
+    Assert.assertEquals(1,
+        inspectJson.getAsJsonArray("errors").size());
+    checkJsonErrorsReport(repairJson, "chunksDirectory.present",
+        new JsonPrimitive(true), new JsonPrimitive(false), true);
     Assert.assertTrue(chunksDirFile.exists());
+    Assert.assertTrue(chunksDirFile.isDirectory());
   }
 
   @Test
@@ -172,15 +189,12 @@ public class TestKeyValueContainerMetadataInspector
 
   public void inspectThenRepairOnCorrectContainer(
       KeyValueContainerData containerData) throws Exception {
-    String inspectOutput = runInspectorAndGetLog(containerData,
-        KeyValueContainerMetadataInspector.Mode.INSPECT);
-    Assert.assertFalse(inspectOutput.contains(
-        KeyValueContainerMetadataInspector.class.getSimpleName()));
+    // No output for correct containers.
+    Assert.assertNull(runInspectorAndGetReport(containerData,
+        KeyValueContainerMetadataInspector.Mode.INSPECT));
 
-    String repairOutput = runInspectorAndGetLog(containerData,
-        KeyValueContainerMetadataInspector.Mode.REPAIR);
-    Assert.assertFalse(repairOutput.contains(
-        KeyValueContainerMetadataInspector.class.getSimpleName()));
+    Assert.assertNull(runInspectorAndGetReport(containerData,
+        KeyValueContainerMetadataInspector.Mode.REPAIR));
   }
 
   /**
@@ -208,44 +222,105 @@ public class TestKeyValueContainerMetadataInspector
       Assert.fail("Unrecognized chunk layout version.");
     }
 
+    String containerState = containerData.getState().toString();
+
     // First inspect the container.
-    String inspectOutput = runInspectorAndGetLog(containerData,
+    JsonObject inspectJson = runInspectorAndGetReport(containerData,
         KeyValueContainerMetadataInspector.Mode.INSPECT);
-    String[] expectedInspectMessages = new String[]{
-        "Audit of container #" + CONTAINER_ID + " metadata",
-        "#BLOCKCOUNT: " + setBlocks,
-        "#BYTESUSED: " + setBytes,
-        createdFiles + " files in chunks directory",
-        "Container state: " + containerData.getState(),
-        String.format(
-            "!Value of metadata key #BLOCKCOUNT does not match DB " +
-            "total: %d != %d", setBlocks, createdBlocks),
-        String.format(
-            "!Value of metadata key #BYTESUSED does not match DB total: %d" +
-            " != %d", setBytes, createdBytes),
-        "Total block keys in DB: " + createdBlocks,
-        "Total pending delete block keys in DB: 0",
-        "Schema Version: " + OzoneConsts.SCHEMA_V2,
-        "Total used bytes in DB: " + createdBytes,
-    };
-    containsAllStrings(inspectOutput, expectedInspectMessages);
+
+    checkJsonReportForIncorrectContainer(inspectJson,
+        containerState, createdBlocks, setBlocks, createdBytes, setBytes,
+        createdFiles, false);
     // Container should not have been modified in inspect mode.
     checkDBBlockAndByteCounts(containerData, setBlocks, setBytes);
 
     // Now repair the container.
-    String repairOutput = runInspectorAndGetLog(containerData,
+    JsonObject repairJson = runInspectorAndGetReport(containerData,
         KeyValueContainerMetadataInspector.Mode.REPAIR);
-    String[] expectedRepairMessages = new String[]{
-      String.format("!Repairing #BLOCKCOUNT of %d to match " +
-          "database total: %d", setBlocks, createdBlocks),
-      String.format("!Repairing #BYTESUSED of %s to match " +
-        "database total: %s", setBytes, createdBytes)
-    };
-    // Repair output should be a superset of inspect output.
-    containsAllStrings(repairOutput, expectedInspectMessages);
-    containsAllStrings(repairOutput, expectedRepairMessages);
-
+    checkJsonReportForIncorrectContainer(repairJson,
+        containerState,createdBlocks, setBlocks, createdBytes, setBytes,
+        createdFiles, true);
+    // Metadata keys should have been fixed.
     checkDBBlockAndByteCounts(containerData, createdBlocks, createdBytes);
+  }
+
+  private void checkJsonReportForIncorrectContainer(JsonObject inspectJson,
+      String expectedContainerState, long createdBlocks,
+      long setBlocks, long createdBytes, long setBytes, long createdFiles,
+      boolean shouldRepair) {
+    // Check main container properties.
+    Assert.assertEquals(inspectJson.get("containerID").getAsLong(),
+        CONTAINER_ID);
+    Assert.assertEquals(inspectJson.get("containerState").getAsString(),
+        expectedContainerState);
+
+    // Check DB metadata.
+    JsonObject jsonDbMetadata = inspectJson.getAsJsonObject("dBMetadata");
+    Assert.assertEquals(setBlocks,
+        jsonDbMetadata.get(OzoneConsts.BLOCK_COUNT).getAsLong());
+    Assert.assertEquals(setBytes,
+        jsonDbMetadata.get(OzoneConsts.CONTAINER_BYTES_USED).getAsLong());
+
+    // Check aggregate metadata values.
+    JsonObject jsonAggregates = inspectJson.getAsJsonObject("aggregates");
+    Assert.assertEquals(createdBlocks,
+        jsonAggregates.get("blockCount").getAsLong());
+    Assert.assertEquals(createdBytes,
+        jsonAggregates.get("usedBytes").getAsLong());
+    Assert.assertEquals(0,
+        jsonAggregates.get("pendingDeleteBlocks").getAsLong());
+
+    // Check chunks directory.
+    JsonObject jsonChunksDir = inspectJson.getAsJsonObject("chunksDirectory");
+    Assert.assertTrue(jsonChunksDir.get("present").getAsBoolean());
+    Assert.assertEquals(createdFiles,
+        jsonChunksDir.get("fileCount").getAsLong());
+
+    // Check errors.
+    checkJsonErrorsReport(inspectJson, "dBMetadata.#BLOCKCOUNT",
+        new JsonPrimitive(createdBlocks), new JsonPrimitive(setBlocks),
+        shouldRepair);
+    checkJsonErrorsReport(inspectJson, "dBMetadata.#BYTESUSED",
+        new JsonPrimitive(createdBytes), new JsonPrimitive(setBytes),
+        shouldRepair);
+  }
+
+  /**
+   * Checks the erorr list in the provided JsonReport for an error matching
+   * the template passed in with the parameters.
+   */
+  private void checkJsonErrorsReport(JsonObject jsonReport,
+      String propertyValue, JsonPrimitive correctExpected,
+      JsonPrimitive correctActual, boolean correctRepair) {
+
+    Assert.assertFalse(jsonReport.get("correct").getAsBoolean());
+
+    JsonArray jsonErrors = jsonReport.getAsJsonArray("errors");
+    boolean matchFound = false;
+    for (JsonElement jsonErrorElem: jsonErrors) {
+      JsonObject jsonErrorObject = jsonErrorElem.getAsJsonObject();
+      String thisProperty =
+          jsonErrorObject.get("property").getAsString();
+
+      if (thisProperty.equals(propertyValue)) {
+        matchFound = true;
+
+        JsonPrimitive expectedJsonPrim =
+            jsonErrorObject.get("expected").getAsJsonPrimitive();
+        Assert.assertEquals(correctExpected, expectedJsonPrim);
+
+        JsonPrimitive actualJsonPrim =
+            jsonErrorObject.get("actual").getAsJsonPrimitive();
+        Assert.assertEquals(correctActual, actualJsonPrim);
+
+        boolean repaired =
+            jsonErrorObject.get("repaired").getAsBoolean();
+        Assert.assertEquals(correctRepair, repaired);
+        break;
+      }
+    }
+
+    Assert.assertTrue(matchFound);
   }
 
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
@@ -262,34 +337,40 @@ public class TestKeyValueContainerMetadataInspector
       long expectedBlockCount, long expectedBytesUsed) throws Exception {
     try (ReferenceCountedDB db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+
       long bytesUsed = metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED);
       Assert.assertEquals(expectedBytesUsed, bytesUsed);
+
       long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
       Assert.assertEquals(expectedBlockCount, blockCount);
     }
   }
 
-  private String runInspectorAndGetLog(KeyValueContainerData containerData,
+  private JsonObject runInspectorAndGetReport(KeyValueContainerData containerData,
       KeyValueContainerMetadataInspector.Mode mode) throws Exception {
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         mode.toString());
     ContainerInspectorUtil.load();
-    String logOut = runInspectorAndGetLog(containerData);
+    JsonObject json = runInspectorAndGetReport(containerData);
     ContainerInspectorUtil.unload();
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
-    return logOut;
+
+    return json;
   }
 
-  private String runInspectorAndGetLog(KeyValueContainerData containerData)
+  private JsonObject runInspectorAndGetReport(KeyValueContainerData containerData)
       throws Exception {
+    // Use an empty layout so the captured log has no prefix and can be
+    // parsed as json.
     GenericTestUtils.LogCapturer capturer =
         GenericTestUtils.LogCapturer.captureLogs(
-            KeyValueContainerMetadataInspector.REPORT_LOG);
+            KeyValueContainerMetadataInspector.REPORT_LOG, new PatternLayout());
     KeyValueContainerUtil.parseKVContainerData(containerData, getConf());
     capturer.stopCapturing();
     String output = capturer.getOutput();
     capturer.clearOutput();
-    return output;
+
+    return new Gson().fromJson(output, JsonObject.class);
   }
 
   private KeyValueContainer createClosedContainer(int normalBlocks)
