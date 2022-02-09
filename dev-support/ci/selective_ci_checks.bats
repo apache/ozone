@@ -66,6 +66,17 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
+@test "runner image update" {
+  run dev-support/ci/selective_ci_checks.sh b95eeba82a
+
+  assert_output -p 'basic-checks=["rat"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-dependency-check=true
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=true
+}
+
 @test "check script" {
   run dev-support/ci/selective_ci_checks.sh 316899152
 
@@ -77,10 +88,21 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
+@test "integration and unit" {
+  run dev-support/ci/selective_ci_checks.sh 9aebf6e25
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "integration only" {
   run dev-support/ci/selective_ci_checks.sh 61396ba9f
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs"]'
   assert_output -p needs-build=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false

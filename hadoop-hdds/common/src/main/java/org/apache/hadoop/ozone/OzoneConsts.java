@@ -333,6 +333,7 @@ public final class OzoneConsts {
   public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
   public static final String SOURCE_VOLUME = "sourceVolume";
   public static final String SOURCE_BUCKET = "sourceBucket";
+  public static final String BUCKET_LAYOUT = "bucketLayout";
 
 
 
