@@ -38,9 +38,13 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -133,6 +137,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    * translator for OM protocol.
    */
   @Override
+  @RequestFeatureValidator(
+      conditions = {ValidationCondition.NEWER_CLIENT_REQUESTS},
+      contextAware = true,
+      requestType = OzoneManagerProtocolProtos.Type.CreateVolume,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS
+  )
   public OMResponse submitRequest(RpcController controller,
       OMRequest request) throws ServiceException {
     OMRequest validatedRequest = requestValidations.validateRequest(request);

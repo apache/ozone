@@ -24,6 +24,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <packaging>pom</packaging>
 
   <modules>
+    <module>dev-support/annotations</module>
     <module>hadoop-hdds</module>
     <module>hadoop-ozone</module>
   </modules>
@@ -213,7 +214,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
 
     <maven-clean-plugin.version>2.5</maven-clean-plugin.version>
-    <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
+    <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>2.5.1</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
@@ -1620,6 +1621,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
     </dependencies>
   </dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-annotation-processing</artifactId>
+      <version>${ozone.version}</version>
+    </dependency>
+  </dependencies>
 
   <build>
     <extensions>
@@ -1697,6 +1705,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <source>${javac.version}</source>
             <target>${javac.version}</target>
             <useIncrementalCompilation>false</useIncrementalCompilation>
+            <!--<annotationProcessorPaths>
+              <path>
+                <groupId>org.apache.ozone</groupId>
+                <artifactId>ozone-annotation-processing</artifactId>
+                <version>${ozone.version}</version>
+              </path>
+            </annotationProcessorPaths>-->
           </configuration>
         </plugin>
         <plugin>
