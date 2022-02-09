@@ -472,10 +472,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     super.close();
     ozoneManager.stop();
     try{
-      ExitUtils.terminate(1, "OM state machine is shutdown by Ratis server", LOG);
+      ExitUtils.terminate(1,
+          "OM state machine is shutdown by Ratis server", LOG);
     }  catch (ExitUtils.ExitException e) {
-    LOG.info("om state machine is terminated by Ratis, " +
-        "but termination is disabled: {}", e.getMessage());
+      LOG.info("om state machine is terminated by Ratis, " +
+          "but termination is disabled: {}", e.getMessage());
     }
   }
 

@@ -54,7 +54,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
-import org.apache.ratis.util.ExitUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
