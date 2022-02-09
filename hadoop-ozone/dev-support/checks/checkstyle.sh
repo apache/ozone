@@ -42,7 +42,7 @@ find "." -name checkstyle-errors.xml -print0 \
       -e '/<checkstyle.*/d' \
       -e '/<\/.*/d' \
       -e 's/<file name="\([^"]*\)".*/\1/' \
-      -e 's/<error.*line="\([[:digit:]]*\)".*column="\([[:digit:]]*\)".*message="\([^"]*\)".*/ \1,\2: \3/' \
+      -e 's/<error.*line="\([[:digit:]]*\)".*message="\([^"]*\)".*/ \1: \2/' \
       -e "s!^${BASE_DIR}/!!" \
       -e "s/&apos;/'/g" \
       -e "s/&lt;/</g" \
