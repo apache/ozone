@@ -107,8 +107,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       }
 
       if (propertyValid) {
-        LOG.info("Container metadata inspector enabled in {} mode. Report will " +
-            "be output to the {} log.", mode, REPORT_LOG.getName());
+        LOG.info("Container metadata inspector enabled in {} mode. Report" +
+            "will be output to the {} log.", mode, REPORT_LOG.getName());
       } else {
         mode = Mode.OFF;
         LOG.error("{} system property specified with invalid mode {}. " +

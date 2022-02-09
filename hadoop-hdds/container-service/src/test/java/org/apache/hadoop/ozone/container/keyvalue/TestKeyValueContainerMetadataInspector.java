@@ -131,7 +131,7 @@ public class TestKeyValueContainerMetadataInspector
 
     // In repair mode, missing chunks dir should be detected and fixed.
     JsonObject repairJson = runInspectorAndGetReport(containerData,
-       KeyValueContainerMetadataInspector.Mode.REPAIR);
+        KeyValueContainerMetadataInspector.Mode.REPAIR);
     Assert.assertEquals(1,
         inspectJson.getAsJsonArray("errors").size());
     checkJsonErrorsReport(repairJson, "chunksDirectory.present",
@@ -238,12 +238,13 @@ public class TestKeyValueContainerMetadataInspector
     JsonObject repairJson = runInspectorAndGetReport(containerData,
         KeyValueContainerMetadataInspector.Mode.REPAIR);
     checkJsonReportForIncorrectContainer(repairJson,
-        containerState,createdBlocks, setBlocks, createdBytes, setBytes,
+        containerState, createdBlocks, setBlocks, createdBytes, setBytes,
         createdFiles, true);
     // Metadata keys should have been fixed.
     checkDBBlockAndByteCounts(containerData, createdBlocks, createdBytes);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private void checkJsonReportForIncorrectContainer(JsonObject inspectJson,
       String expectedContainerState, long createdBlocks,
       long setBlocks, long createdBytes, long setBytes, long createdFiles,
@@ -346,7 +347,8 @@ public class TestKeyValueContainerMetadataInspector
     }
   }
 
-  private JsonObject runInspectorAndGetReport(KeyValueContainerData containerData,
+  private JsonObject runInspectorAndGetReport(
+      KeyValueContainerData containerData,
       KeyValueContainerMetadataInspector.Mode mode) throws Exception {
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         mode.toString());
@@ -358,8 +360,8 @@ public class TestKeyValueContainerMetadataInspector
     return json;
   }
 
-  private JsonObject runInspectorAndGetReport(KeyValueContainerData containerData)
-      throws Exception {
+  private JsonObject runInspectorAndGetReport(
+      KeyValueContainerData containerData) throws Exception {
     // Use an empty layout so the captured log has no prefix and can be
     // parsed as json.
     GenericTestUtils.LogCapturer capturer =
