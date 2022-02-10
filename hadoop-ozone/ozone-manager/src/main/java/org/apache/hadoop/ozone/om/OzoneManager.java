@@ -2974,6 +2974,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDBTenantInfo>>>
         cacheIter = tenantStateTable.cacheIterator();
 
+    // Iterate cache first
     while (cacheIter.hasNext()) {
       final Map.Entry<CacheKey<String>, CacheValue<OmDBTenantInfo>> cacheEntry =
           cacheIter.next();
@@ -2996,6 +2997,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
 
+    // Then iterate table
     while (iterator.hasNext()) {
       final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
       final String tenantId = dbEntry.getKey();
