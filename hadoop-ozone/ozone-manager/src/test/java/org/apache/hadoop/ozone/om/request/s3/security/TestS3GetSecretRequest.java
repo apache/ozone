@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
@@ -328,6 +329,10 @@ public class TestS3GetSecretRequest {
 
     // This effectively makes alice an admin.
     when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
+    // Init LayoutVersionManager to prevent NPE in checkLayoutFeature
+    final OMLayoutVersionManager lvm =
+        new OMLayoutVersionManager(OMLayoutVersionManager.maxLayoutVersion());
+    when(ozoneManager.getVersionManager()).thenReturn(lvm);
 
     // 1. CreateTenantRequest: Create tenant "finance".
     long txLogIndex = 1;

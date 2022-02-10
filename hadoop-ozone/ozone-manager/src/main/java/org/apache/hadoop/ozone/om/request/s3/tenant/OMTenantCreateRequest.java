@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
@@ -61,6 +62,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
   Ratis execution flow for OMTenantCreate
@@ -110,6 +112,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   }
 
   @Override
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     // Check Ozone cluster admin privilege
