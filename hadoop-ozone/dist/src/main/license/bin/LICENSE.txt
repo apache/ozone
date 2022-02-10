@@ -309,6 +309,8 @@ Apache License
    io.netty:netty-handler
    io.netty:netty-handler-proxy
    io.netty:netty-resolver
+   io.netty:netty-tcnative-classes
+   io.netty:netty-transport-classes-epoll
    io.netty:netty-transport
    io.netty:netty-transport-native-epoll
    io.netty:netty-transport-native-unix-common
