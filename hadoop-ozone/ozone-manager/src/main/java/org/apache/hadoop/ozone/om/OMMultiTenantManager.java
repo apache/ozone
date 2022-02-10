@@ -177,6 +177,14 @@ public interface OMMultiTenantManager {
   boolean isTenantAdmin(String user, String tenantName);
 
   /**
+   * Check if a tenant exists.
+   * @param tenantId tenant name.
+   * @return true if tenant exists, false otherwise.
+   * @throws IOException
+   */
+  boolean tenantExists(String tenantId) throws IOException;
+
+  /**
    * List all the user & accessIDs of all users that belong to this Tenant.
    * Note this read is unprotected. See OzoneManager#listUserInTenant
    * @param tenantID

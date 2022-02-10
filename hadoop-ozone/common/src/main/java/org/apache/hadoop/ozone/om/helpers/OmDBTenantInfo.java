@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.StringUtils;
 /**
  * This class is used for storing Ozone tenant info.
  */
-public final class OmDBTenantInfo {
+public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
   /**
    * Name of the tenant.
    */
@@ -67,6 +67,10 @@ public final class OmDBTenantInfo {
     accountNamespaceName = tInfo[2];
     userPolicyGroupName = tInfo[3];
     bucketPolicyGroupName = tInfo[4];
+  }
+
+  public int compareTo(OmDBTenantInfo otherOmDBTenantInfo) {
+    return this.tenantId.compareTo(otherOmDBTenantInfo.tenantId);
   }
 
   public String getTenantId() {

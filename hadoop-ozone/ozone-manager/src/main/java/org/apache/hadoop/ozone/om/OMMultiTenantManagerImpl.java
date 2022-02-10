@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantInfo;
-import org.apache.hadoop.ozone.om.multitenant.DefaultOzoneS3Tenant;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
@@ -163,7 +163,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   public Tenant createTenantAccessInAuthorizer(String tenantID)
       throws IOException {
 
-    Tenant tenant = new DefaultOzoneS3Tenant(tenantID);
+    Tenant tenant = new OzoneTenant(tenantID);
     try {
       controlPathLock.writeLock().lock();
 
@@ -376,6 +376,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   @Override
   public boolean isTenantAdmin(String user, String tenantName) {
     return true;
+  }
+
+  @Override
+  public boolean tenantExists(String tenantId) throws IOException {
+    return omMetadataManager.getTenantStateTable().isExist(tenantId);
   }
 
   @Override

@@ -98,6 +98,8 @@ public final class OMTenantRequestHelper {
 
   /**
    * Retrieve volume name of the tenant.
+   *
+   * Throws OMException TENANT_NOT_FOUND if tenantId doesn't exist.
    */
   public static String getTenantVolumeName(OMMetadataManager omMetadataManager,
                                            String tenantId) throws IOException {

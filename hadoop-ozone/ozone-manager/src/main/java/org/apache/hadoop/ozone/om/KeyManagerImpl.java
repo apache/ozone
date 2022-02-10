@@ -1506,7 +1506,7 @@ public class KeyManagerImpl implements KeyManager {
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
-    Table keyTable = metadataManager
+    Table<String, OmKeyInfo> keyTable = metadataManager
         .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator;
