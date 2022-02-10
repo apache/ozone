@@ -749,7 +749,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     } catch (OMException ex) {
       throw ex;
-    } catch (IOException ex){
+    } catch (IOException ex) {
       LOG.error(
           "List Multipart Upload Parts Failed: volume: {}, bucket: {}, ,key: "
               + "{} ",
@@ -1071,7 +1071,7 @@ public class KeyManagerImpl implements KeyManager {
       }
       return hasAccess;
     } catch (IOException ex) {
-      if(ex instanceof OMException) {
+      if (ex instanceof OMException) {
         throw (OMException) ex;
       }
       LOG.error("CheckAccess operation failed for key:{}/{}/{}", volume,
@@ -1763,7 +1763,7 @@ public class KeyManagerImpl implements KeyManager {
       if (fileStatusInfo != null) {
         prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
 
-        if(fileStatusInfo.isDirectory()){
+        if (fileStatusInfo.isDirectory()) {
           seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
               fileStatusInfo.getKeyInfo().getFileName());
 
@@ -2005,7 +2005,7 @@ public class KeyManagerImpl implements KeyManager {
       String cacheKey = entry.getKey().getCacheKey();
       OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
-      if(cacheOmKeyInfo == null){
+      if (cacheOmKeyInfo == null) {
         deletedKeySet.add(cacheKey);
         continue;
       }
@@ -2050,7 +2050,7 @@ public class KeyManagerImpl implements KeyManager {
       String cacheKey = entry.getKey().getCacheKey();
       OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
-      if(cacheOmDirInfo == null){
+      if (cacheOmDirInfo == null) {
         deletedKeySet.add(cacheKey);
         continue;
       }

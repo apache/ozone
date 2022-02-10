@@ -139,7 +139,7 @@ public class TestReadRetries {
    */
   @After
   public void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 

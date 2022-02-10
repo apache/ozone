@@ -136,7 +136,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       } else {
         xceiverClients = new ArrayList<>();
         pipelines = new HashSet<>();
-        for(String pipelineId:pipelinesFromCmd){
+        for (String pipelineId:pipelinesFromCmd) {
           List<Pipeline> selectedPipelines =  pipelinesFromSCM.stream()
               .filter((p -> p.getId().toString()
                   .equals("PipelineID=" + pipelineId)
@@ -144,11 +144,11 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
                .collect(Collectors.toList());
           pipelines.addAll(selectedPipelines);
         }
-        for (Pipeline p:pipelines){
+        for (Pipeline p:pipelines) {
           LOG.info("Writing to pipeline: " + p.getId());
           xceiverClients.add(xceiverClientManager.acquireClient(p));
         }
-        if (pipelines.isEmpty()){
+        if (pipelines.isEmpty()) {
           throw new IllegalArgumentException(
               "Couldn't find the any/the selected pipeline");
         }
@@ -166,8 +166,8 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
   private boolean pipelineContainsDatanode(Pipeline p,
       List<String> datanodeHosts) {
-    for (DatanodeDetails dn:p.getNodes()){
-      if (datanodeHosts.contains(dn.getHostName())){
+    for (DatanodeDetails dn:p.getNodes()) {
+      if (datanodeHosts.contains(dn.getHostName())) {
         return true;
       }
     }
@@ -219,7 +219,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
             .setData(dataToWrite);
 
     XceiverClientSpi clientSpi = xceiverClients.get(
-        (int) (stepNo%(xceiverClients.size())));
+        (int) (stepNo % (xceiverClients.size())));
     sendWriteChunkRequest(blockId, writeChunkRequest,
         clientSpi);
 

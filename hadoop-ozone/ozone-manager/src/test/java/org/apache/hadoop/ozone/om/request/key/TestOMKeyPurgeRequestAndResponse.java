@@ -137,7 +137,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setStatus(Status.OK)
         .build();
 
-    try(BatchOperation batchOperation =
+    try (BatchOperation batchOperation =
         omMetadataManager.getStore().initBatchOperation()) {
 
       OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(

@@ -175,7 +175,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       }
     }
 
-    while(spanIndex < span) {
+    while (spanIndex < span) {
       String levelSubDir = makeDirWithGivenNumberOfFiles(parent);
       ++spanIndex;
 

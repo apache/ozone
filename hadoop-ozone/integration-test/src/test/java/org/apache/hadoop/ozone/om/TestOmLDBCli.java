@@ -70,7 +70,7 @@ public class TestOmLDBCli {
 
   @After
   public void shutdown() throws Exception {
-    if (dbStore!=null){
+    if (dbStore != null) {
       dbStore.close();
     }
   }
@@ -78,7 +78,7 @@ public class TestOmLDBCli {
   @Test
   public void testOMDB() throws Exception {
     File newFolder = folder.newFolder();
-    if(!newFolder.exists()) {
+    if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     // Dummy om.db with only keyTable
@@ -88,11 +88,11 @@ public class TestOmLDBCli {
       .addTable("keyTable")
       .build();
     // insert 5 keys
-    for (int i = 0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
       OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
-          "sampleBuck", "key" + (i+1), HddsProtos.ReplicationType.STAND_ALONE,
+          "sampleBuck", "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
           HddsProtos.ReplicationFactor.ONE);
-      String key = "key"+ (i);
+      String key = "key" + (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
       byte[] arr = value.getProtobuf(CURRENT_VERSION).toByteArray();
       keyTable.put(key.getBytes(UTF_8), arr);
@@ -111,7 +111,7 @@ public class TestOmLDBCli {
     try {
       getKeyNames(dbScanner);
       Assert.fail("IllegalArgumentException is expected");
-    }catch (IllegalArgumentException e){
+    }  catch (IllegalArgumentException e) {
       //ignore
     }
 
@@ -177,7 +177,7 @@ public class TestOmLDBCli {
     scanner.setTableName("keyTable");
     scanner.call();
     Assert.assertFalse(scanner.getScannedObjects().isEmpty());
-    for (Object o : scanner.getScannedObjects()){
+    for (Object o : scanner.getScannedObjects()) {
       OmKeyInfo keyInfo = (OmKeyInfo)o;
       keyNames.add(keyInfo.getKeyName());
     }

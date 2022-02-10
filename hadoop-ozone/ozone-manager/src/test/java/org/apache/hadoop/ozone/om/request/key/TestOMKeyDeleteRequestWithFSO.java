@@ -125,10 +125,10 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         pathName);
     Assert.assertTrue("Failed to list keyPaths", pathItr.hasNext());
     Assert.assertEquals(expectedPath, pathItr.next().getTrimmedName());
-    try{
+    try {
       pathItr.next();
       Assert.fail("Reached end of the list!");
-    } catch (NoSuchElementException nse){
+    } catch (NoSuchElementException nse) {
       // expected
     }
   }

@@ -151,7 +151,7 @@ public class OzoneAddress {
         client = createRpcClientFromHostPort(ozoneURI.getHost(),
             ozoneURI.getPort(), conf);
       }
-    } else {// When host is not specified
+    } else { // When host is not specified
 
       Collection<String> omServiceIds = conf.getTrimmedStringCollection(
           OZONE_OM_SERVICE_IDS_KEY);
@@ -270,7 +270,7 @@ public class OzoneAddress {
 
     // add leading slash to the path, if it does not exist
     int firstSlash = path.indexOf('/');
-    if(firstSlash != 0) {
+    if (firstSlash != 0) {
       path = "/" + path;
     }
 

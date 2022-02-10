@@ -45,7 +45,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
-    if(omBucketInfo!= null){
+    if (omBucketInfo != null) {
       return omBucketInfo.getObjectID();
     }
     // bucket doesn't exists in DB

@@ -396,7 +396,7 @@ public class TestOMDirectoryCreateRequest {
   private String genRandomKeyName() {
     StringBuilder keyNameBuilder = new StringBuilder();
     keyNameBuilder.append(RandomStringUtils.randomAlphabetic(5));
-    for (int i =0; i< 3; i++) {
+    for (int i = 0; i < 3; i++) {
       keyNameBuilder.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
     return keyNameBuilder.toString();

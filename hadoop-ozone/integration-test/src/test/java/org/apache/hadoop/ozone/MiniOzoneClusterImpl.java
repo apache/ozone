@@ -677,7 +677,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // In this way safemode exit will happen only when atleast we have one
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
-          numOfDatanodes >=3 ? 3 : 1);
+          numOfDatanodes >= 3 ? 3 : 1);
       configureTrace();
     }
 

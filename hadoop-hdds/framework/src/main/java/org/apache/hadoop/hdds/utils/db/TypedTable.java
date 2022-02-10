@@ -98,7 +98,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>();
       //fill cache
-      try(TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
+      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
               iterator()) {
 
         while (tableIterator.hasNext()) {

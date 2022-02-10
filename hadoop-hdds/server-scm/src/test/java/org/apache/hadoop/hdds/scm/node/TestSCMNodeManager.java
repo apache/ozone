@@ -457,7 +457,7 @@ public class TestSCMNodeManager {
       // these pipelines use nodes outside of allowedDNs.
       if (success) {
         for (Pipeline pipeline: pipelines) {
-          for(DatanodeDetails pipelineDN: pipeline.getNodes()) {
+          for (DatanodeDetails pipelineDN: pipeline.getNodes()) {
             // Do not wait for this condition to be true. Disallowed DNs should
             // never be used once we have the expected number of pipelines.
             if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
@@ -1762,7 +1762,7 @@ public class TestSCMNodeManager {
     final int nodeCount = 6;
     SCMNodeManager nodeManager = createNodeManager(conf);
 
-    for (int i=0; i<nodeCount; i++) {
+    for (int i = 0; i < nodeCount; i++) {
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.randomDatanodeDetails();
       final long capacity = 2000;

@@ -177,7 +177,7 @@ public class TestContainerCache {
     for (Future future: futureList) {
       try {
         future.get();
-      } catch (InterruptedException| ExecutionException e) {
+      } catch (InterruptedException | ExecutionException e) {
         Assert.fail("Should get the DB instance");
       }
     }

@@ -114,7 +114,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
     try {
       policy.chooseVolume(volumes, blockSize);
       Assert.fail("expected to throw DiskOutOfSpaceException");
-    } catch(DiskOutOfSpaceException e) {
+    } catch (DiskOutOfSpaceException e) {
       Assert.assertEquals("Not returning the expected message",
           "Out of space: The volume with the most available space (=" + 200
               + " B) is less than the container size (=" + blockSize + " B).",
