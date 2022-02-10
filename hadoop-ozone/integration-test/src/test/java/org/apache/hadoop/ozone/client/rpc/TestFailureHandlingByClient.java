@@ -173,10 +173,8 @@ public class TestFailureHandlingByClient {
     startCluster();
     String keyName = UUID.randomUUID().toString();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    byte[] data =
-        ContainerTestHelper
-        .getFixedLengthString(keyString, chunkSize + chunkSize / 2).getBytes(
-            UTF_8);
+    byte[] data = ContainerTestHelper.getFixedLengthString(
+        keyString, 2 * chunkSize + chunkSize / 2).getBytes(UTF_8);
     key.write(data);
 
     // get the name of a valid container
@@ -209,7 +207,7 @@ public class TestFailureHandlingByClient {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
     Assert.assertEquals(data.length, keyInfo.getDataSize());
-//    validateData(keyName, data);
+    validateData(keyName, data);
 
     // Verify that the block information is updated correctly in the DB on
     // failures
@@ -224,26 +222,53 @@ public class TestFailureHandlingByClient {
    * chunk writes to a new block.
    */
   private void testBlockCountOnFailures(OmKeyInfo omKeyInfo) throws Exception {
-    // testBlockWritesWithDnFailures writes chunkSize*1.5 size of data into
+    // testBlockWritesWithDnFailures writes chunkSize*2.5 size of data into
     // KeyOutputStream. But before closing the outputStream, 2 of the DNs in
-    // the pipeline being written to are closed. This forces the client to
-    // write the uncommitted data in the buffer (first chunkSize of data will
-    // be committed before close as the flush size = chunkSize, the last 0
-    // .5*chunkSize of data will be in buffer) to another block in a
-    // different pipeline.
+    // the pipeline being written to are closed. So the key will be written
+    // to 2 blocks as atleast the last 0.5 chunk would not be committed to the
+    // first block before the stream is closed.
+    /**
+     * There are 3 possible scenarios:
+     * 1. Block1 has 2 chunks and OMKeyInfo also has 2 chunks against this block
+     *    => Block2 should have 1 chunk
+     *    (2 chunks were written to Block1, committed and acknowledged by
+     *    CommitWatcher)
+     * 2. Block1 has 1 chunk and OMKeyInfo has 1 chunk against this block
+     *    => Block2 should have 2 chunks
+     *    (Possibly 2 chunks were written but only 1 was committed to the
+     *    block)
+     * 3. Block1 has 2 chunks but OMKeyInfo has only 1 chunk against this block
+     *    => Block2 should have 2 chunks
+     *    (This happens when the 2nd chunk has been committed to Block1 but
+     *    not acknowledged by CommitWatcher before pipeline shutdown)
+     */
 
     // Get information about the first and second block (in different pipelines)
     List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations()
         .getLocationList();
     long containerId1 = locationList.get(0).getContainerID();
-    long containerId2 = locationList.get(1).getContainerID();
     List<DatanodeDetails> block1DNs = locationList.get(0).getPipeline()
         .getNodes();
+    long containerId2 = locationList.get(1).getContainerID();
     List<DatanodeDetails> block2DNs = locationList.get(1).getPipeline()
         .getNodes();
 
+
+    int block2ExpectedChunkCount;
+    if (locationList.get(0).getLength() == 2*chunkSize) {
+      // Scenario 1
+      block2ExpectedChunkCount = 1;
+    } else {
+      // Scenario 2
+      block2ExpectedChunkCount = 2;
+    }
+
     // For the first block, first 2 DNs in the pipeline are shutdown (to
-    // simulate a failure).
+    // simulate a failure). It should have 1 or 2 chunks (depending on
+    // whether the DN CommitWatcher successfully acknowledged the 2nd chunk
+    // write or not). The 3rd chunk would not exist on the first pipeline as
+    // the pipeline would be closed before the last 0.5 chunk was committed
+    // to the block.
     KeyValueContainerData containerData1 =
         ((KeyValueContainer) cluster.getHddsDatanode(block1DNs.get(2))
             .getDatanodeStateMachine().getContainer().getContainerSet()
@@ -252,13 +277,14 @@ public class TestFailureHandlingByClient {
         conf)) {
       BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
           Long.toString(locationList.get(0).getBlockID().getLocalID()));
-      // The first Block should have 1 chunkSize of data
-      Assert.assertEquals(1, blockData1.getChunks().size());
-      Assert.assertEquals(chunkSize, blockData1.getChunks().get(0).getLen());
-      // The container having the first block should have only 1 block (the
-      // pipeline would be un-writable as 2 of it's DNs are down)
+      // The first Block could have 1 or 2 chunkSize of data
+      int block1NumChunks = blockData1.getChunks().size();
+      Assert.assertTrue(block1NumChunks >= 1);
+
+      Assert.assertEquals(chunkSize * block1NumChunks, blockData1.getSize());
       Assert.assertEquals(1, containerData1.getBlockCount());
-      Assert.assertEquals(chunkSize, containerData1.getBytesUsed());
+      Assert.assertEquals(chunkSize * block1NumChunks,
+          containerData1.getBytesUsed());
     }
 
     // Verify that the second block has the remaining 0.5*chunkSize of data
@@ -271,13 +297,17 @@ public class TestFailureHandlingByClient {
       BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
           Long.toString(locationList.get(1).getBlockID().getLocalID()));
       // The second Block should have 0.5 chunkSize of data
-      Assert.assertEquals(1, blockData2.getChunks().size());
-      Assert
-          .assertEquals(chunkSize / 2, blockData2.getChunks().get(0).getLen());
-      // The container having the second block should also have only 1 block
-      // (as only 0.5 chunk is written to it)
+      Assert.assertEquals(block2ExpectedChunkCount,
+          blockData2.getChunks().size());
       Assert.assertEquals(1, containerData2.getBlockCount());
-      Assert.assertEquals(chunkSize/2, containerData2.getBytesUsed());
+      int expectedBlockSize;
+      if (block2ExpectedChunkCount == 1) {
+        expectedBlockSize = chunkSize/2;
+      } else {
+        expectedBlockSize = chunkSize + chunkSize/2;
+      }
+      Assert.assertEquals(expectedBlockSize, blockData2.getSize());
+      Assert.assertEquals(expectedBlockSize, containerData2.getBytesUsed());
     }
   }
 

@@ -450,16 +450,16 @@ public class KeyValueHandler extends Handler {
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
 
-      boolean incrBlockCount = false;
+      boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
         chunkManager.finishWriteChunks(kvContainer, blockData);
-        incrBlockCount = true;
+        endOfBlock = true;
       }
 
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      blockManager.putBlock(kvContainer, blockData, incrBlockCount);
+      blockManager.putBlock(kvContainer, blockData, endOfBlock);
 
       blockDataProto = blockData.getProtoBufMessage();
 

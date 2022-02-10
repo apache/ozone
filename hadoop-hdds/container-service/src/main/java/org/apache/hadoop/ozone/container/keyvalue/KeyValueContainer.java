@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -89,6 +90,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private final KeyValueContainerData containerData;
   private ConfigurationSource config;
 
+  // Cache of Blocks (LocalIDs) awaiting final PutBlock call after the stream
+  // is closed. When a block is added to the DB as part of putBlock, it is
+  // added to the cache here. It is cleared from the Cache when the putBlock
+  // is called on the block as part of stream.close() (with endOfBlock = true
+  // in BlockManagerImpl#putBlock). Or when the container is marked for
+  // close, the whole cache is cleared as there can be no more writes to this
+  // container.
+  // We do not need to explicitly synchronize this cache as the writes to
+  // container are synchronous.
+  private ArrayList<Long> pendingPutBlockCache;
+
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource
       ozoneConfig) {
@@ -98,6 +110,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             "Ozone configuration cannot be null");
     this.config = ozoneConfig;
     this.containerData = containerData;
+    this.pendingPutBlockCache = new ArrayList<>();
   }
 
   @Override
@@ -286,6 +299,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.CLOSING));
+      // Clear the Block Cache as there will not be any more writes to this
+      // block
+      pendingPutBlockCache.clear();
     } finally {
       writeUnlock();
     }
@@ -667,6 +683,27 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     return containerData.getBlockCommitSequenceId();
   }
 
+  /**
+   * Add the given localID of a block to the pendingPutBlockCache.
+   */
+  public void addToPendingPutBlockCache(long localID) {
+    pendingPutBlockCache.add(localID);
+  }
+
+  /**
+   * Return whether the given localID of a block is present in the
+   * pendingPutBlockCache or not.
+   */
+  public boolean isBlockInPendingPutBlockCache(long localID) {
+    return pendingPutBlockCache.contains(localID);
+  }
+
+  /**
+   * Remove the given localID of a block from the pendingPutBlockCache.
+   */
+  public void removeFromPendingPutBlockCache(long localID) {
+    pendingPutBlockCache.remove(localID);
+  }
 
   /**
    * Returns KeyValueContainerReport for the KeyValueContainer.

@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 
 import com.google.common.base.Preconditions;
@@ -95,23 +96,23 @@ public class BlockManagerImpl implements BlockManager {
    *
    * @param container - Container for which block need to be added.
    * @param data - BlockData.
-   * @param incrBlockCount - Increment BlockCount only when the last chunk is
-   *                      written or the key is committed
+   * @param endOfBlock - The last putBlock call for this block (when
+   *                   all the chunks are written and stream is closed)
    * @return length of the block.
    * @throws IOException
    */
   @Override
   public long putBlock(Container container, BlockData data,
-      boolean incrBlockCount) throws IOException {
+      boolean endOfBlock) throws IOException {
     return persistPutBlock(
         (KeyValueContainer) container,
         data,
         config,
-        incrBlockCount);
+        endOfBlock);
   }
 
   public static long persistPutBlock(KeyValueContainer container,
-      BlockData data, ConfigurationSource config, boolean incrBlockCount)
+      BlockData data, ConfigurationSource config, boolean endOfBlock)
       throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
@@ -143,11 +144,32 @@ public class BlockManagerImpl implements BlockManager {
             containerBCSId, bcsId);
         return data.getSize();
       }
+
+      // Check if the block is present in the pendingPutBlockCache for the
+      // container to determine whether the blockCount is already incremented
+      // for this block in the DB or not.
+      long localID = data.getLocalID();
+      boolean isBlockInCache = container.isBlockInPendingPutBlockCache(localID);
+      boolean incrBlockCount = false;
+
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
+
+        // If the block does not exist in the pendingPutBlockCache of the
+        // container, then check the DB to ascertain if it exists or not.
+        // If block exists in cache, blockCount should not be incremented.
+        if (!isBlockInCache) {
+          if (db.getStore().getBlockDataTable().get(
+              Long.toString(localID)) == null) {
+            // Block does not exist in DB => blockCount needs to be
+            // incremented when the block is added into DB.
+            incrBlockCount = true;
+          }
+        }
+
         db.getStore().getBlockDataTable().putWithBatch(
-            batch, Long.toString(data.getLocalID()), data);
+            batch, Long.toString(localID), data);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
@@ -176,10 +198,24 @@ public class BlockManagerImpl implements BlockManager {
       if (bcsId != 0) {
         container.updateBlockCommitSequenceId(bcsId);
       }
-      // Increment block count finally here for in-memory.
+
+      // Increment block count and add block to pendingPutBlockCache
+      // in-memory after the DB update.
       if (incrBlockCount) {
         container.getContainerData().incrBlockCount();
       }
+
+      // If the Block is not in PendingPutBlockCache (and it is not endOfBlock),
+      // add it there so that subsequent putBlock calls for this block do not
+      // have to read the DB to check for block existence
+      if (!isBlockInCache && !endOfBlock) {
+        container.addToPendingPutBlockCache(localID);
+      } else if (isBlockInCache && endOfBlock) {
+        // Remove the block from the PendingPutBlockCache as there would not
+        // be any more writes to this block
+        container.removeFromPendingPutBlockCache(localID);
+      }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug(
             "Block " + data.getBlockID() + " successfully committed with bcsId "
