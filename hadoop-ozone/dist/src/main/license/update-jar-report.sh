@@ -30,4 +30,4 @@ cd "$OZONE_DIST_DIR"
 
 #sed expression removes the version. Usually license is not changed with version bumps
 #jacoco and test dependencies are excluded
-find . -type f -name "*.jar" | cut -c3- | perl -wpl -e 's/-[0-9]+(.[0-9]+)*(-([0-9a-z]+-)?SNAPSHOT)?+//g; s/\.v\d+\.jar/.jar/g;' | grep -v -e jacoco -e hdds-test-utils | sort > "$SCRIPTDIR"/$REPORT_NAME
+find . -type f -name "*.jar" | cut -c3- | perl -wpl -e 's/-[0-9]+(\.[0-9]+)*(-([0-9a-z]+-)?SNAPSHOT)?+//g; s/\.v\d+\.jar/.jar/g;' | grep -v -e jacoco -e hdds-test-utils | sort > "$SCRIPTDIR"/$REPORT_NAME
