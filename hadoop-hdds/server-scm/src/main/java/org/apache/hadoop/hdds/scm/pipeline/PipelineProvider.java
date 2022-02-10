@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -72,6 +73,11 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
   protected abstract Pipeline create(
       REPLICATION_CONFIG replicationConfig,
       List<DatanodeDetails> nodes
+  );
+
+  protected abstract Pipeline createForRead(
+      REPLICATION_CONFIG replicationConfig,
+      Set<ContainerReplica> replicas
   );
 
   protected abstract void close(Pipeline pipeline) throws IOException;

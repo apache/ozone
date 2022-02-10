@@ -23,8 +23,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.junit.Assert;
 import org.junit.Before;
@@ -33,7 +36,10 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
@@ -91,6 +97,22 @@ public class TestECPipelineProvider {
   }
 
   @Test
+  public void testPipelineForReadCanBeCreated() {
+    ECReplicationConfig ecConf = new ECReplicationConfig(3, 2);
+
+    Set<ContainerReplica> replicas = createContainerReplicas(4);
+    Pipeline pipeline = provider.createForRead(ecConf, replicas);
+
+    Assert.assertEquals(EC, pipeline.getType());
+    Assert.assertEquals(4, pipeline.getNodes().size());
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    for (ContainerReplica r : replicas) {
+      Assert.assertEquals(r.getReplicaIndex(),
+          pipeline.getReplicaIndex(r.getDatanodeDetails()));
+    }
+  }
+
+  @Test
   public void testExcludedAndFavoredNodesPassedToPlacementPolicy()
       throws IOException {
     ECReplicationConfig ecConf = new ECReplicationConfig(3, 2);
@@ -108,6 +130,25 @@ public class TestECPipelineProvider {
 
     verify(placementPolicy).chooseDatanodes(excludedNodes, favoredNodes,
         ecConf.getRequiredNodes(), 0, containerSizeBytes);
+  }
+
+  private Set<ContainerReplica> createContainerReplicas(int number) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i = 0; i < number; i++) {
+      ContainerReplica r = ContainerReplica.newBuilder()
+          .setBytesUsed(1)
+          .setContainerID(ContainerID.valueOf(1))
+          .setContainerState(StorageContainerDatanodeProtocolProtos
+              .ContainerReplicaProto.State.CLOSED)
+          .setKeyCount(1)
+          .setOriginNodeId(UUID.randomUUID())
+          .setSequenceId(1)
+          .setReplicaIndex(i + 1)
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .build();
+      replicas.add(r);
+    }
+    return replicas;
   }
 
 }

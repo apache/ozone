@@ -256,12 +256,9 @@ public class SCMClientProtocolServer implements
     }
 
     if (pipeline == null) {
-      pipeline = scm.getPipelineManager().createPipeline(
+      pipeline = scm.getPipelineManager().createPipelineForRead(
           container.getReplicationConfig(),
-          scm.getContainerManager()
-              .getContainerReplicas(cid).stream()
-              .map(ContainerReplica::getDatanodeDetails)
-              .collect(Collectors.toList()));
+          scm.getContainerManager().getContainerReplicas(cid));
     }
 
     return new ContainerWithPipeline(container, pipeline);
