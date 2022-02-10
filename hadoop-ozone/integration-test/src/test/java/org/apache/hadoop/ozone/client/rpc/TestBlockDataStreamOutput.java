@@ -106,9 +106,9 @@ public class TestBlockDataStreamOutput {
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
         .setDataStreamBufferFlushize(maxFlushSize)
-        .setDataStreamBufferMaxSize(chunkSize)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
-        .setDataStreamMinPacketSize(2*chunkSize/5)
+        .setDataStreamMinPacketSize(chunkSize)
+        .setDataStreamStreamWindowSize(5*chunkSize)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -195,7 +195,7 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testPutBlockAtBoundary() throws Exception {
-    int dataLength = 200;
+    int dataLength = 500;
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -213,8 +213,8 @@ public class TestBlockDataStreamOutput {
         metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             <= pendingPutBlockCount + 1);
     key.close();
-    // Since data length is 200 , first putBlock will be at 160(flush boundary)
-    // and the other at 200
+    // Since data length is 500 , first putBlock will be at 400(flush boundary)
+    // and the other at 500
     Assert.assertTrue(
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             == putBlockCount + 2);
@@ -242,10 +242,10 @@ public class TestBlockDataStreamOutput {
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 5)
+        ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 2)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    // minPacketSize= 40, so first write of 20 wont trigger a writeChunk
+    // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
     Assert.assertEquals(writeChunkCount,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     key.write(ByteBuffer.wrap(data));
