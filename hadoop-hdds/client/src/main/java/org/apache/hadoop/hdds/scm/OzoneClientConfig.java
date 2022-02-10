@@ -66,14 +66,6 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int streamBufferSize = 4 * 1024 * 1024;
 
-  @Config(key = "datastream.max.buffer.size",
-      defaultValue = "4MB",
-      type = ConfigType.SIZE,
-      description = "The maximum size of the ByteBuffer "
-          + "(used via ratis streaming)",
-      tags = ConfigTag.CLIENT)
-  private int dataStreamMaxBufferSize = 4 * 1024 * 1024;
-
   @Config(key = "datastream.buffer.flush.size",
       defaultValue = "16MB",
       type = ConfigType.SIZE,
@@ -88,6 +80,15 @@ public class OzoneClientConfig {
           + "(used via ratis streaming)",
       tags = ConfigTag.CLIENT)
   private int dataStreamMinPacketSize = 1024 * 1024;
+
+  @Config(key = "datastream.window.size",
+      defaultValue = "64MB",
+      type = ConfigType.SIZE,
+      description = "Maximum size of BufferList(used for retry) size per " +
+          "BlockDataStreamOutput instance",
+      tags = ConfigTag.CLIENT)
+  private long streamWindowSize = 64 * 1024 * 1024;
+
 
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
@@ -258,14 +259,6 @@ public class OzoneClientConfig {
     this.streamBufferSize = streamBufferSize;
   }
 
-  public int getDataStreamMaxBufferSize() {
-    return dataStreamMaxBufferSize;
-  }
-
-  public void setDataStreamMaxBufferSize(int dataStreamMaxBufferSize) {
-    this.dataStreamMaxBufferSize = dataStreamMaxBufferSize;
-  }
-
   public boolean isStreamBufferFlushDelay() {
     return streamBufferFlushDelay;
   }
@@ -288,6 +281,14 @@ public class OzoneClientConfig {
 
   public void setDataStreamMinPacketSize(int dataStreamMinPacketSize) {
     this.dataStreamMinPacketSize = dataStreamMinPacketSize;
+  }
+
+  public long getStreamWindowSize() {
+    return streamWindowSize;
+  }
+
+  public void setStreamWindowSize(long streamWindowSize) {
+    this.streamWindowSize = streamWindowSize;
   }
 
   public int getMaxRetryCount() {
