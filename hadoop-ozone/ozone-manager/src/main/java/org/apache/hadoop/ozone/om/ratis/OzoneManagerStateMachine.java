@@ -470,7 +470,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     LOG.info("StateMachine has shutdown. Shutdown OzoneManager if not " +
         "already shutdown.");
     super.close();
-    stop();
+    if (!ozoneManager.isOmStopped()) {
+      ozoneManager.stop();
+    }
     try{
       ExitUtils.terminate(1,
           "OM state machine is shutdown by Ratis server", LOG);

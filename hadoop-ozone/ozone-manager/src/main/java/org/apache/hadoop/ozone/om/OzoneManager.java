@@ -560,6 +560,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  public boolean isOmStopped() {
+    return omState == State.STOPPED;
+  }
+
   /**
    * Set the {@link S3Authentication} for the current rpc handler thread.
    */

@@ -387,8 +387,8 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void close() throws IOException {
-    stop();
     super.close();
+    stop();
     try {
       ExitUtils.terminate(1, "scm state machine terminated by ratis", LOG);
     } catch (ExitUtils.ExitException e) {
