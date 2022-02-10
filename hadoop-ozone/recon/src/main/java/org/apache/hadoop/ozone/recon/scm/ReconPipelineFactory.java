@@ -19,10 +19,12 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.collections.map.DefaultedMap;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
@@ -63,6 +65,13 @@ public class ReconPipelineFactory extends PipelineFactory {
     @Override
     public Pipeline create(ReplicationConfig config,
                            List<DatanodeDetails> nodes) {
+      throw new UnsupportedOperationException(
+          "Trying to create pipeline in Recon, which is prohibited!");
+    }
+    
+    @Override
+    public Pipeline createForRead(ReplicationConfig config,
+        Set<ContainerReplica> replicas) {
       throw new UnsupportedOperationException(
           "Trying to create pipeline in Recon, which is prohibited!");
     }

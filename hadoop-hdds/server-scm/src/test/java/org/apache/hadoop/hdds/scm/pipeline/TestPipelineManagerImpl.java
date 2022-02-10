@@ -25,10 +25,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -57,9 +60,12 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
@@ -707,6 +713,43 @@ public class TestPipelineManagerImpl {
     int containerLogIdx = logOutput.indexOf(containerExpectedOutput);
     int pipelineLogIdx = logOutput.indexOf(pipelineExpectedOutput);
     assertTrue(containerLogIdx < pipelineLogIdx);
+  }
+
+  @Test
+  public void testCreatePipelineForRead() throws IOException {
+    PipelineManager pipelineManager = createPipelineManager(true);
+    List<DatanodeDetails> dns = nodeManager
+        .getNodes(NodeStatus.inServiceHealthy())
+        .stream()
+        .limit(3)
+        .collect(Collectors.toList());
+    Set<ContainerReplica> replicas = createContainerReplicasList(dns);
+    Pipeline pipeline = pipelineManager.createPipelineForRead(
+        new RatisReplicationConfig(ReplicationFactor.THREE), replicas);
+    Assert.assertEquals(3, pipeline.getNodes().size());
+    for (DatanodeDetails dn : pipeline.getNodes())  {
+      Assert.assertTrue(dns.contains(dn));
+    }
+  }
+
+  private Set<ContainerReplica> createContainerReplicasList(
+      List <DatanodeDetails> dns) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (DatanodeDetails dn : dns) {
+      ContainerReplica r = ContainerReplica.newBuilder()
+          .setBytesUsed(1)
+          .setContainerID(ContainerID.valueOf(1))
+          .setContainerState(StorageContainerDatanodeProtocolProtos
+              .ContainerReplicaProto.State.CLOSED)
+          .setKeyCount(1)
+          .setOriginNodeId(UUID.randomUUID())
+          .setSequenceId(1)
+          .setReplicaIndex(0)
+          .setDatanodeDetails(dn)
+          .build();
+      replicas.add(r);
+    }
+    return replicas;
   }
 
   private void sendPipelineReport(
