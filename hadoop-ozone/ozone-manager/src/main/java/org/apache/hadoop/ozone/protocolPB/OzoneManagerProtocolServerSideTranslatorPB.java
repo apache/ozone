@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.crea
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -131,18 +132,22 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
             .load();
   }
 
+  @RequestFeatureValidator(
+      conditions = {ValidationCondition.NEWER_CLIENT_REQUESTS},
+      contextAware = true,
+      requestType = OzoneManagerProtocolProtos.Type.CreateVolume,
+      processingPhase = RequestProcessingPhase.POST_PROCESS
+  )
+  public static OMResponse fooValidation(OMRequest first, OMResponse second, ValidationContext third) {
+    return null;
+  }
+
   /**
    * Submit requests to Ratis server for OM HA implementation.
    * TODO: Once HA is implemented fully, we should have only one server side
    * translator for OM protocol.
    */
   @Override
-  @RequestFeatureValidator(
-      conditions = {ValidationCondition.NEWER_CLIENT_REQUESTS},
-      contextAware = true,
-      requestType = OzoneManagerProtocolProtos.Type.CreateVolume,
-      processingPhase = RequestProcessingPhase.PRE_PROCESS
-  )
   public OMResponse submitRequest(RpcController controller,
       OMRequest request) throws ServiceException {
     OMRequest validatedRequest = requestValidations.validateRequest(request);
