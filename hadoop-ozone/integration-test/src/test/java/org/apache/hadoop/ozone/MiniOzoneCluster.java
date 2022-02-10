@@ -322,7 +322,7 @@ public interface MiniOzoneCluster {
     protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
     protected Optional<Long> dataStreamBufferFlushSize= Optional.empty();
-    protected OptionalInt dataStreamMaxBufferSize  = OptionalInt.empty();
+    protected Optional<Long> datastreamWindowSize= Optional.empty();
     protected Optional<Long> streamBufferMaxSize = Optional.empty();
     protected OptionalInt dataStreamMinPacketSize = OptionalInt.empty();
     protected Optional<Long> blockSize = Optional.empty();
@@ -558,11 +558,6 @@ public interface MiniOzoneCluster {
       return this;
     }
 
-    public Builder setDataStreamBufferMaxSize(int size) {
-      dataStreamMaxBufferSize = OptionalInt.of(size);
-      return this;
-    }
-
     public Builder setDataStreamBufferFlushize(long size) {
       dataStreamBufferFlushSize = Optional.of(size);
       return this;
@@ -570,6 +565,11 @@ public interface MiniOzoneCluster {
 
     public Builder setDataStreamMinPacketSize(int size) {
       dataStreamMinPacketSize = OptionalInt.of(size);
+      return this;
+    }
+
+    public Builder setDataStreamStreamWindowSize(long size) {
+      datastreamWindowSize = Optional.of(size);
       return this;
     }
 
