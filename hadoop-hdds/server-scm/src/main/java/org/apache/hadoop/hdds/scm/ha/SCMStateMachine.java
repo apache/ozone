@@ -388,6 +388,7 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void close() throws IOException {
     stop();
+    super.close();
     try {
       ExitUtils.terminate(1, "scm state machine terminated by ratis", LOG);
     } catch (ExitUtils.ExitException e) {
@@ -400,7 +401,6 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    super.close();
     transactionBuffer.close();
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
