@@ -117,6 +117,15 @@ public class TestECBlockReconstructedStripeInputStream {
       ((ECBlockReconstructedStripeInputStream)ecb).addFailedDatanodes(failed);
       Assert.assertFalse(ecb.hasSufficientLocations());
     }
+
+    // One chunk, indexes 2 and 3 are padding, but still reported in the
+    // container list. The other locations are missing so we should have
+    // insufficient locations.
+    dnMap = ECStreamTestUtil.createIndexMap(2, 3);
+    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, ONEMB, dnMap);
+    try (ECBlockInputStream ecb = createInputStream(keyInfo)) {
+      Assert.assertFalse(ecb.hasSufficientLocations());
+    }
   }
 
   @Test
@@ -525,6 +534,42 @@ public class TestECBlockReconstructedStripeInputStream {
           // expected
         }
       }
+    }
+  }
+
+  @Test(expected=InsufficientLocationsException.class)
+  public void testAllLocationsFailOnFirstRead() throws IOException {
+    // This test simulates stale nodes. When the nodes are stale, but not yet
+    // dead, the locations will still be given to the client and it will try to
+    // read them, but the read will always fail.
+    // Additionally, if the key is small (less than 2 EC chunks), the locations
+    // for the indexes which are all padding will be returned to the client and
+    // this can confuse the "sufficient locations" check, resulting in a strange
+    // error when selecting parity indexes (HDDS-6258)
+    int chunkSize = repConfig.getEcChunkSize();
+    int partialStripeSize = chunkSize;
+    int blockLength = partialStripeSize;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), chunkSize);
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+
+    streamFactory = new TestBlockInputStreamFactory();
+    addDataStreamsToFactory(dataBufs, parity);
+    // Fail all the indexes containing data on their first read.
+    streamFactory.setFailIndexes(indexesToList(1, 4, 5));
+    // The locations contain the padded indexes, as will often be the case
+    // when containers are reported by SCM.
+    Map<DatanodeDetails, Integer> dnMap =
+          ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+        blockLength, dnMap);
+    streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+    try (ECBlockReconstructedStripeInputStream ecb =
+             createInputStream(keyInfo)) {
+      ecb.readStripe(bufs);
     }
   }
 

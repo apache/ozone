@@ -74,19 +74,21 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   /**
-   * From ECReplicationConfig and Pipeline with the block locations and location
-   * indexes, determine the number of data locations available.
-   * @param repConfig The EC Replication Config
+   * From the Pipeline and expected number of locations, determine the number
+   * of data locations available.
    * @param pipeline The pipeline for the data block, givings its locations and
    *                 the index of each location.
+   * @param expectedLocs The number of locations we expect for the block to have
+   *                     based on its block length and replication config. The
+   *                     max value should be the repConfig data number.
    * @return The number of locations available
    */
-  public static int availableDataLocations(ECReplicationConfig repConfig,
-      Pipeline pipeline) {
+  public static int availableDataLocations(Pipeline pipeline,
+      int expectedLocs) {
     Set<Integer> locations = new HashSet<>();
     for (DatanodeDetails dn : pipeline.getNodes()) {
       int index = pipeline.getReplicaIndex(dn);
-      if (index > 0 && index <= repConfig.getData()) {
+      if (index > 0 && index <= expectedLocs) {
         locations.add(index);
       }
     }
@@ -110,7 +112,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
 
   private synchronized void setReaderType() {
     int expected = expectedDataLocations(repConfig, getLength());
-    int available = availableDataLocations(repConfig, blockInfo.getPipeline());
+    int available = availableDataLocations(blockInfo.getPipeline(), expected);
     reconstructionReader = available < expected;
   }
 

@@ -558,7 +558,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     ECReplicationConfig repConfig = getRepConfig();
     int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
     int availableLocations =
-        availableDataLocations() + availableParityLocations();
+        availableDataLocations(expectedDataBlocks) + availableParityLocations();
     int paddedLocations = repConfig.getData() - expectedDataBlocks;
     int failedLocations = failedDataIndexes.size();
 
