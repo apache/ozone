@@ -78,9 +78,18 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     return stripeSize;
   }
 
-  protected int availableDataLocations() {
+  /**
+   * Returns the number of available data locations, taking account of the
+   * expected number of locations. Eg, if the block is less than 1 EC chunk,
+   * we only expect 1 data location. If it is between 1 and 2 chunks, we expect
+   * there to be 2 locations, and so on.
+   * @param expectedLocations The maximum number of allowed data locations,
+   *                          depending on the block size.
+   * @return The number of available data locations.
+   */
+  protected int availableDataLocations(int expectedLocations) {
     int count = 0;
-    for (int i = 0; i < repConfig.getData(); i++) {
+    for (int i = 0; i < repConfig.getData() && i < expectedLocations; i++) {
       if (dataLocations[i] != null) {
         count++;
       }
@@ -127,7 +136,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     // must have all data_num locations.
     // We only consider data locations here.
     int expectedDataBlocks = calculateExpectedDataBlocks(repConfig);
-    return expectedDataBlocks == availableDataLocations();
+    return expectedDataBlocks == availableDataLocations(expectedDataBlocks);
   }
 
   protected int calculateExpectedDataBlocks(ECReplicationConfig rConfig) {

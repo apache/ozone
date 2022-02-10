@@ -92,21 +92,25 @@ public class TestECBlockInputStreamProxy {
   @Test
   public void testAvailableDataLocations() {
     Map<DatanodeDetails, Integer> dnMap =
-        ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
+        ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
     OmKeyLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 1024, dnMap);
+    Assert.assertEquals(1, ECBlockInputStreamProxy.availableDataLocations(
+        blockInfo.getPipeline(), 1));
     Assert.assertEquals(2, ECBlockInputStreamProxy.availableDataLocations(
-        repConfig, blockInfo.getPipeline()));
+        blockInfo.getPipeline(), 2));
+    Assert.assertEquals(3, ECBlockInputStreamProxy.availableDataLocations(
+        blockInfo.getPipeline(), 3));
 
     dnMap = ECStreamTestUtil.createIndexMap(1, 4, 5);
     blockInfo = ECStreamTestUtil.createKeyInfo(repConfig, 1024, dnMap);
     Assert.assertEquals(1, ECBlockInputStreamProxy.availableDataLocations(
-        repConfig, blockInfo.getPipeline()));
+        blockInfo.getPipeline(), 3));
 
-    dnMap = ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
+    dnMap = ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
     blockInfo = ECStreamTestUtil.createKeyInfo(repConfig, 1024, dnMap);
-    Assert.assertEquals(3, ECBlockInputStreamProxy.availableDataLocations(
-        repConfig, blockInfo.getPipeline()));
+    Assert.assertEquals(0, ECBlockInputStreamProxy.availableDataLocations(
+        blockInfo.getPipeline(), 1));
   }
 
   @Test
