@@ -52,7 +52,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -116,9 +118,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // Also, corresponding to the logIndex, the corresponding list of buffers will
   // be released from the buffer pool.
   private final StreamCommitWatcher commitWatcher;
-  private final AtomicReference<CompletableFuture<
-      ContainerCommandResponseProto>> putBlockFuture
-      = new AtomicReference<>(CompletableFuture.completedFuture(null));
+
+  private Queue<CompletableFuture<ContainerCommandResponseProto>>
+      putBlockFutures = new LinkedList<>();
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -307,13 +309,32 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private void doFlushIfNeeded() throws IOException {
-    Preconditions.checkArgument(config.getDataStreamBufferFlushSize() > config
-        .getDataStreamMaxBufferSize());
     long boundary = config.getDataStreamBufferFlushSize() / config
-        .getDataStreamMaxBufferSize();
+        .getDataStreamMinPacketSize();
+    // streamWindow is the maximum number of buffers that
+    // are allowed to exist in the bufferList. If buffers in
+    // the list exceed this limit , client will till it gets
+    // one putBlockResponse (first index) . This is similar to
+    // the bufferFull condition in async write path.
+    long streamWindow = config.getStreamWindowSize() / config
+        .getDataStreamMinPacketSize();
     if (!bufferList.isEmpty() && bufferList.size() % boundary == 0) {
       updateFlushLength();
       executePutBlock(false, false);
+    }
+    if (bufferList.size()==streamWindow){
+      try {
+        checkOpen();
+        if (!putBlockFutures.isEmpty()) {
+          putBlockFutures.remove().get();
+        }
+      } catch (ExecutionException e) {
+        handleExecutionException(e);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        handleInterruptedException(ex, true);
+      }
+      watchForCommit(true);
     }
   }
 
@@ -453,8 +474,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             setIoException(ce);
             throw ce;
           });
-      putBlockFuture.updateAndGet(f -> f.thenCombine(flushFuture,
-          (previous, current) -> current));
+      putBlockFutures.add(flushFuture);
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
@@ -496,7 +516,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       // data since latest flush - we need to send the "EOF" flag
       executePutBlock(true, true);
     }
-    putBlockFuture.get().get();
+    CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
     watchForCommit(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
@@ -638,6 +658,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
                 CompletionException ce = new CompletionException(msg, e);
                 setIoException(ce);
                 throw ce;
+              } else if (r.isSuccess()) {
+                xceiverClient.updateCommitInfosMap(r.getCommitInfos());
               }
             }, responseExecutor);
 
