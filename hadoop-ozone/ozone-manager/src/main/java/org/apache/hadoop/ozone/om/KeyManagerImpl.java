@@ -1421,9 +1421,9 @@ public class KeyManagerImpl implements KeyManager {
       }
       OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
-      if (cacheKey.startsWith(startCacheKey)
-          && cacheKey.compareTo(startCacheKey) >= 0
-          && cacheOmKeyInfo != null) {
+      if (cacheOmKeyInfo != null
+          && cacheKey.startsWith(startCacheKey)
+          && cacheKey.compareTo(startCacheKey) >= 0) {
         if (!recursive) {
           String remainingKey = StringUtils.stripEnd(cacheKey.substring(
               startCacheKey.length()), OZONE_URI_DELIMITER);
