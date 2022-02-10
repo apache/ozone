@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -31,7 +32,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 /**
  * Data generator tool test om performance.
@@ -44,6 +47,8 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
+
+  @Spec CommandSpec spec;
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -66,6 +71,12 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       description = "Size of buffer used to generated the key content.",
       defaultValue = "4096")
   private int bufferSize;
+
+  @Option(names = { "-F", "--factor" },
+      description = "[Deprecated] Replication factor (ONE, THREE)",
+      defaultValue = "THREE"
+  )
+  private ReplicationFactor factor = ReplicationFactor.THREE;
 
   @Option(names = "--om-service-id",
       description = "OM Service ID"
@@ -101,9 +112,15 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
-    replicationConfig = OzoneClientUtils
-        .validateAndGetClientReplicationConfig(replicationType, replication,
-            ozoneConfiguration);
+
+    if (spec.commandLine().getParseResult().hasMatchedOption("--factor")) {
+      replicationConfig = ReplicationConfig
+          .fromTypeAndFactor(ReplicationType.RATIS, factor);
+    } else {
+      replicationConfig = OzoneClientUtils
+          .validateAndGetClientReplicationConfig(replicationType, replication,
+              ozoneConfiguration);
+    }
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
