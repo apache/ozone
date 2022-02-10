@@ -72,7 +72,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>2.2.0</ratis.version>
+    <ratis.version>2.3.0-94db58b-SNAPSHOT</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>0.7.0</ratis.thirdparty.version>
