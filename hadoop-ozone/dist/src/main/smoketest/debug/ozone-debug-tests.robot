@@ -16,13 +16,13 @@
 *** Settings ***
 Documentation       Test ozone Debug CLI
 Library             OperatingSystem
-Resource            ../commonlib.robot
+Resource            ../lib/os.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 Suite Setup         Write keys
 *** Variables ***
-${VOLUME}           vol1
-${BUCKET}           bucket1
+${VOLUME}           cli-debug-volume
+${BUCKET}           cli-debug-bucket
 ${DEBUGKEY}         debugKey
 ${TESTFILE}         testfile
 
@@ -42,12 +42,7 @@ Test ozone debug chunkinfo
                     File Should Exist   ${result}
 
 Test ozone debug read-replicas
-    Execute                             ozone debug read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    ${directory} =                      Execute     find /opt/hadoop -maxdepth 1 -name '${VOLUME}_${BUCKET}_${TESTFILE}_*' | tail -n 1
-    Directory Should Exist              ${directory}
-    File Should Exist                   ${directory}/${TESTFILE}_manifest
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     7
+    ${directory} =                      Execute read-replicas CLI tool
     ${dn1_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_1.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_1.ozone_default | md5sum | awk '{print $1}'
     ${dn2_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default | md5sum | awk '{print $1}'
     ${dn3_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_3.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_3.ozone_default | md5sum | awk '{print $1}'

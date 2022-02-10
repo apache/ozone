@@ -16,22 +16,17 @@
 *** Settings ***
 Documentation       Test read-replicas in case of a corrupt replica
 Library             OperatingSystem
-Resource            ../commonlib.robot
+Resource            ../lib/os.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 *** Variables ***
-${VOLUME}           vol1
-${BUCKET}           bucket1
+${VOLUME}           cli-debug-volume
+${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 
 *** Test Cases ***
 Test ozone debug read-replicas with corrupt block replica
-    Execute                             ozone debug read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    ${directory} =                      Execute     find /opt/hadoop -maxdepth 1 -name '${VOLUME}_${BUCKET}_${TESTFILE}_*' | tail -n 1
-    Directory Should Exist              ${directory}
-    File Should Exist                   ${directory}/${TESTFILE}_manifest
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     7
+    ${directory} =                      Execute read-replicas CLI tool
     ${dn1_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_1.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_1.ozone_default | md5sum | awk '{print $1}'
     ${dn2_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default | md5sum | awk '{print $1}'
     ${dn3_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_3.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_3.ozone_default | md5sum | awk '{print $1}'
@@ -42,4 +37,4 @@ Test ozone debug read-replicas with corrupt block replica
     ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
     ${json} =                           Evaluate        json.loads('''${manifest}''')        json
     Compare JSON                        ${json}
-    Check cheksum mismatch error        ${json}         ozone_datanode_2.ozone_default
+    Check checksum mismatch error       ${json}         ozone_datanode_2.ozone_default

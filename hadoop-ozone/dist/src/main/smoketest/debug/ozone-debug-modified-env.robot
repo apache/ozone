@@ -16,22 +16,17 @@
 *** Settings ***
 Documentation       Test read-replicas in case of one datanode is unavailable
 Library             OperatingSystem
-Resource            ../commonlib.robot
+Resource            ../lib/os.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 *** Variables ***
-${VOLUME}           vol1
-${BUCKET}           bucket1
+${VOLUME}           cli-debug-volume
+${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 
 *** Test Cases ***
 Test ozone debug read-replicas with one datanode unavailable
-    Execute                             ozone debug read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    ${directory} =                      Execute     find /opt/hadoop -maxdepth 1 -name '${VOLUME}_${BUCKET}_${TESTFILE}_*' | tail -n 1
-    Directory Should Exist              ${directory}
-    File Should Exist                   ${directory}/${TESTFILE}_manifest
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     7
+    ${directory} =                      Execute read-replicas CLI tool
     ${corrupted_block1} =               Get File Size   ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default
     ${corrupted_block2} =               Get File Size   ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default
     Should Be Equal As Integers         ${corrupted_block1}     0
