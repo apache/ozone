@@ -376,7 +376,7 @@ public class TestKeyValueContainerMetadataInspector
   }
 
   private KeyValueContainer createClosedContainer(int normalBlocks)
-      throws Exception{
+      throws Exception {
     KeyValueContainer container = createOpenContainer(normalBlocks);
     container.close();
     return container;
