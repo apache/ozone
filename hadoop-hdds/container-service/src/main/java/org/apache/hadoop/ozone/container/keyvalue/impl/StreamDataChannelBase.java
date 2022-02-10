@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.StreamDataChannel;
+import org.apache.ratis.statemachine.StateMachine;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -34,7 +34,7 @@ import java.nio.channels.FileChannel;
 /**
  * For write state machine data.
  */
-abstract class StreamDataChannelBase implements StreamDataChannel {
+abstract class StreamDataChannelBase implements StateMachine.DataChannel {
   private final RandomAccessFile randomAccessFile;
 
   private final File file;
