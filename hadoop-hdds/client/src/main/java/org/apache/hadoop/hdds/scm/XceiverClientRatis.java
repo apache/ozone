@@ -136,7 +136,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         .orElse(0L);
   }
 
-  private long updateCommitInfosMap(
+  public long updateCommitInfosMap(
       Collection<RaftProtos.CommitInfoProto> commitInfoProtos) {
     // if the commitInfo map is empty, just update the commit indexes for each
     // of the servers
