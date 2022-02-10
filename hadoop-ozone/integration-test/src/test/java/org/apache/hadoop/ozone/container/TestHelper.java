@@ -119,9 +119,12 @@ public final class TestHelper {
   public static OzoneOutputStream createKey(String keyName,
       ReplicationType type, long size, ObjectStore objectStore,
       String volumeName, String bucketName) throws Exception {
+    if (type == ReplicationType.STAND_ALONE) {
+      throw new IllegalArgumentException(ReplicationType.STAND_ALONE +
+          " replication type should not be used in tests to write keys anymore."
+      );
+    }
     org.apache.hadoop.hdds.client.ReplicationFactor factor =
-        type == ReplicationType.STAND_ALONE ?
-            org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
             org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey(keyName, size, type, factor, new HashMap<>());

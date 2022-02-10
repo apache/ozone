@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.upgrade;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -105,7 +105,8 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     // Set up new pre-finalized SCM.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         haEnabledPreFinalized);
-    StorageContainerManager scm = TestUtils.getScm(conf);
+    StorageContainerManager scm = HddsTestUtils.getScm(conf);
+
     Assert.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
         scm.getUpgradeFinalizer().getStatus());
 

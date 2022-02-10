@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.file;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.TestOMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -40,7 +40,7 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     Assert.assertNotNull(omBucketInfo);
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName,
             omBucketInfo.getBucketName(), keyName, replicationType,
             replicationFactor,
             omBucketInfo.getObjectID() + 1,
