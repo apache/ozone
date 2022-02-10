@@ -256,7 +256,7 @@ public class GeneratorDatanode extends BaseGenerator {
         //loop to create multiple chunks per blocks
         while (writtenBytes < getKeySize()) {
           int currentChunkSize =
-                  Math.min(getKeySize() - writtenBytes, chunkSize);
+              Math.min(getKeySize() - writtenBytes, chunkSize);
           String chunkName = "chunk" + chunkIndex++;
 
           final byte[] data = new byte[currentChunkSize];
