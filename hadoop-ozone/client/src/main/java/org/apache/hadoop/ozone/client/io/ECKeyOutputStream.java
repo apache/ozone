@@ -63,8 +63,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     FAILED
   }
 
-  private long currentBlockGroupLen = 0;
-
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
@@ -221,7 +219,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
     // Let's close the current entry.
     blockOutputStreamEntryPool.getCurrentStreamEntry().close();
-    currentBlockGroupLen = 0;
 
     // Let's rewrite the last stripe, so that it will be written to new block
     // group.
@@ -268,7 +265,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       if (allocateBlockIfFull) {
         blockOutputStreamEntryPool.allocateBlockIfNeeded();
       }
-      currentBlockGroupLen = 0;
     } else {
       newBlockGroupStreamEntry.resetToFirstEntry();
     }
@@ -325,7 +321,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       if (allocateBlockIfFull) {
         blockOutputStreamEntryPool.allocateBlockIfNeeded();
       }
-      currentBlockGroupLen = 0;
     } else {
       streamEntry.resetToFirstEntry();
     }
@@ -405,9 +400,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
     BlockOutputStreamEntry current =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
-    int writeLengthToCurrStream =
-        Math.min((int) len, (int) current.getRemaining());
-    currentBlockGroupLen += isParity ? 0 : writeLengthToCurrStream;
 
     if (isFullCell) {
       ByteBuffer bytesToWrite = isParity ?
@@ -504,7 +496,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      if(isPartialStripe()){
+      final int lastStripeSize = getCurrentStripeSize();
+      if (isPartialStripe(lastStripeSize)) {
         ByteBuffer bytesToWrite =
             ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
                 .getCurrentStreamEntry().getCurrentStreamIdx()];
@@ -521,8 +514,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
             markStreamAsFailed(e);
           }
         }
-        final int lastStripeSize =
-            (int) (currentBlockGroupLen % (numDataBlks * ecChunkSize));
 
         final int parityCellSize =
             lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize;
@@ -587,8 +578,17 @@ public class ECKeyOutputStream extends KeyOutputStream {
     buf.position(limit);
   }
 
-  private boolean isPartialStripe() {
-    return currentBlockGroupLen % (numDataBlks * ecChunkSize) > 0;
+  private boolean isPartialStripe(int stripeSize) {
+    return stripeSize > 0 && stripeSize < numDataBlks * ecChunkSize;
+  }
+
+  private int getCurrentStripeSize() {
+    final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
+    int lastStripeSize = 0;
+    for (int i = 0; i < numDataBlks; i++) {
+      lastStripeSize += dataBuffers[i].position();
+    }
+    return lastStripeSize;
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
