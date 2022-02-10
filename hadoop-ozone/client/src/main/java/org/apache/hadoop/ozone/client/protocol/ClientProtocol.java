@@ -27,6 +27,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -772,4 +774,29 @@ public interface ClientProtocol {
    * Clears the S3 Authentication information attached to the thread.
    */
   void clearTheadLocalS3Auth();
+
+  /**
+   * Sets the owner of bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param owner to be set for the bucket
+   * @throws IOException
+   */
+  boolean setBucketOwner(String volumeName, String bucketName,
+      String owner) throws IOException;
+
+  /**
+   * Reads every replica for all the blocks associated with a given key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @return For every OmKeyLocationInfo (represents a block) it is mapped
+   * every replica, which is constructed by the DatanodeDetails and an
+   * inputstream made from the block.
+   * @throws IOException
+   */
+  Map<OmKeyLocationInfo,
+      Map<DatanodeDetails, OzoneInputStream>> getKeysEveryReplicas(
+          String volumeName, String bucketName, String keyName)
+      throws IOException;
 }

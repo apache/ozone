@@ -290,7 +290,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   public void refreshAllVolumeUsage() {
-    volumeMap.forEach((k, v)-> v.refreshVolumeInfo());
+    volumeMap.forEach((k, v) -> v.refreshVolumeInfo());
   }
 
   /**

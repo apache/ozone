@@ -30,6 +30,8 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
+
 /**
  * Tests for GrpcOmTransport.
  */
@@ -44,7 +46,10 @@ public class TestGrpcOmTransport {
   @Test
   public void testGrpcOmTransportFactory() throws Exception {
     String omServiceId = "";
+    String transportCls = GrpcOmTransport.class.getName();
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_TRANSPORT_CLASS,
+        transportCls);
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);

@@ -86,10 +86,10 @@ public class TestSCMSafeModeWithPipelineRules {
     int datanodeCount = 6;
     setup(datanodeCount);
 
-    waitForRatis3NodePipelines(datanodeCount/3);
+    waitForRatis3NodePipelines(datanodeCount / 3);
     waitForRatis1NodePipelines(datanodeCount);
 
-    int totalPipelineCount = datanodeCount + (datanodeCount/3);
+    int totalPipelineCount = datanodeCount + (datanodeCount / 3);
 
     //Cluster is started successfully
     cluster.stop();
@@ -178,7 +178,7 @@ public class TestSCMSafeModeWithPipelineRules {
     });
 
     waitForRatis1NodePipelines(datanodeCount);
-    waitForRatis3NodePipelines(datanodeCount/3);
+    waitForRatis3NodePipelines(datanodeCount / 3);
 
   }
 

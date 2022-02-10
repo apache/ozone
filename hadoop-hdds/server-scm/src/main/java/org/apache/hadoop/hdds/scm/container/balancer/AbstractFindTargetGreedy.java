@@ -70,7 +70,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     potentialTargets = pt;
   }
 
-  private void setUpperLimit(Double upperLimit){
+  private void setUpperLimit(Double upperLimit) {
     this.upperLimit = upperLimit;
   }
 
@@ -199,12 +199,12 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    */
   @Override
   public void increaseSizeEntering(DatanodeDetails target, long size) {
-    if(sizeEnteringNode.containsKey(target)) {
+    if (sizeEnteringNode.containsKey(target)) {
       long totalEnteringSize = sizeEnteringNode.get(target) + size;
       sizeEnteringNode.put(target, totalEnteringSize);
       potentialTargets.removeIf(
           c -> c.getDatanodeDetails().equals(target));
-      if(totalEnteringSize < config.getMaxSizeEnteringTarget()) {
+      if (totalEnteringSize < config.getMaxSizeEnteringTarget()) {
         //reorder
         potentialTargets.add(nodeManager.getUsageInfo(target));
       }

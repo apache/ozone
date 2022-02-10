@@ -68,7 +68,7 @@ public class CRLClientUpdateHandler implements ClientUpdateHandler {
 
     this.clientStore = serviceGrpcClient.getClientCRLStore();
     this.crlCheckInterval = crlCheckInterval;
-    LOG.info("Pending CRL check interval : {}s", crlCheckInterval/1000);
+    LOG.info("Pending CRL check interval : {}s", crlCheckInterval / 1000);
     this.executorService = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("CRLUpdateHandler Thread - %d").build());
