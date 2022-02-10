@@ -48,7 +48,7 @@ import picocli.CommandLine.Spec;
 public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
-  @Spec CommandSpec spec;
+  @Spec private CommandSpec spec;
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
