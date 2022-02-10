@@ -122,7 +122,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     this.ozoneConfiguration = configuration;
   }
 
-  private void updateCommitInfosMap(
+  public void updateCommitInfosMap(
       Collection<RaftProtos.CommitInfoProto> commitInfoProtos) {
     // if the commitInfo map is empty, just update the commit indexes for each
     // of the servers
