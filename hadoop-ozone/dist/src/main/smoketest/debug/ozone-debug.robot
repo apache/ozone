@@ -16,14 +16,18 @@
 *** Settings ***
 Documentation       Test ozone Debug CLI
 Library             Collections
-Resource            ../commonlib.robot
-
-*** Variables ***
-${VOLUME}           vol1
-${BUCKET}           bucket1
-${TESTFILE}         testfile
+Resource            ../lib/os.robot
 
 *** Keywords ***
+Execute read-replicas CLI tool
+    Execute                         ozone debug read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+    ${directory} =                  Execute     find /opt/hadoop -maxdepth 1 -name '${VOLUME}_${BUCKET}_${TESTFILE}_*' | tail -n 1
+    Directory Should Exist          ${directory}
+    File Should Exist               ${directory}/${TESTFILE}_manifest
+    ${count_files} =                Count Files In Directory    ${directory}
+    Should Be Equal As Integers     ${count_files}     7
+    [Return]                        ${directory}
+
 Compare JSON
     [arguments]                     ${json}
     Should Be Equal                 ${json}[filename]                   ${VOLUME}/${BUCKET}/${TESTFILE}
@@ -46,7 +50,7 @@ Compare JSON
     ${datanodes_expected_b2} =      Create List  ozone_datanode_1.ozone_default  ozone_datanode_2.ozone_default  ozone_datanode_3.ozone_default
     Lists Should Be Equal	        ${datanodes_b2}    ${datanodes_expected_b2}   ignore_order=True
 
-Check cheksum mismatch error
+Check checksum mismatch error
     [arguments]                     ${json}     ${datanode}
     ${datanodes} =                  Create List     ${json}[blocks][0][replicas][0][hostname]   ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
     ${index} =                      Get Index From List         ${datanodes}        ${datanode}
