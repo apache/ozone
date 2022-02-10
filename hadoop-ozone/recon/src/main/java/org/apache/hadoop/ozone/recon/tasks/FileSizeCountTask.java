@@ -43,6 +43,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.recon.ReconUtils.getBucketLayoutList;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
 /**
@@ -74,18 +75,25 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    Table<String, OmKeyInfo> omKeyInfoTable =
-        omMetadataManager.getKeyTable(getBucketLayout());
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        keyIter = omKeyInfoTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+    for (BucketLayout bucketLayout : getBucketLayoutList()) {
+      Table<String, OmKeyInfo> omKeyInfoTable =
+          omMetadataManager.getKeyTable(bucketLayout);
+
+      if(omKeyInfoTable == null) {
+        continue;
       }
-    } catch (IOException ioEx) {
-      LOG.error("Unable to populate File Size Count in Recon DB. ", ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
+
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+               keyIter = omKeyInfoTable.iterator()) {
+        while (keyIter.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+          handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+        }
+      } catch (IOException ioEx) {
+        LOG.error("Unable to populate File Size Count in Recon DB. ", ioEx);
+        return new ImmutablePair<>(getTaskName(), false);
+      }
     }
     // Truncate table before inserting new rows
     int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();

@@ -31,6 +31,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
 import com.google.inject.Singleton;
@@ -55,6 +57,7 @@ import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
@@ -336,6 +339,18 @@ public class ReconUtils {
       index += 1;
     }
     return index;
+  }
+
+  /**
+   * Fetches a list of supported bucket layouts.
+   *
+   * @return List of supported bucket layouts.
+   */
+  public static List<BucketLayout> getBucketLayoutList() {
+    return Arrays.asList(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        BucketLayout.OBJECT_STORE
+    );
   }
 
   /**

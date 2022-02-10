@@ -41,6 +41,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import static org.apache.hadoop.ozone.recon.ReconUtils.getBucketLayoutList;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -157,11 +159,29 @@ public class ContainerEndpoint {
       for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap
           .keySet()) {
 
-        // Directly calling get() on the Key table instead of iterating since
-        // only full keys are supported now. When we change to using a prefix
-        // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
-            .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        OmKeyInfo omKeyInfo = null;
+
+        for (BucketLayout bucketLayout : getBucketLayoutList()) {
+          Table<String, OmKeyInfo> omKeyInfoTable =
+              omMetadataManager.getKeyTable(bucketLayout);
+
+          if(omKeyInfoTable == null) {
+            // keyTable for current bucketLayout not found, continue.
+            continue;
+          }
+
+          // Directly calling get() on the Key table instead of iterating since
+          // only full keys are supported now. When we change to using a prefix
+          // of the key, this needs to change to prefix seek.
+          omKeyInfo =
+              omKeyInfoTable.getSkipCache(containerKeyPrefix.getKeyPrefix());
+
+          if(omKeyInfo != null) {
+            // we found the key, so break out of the loop.
+            break;
+          }
+        }
+
         if (null != omKeyInfo) {
           // Filter keys by version.
           List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo
