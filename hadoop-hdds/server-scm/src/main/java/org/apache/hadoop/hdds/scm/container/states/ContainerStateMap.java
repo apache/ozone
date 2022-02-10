@@ -215,7 +215,8 @@ public class ContainerStateMap {
   }
 
   private Set<ContainerReplica> createNewReplicaSet(ContainerID containerID) {
-    return new HashSet<>(replicaMap.get(containerID));
+    Set<ContainerReplica> existingSet = replicaMap.get(containerID);
+    return existingSet == null ? new HashSet<>() : new HashSet<>(existingSet);
   }
 
   private void replaceReplicaSet(ContainerID containerID,
