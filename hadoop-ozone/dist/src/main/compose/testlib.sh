@@ -147,8 +147,8 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  docker-compose --no-ansi down
-  if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
+  docker-compose --ansi never down
+  if ! { docker-compose --ansi never up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
     [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
@@ -235,7 +235,7 @@ execute_command_in_container(){
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
   set -e
-  docker-compose --no-ansi stop $@
+  docker-compose --ansi never stop $@
   set +e
 }
 
@@ -244,7 +244,7 @@ stop_containers() {
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
   set -e
-  docker-compose --no-ansi start $@
+  docker-compose --ansi never start $@
   set +e
 }
 
@@ -280,9 +280,9 @@ wait_for_port(){
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  docker-compose --ansi never logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose --no-ansi down
+     docker-compose --ansi never down
   fi
 }
 

@@ -29,8 +29,8 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  */
 public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
-  INITIAL_VERSION(0, "Initial Layout Version");
-
+  INITIAL_VERSION(0, "Initial Layout Version"),
+  MULTITENANCY_SCHEMA(1, "Multi-Tenancy Schema");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions

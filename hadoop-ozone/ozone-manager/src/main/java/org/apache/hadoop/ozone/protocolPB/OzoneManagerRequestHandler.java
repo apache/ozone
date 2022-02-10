@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
@@ -91,6 +92,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -372,6 +374,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   private TenantGetUserInfoResponse tenantGetUserInfo(
       TenantGetUserInfoRequest request) throws IOException {
 
@@ -390,6 +393,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   private TenantListUserResponse tenantListUsers(
       TenantListUserRequest request) throws IOException {
     TenantListUserResponse.Builder builder =
@@ -406,6 +410,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   private ListTenantResponse listTenant(
       ListTenantRequest request) throws IOException {
 
