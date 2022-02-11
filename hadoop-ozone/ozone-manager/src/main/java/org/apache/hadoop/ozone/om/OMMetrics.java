@@ -48,6 +48,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numVolumeInfos;
   private @Metric MutableCounterLong numVolumeCheckAccesses;
   private @Metric MutableCounterLong numBucketCreates;
+  private @Metric MutableCounterLong numFSOBucketCreates;
   private @Metric MutableCounterLong numVolumeDeletes;
   private @Metric MutableCounterLong numBucketInfos;
   private @Metric MutableCounterLong numBucketUpdates;
@@ -304,6 +305,10 @@ public class OMMetrics {
   public void incNumBucketCreates() {
     numBucketOps.incr();
     numBucketCreates.incr();
+  }
+
+  public void incNumFSOBucketCreates() {
+    numFSOBucketCreates.incr();
   }
 
   public void incNumBucketInfos() {
@@ -628,6 +633,9 @@ public class OMMetrics {
   public long getNumBucketCreates() {
     return numBucketCreates.value();
   }
+
+  @VisibleForTesting
+  public long getNumFSOBucketCreates() { return numFSOBucketCreates.value(); }
 
   @VisibleForTesting
   public long getNumBucketInfos() {
