@@ -57,8 +57,10 @@ public final class PipelineMetadata {
   @XmlElement(name = "replicationType")
   private String replicationType;
 
+  // TODO: name can be changed to just "replication". Currently EC replication
+  //  also showed with below parameter but in String format.
   @XmlElement(name = "replicationFactor")
-  private int replicationFactor;
+  private String replicationFactor;
 
   @XmlElement(name = "containers")
   private int containers;
@@ -95,7 +97,7 @@ public final class PipelineMetadata {
     return replicationType;
   }
 
-  public int getReplicationFactor() {
+  public String getReplicationFactor() {
     return replicationFactor;
   }
 
@@ -139,7 +141,7 @@ public final class PipelineMetadata {
     private long duration;
     private long leaderElections;
     private String replicationType;
-    private int replicationFactor;
+    private String replicationFactor;
     private int containers;
 
     public Builder() {
@@ -205,7 +207,7 @@ public final class PipelineMetadata {
       return this;
     }
 
-    public Builder setReplicationFactor(int replicationFactor) {
+    public Builder setReplicationFactor(String replicationFactor) {
       this.replicationFactor = replicationFactor;
       return this;
     }
