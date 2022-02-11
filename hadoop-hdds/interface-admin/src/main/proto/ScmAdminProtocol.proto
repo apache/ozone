@@ -76,6 +76,7 @@ message ScmContainerLocationRequest {
   optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
   optional GetContainerCountRequestProto getContainerCountRequest = 38;
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
+  optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
 }
 
 message ScmContainerLocationResponse {
@@ -123,6 +124,7 @@ message ScmContainerLocationResponse {
   optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
   optional GetContainerCountResponseProto getContainerCountResponse = 38;
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
+  optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
 
   enum Status {
     OK = 1;
@@ -168,6 +170,7 @@ enum Type {
   QueryUpgradeFinalizationProgress = 32;
   GetContainerCount = 33;
   GetContainerReplicas = 34;
+  GetReplicationManagerReport = 35;
 }
 
 /**
@@ -466,6 +469,14 @@ message ReplicationManagerStatusRequestProto {
 
 message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message ReplicationManagerReportRequestProto {
+  optional string traceID = 1;
+}
+
+message ReplicationManagerReportResponseProto {
+  required ReplicationManagerReportProto report = 1;
 }
 
 message FinalizeScmUpgradeRequestProto {

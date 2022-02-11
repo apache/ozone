@@ -440,7 +440,7 @@ public class BlockDeletingService extends BackgroundService {
 
         // Once blocks are deleted... remove the blockID from blockDataTable
         // and also remove the transactions from txnTable.
-        try(BatchOperation batch = meta.getStore().getBatchHandler()
+        try (BatchOperation batch = meta.getStore().getBatchHandler()
             .initBatchOperation()) {
           for (DeletedBlocksTransaction delTx : delBlocks) {
             deleteTxns.deleteWithBatch(batch, delTx.getTxID());

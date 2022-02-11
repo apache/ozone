@@ -189,7 +189,7 @@ public final class ContainerUtils {
             HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
             HddsConfigKeys.
                     HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
-    if(enabled) {
+    if (enabled) {
       String storedChecksum = containerData.getChecksum();
 
       Yaml yaml = ContainerDataYaml.getYamlForContainerType(

@@ -50,7 +50,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
@@ -107,7 +107,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true);
+    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     startCluster(conf);
   }
 
@@ -140,7 +140,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
   static void shutdownCluster() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
@@ -609,11 +609,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(1, partName1);
 
-    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(2, partName2);
 
-    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(3, partName3);
 
@@ -711,11 +711,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(1, partName1);
 
-    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(2, partName2);
 
-    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(3, partName3);
 

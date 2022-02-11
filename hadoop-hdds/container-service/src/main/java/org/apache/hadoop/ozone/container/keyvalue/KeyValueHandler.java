@@ -193,7 +193,7 @@ public class KeyValueHandler extends Handler {
       DispatcherContext dispatcherContext) {
     Type cmdType = request.getCmdType();
 
-    switch(cmdType) {
+    switch (cmdType) {
     case CreateContainer:
       return handler.handleCreateContainer(request, kvContainer);
     case ReadContainer:
@@ -701,7 +701,7 @@ public class KeyValueHandler extends Handler {
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
       // We should increment stats after writeChunk
-      if (stage == WriteChunkStage.WRITE_DATA||
+      if (stage == WriteChunkStage.WRITE_DATA ||
           stage == WriteChunkStage.COMBINED) {
         metrics.incContainerBytesStats(Type.WriteChunk, writeChunk
             .getChunkData().getLen());
@@ -916,7 +916,7 @@ public class KeyValueHandler extends Handler {
   public void exportContainer(final Container container,
       final OutputStream outputStream,
       final TarContainerPacker packer)
-      throws IOException{
+      throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
   }

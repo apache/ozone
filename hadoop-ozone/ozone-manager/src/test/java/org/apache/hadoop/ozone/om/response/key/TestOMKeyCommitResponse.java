@@ -27,7 +27,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -79,7 +79,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchNoOp() throws Exception {
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
     omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -139,7 +139,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   @NotNull
   protected void addKeyToOpenKeyTable() throws Exception {
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
+    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
             clientID, replicationType, replicationFactor, omMetadataManager);
   }
 

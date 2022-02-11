@@ -66,7 +66,7 @@ class OzoneContract extends AbstractFSContract {
     return path;
   }
 
-  public static void initOzoneConfiguration(boolean fsoServer){
+  public static void initOzoneConfiguration(boolean fsoServer) {
     fsOptimizedServer = fsoServer;
   }
 
@@ -92,7 +92,7 @@ class OzoneContract extends AbstractFSContract {
 
     conf.addResource(CONTRACT_XML);
 
-    if (fsOptimizedServer){
+    if (fsOptimizedServer) {
       // Default bucket layout is set to FSO in case of FSO server.
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);

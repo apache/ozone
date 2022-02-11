@@ -435,7 +435,7 @@ public class TestSCMSafeModeManager {
     }, 100, 1000 * 5);
   }
 
-  private void checkHealthy(int expectedCount) throws Exception{
+  private void checkHealthy(int expectedCount) throws Exception {
     GenericTestUtils.waitFor(() -> scmSafeModeManager
             .getHealthyPipelineSafeModeRule()
             .getCurrentHealthyPipelineCount() == expectedCount,
@@ -548,14 +548,14 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     // Register all DataNodes except last one and assert SCM is in safe mode.
-    for (int i = 0; i < numOfDns-1; i++) {
+    for (int i = 0; i < numOfDns - 1; i++) {
       queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
           HddsTestUtils.createNodeRegistrationContainerReport(containers));
       assertTrue(scmSafeModeManager.getInSafeMode());
       assertTrue(scmSafeModeManager.getCurrentContainerThreshold() == 1);
     }
 
-    if(numOfDns == 0){
+    if (numOfDns == 0) {
       GenericTestUtils.waitFor(() -> {
         return scmSafeModeManager.getInSafeMode();
       }, 10, 1000 * 10);
@@ -586,7 +586,7 @@ public class TestSCMSafeModeManager {
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
     String storageDir = GenericTestUtils.getTempPath(
         TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
-    try{
+    try {
       MockNodeManager nodeManager = new MockNodeManager(true, 3);
       config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
       // enable pipeline check

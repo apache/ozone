@@ -44,7 +44,7 @@ public class CRLInfoCodec implements Codec<CRLInfo> {
     try {
       return CRLInfo.fromProtobuf(
           HddsProtos.CRLInfoProto.PARSER.parseFrom(rawData));
-    } catch (CertificateException|CRLException e) {
+    } catch (CertificateException | CRLException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);
     }

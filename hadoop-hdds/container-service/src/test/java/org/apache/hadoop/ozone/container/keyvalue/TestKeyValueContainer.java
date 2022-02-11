@@ -446,7 +446,7 @@ public class TestKeyValueContainer {
         keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    try(ReferenceCountedDB db =
+    try (ReferenceCountedDB db =
         BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
       long defaultCacheSize = 64 * OzoneConsts.MB;

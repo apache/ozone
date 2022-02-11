@@ -250,7 +250,7 @@ public class TestKeyValueHandler {
   }
 
   @Test
-  public void testVolumeSetInKeyValueHandler() throws Exception{
+  public void testVolumeSetInKeyValueHandler() throws Exception {
     File path = GenericTestUtils.getRandomizedTestDir();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
@@ -285,7 +285,7 @@ public class TestKeyValueHandler {
       try {
         new KeyValueHandler(conf,
             context.getParent().getDatanodeDetails().getUuidString(),
-            cset, volumeSet, metrics, c->{});
+            cset, volumeSet, metrics, c -> { });
       } catch (RuntimeException ex) {
         GenericTestUtils.assertExceptionContains("class org.apache.hadoop" +
             ".ozone.container.common.impl.HddsDispatcher not org.apache" +

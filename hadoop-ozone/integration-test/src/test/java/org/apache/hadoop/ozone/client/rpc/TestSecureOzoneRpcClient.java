@@ -119,7 +119,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .setCertificateClient(certificateClientTest)
         .build();
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        60 *60, certificateClientTest.getCertificate().
+        60 * 60, certificateClientTest.getCertificate().
         getSerialNumber().toString());
     secretManager.start(certificateClientTest);
     cluster.getOzoneManager().startSecretManager();
@@ -168,7 +168,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
       byte[] fileContent;
-      try(OzoneInputStream is = bucket.readKey(keyName)) {
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
         is.read(fileContent);
       }
@@ -342,7 +342,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    */
   @AfterClass
   public static void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
