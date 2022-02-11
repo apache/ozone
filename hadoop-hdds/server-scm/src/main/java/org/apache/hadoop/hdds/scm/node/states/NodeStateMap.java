@@ -345,8 +345,7 @@ public class NodeStateMap {
     lock.readLock().lock();
     try {
       checkIfNodeExist(uuid);
-      return Collections
-          .unmodifiableSet(new HashSet<>(nodeToContainer.get(uuid)));
+      return new HashSet<>(nodeToContainer.get(uuid));
     } finally {
       lock.readLock().unlock();
     }

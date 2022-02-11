@@ -613,7 +613,9 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Return set of containerIDs available on a datanode.
+   * Return set of containerIDs available on a datanode. This is a copy of the
+   * set which resides inside NodeStateMap and hence can be modified without
+   * synchronization or side effects.
    * @param uuid - DatanodeID
    * @return - set of containerIDs
    */

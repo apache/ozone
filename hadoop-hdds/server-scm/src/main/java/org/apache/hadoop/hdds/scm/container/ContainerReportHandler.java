@@ -127,11 +127,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             .map(ContainerReplicaProto::getContainerID)
             .map(ContainerID::valueOf).collect(Collectors.toSet());
 
-        final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
-        missingReplicas.removeAll(containersInDn);
+        containersInSCM.removeAll(containersInDn);
 
         processContainerReplicas(datanodeDetails, replicas, publisher);
-        processMissingReplicas(datanodeDetails, missingReplicas);
+        processMissingReplicas(datanodeDetails, containersInSCM);
 
         /*
          * Update the latest set of containers for this datanode in
