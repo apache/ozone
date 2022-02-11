@@ -345,7 +345,7 @@ public final class OzoneManagerDoubleBuffer {
           cleanupCache(cleanupEpochs);
 
           readyBuffer.clear();
-          if(isRatisEnabled) {
+          if (isRatisEnabled) {
             availPendingRequestNum.release(flushedTransactionsSize);
           }
 
