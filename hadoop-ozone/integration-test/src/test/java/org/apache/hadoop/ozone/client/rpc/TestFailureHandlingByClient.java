@@ -255,7 +255,7 @@ public class TestFailureHandlingByClient {
 
 
     int block2ExpectedChunkCount;
-    if (locationList.get(0).getLength() == 2*chunkSize) {
+    if (locationList.get(0).getLength() == 2 * chunkSize) {
       // Scenario 1
       block2ExpectedChunkCount = 1;
     } else {
@@ -302,9 +302,9 @@ public class TestFailureHandlingByClient {
       Assert.assertEquals(1, containerData2.getBlockCount());
       int expectedBlockSize;
       if (block2ExpectedChunkCount == 1) {
-        expectedBlockSize = chunkSize/2;
+        expectedBlockSize = chunkSize / 2;
       } else {
-        expectedBlockSize = chunkSize + chunkSize/2;
+        expectedBlockSize = chunkSize + chunkSize / 2;
       }
       Assert.assertEquals(expectedBlockSize, blockData2.getSize());
       Assert.assertEquals(expectedBlockSize, containerData2.getBytesUsed());

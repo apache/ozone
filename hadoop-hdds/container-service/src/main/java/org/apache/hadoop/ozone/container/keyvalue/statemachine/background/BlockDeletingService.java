@@ -358,7 +358,7 @@ public class BlockDeletingService extends BackgroundService {
 
         // Once chunks in the blocks are deleted... remove the blockID from
         // blockDataTable.
-        try(BatchOperation batch = meta.getStore().getBatchHandler()
+        try (BatchOperation batch = meta.getStore().getBatchHandler()
             .initBatchOperation()) {
           for (String entry : succeedBlocks) {
             blockDataTable.deleteWithBatch(batch, entry);
