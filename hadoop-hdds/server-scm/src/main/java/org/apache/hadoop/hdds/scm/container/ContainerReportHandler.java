@@ -37,10 +37,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Handles container reports from datanode.
@@ -123,21 +121,30 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         final Set<ContainerID> containersInSCM =
             nodeManager.getContainers(datanodeDetails);
 
-        final Set<ContainerID> containersInDn = replicas.parallelStream()
-            .map(ContainerReplicaProto::getContainerID)
-            .map(ContainerID::valueOf).collect(Collectors.toSet());
+        for (ContainerReplicaProto replica : replicas) {
+          ContainerID cid = ContainerID.valueOf(replica.getContainerID());
+          ContainerInfo container = null;
+          try {
+            // We get the container using the ContainerID object we obtained
+            // from protobuf. However we don't want to store that object if
+            // there is already an instance for the same ContainerID we can
+            // reuse.
+            container = containerManager.getContainer(cid);
+            cid = container.containerID();
+          } catch (ContainerNotFoundException e) {
+            // Ignore this for now. It will be handle later with a null check.
+          }
 
-        containersInSCM.removeAll(containersInDn);
-
-        processContainerReplicas(datanodeDetails, replicas, publisher);
+          boolean wasInSCM = containersInSCM.remove(cid);
+          if (!wasInSCM) {
+            // This is a new Container not in the nodeManager -> dn map yet
+            nodeManager.addContainer(datanodeDetails, cid);
+          }
+          processSingleReplica(datanodeDetails, container, replica, publisher);
+        }
+        // Anything left in containersInSCM was not in the full report, so it is
+        // now missing on the DN
         processMissingReplicas(datanodeDetails, containersInSCM);
-
-        /*
-         * Update the latest set of containers for this datanode in
-         * NodeManager
-         */
-        nodeManager.setContainers(datanodeDetails, containersInDn);
-
         containerManager.notifyContainerReportProcessing(true, true);
       }
     } catch (NodeNotFoundException ex) {
@@ -153,32 +160,34 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    * that will be deleted by SCM.
    *
    * @param datanodeDetails Datanode from which this report was received
-   * @param replicas list of ContainerReplicaProto
+   * @param container ContainerInfo representing the container
+   * @param replicaProto Proto message for the replica
    * @param publisher EventPublisher reference
    */
-  private void processContainerReplicas(final DatanodeDetails datanodeDetails,
-      final List<ContainerReplicaProto> replicas,
+  private void processSingleReplica(final DatanodeDetails datanodeDetails,
+      final ContainerInfo container, final ContainerReplicaProto replicaProto,
       final EventPublisher publisher) {
-    for (ContainerReplicaProto replicaProto : replicas) {
-      try {
-        processContainerReplica(datanodeDetails, replicaProto, publisher);
-      } catch (ContainerNotFoundException e) {
-        if (unknownContainerHandleAction.equals(
-            UNKNOWN_CONTAINER_ACTION_WARN)) {
-          LOG.error("Received container report for an unknown container" +
-              " {} from datanode {}.", replicaProto.getContainerID(),
-              datanodeDetails, e);
-        } else if (unknownContainerHandleAction.equals(
-            UNKNOWN_CONTAINER_ACTION_DELETE)) {
-          final ContainerID containerId = ContainerID
-              .valueOf(replicaProto.getContainerID());
-          deleteReplica(containerId, datanodeDetails, publisher, "unknown");
-        }
-      } catch (IOException | InvalidStateTransitionException e) {
-        LOG.error("Exception while processing container report for container" +
+    if (container == null) {
+      if (unknownContainerHandleAction.equals(
+          UNKNOWN_CONTAINER_ACTION_WARN)) {
+        LOG.error("Received container report for an unknown container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails, e);
+            datanodeDetails);
+      } else if (unknownContainerHandleAction.equals(
+          UNKNOWN_CONTAINER_ACTION_DELETE)) {
+        final ContainerID containerId = ContainerID
+            .valueOf(replicaProto.getContainerID());
+        deleteReplica(containerId, datanodeDetails, publisher, "unknown");
       }
+      return;
+    }
+    try {
+      processContainerReplica(
+          datanodeDetails, container, replicaProto, publisher);
+    } catch (IOException | InvalidStateTransitionException e) {
+      LOG.error("Exception while processing container report for container" +
+              " {} from datanode {}.", replicaProto.getContainerID(),
+          datanodeDetails, e);
     }
   }
 
@@ -190,6 +199,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    */
   private void processMissingReplicas(final DatanodeDetails datanodeDetails,
                                       final Set<ContainerID> missingReplicas) {
+    // TODO - must also remove from NodeManager DN -> Cid list.
     for (ContainerID id : missingReplicas) {
       try {
         containerManager.getContainerReplicas(id).stream()

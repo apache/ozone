@@ -71,19 +71,38 @@ public class AbstractContainerReportHandler {
   }
 
   /**
-   * Process the given ContainerReplica received from specified datanode.
    *
-   * @param datanodeDetails DatanodeDetails of the node which reported
-   *                        this replica
-   * @param replicaProto ContainerReplica
-   *
-   * @throws IOException In case of any Exception while processing the report
+   * @param datanodeDetails DatanodeDetails for the DN
+   * @param replicaProto Protobuf representing the replicas
+   * @param publisher EventPublisher instance
+   * @throws IOException
+   * @throws InvalidStateTransitionException
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher)
       throws IOException, InvalidStateTransitionException {
-    final ContainerID containerId = ContainerID
-        .valueOf(replicaProto.getContainerID());
+    ContainerInfo container = getContainerManager().getContainer(
+        ContainerID.valueOf(replicaProto.getContainerID()));
+    processContainerReplica(
+        datanodeDetails, container, replicaProto, publisher);
+  }
+
+  /**
+   * Process the given ContainerReplica received from specified datanode.
+   *
+   * @param datanodeDetails DatanodeDetails of the node which reported
+   *                        this replica
+   * @param container ContainerInfo represending the container
+   * @param replicaProto ContainerReplica
+   * @param publisher EventPublisher instance
+   *
+   * @throws IOException In case of any Exception while processing the report
+   */
+  protected void processContainerReplica(final DatanodeDetails datanodeDetails,
+      final ContainerInfo container, final ContainerReplicaProto replicaProto,
+      final EventPublisher publisher)
+      throws IOException, InvalidStateTransitionException {
+    final ContainerID containerId = container.containerID();
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
@@ -91,9 +110,9 @@ public class AbstractContainerReportHandler {
     }
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
-    synchronized (containerManager.getContainer(containerId)) {
-      updateContainerStats(datanodeDetails, containerId, replicaProto);
-      if (!updateContainerState(datanodeDetails, containerId, replicaProto,
+    synchronized (container) {
+      updateContainerStats(datanodeDetails, container, replicaProto);
+      if (!updateContainerState(datanodeDetails, container, replicaProto,
           publisher)) {
         updateContainerReplica(datanodeDetails, containerId, replicaProto);
       }
@@ -104,16 +123,15 @@ public class AbstractContainerReportHandler {
    * Update the container stats if it's lagging behind the stats in reported
    * replica.
    *
-   * @param containerId ID of the container
+   * @param containerInfo ContainerInfo representing the container
    * @param replicaProto Container Replica information
    * @throws ContainerNotFoundException If the container is not present
    */
   private void updateContainerStats(final DatanodeDetails datanodeDetails,
-                                    final ContainerID containerId,
+                                    final ContainerInfo containerInfo,
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
-    final ContainerInfo containerInfo = containerManager
-        .getContainer(containerId);
+    final ContainerID containerId = containerInfo.containerID();
 
     if (isHealthy(replicaProto::getState)) {
       if (containerInfo.getSequenceId() <
@@ -165,19 +183,18 @@ public class AbstractContainerReportHandler {
    * Updates the container state based on the given replica state.
    *
    * @param datanode Datanode from which the report is received
-   * @param containerId ID of the container
+   * @param container ContainerInfo representing the the container
    * @param replica ContainerReplica
    * @boolean true - replica should be ignored in the next process
    * @throws IOException In case of Exception
    */
   private boolean updateContainerState(final DatanodeDetails datanode,
-                                    final ContainerID containerId,
+                                    final ContainerInfo container,
                                     final ContainerReplicaProto replica,
                                     final EventPublisher publisher)
       throws IOException, InvalidStateTransitionException {
 
-    final ContainerInfo container = containerManager
-        .getContainer(containerId);
+    final ContainerID containerId = container.containerID();
     boolean ignored = false;
 
     switch (container.getState()) {
