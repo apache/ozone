@@ -257,7 +257,7 @@ public class OzoneClientConfig {
   public ChecksumCombineMode getChecksumCombineMode() {
     try {
       return ChecksumCombineMode.valueOf(checksumCombineMode);
-    } catch(IllegalArgumentException iae) {
+    } catch (IllegalArgumentException iae) {
       LOG.warn("Bad checksum combine mode: {}. Using default {}",
           checksumCombineMode,
           ChecksumCombineMode.COMPOSITE_CRC.name());
