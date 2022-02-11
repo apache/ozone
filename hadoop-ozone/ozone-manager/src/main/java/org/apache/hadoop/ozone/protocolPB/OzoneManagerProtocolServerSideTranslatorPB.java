@@ -132,20 +132,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
             .load();
   }
 
-  @RequestFeatureValidator(
-      conditions = {ValidationCondition.NEWER_CLIENT_REQUESTS},
-      contextAware = true,
-      requestType = OzoneManagerProtocolProtos.Type.CreateVolume,
-      processingPhase = RequestProcessingPhase.POST_PROCESS
-  )
-  public static OMResponse fooValidation(OMRequest first, OMResponse second, ValidationContext third) {
-    return null;
-  }
-
   /**
-   * Submit requests to Ratis server for OM HA implementation.
-   * TODO: Once HA is implemented fully, we should have only one server side
-   * translator for OM protocol.
+   * Submit mutating requests to Ratis server in OM, and process read requests.
    */
   @Override
   public OMResponse submitRequest(RpcController controller,

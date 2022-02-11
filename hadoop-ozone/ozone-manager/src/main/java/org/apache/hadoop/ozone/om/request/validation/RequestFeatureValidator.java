@@ -45,12 +45,11 @@ import java.lang.annotation.Target;
  * the request is processed by the regular code.
  * Its signature has to be the following:
  * - it has to be static and idempotent
- * - it has to have one or two parameters
- * - if not contextAware, the only parameter it should have is an
+ * - it has to have two parameters
+ * - the first parameter it is an
  * {@link
  * org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest}
- * - if contextAware, a second parameter of type {@link ValidationContext} has
- *   to be there in the argument list.
+ * - the second parameter of type {@link ValidationContext}
  * - the method has to return the modified request, or throw a ServiceException
  *   in case the request is considered to be invalid
  * - the method does not need to care about preserving the request it gets,
@@ -63,12 +62,12 @@ import java.lang.annotation.Target;
  * is calculated for a given request.
  * Its signature has to be the following:
  * - it has to be static and idempotent
- * - it has 2 or 3 parameters
+ * - it has three parameters
  * - similalry to the pre-processing validators, first parameter is the
- *   OMRequest, the second parameter is the OMResponse, and the third optional
- *   parameter is a ValidationContext if the method marked to be context aware.
- * - the method has to return the modified response of throw a ServiceException
- *   if the request is considered invalid based on the response.
+ *   OMRequest, the second parameter is the OMResponse, and the third
+ *   parameter is a ValidationContext.
+ * - the method has to return the modified OMResponse or throw a
+ *   ServiceException if the request is considered invalid based on response.
  * - the method gets the request object that was supplied for the general
  *   request processing code, not the original request, while it gets a copy
  *   of the original response object provided by the general request processing
@@ -96,12 +95,5 @@ public @interface RequestFeatureValidator {
    * @return the requestType to whihc the validator shoudl be applied
    */
   Type requestType();
-
-  /**
-   * Tells whether the validator requires a {@link ValidationContext} or it
-   * does not.
-   * @return if the method requires the context.
-   */
-  boolean contextAware() default false;
 
 }

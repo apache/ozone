@@ -40,7 +40,6 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
           if (methodAnnotation.getAnnotationType().asElement().getSimpleName()
               .contentEquals("RequestFeatureValidator")){
             int expectedParamCount = -1;
-            boolean hasContext = false;
             boolean isPreprocessor = false;
             for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
                 entry : methodAnnotation.getElementValues().entrySet()) {
@@ -49,23 +48,16 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
                 processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                     "Condition is empty...");
               }
-              if (entry.getKey().getSimpleName().contentEquals("contextAware")) {
-                System.out.println("HAS CONTEXT!");
-                hasContext = true;
-              }
               if (entry.getKey().getSimpleName().contentEquals("processingPhase")) {
                 String procPhase = entry.getValue().accept(new ProcessingPhaseVisitor(), null);
                 if (procPhase.equals("PRE_PROCESS")) {
                   isPreprocessor = true;
-                  expectedParamCount = 1;
+                  expectedParamCount = 2;
                 } else if (procPhase.equals("POST_PROCESS")){
                   isPreprocessor = false;
-                  expectedParamCount = 2;
+                  expectedParamCount = 3;
                 }
               }
-            }
-            if (hasContext) {
-              expectedParamCount++;
             }
             if (elem.getKind() != ElementKind.METHOD) {
               processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
@@ -126,7 +118,6 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
         }
       }
     }
-
     return true;
   }
 
