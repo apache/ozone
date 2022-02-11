@@ -496,7 +496,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      final int lastStripeSize = getCurrentStripeSize();
+      final int lastStripeSize = getCurrentDataStripeSize();
       if (isPartialStripe(lastStripeSize)) {
         ByteBuffer bytesToWrite =
             ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
@@ -582,7 +582,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return stripeSize > 0 && stripeSize < numDataBlks * ecChunkSize;
   }
 
-  private int getCurrentStripeSize() {
+  private int getCurrentDataStripeSize() {
     final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
     int lastStripeSize = 0;
     for (int i = 0; i < numDataBlks; i++) {

@@ -499,6 +499,39 @@ public class TestOzoneECClient {
   }
 
   @Test
+  public void test10D4PConfigWithPartialStripe()
+      throws IOException {
+    // A large block size try to trigger potential overflow
+    // refer to: HDDS-6295
+    conf.set(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT);
+    int dataBlks = 10;
+    int parityBlks = 4;
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // A partial chunk to trigger partialStripe check
+    // in ECKeyOutputStream.close()
+    int inSize = chunkSize - 1;
+    byte[] partialChunk = new byte[inSize];
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, inSize,
+        new ECReplicationConfig(dataBlks, parityBlks,
+            ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
+      out.write(partialChunk);
+    }
+
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      Assert.assertEquals(inSize, is.read(fileContent));
+      Assert.assertTrue(Arrays.equals(partialChunk,
+          Arrays.copyOf(fileContent, inSize)));
+    }
+  }
+
+  @Test
   public void testWriteShouldFailIfMoreThanParityNodesFail()
       throws IOException {
     testNodeFailuresWhileWriting(new int[] {0, 1, 2}, 3, 2);
