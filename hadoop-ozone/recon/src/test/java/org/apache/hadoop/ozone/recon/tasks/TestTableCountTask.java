@@ -116,7 +116,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
     ArrayList<OMDBUpdateEvent> events = new ArrayList<>();
     // Create 5 put, 1 delete and 1 update event for each table
     for (String tableName: tableCountTask.getTaskTables()) {
-      for (int i=0; i<5; i++) {
+      for (int i = 0; i < 5; i++) {
         events.add(getOMUpdateEvent("item" + i, null, tableName, PUT));
       }
       // for delete event, if value is set to null, the counter will not be

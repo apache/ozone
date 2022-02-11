@@ -68,7 +68,7 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
         response.getEntity();
 
     Assert.assertEquals(resultList.size(), responseList.size());
-    for(ReconTaskStatus r : responseList) {
+    for (ReconTaskStatus r : responseList) {
       Assert.assertEquals(reconTaskStatusRecord.getTaskName(), r.getTaskName());
       Assert.assertEquals(reconTaskStatusRecord.getLastUpdatedTimestamp(),
           r.getLastUpdatedTimestamp());

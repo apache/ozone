@@ -62,7 +62,7 @@ import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE;
@@ -109,6 +109,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
         .setNumDataVolumes(1)
         .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
     ozClient = OzoneClientFactory.getRpcClient(ozoneConfig);
     store = ozClient.getObjectStore();
@@ -141,7 +142,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, STAND_ALONE,
+        value.getBytes(UTF_8).length, RATIS,
         ONE, new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
@@ -223,7 +224,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     try {
       c1.close();
       Assert.fail();
-    } catch(Exception e) {
+    } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
     }
 
@@ -243,7 +244,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, STAND_ALONE,
+        value.getBytes(UTF_8).length, RATIS,
         ONE, new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();

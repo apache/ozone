@@ -121,7 +121,7 @@ public class DatanodeConfiguration {
       type = ConfigType.INT,
       defaultValue = "1440",
       tags = {DATANODE},
-      description = "The maximum number of block delete commands queued on "+
+      description = "The maximum number of block delete commands queued on " +
           " a datanode"
   )
   private int blockDeleteQueueLimit = 60 * 24;

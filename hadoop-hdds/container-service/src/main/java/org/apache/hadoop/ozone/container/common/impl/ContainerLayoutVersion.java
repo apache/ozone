@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Defines layout versions for the Chunks.
  */
-public enum ChunkLayOutVersion {
+public enum ContainerLayoutVersion {
 
   FILE_PER_CHUNK(1, "One file per chunk") {
     @Override
@@ -54,29 +54,31 @@ public enum ChunkLayOutVersion {
   };
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ChunkLayOutVersion.class);
+      LoggerFactory.getLogger(ContainerLayoutVersion.class);
 
-  private static final ChunkLayOutVersion
-      DEFAULT_LAYOUT = ChunkLayOutVersion.FILE_PER_BLOCK;
+  private static final ContainerLayoutVersion
+      DEFAULT_LAYOUT = ContainerLayoutVersion.FILE_PER_BLOCK;
 
-  private static final List<ChunkLayOutVersion> CHUNK_LAYOUT_VERSIONS =
+  private static final List<ContainerLayoutVersion> CONTAINER_LAYOUT_VERSIONS =
       ImmutableList.copyOf(values());
 
   private final int version;
   private final String description;
 
-  ChunkLayOutVersion(int version, String description) {
+  ContainerLayoutVersion(int version, String description) {
     this.version = version;
     this.description = description;
   }
 
   /**
-   * Return ChunkLayOutVersion object for the numeric chunkVersion.
+   * Return ContainerLayoutVersion object for the numeric containerVersion.
    */
-  public static ChunkLayOutVersion getChunkLayOutVersion(int chunkVersion) {
-    for (ChunkLayOutVersion chunkLayOutVersion : CHUNK_LAYOUT_VERSIONS) {
-      if (chunkLayOutVersion.getVersion() == chunkVersion) {
-        return chunkLayOutVersion;
+  public static ContainerLayoutVersion getContainerLayoutVersion(
+      int containerVersion) {
+    for (ContainerLayoutVersion containerLayoutVersion :
+        CONTAINER_LAYOUT_VERSIONS) {
+      if (containerLayoutVersion.getVersion() == containerVersion) {
+        return containerLayoutVersion;
       }
     }
     return null;
@@ -85,17 +87,17 @@ public enum ChunkLayOutVersion {
   /**
    * @return list of all versions.
    */
-  public static List<ChunkLayOutVersion> getAllVersions() {
-    return CHUNK_LAYOUT_VERSIONS;
+  public static List<ContainerLayoutVersion> getAllVersions() {
+    return CONTAINER_LAYOUT_VERSIONS;
   }
 
   /**
    * @return the latest version.
    */
-  public static ChunkLayOutVersion getConfiguredVersion(
+  public static ContainerLayoutVersion getConfiguredVersion(
       ConfigurationSource conf) {
     try {
-      return conf.getEnum(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY,
+      return conf.getEnum(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
           DEFAULT_LAYOUT);
     } catch (IllegalArgumentException e) {
       return DEFAULT_LAYOUT;
@@ -127,7 +129,7 @@ public enum ChunkLayOutVersion {
 
   @Override
   public String toString() {
-    return "ChunkLayout:v" + version;
+    return "ContainerLayout:v" + version;
   }
 
   private static File getChunkDir(ContainerData containerData)
