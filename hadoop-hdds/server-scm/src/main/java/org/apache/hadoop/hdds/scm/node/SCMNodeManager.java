@@ -972,6 +972,13 @@ public class SCMNodeManager implements NodeManager {
     nodeStateManager.addContainer(datanodeDetails.getUuid(), containerId);
   }
 
+  @Override
+  public void removeContainer(final DatanodeDetails datanodeDetails,
+                           final ContainerID containerId)
+      throws NodeNotFoundException {
+    nodeStateManager.removeContainer(datanodeDetails.getUuid(), containerId);
+  }
+
   /**
    * Update set of containers available on a datanode.
    *

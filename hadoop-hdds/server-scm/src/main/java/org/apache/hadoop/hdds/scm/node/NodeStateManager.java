@@ -602,6 +602,20 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Removes the given container from the specified datanode.
+   *
+   * @param uuid - datanode uuid
+   * @param containerId - containerID
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  public void removeContainer(final UUID uuid,
+                           final ContainerID containerId)
+      throws NodeNotFoundException {
+    nodeStateMap.removeContainer(uuid, containerId);
+  }
+
+  /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
    * @param containerIds - Set of containerIDs

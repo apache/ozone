@@ -199,8 +199,13 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    */
   private void processMissingReplicas(final DatanodeDetails datanodeDetails,
                                       final Set<ContainerID> missingReplicas) {
-    // TODO - must also remove from NodeManager DN -> Cid list.
     for (ContainerID id : missingReplicas) {
+      try {
+        nodeManager.removeContainer(datanodeDetails, id);
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Failed to remove container {} from a node which does not " +
+            "exist {}", id, datanodeDetails, e);
+      }
       try {
         containerManager.getContainerReplicas(id).stream()
             .filter(replica -> replica.getDatanodeDetails()

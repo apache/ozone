@@ -257,7 +257,10 @@ public class SimpleMockNodeManager implements NodeManager {
       throws NodeNotFoundException {
   }
 
-
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
+  }
 
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
