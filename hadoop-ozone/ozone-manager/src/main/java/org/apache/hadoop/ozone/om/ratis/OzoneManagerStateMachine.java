@@ -323,7 +323,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);
       future.thenApply(omResponse -> {
-        if(!omResponse.getSuccess()) {
+        if (!omResponse.getSuccess()) {
           // When INTERNAL_ERROR or METADATA_ERROR it is considered as
           // critical error and terminate the OM. Considering INTERNAL_ERROR
           // also for now because INTERNAL_ERROR is thrown for any error
@@ -529,8 +529,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public void updateLastAppliedIndex(List<Long> flushedEpochs) {
     Preconditions.checkArgument(flushedEpochs.size() > 0);
-    computeAndUpdateLastAppliedIndex(flushedEpochs.get(flushedEpochs.size() -1),
-        -1L, flushedEpochs, true);
+    computeAndUpdateLastAppliedIndex(
+        flushedEpochs.get(flushedEpochs.size() - 1), -1L, flushedEpochs, true);
   }
 
   /**

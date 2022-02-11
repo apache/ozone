@@ -113,7 +113,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(0, metrics.getTotalNumOfFlushedTransactions());
     assertEquals(0, metrics.getMaxNumberOfTransactionsFlushedInOneIteration());
 
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
           trxId.incrementAndGet());
     }

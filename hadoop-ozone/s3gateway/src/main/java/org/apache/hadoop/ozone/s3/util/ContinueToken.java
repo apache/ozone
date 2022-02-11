@@ -111,7 +111,7 @@ public class ContinueToken {
 
       } catch (DecoderException ex) {
         OS3Exception os3Exception = S3ErrorTable.newError(S3ErrorTable
-            .INVALID_ARGUMENT, key);
+            .INVALID_ARGUMENT, key, ex);
         os3Exception.setErrorMessage("The continuation token provided is " +
             "incorrect");
         throw os3Exception;
