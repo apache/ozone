@@ -79,7 +79,7 @@ public class ValidatorRegistry {
     List<Method> returnValue =
         validationsFor(conditions.get(0), requestType, phase);
 
-    for (int i=1; i < conditions.size(); i++) {
+    for (int i = 1; i < conditions.size(); i++) {
       returnValue.addAll(validationsFor(conditions.get(i), requestType, phase));
     }
     return returnValue;
@@ -199,7 +199,7 @@ public class ValidatorRegistry {
       }
 
       @Override
-      void initMaps(String validatorPackage) {}
+      void initMaps(String validatorPackage) { }
     };
   }
 

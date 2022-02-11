@@ -7,6 +7,7 @@ import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
+import javax.lang.model.element.AnnotationValueVisitor;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -27,101 +28,212 @@ import java.util.Set;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class RequestFeatureValidatorProcessor extends AbstractProcessor {
 
+  public static final String ERROR_CONDITION_IS_EMPTY =
+      "RequestFeatureValidator has an empty condition list. Please define the"
+          + " ValidationCondition in which the validator has to be applied.";
+  public static final String ERROR_ANNOTATED_ELEMENT_IS_NOT_A_METHOD =
+      "RequestFeatureValidator annotation is not applied to a method.";
+  public static final String ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC =
+      "Only static methods can be annotated with the RequestFeatureValidator"
+          + " annotation.";
+  public static final String ERROR_UNEXPECTED_PARAMETER_TYPE =
+      "Unexpected parameter type, it has to be a declared type. Found: %s";
+  public static final String ERROR_UNEXPECTED_PARAMETER_COUNT =
+      "Unexpected parameter count. Expected: %d; found: %d.";
+  public static final String ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST =
+      "Pre-processing validator methods annotated with RequestFeatureValidator"
+          + " annotation has to return an OMRequest object.";
+  public static final String ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE =
+      "Post-processing validator methods annotated with RequestFeatureValidator"
+          + " annotation has to return an OMResponse object.";
+  public static final String ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST =
+      "First parameter of a RequestFeatureValidator method has to be an"
+          + " OMRequest object.";
+  public static final String ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT =
+      "Last parameter of a RequestFeatureValidator method has to be"
+          + " ValidationContext object.";
+  public static final String ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE =
+      "Second parameter of a RequestFeatureValidator method has to be an"
+          + " OMResponse object.";
+
+  public static final String OM_REQUEST_CLASS_NAME =
+      "org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos"
+          + ".OMRequest";
+  public static final String OM_RESPONSE_CLASS_NAME =
+      "org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos"
+          + ".OMResponse";
+  public static final String VALIDATION_CONTEXT_CLASS_NAME =
+      "org.apache.hadoop.ozone.om.request.validation.ValidationContext";
+
+  public static final String ANNOTATION_SIMPLE_NAME = "RequestFeatureValidator";
+  public static final String ANNOTATION_CONDITIONS_PROPERTY_NAME = "conditions";
+  public static final String ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME =
+      "processingPhase";
+
+  public static final String PROCESSING_PHASE_PRE_PROCESS = "PRE_PROCESS";
+  public static final String PROCESSING_PHASE_POST_PROCESS = "POST_PROCESS";
+  public static final String ERROR_NO_PROCESSING_PHASE_DEFINED =
+      "RequestFeatureValidator has an invalid ProcessingPhase defined.";
+
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
       RoundEnvironment roundEnv) {
-    System.out.println("I am here!!!!");
     for (TypeElement annotation : annotations) {
-      Set<? extends Element> annotatedElements
-          = roundEnv.getElementsAnnotatedWith(annotation);
-      for(Element elem : annotatedElements) {
-        for (AnnotationMirror methodAnnotation : elem.getAnnotationMirrors()){
-          System.out.println("simpleName: " + methodAnnotation.getAnnotationType().asElement().getSimpleName());
-          if (methodAnnotation.getAnnotationType().asElement().getSimpleName()
-              .contentEquals("RequestFeatureValidator")){
-            int expectedParamCount = -1;
-            boolean isPreprocessor = false;
-            for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
-                entry : methodAnnotation.getElementValues().entrySet()) {
-              if (entry.getKey().getSimpleName().contentEquals("conditions")
-                  && !entry.getValue().accept(new ConditionValidator(), null)) {
-                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                    "Condition is empty...");
-              }
-              if (entry.getKey().getSimpleName().contentEquals("processingPhase")) {
-                String procPhase = entry.getValue().accept(new ProcessingPhaseVisitor(), null);
-                if (procPhase.equals("PRE_PROCESS")) {
-                  isPreprocessor = true;
-                  expectedParamCount = 2;
-                } else if (procPhase.equals("POST_PROCESS")){
-                  isPreprocessor = false;
-                  expectedParamCount = 3;
-                }
-              }
-            }
-            if (elem.getKind() != ElementKind.METHOD) {
-              processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                  "Annotated element is not a method...");
-            }
-            if (!elem.getModifiers().contains(Modifier.STATIC)) {
-              processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                  "Validator method has to be static...");
-            }
-            if (isPreprocessor && !((ExecutableElement) elem).getReturnType().toString()
-                .equals("org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest")) {
-              processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                  "Validator method has to return OMRequest...");
-            }
-            if (!isPreprocessor && !((ExecutableElement) elem).getReturnType().toString()
-                .equals("org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse")) {
-              processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                  "Validator method has to return OMResponse...");
-            }
-            List<? extends TypeMirror> paramTypes =
-                ((ExecutableType) elem.asType()).getParameterTypes();
-            int realParamCount =
-                paramTypes.size();
-            if (realParamCount != expectedParamCount) {
-              processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                  "Unexpected parameter count. Expected: " + expectedParamCount
-                      + "; found: " + realParamCount);
-            }
-            paramTypes.forEach(t -> {
-              if (!t.getKind().equals(TypeKind.DECLARED)) {
-                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                    "Unexpected parameter type, it has to be a declared type."
-                        + " Found: " + t);
-              }
-            });
-            int contextOrder = -1;
-            if (isPreprocessor) {
-              contextOrder = 1;
-            } else {
-              contextOrder = 2;
-              if (paramTypes.size()>=2 && !paramTypes.get(1).toString()
-                  .equals("org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse")) {
-                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                    "Validator method second param has to be OMResponse...");
-              }
-            }
-            if (paramTypes.size()>=1 && !paramTypes.get(0).toString()
-                .equals("org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest")) {
-              processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                  "Validator method first param has to be OMRequest...");
-            }
-            if (paramTypes.size()>=contextOrder+1 && !paramTypes.get(contextOrder).toString()
-                .equals("org.apache.hadoop.ozone.om.request.validation.ValidationContext")) {
-              processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                  "Validator method last param has to be ValidationContext...");
-            }
-          }
-        }
+      if (!annotation.getSimpleName().contentEquals(ANNOTATION_SIMPLE_NAME)) {
+        continue;
       }
+      processElements(roundEnv.getElementsAnnotatedWith(annotation));
     }
-    return true;
+    return false;
   }
 
-  class ConditionValidator
+  private void processElements(Set<? extends Element> annotatedElements) {
+    for(Element elem : annotatedElements) {
+      for (AnnotationMirror methodAnnotation : elem.getAnnotationMirrors()){
+        validateAnnotatedMethod(elem, methodAnnotation);
+      }
+    }
+  }
+
+  private void validateAnnotatedMethod(
+      Element elem, AnnotationMirror methodAnnotation) {
+    boolean isPreprocessor = checkAndEvaluateAnnotation(methodAnnotation);
+
+    checkMethodIsAnnotated(elem);
+    ensureAnnotatedMethodIsStatic(elem);
+    ensurePreProcessorReturnsOMReqest((ExecutableElement) elem, isPreprocessor);
+    ensurePostProcessorReturnsOMResponse(
+        (ExecutableElement) elem, isPreprocessor);
+    ensureMethodParameters(elem, isPreprocessor);
+  }
+
+  private void ensureMethodParameters(Element elem, boolean isPreprocessor) {
+    List<? extends TypeMirror> paramTypes =
+        ((ExecutableType) elem.asType()).getParameterTypes();
+    ensureParameterCount(isPreprocessor, paramTypes);
+    ensureParametersHaveDeclaredTypes(paramTypes);
+    ensureParameterRequirements(paramTypes, 0, OM_REQUEST_CLASS_NAME,
+        ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST);
+    if (!isPreprocessor) {
+      ensureParameterRequirements(paramTypes, 1, OM_RESPONSE_CLASS_NAME,
+          ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE);
+    }
+    int contextOrder = isPreprocessor ? 1 : 2;
+    ensureParameterRequirements(paramTypes, contextOrder,
+        VALIDATION_CONTEXT_CLASS_NAME,
+        ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
+  }
+
+  private void ensureParametersHaveDeclaredTypes(
+      List<? extends TypeMirror> paramTypes) {
+    paramTypes.forEach(t -> {
+      if (!t.getKind().equals(TypeKind.DECLARED)) {
+        emitErrorMsg(String.format(
+            ERROR_UNEXPECTED_PARAMETER_TYPE, t.getKind()));
+      }
+    });
+  }
+
+  private void ensureParameterCount(boolean isPreprocessor,
+      List<? extends TypeMirror> paramTypes) {
+    int realParamCount = paramTypes.size();
+    int expectedParamCount = isPreprocessor ? 2 : 3;
+    if (realParamCount != expectedParamCount) {
+      emitErrorMsg(String.format(ERROR_UNEXPECTED_PARAMETER_COUNT,
+          expectedParamCount, realParamCount));
+    }
+  }
+
+  private void ensureParameterRequirements(
+      List<? extends TypeMirror> paramTypes,
+      int index, String validationContextClassName,
+      String errorLastParamHasToBeValidationContext) {
+    if (paramTypes.size() >= index+1 && 
+        !paramTypes.get(index).toString().equals(validationContextClassName)) {
+      emitErrorMsg(errorLastParamHasToBeValidationContext);
+    }
+  }
+
+  private void ensurePostProcessorReturnsOMResponse(
+      ExecutableElement elem, boolean isPreprocessor) {
+    if (!isPreprocessor && !elem.getReturnType().toString()
+        .equals(OM_RESPONSE_CLASS_NAME)) {
+      emitErrorMsg(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE);
+    }
+  }
+
+  private void ensurePreProcessorReturnsOMReqest(
+      ExecutableElement elem, boolean isPreprocessor) {
+    if (isPreprocessor && !elem.getReturnType().toString()
+        .equals(OM_REQUEST_CLASS_NAME)) {
+      emitErrorMsg(ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST);
+    }
+  }
+
+  private void ensureAnnotatedMethodIsStatic(Element elem) {
+    if (!elem.getModifiers().contains(Modifier.STATIC)) {
+      emitErrorMsg(ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC);
+    }
+  }
+
+  private void checkMethodIsAnnotated(Element elem) {
+    if (elem.getKind() != ElementKind.METHOD) {
+      emitErrorMsg(ERROR_ANNOTATED_ELEMENT_IS_NOT_A_METHOD);
+    }
+  }
+
+  private boolean checkAndEvaluateAnnotation(
+      AnnotationMirror methodAnnotation) {
+    boolean isPreprocessor = false;
+    for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
+        entry : methodAnnotation.getElementValues().entrySet()) {
+      
+      if (hasInvalidValidationCondition(entry)) {
+        emitErrorMsg(ERROR_CONDITION_IS_EMPTY);
+      }
+      isPreprocessor = evaluateProcessingPhase(entry);
+    }
+    return isPreprocessor;
+  }
+
+  private boolean evaluateProcessingPhase(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
+    boolean isPreprocessor = false;
+    if (isProcessingPhaseValue(entry)) {
+      String procPhase = visit(entry, new ProcessingPhaseVisitor());
+      if (procPhase.equals(PROCESSING_PHASE_PRE_PROCESS)) {
+        isPreprocessor = true;
+      } else if (procPhase.equals(PROCESSING_PHASE_POST_PROCESS)){
+        isPreprocessor = false;
+      }
+    }
+    return isPreprocessor;
+  }
+
+  private boolean isProcessingPhaseValue(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
+    return isPropertyNamedAs(entry, ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME);
+  }
+
+  private boolean hasInvalidValidationCondition(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
+    return isPropertyNamedAs(entry, ANNOTATION_CONDITIONS_PROPERTY_NAME)
+        && !visit(entry, new ConditionValidator());
+  }
+
+  private boolean isPropertyNamedAs(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry,
+      String simpleName) {
+    return entry.getKey().getSimpleName().contentEquals(simpleName);
+  }
+
+  private <T> T visit(
+      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry,
+      AnnotationValueVisitor<T, Void> visitor) {
+    return entry.getValue().accept(visitor, null);
+  }
+
+  private static class ConditionValidator
       extends SimpleAnnotationValueVisitor8<Boolean, Void> {
 
     ConditionValidator() {
@@ -136,9 +248,10 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       }
       return Boolean.TRUE;
     }
+
   }
 
-  class ProcessingPhaseVisitor
+  private static class ProcessingPhaseVisitor
       extends SimpleAnnotationValueVisitor8<String, Void> {
 
     ProcessingPhaseVisitor() {
@@ -147,12 +260,17 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
 
     @Override
     public String visitEnumConstant(VariableElement c, Void unused) {
-      if (c.getSimpleName().contentEquals("PRE_PROCESS")) {
-        return "PRE_PROCESS";
-      } else if (c.getSimpleName().contentEquals("POST_PROCESS")) {
-        return "POST_PROCESS";
+      if (c.getSimpleName().contentEquals(PROCESSING_PHASE_PRE_PROCESS)) {
+        return PROCESSING_PHASE_PRE_PROCESS;
+      } else
+        if (c.getSimpleName().contentEquals(PROCESSING_PHASE_POST_PROCESS)) {
+          return PROCESSING_PHASE_POST_PROCESS;
       }
-      throw new IllegalStateException("Method processing phase is unknown...");
+      throw new IllegalStateException(ERROR_NO_PROCESSING_PHASE_DEFINED);
     }
+  }
+
+  private void emitErrorMsg(String s) {
+    processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, s);
   }
 }
