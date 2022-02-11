@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -50,8 +49,8 @@ public abstract class BaseFileChecksumHelper {
   private final long length;
   private ClientProtocol rpcClient;
 
-  private XceiverClientFactory xceiverClientFactory;
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
+  private XceiverClientFactory xceiverClientFactory;
   private FileChecksum fileChecksum;
   private List<OmKeyLocationInfo> keyLocationInfos;
   private long remaining = 0L;
@@ -160,12 +159,6 @@ public abstract class BaseFileChecksumHelper {
       fileChecksum = makeFinalResult();
     }
   }
-
-  @VisibleForTesting
-  List<OmKeyLocationInfo> getKeyLocationInfos() {
-    return keyLocationInfos;
-  }
-
 
   /**
    * Compute block checksums block by block and append the raw bytes of the
