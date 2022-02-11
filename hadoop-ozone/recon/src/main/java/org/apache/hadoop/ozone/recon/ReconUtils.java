@@ -343,7 +343,7 @@ public class ReconUtils {
    * @param config
    * */
   public static PKCS10CertificationRequest getCSR(OzoneConfiguration config,
-      CertificateClient certClient) throws IOException{
+      CertificateClient certClient) throws IOException {
     CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
     KeyPair keyPair = new KeyPair(certClient.getPublicKey(),
         certClient.getPrivateKey());

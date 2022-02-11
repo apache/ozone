@@ -222,7 +222,7 @@ public class ReconServer extends GenericCli {
               reconDetailsProtoBuilder.build(),
               getEncodedString(csr));
       // Persist certificates.
-      if(response.hasX509CACertificate()) {
+      if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         certClient.storeCertificate(pemEncodedCert, true);
         certClient.storeCertificate(response.getX509CACertificate(), true,
