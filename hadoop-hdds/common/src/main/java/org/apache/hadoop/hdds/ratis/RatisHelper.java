@@ -325,6 +325,10 @@ public final class RatisHelper {
     return key.startsWith(NettyConfigKeys.DataStream.PREFIX);
   }
 
+  private static boolean isStreamClientConfig(String key) {
+    return key.startsWith(RaftClientConfigKeys.DataStream.PREFIX);
+  }
+
   /**
    * Set all server properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
@@ -339,7 +343,8 @@ public final class RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisServerConf.forEach((key, val) -> {
       // Exclude ratis client configuration.
-      if (!isClientConfig(key)) {
+      if (isNettyStreamConfig(key) || isStreamClientConfig(key) ||
+          !isClientConfig(key)) {
         raftProperties.set(key, val);
       }
     });
