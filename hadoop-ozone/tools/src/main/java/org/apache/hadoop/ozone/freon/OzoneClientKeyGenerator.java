@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -29,6 +28,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
@@ -139,10 +140,13 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OutputStream stream = bucket.createKey(key, keySize,
+      try (OzoneOutputStream stream = bucket.createKey(key, keySize,
           replicationConfig, metadata)) {
         contentGenerator.write(stream);
-        stream.flush();
+        if (!(stream.getOutputStream() instanceof ECKeyOutputStream)) {
+          // ECKeyOutputStream#flush() is not implemented yet.
+          stream.flush();
+        }
       }
       return null;
     });
