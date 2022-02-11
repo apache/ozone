@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -143,6 +144,8 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
           replicationConfig, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
+      } catch (NotImplementedException e) {
+        // flush() is not implemented in ECKeyOutputStream
       }
       return null;
     });
