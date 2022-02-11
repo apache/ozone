@@ -57,8 +57,9 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     Preconditions.checkArgument(increment > 0);
     this.limit = limit;
     this.increment = increment;
-    this.limitIndex = limit/increment;
-    this.buffers = new ArrayList<>(limitIndex + (limit%increment == 0? 0: 1));
+    this.limitIndex = limit / increment;
+    this.buffers = new ArrayList<>(
+        limitIndex + (limit % increment == 0 ? 0 : 1));
     this.isDuplicated = isDuplicated;
   }
 
@@ -66,7 +67,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   private int getBufferCapacityAtIndex(int i) {
     Preconditions.checkArgument(i >= 0);
     Preconditions.checkArgument(i <= limitIndex);
-    return i < limitIndex? increment: limit%increment;
+    return i < limitIndex ? increment : limit % increment;
   }
 
   private void assertInt(int expected, int computed, String name, int i) {
@@ -126,7 +127,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     Preconditions.checkArgument(position < limit);
     final int i = position / increment;
     final ByteBuffer ith = getAndAllocateAtIndex(i);
-    assertInt(position%increment, ith.position(), "position", i);
+    assertInt(position % increment, ith.position(), "position", i);
     return ith;
   }
 
@@ -207,7 +208,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     }
 
     final int thatLimit = that.limit();
-    for(int p = position(); that.position() < thatLimit;) {
+    for (int p = position(); that.position() < thatLimit;) {
       final ByteBuffer b = getAndAllocateAtPosition(p);
       final int min = Math.min(b.remaining(), thatLimit - that.position());
       that.limit(that.position() + min);
@@ -229,7 +230,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     final int pr = newPosition % increment;
     final int li = newLimit / increment;
     final int lr = newLimit % increment;
-    final int newSize = lr == 0? li: li + 1;
+    final int newSize = lr == 0 ? li : li + 1;
 
     for (int i = 0; i < newSize; i++) {
       final int pos = i < pi ? increment : i == pi ? pr : 0;

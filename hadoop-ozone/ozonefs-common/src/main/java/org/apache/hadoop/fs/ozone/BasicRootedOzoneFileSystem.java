@@ -832,7 +832,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
-    return super.getFileChecksum(f, length);
+    String key = pathToKey(f);
+    return adapter.getFileChecksum(key, length);
   }
 
   @Override

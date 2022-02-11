@@ -350,7 +350,7 @@ public class TestReconWithOzoneManager {
    * For test purpose each container will have only one key.
    */
   private void addKeys(int start, int end) throws Exception {
-    for(int i = start; i < end; i++) {
+    for (int i = start; i < end; i++) {
       Pipeline pipeline = HddsTestUtils.getRandomPipeline();
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
       BlockID blockID = new BlockID(i, 1);
@@ -359,7 +359,7 @@ public class TestReconWithOzoneManager {
       omKeyLocationInfoList.add(omKeyLocationInfo1);
       OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
           OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
-      writeDataToOm("key"+i, "bucket"+i, "vol"+i,
+      writeDataToOm("key" + i, "bucket" + i, "vol" + i,
           Collections.singletonList(omKeyLocationInfoGroup));
     }
   }
@@ -367,7 +367,7 @@ public class TestReconWithOzoneManager {
   private long getTableKeyCount(TableIterator<String, ? extends
       Table.KeyValue<String, OmKeyInfo>> iterator) {
     long keyCount = 0;
-    while(iterator.hasNext()) {
+    while (iterator.hasNext()) {
       keyCount++;
       iterator.next();
     }

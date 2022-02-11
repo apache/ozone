@@ -224,7 +224,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     try {
       c1.close();
       Assert.fail();
-    } catch(Exception e) {
+    } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
     }
 

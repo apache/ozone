@@ -74,7 +74,7 @@ public class TestRDBStore {
     statistics.setStatsLevel(StatsLevel.ALL);
     options = options.setStatistics(statistics);
     configSet = new HashSet<>();
-    for(String name : families) {
+    for (String name : families) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }
@@ -288,42 +288,6 @@ public class TestRDBStore {
     }
   }
 
-  /**
-   * Not strictly a unit test. Just a confirmation of the expected behavior
-   * of RocksDB keyMayExist API.
-   * Expected behavior - On average, keyMayExist latency < key.get() latency
-   * for invalid keys.
-   * @throws Exception if unable to read from RocksDB.
-   */
-  @Test
-  public void testRocksDBKeyMayExistApi() throws Exception {
-    try (RDBStore newStore =
-             new RDBStore(folder.newFolder(), options, configSet)) {
-      RocksDB db = newStore.getDb();
-
-      //Test with 50 invalid keys.
-      long start = System.nanoTime();
-      for (int i = 0; i < 50; i++) {
-        Assert.assertTrue(db.get(
-            org.apache.commons.codec.binary.StringUtils
-                .getBytesUtf16("key" + i)) == null);
-      }
-      long end = System.nanoTime();
-      long keyGetLatency = end - start;
-
-      start = System.nanoTime();
-      for (int i = 0; i < 50; i++) {
-        Assert.assertFalse(db.keyMayExist(
-            org.apache.commons.codec.binary.StringUtils
-                .getBytesUtf16("key" + i), null));
-      }
-      end = System.nanoTime();
-      long keyMayExistLatency = end - start;
-
-      Assert.assertTrue(keyMayExistLatency < keyGetLatency);
-    }
-  }
-
   @Test
   public void testGetDBUpdatesSince() throws Exception {
 
@@ -394,7 +358,7 @@ public class TestRDBStore {
     options.setCreateMissingColumnFamilies(true);
     configSet = new HashSet<>();
     List<String> familiesMinusOne = families.subList(0, families.size() - 1);
-    for(String name : familiesMinusOne) {
+    for (String name : familiesMinusOne) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }

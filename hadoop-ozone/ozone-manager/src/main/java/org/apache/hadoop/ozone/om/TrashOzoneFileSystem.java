@@ -135,7 +135,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   public FSDataOutputStream create(Path path,
       FsPermission fsPermission,
       boolean b, int i, short i1,
-      long l, Progressable progressable){
+      long l, Progressable progressable) {
     throw new UnsupportedOperationException(
         "fs.create() not implemented in TrashOzoneFileSystem");
   }
@@ -173,12 +173,12 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getRenameKeyRequest(srcPath, dstPath);
     try {
-      if(omRequest != null) {
+      if (omRequest != null) {
         submitRequest(omRequest);
         return true;
       }
       return false;
-    } catch (Exception e){
+    } catch (Exception e) {
       LOG.error("Couldn't send rename request", e);
       return false;
     }
@@ -203,7 +203,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getDeleteKeyRequest(srcPath);
     try {
-      if(omRequest != null) {
+      if (omRequest != null) {
         submitRequest(omRequest);
         return true;
       }
@@ -299,7 +299,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         CacheValue<OmBucketInfo>>> bucketIterator =
         ozoneManager.getMetadataManager().getBucketIterator();
     List<FileStatus> ret = new ArrayList<>();
-    while (bucketIterator.hasNext()){
+    while (bucketIterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry =
           bucketIterator.next();
       OmBucketInfo omBucketInfo = entry.getValue().getCacheValue();
@@ -316,7 +316,7 @@ public class TrashOzoneFileSystem extends FileSystem {
             }
           }
         }
-      } catch (Exception e){
+      } catch (Exception e) {
         LOG.error("Couldn't perform fs operation " +
             "fs.listStatus()/fs.exists()", e);
       }

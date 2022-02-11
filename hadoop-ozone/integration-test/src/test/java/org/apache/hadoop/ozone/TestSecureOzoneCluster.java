@@ -138,7 +138,7 @@ public final class TestSecureOzoneCluster {
   public Timeout timeout = Timeout.seconds(80);
 
   @Rule
-  public TemporaryFolder folder= new TemporaryFolder();
+  public TemporaryFolder folder = new TemporaryFolder();
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;

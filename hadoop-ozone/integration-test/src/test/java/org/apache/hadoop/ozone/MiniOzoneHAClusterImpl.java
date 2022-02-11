@@ -490,7 +490,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         try {
           initOMHAConfig();
 
-          for (int i = 1; i<= numOfOMs; i++) {
+          for (int i = 1; i <= numOfOMs; i++) {
             // Set nodeId
             String nodeId = OM_NODE_ID_PREFIX + i;
             OzoneConfiguration config = new OzoneConfiguration(conf);
@@ -564,7 +564,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         try {
           initSCMHAConfig();
 
-          for (int i = 1; i<= numOfSCMs; i++) {
+          for (int i = 1; i <= numOfSCMs; i++) {
             // Set nodeId
             String nodeId = SCM_NODE_ID_PREFIX + i;
             String metaDirPath = path + "/" + nodeId;

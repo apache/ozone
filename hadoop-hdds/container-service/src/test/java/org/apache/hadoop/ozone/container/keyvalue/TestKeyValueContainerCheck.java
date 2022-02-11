@@ -186,7 +186,7 @@ import static org.junit.Assert.assertFalse;
       try (RandomAccessFile file = new RandomAccessFile(chunkFile, "rws")) {
         file.setLength(length / 2);
       }
-      assertEquals(length/2, chunkFile.length());
+      assertEquals(length / 2, chunkFile.length());
     }
 
     // metadata check should pass.

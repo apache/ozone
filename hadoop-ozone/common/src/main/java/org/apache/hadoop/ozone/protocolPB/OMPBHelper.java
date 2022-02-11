@@ -50,7 +50,7 @@ public final class OMPBHelper {
    * @return tokenProto
    */
   public static TokenProto convertToTokenProto(Token<?> tok) {
-    if(tok == null){
+    if (tok == null) {
       throw new IllegalArgumentException("Invalid argument: token is null");
     }
 
@@ -86,9 +86,9 @@ public final class OMPBHelper {
     }
 
     return new BucketEncryptionKeyInfo(
-        beInfo.hasCryptoProtocolVersion()?
+        beInfo.hasCryptoProtocolVersion() ?
             convert(beInfo.getCryptoProtocolVersion()) : null,
-        beInfo.hasSuite()? convert(beInfo.getSuite()) : null,
+        beInfo.hasSuite() ? convert(beInfo.getSuite()) : null,
         beInfo.getKeyName());
   }
 
@@ -106,7 +106,7 @@ public final class OMPBHelper {
     if (beInfo.getSuite() != null) {
       bb.setSuite(convert(beInfo.getSuite()));
     }
-    if (beInfo.getVersion()!= null) {
+    if (beInfo.getVersion() != null) {
       bb.setCryptoProtocolVersion(convert(beInfo.getVersion()));
     }
     return bb.build();
@@ -142,7 +142,7 @@ public final class OMPBHelper {
   }
 
   public static CipherSuite convert(CipherSuiteProto proto) {
-    switch(proto) {
+    switch (proto) {
     case AES_CTR_NOPADDING:
       return CipherSuite.AES_CTR_NOPADDING;
     default:
@@ -166,7 +166,7 @@ public final class OMPBHelper {
 
   public static CryptoProtocolVersionProto convert(
       CryptoProtocolVersion version) {
-    switch(version) {
+    switch (version) {
     case UNKNOWN:
       return OzoneManagerProtocolProtos.CryptoProtocolVersionProto
           .UNKNOWN_PROTOCOL_VERSION;
@@ -180,7 +180,7 @@ public final class OMPBHelper {
 
   public static CryptoProtocolVersion convert(
       CryptoProtocolVersionProto proto) {
-    switch(proto) {
+    switch (proto) {
     case ENCRYPTION_ZONES:
       return CryptoProtocolVersion.ENCRYPTION_ZONES;
     default:

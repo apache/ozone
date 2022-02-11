@@ -68,7 +68,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
               invokeLocal(method, args);
       LOG.debug("Call: {} took {} ms", method, Time.monotonicNow() - startTime);
       return result;
-    } catch(InvocationTargetException iEx) {
+    } catch (InvocationTargetException iEx) {
       throw iEx.getCause();
     }
   }
@@ -88,7 +88,8 @@ public class SCMHAInvocationHandler implements InvocationHandler {
    */
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
-    long startTime = Time.monotonicNowNanos();
+    LOG.trace("Invoking method {} on target {}", method, ratisHandler);
+    // TODO: Add metric here to track time taken by Ratis
     Preconditions.checkNotNull(ratisHandler);
     SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
         method.getName(), method.getParameterTypes(), args);
@@ -99,7 +100,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     // via ratis. So, in this special scenario we use RaftClient.
     final SCMRatisResponse response;
     if (method.getName().equals("storeValidCertificate") &&
-        args[args.length -1].equals(HddsProtos.NodeType.SCM)) {
+        args[args.length - 1].equals(HddsProtos.NodeType.SCM)) {
       response =
           HASecurityUtils.submitScmCertsToRatis(
               ratisHandler.getDivision().getGroup(),
@@ -110,8 +111,6 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       response = ratisHandler.submitRequest(
           scmRatisRequest);
     }
-    LOG.info("Invoking method {} on target {}, cost {}us",
-        method, ratisHandler, (Time.monotonicNowNanos() - startTime) / 1000.0);
 
     if (response.isSuccess()) {
       return response.getResult();

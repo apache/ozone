@@ -445,12 +445,12 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   private List<KeyLocation> getKeyLocation(int count) {
     List<KeyLocation> keyLocations = new ArrayList<>();
 
-    for (int i=0; i < count; i++) {
+    for (int i = 0; i < count; i++) {
       KeyLocation keyLocation =
           KeyLocation.newBuilder()
               .setBlockID(HddsProtos.BlockID.newBuilder()
                   .setContainerBlockID(HddsProtos.ContainerBlockID.newBuilder()
-                      .setContainerID(i+1000).setLocalID(i+100).build()))
+                      .setContainerID(i + 1000).setLocalID(i + 100).build()))
               .setOffset(0).setLength(200).setCreateVersion(version).build();
       keyLocations.add(keyLocation);
     }

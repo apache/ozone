@@ -94,12 +94,12 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testAnyInvalidHostThrowsException()
-      throws InvalidHostStringException{
+      throws InvalidHostStringException {
     List<DatanodeDetails> dns = generateDatanodes();
 
     // Try to decommission a host that does exist, but give incorrect port
     try {
-      decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()+":10"));
+      decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress() + ":10"));
       fail("InvalidHostStringException expected");
     } catch (InvalidHostStringException e) {
     }
@@ -131,7 +131,7 @@ public class TestNodeDecommissionManager {
     // that does not exist
     try {
       decom.decommissionNodes(Arrays.asList(
-          dns.get(0).getIpAddress()+":10"));
+          dns.get(0).getIpAddress() + ":10"));
       fail("InvalidHostStringException expected");
     } catch (InvalidHostStringException e) {
     }
@@ -159,7 +159,7 @@ public class TestNodeDecommissionManager {
     // and we hardcoded ports to 3456, 4567, 5678
     DatanodeDetails multiDn = dns.get(10);
     String multiAddr =
-        multiDn.getIpAddress()+":"+multiDn.getPorts().get(0).getValue();
+        multiDn.getIpAddress() + ":" + multiDn.getPorts().get(0).getValue();
     decom.decommissionNodes(Arrays.asList(multiAddr));
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
@@ -202,7 +202,7 @@ public class TestNodeDecommissionManager {
     // and we hardcoded ports to 3456, 4567, 5678
     DatanodeDetails multiDn = dns.get(10);
     String multiAddr =
-        multiDn.getIpAddress()+":"+multiDn.getPorts().get(0).getValue();
+        multiDn.getIpAddress() + ":" + multiDn.getPorts().get(0).getValue();
     decom.startMaintenanceNodes(Arrays.asList(multiAddr), 100);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
@@ -296,7 +296,7 @@ public class TestNodeDecommissionManager {
    */
   private List<DatanodeDetails> generateDatanodes() {
     List<DatanodeDetails> dns = new ArrayList<>();
-    for (int i=0; i<10; i++) {
+    for (int i = 0; i < 10; i++) {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);

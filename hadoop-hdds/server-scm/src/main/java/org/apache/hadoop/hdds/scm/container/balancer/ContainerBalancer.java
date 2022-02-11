@@ -180,7 +180,7 @@ public class ContainerBalancer {
    */
   private void balance() {
     this.iterations = config.getIterations();
-    if(this.iterations == -1) {
+    if (this.iterations == -1) {
       //run balancer infinitely
       this.iterations = Integer.MAX_VALUE;
     }
