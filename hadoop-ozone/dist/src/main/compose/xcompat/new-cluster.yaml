@@ -19,7 +19,7 @@ version: "3.4"
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-new-config:
   &new-config
-  image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
   env_file:
     - docker-config
   volumes:
