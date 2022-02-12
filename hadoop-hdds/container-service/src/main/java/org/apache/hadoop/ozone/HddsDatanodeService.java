@@ -111,12 +111,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
+      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
-  public HddsDatanodeService(){}
+  public HddsDatanodeService() { }
 
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
@@ -244,12 +244,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
               DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
-              conf.get(DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY));
+              conf.get(
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
           UserGroupInformation.setConfiguration(conf);
 
           SecurityUtil
-              .login(conf, DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY,
+              .login(conf,
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
                   DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY,
                   hostname);
         } else {
@@ -374,7 +376,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));
       // Persist certificates.
-      if(response.hasX509CACertificate()) {
+      if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,

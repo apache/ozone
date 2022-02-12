@@ -69,8 +69,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
-import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
 /**
@@ -352,7 +352,7 @@ public class TestIncrementalContainerReportHandler {
     final ContainerReportsProto fullReport = TestContainerReportHandler
         .getContainerReportsProto(containerTwo.containerID(), CLOSED,
             datanode.getUuidString());
-    final ContainerReportFromDatanode fcr =new ContainerReportFromDatanode(
+    final ContainerReportFromDatanode fcr = new ContainerReportFromDatanode(
         datanode, fullReport);
 
     // We need to run the FCR and ICR at the same time via the executor so we
@@ -363,7 +363,7 @@ public class TestIncrementalContainerReportHandler {
       // Running this test 10 times to ensure the race condition we are testing
       // for does not occur. In local tests, before the code was fixed, this
       // test failed consistently every time (reproducing the issue).
-      for (int i=0; i<10; i++) {
+      for (int i = 0; i < 10; i++) {
         Future<?> t1 =
             executor.submit(() -> fullReportHandler.onMessage(fcr, publisher));
         Future<?> t2 =

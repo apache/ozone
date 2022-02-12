@@ -57,7 +57,7 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
 
   @Option(names = { "--layout", "-l" },
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",

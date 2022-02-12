@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -293,5 +294,15 @@ public class ReconNodeManager extends SCMNodeManager {
       long currentTime) {
     return currentTime - getLastHeartbeat(datanodeDetails) >=
         reconDatanodeOutdatedTime;
+  }
+
+  public void reinitialize(Table<UUID, DatanodeDetails> nodeTable) {
+    this.nodeDB = nodeTable;
+    loadExistingNodes();
+  }
+
+  @VisibleForTesting
+  public long getNodeDBKeyCount() throws IOException {
+    return nodeDB.getEstimatedKeyCount();
   }
 }

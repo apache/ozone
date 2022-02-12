@@ -139,7 +139,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jaeger.version>1.6.0</jaeger.version>
     <opentracing.version>0.33.0</opentracing.version>
 
-    <jmh.version>1.19</jmh.version>
     <hk2.version>2.5.0</hk2.version>
 
     <!-- httpcomponents versions -->
@@ -149,7 +148,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>1.7.30</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
-    <log4j2.version>2.17.0</log4j2.version>
+    <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
 
     <prometheus.version>0.7.0</prometheus.version>
@@ -669,18 +668,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>hadoop-aliyun</artifactId>
         <version>${hadoop.version}</version>
       </dependency>
-
-      <dependency>
-        <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-core</artifactId>
-        <version>${jmh.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-generator-annprocess</artifactId>
-        <version>${jmh.version}</version>
-      </dependency>
-
 
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -1329,11 +1316,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.jcraft</groupId>
         <artifactId>jsch</artifactId>
         <version>0.1.54</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jdom</groupId>
-        <artifactId>jdom</artifactId>
-        <version>1.1</version>
       </dependency>
       <dependency>
         <groupId>com.googlecode.json-simple</groupId>
