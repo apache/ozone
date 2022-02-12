@@ -62,17 +62,12 @@ public class RequestValidations {
     OMRequest validatedRequest = request.toBuilder().build();
     try {
       for (Method m : validations) {
-        if (m.getParameterCount() == 2) { // context aware
-          return  (OMRequest) m.invoke(null, validatedRequest, context);
-        } else {
-          return (OMRequest) m.invoke(null, validatedRequest);
-        }
+        validatedRequest =
+            (OMRequest) m.invoke(null, validatedRequest, context);
       }
     } catch (IllegalAccessException | InvocationTargetException e) {
       throw new ServiceException(e);
     }
-    // this should not happen, as parameter count is enforced by tests,
-    // but for sanity return the request as is.
     return validatedRequest;
   }
 
@@ -84,17 +79,12 @@ public class RequestValidations {
     OMResponse validatedResponse = response.toBuilder().build();
     try {
       for (Method m : validations) {
-        if (m.getParameterCount() == 3) { // context aware post processor
-          return (OMResponse) m.invoke(null, request, response, context);
-        } else {
-          return (OMResponse) m.invoke(null, request, response);
-        }
+        validatedResponse =
+            (OMResponse) m.invoke(null, request, response, context);
       }
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new ServiceException(e);
     }
-    // this should not happen, as parameter count is enforced by tests,
-    // but for sanity return the response as is.
     return validatedResponse;
   }
 
