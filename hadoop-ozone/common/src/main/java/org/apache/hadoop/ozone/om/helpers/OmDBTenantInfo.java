@@ -74,7 +74,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     if (this == o) {
       return 0;
     }
-    return this.tenantId.compareTo(o.tenantId);
+    return this.getTenantId().compareTo(o.getTenantId());
   }
 
   public String getTenantId() {
