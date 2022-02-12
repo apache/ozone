@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * This class is used for storing Ozone tenant info.
