@@ -425,9 +425,15 @@ prepare_for_runner_image() {
 ## @description Executing the Ozone Debug CLI related robot tests
 execute_debug_tests() {
 
+  OZONE_DEBUG_VOLUME="cli-debug-volume"
+  OZONE_DEBUG_BUCKET="cli-debug-bucket"
+  OZONE_DEBUG_KEY="testfile"
+
   execute_robot_test datanode debug/ozone-debug-tests.robot
 
-  docker exec ozone_datanode_2 find /data/hdds/hdds/ -name *.block | sed -n '2p' | xargs docker exec ozone_datanode_2 sed -i -e '1s/^/a/'
+  docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${OZONE_DEBUG_VOLUME}/${OZONE_DEBUG_BUCKET}/${OZONE_DEBUG_KEY}" > /tmp/blocks
+  block=$(cat /tmp/blocks | jq -r '.KeyLocations[0][0].Locations.files[0]')
+  docker exec ozone_datanode_2 sed -i -e '1s/^/a/' "${block}"
   execute_robot_test datanode debug/ozone-debug-corrupt-block.robot
 
   docker stop ozone_datanode_2
