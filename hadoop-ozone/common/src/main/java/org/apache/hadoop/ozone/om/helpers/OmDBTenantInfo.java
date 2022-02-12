@@ -70,7 +70,8 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     bucketPolicyGroupName = tInfo[4];
   }
 
-  public int compareTo(@NotNull OmDBTenantInfo o) {
+  @Override
+  public int compareTo(OmDBTenantInfo o) {
     if (this == o) {
       return 0;
     }
