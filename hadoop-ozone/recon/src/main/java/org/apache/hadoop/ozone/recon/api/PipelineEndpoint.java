@@ -104,7 +104,8 @@ public class PipelineEndpoint {
               .setDatanodes(datanodes)
               .setDuration(duration)
               .setStatus(pipeline.getPipelineState())
-              .setReplicationFactor(pipeline.getReplicationConfig().toString())
+              .setReplicationFactor(
+                  pipeline.getReplicationConfig().getReplication())
               .setReplicationType(pipeline.getType().toString());
       // If any metrics service providers like Prometheus
       // is configured, then query it for metrics and populate

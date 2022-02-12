@@ -48,6 +48,11 @@ public class StandaloneReplicationConfig implements
   }
 
   @Override
+  public String getReplication() {
+    return String.valueOf(this.replicationFactor);
+  }
+
+  @Override
   public ReplicationType getReplicationType() {
     return ReplicationType.STAND_ALONE;
   }

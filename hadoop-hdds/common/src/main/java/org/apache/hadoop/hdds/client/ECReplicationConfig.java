@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
  */
 public class ECReplicationConfig implements ReplicationConfig {
 
+  private static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
+
   /**
    * Enum defining the allowed list of ECCodecs.
    */
@@ -139,6 +141,14 @@ public class ECReplicationConfig implements ReplicationConfig {
   @Override
   public int getRequiredNodes() {
     return data + parity;
+  }
+
+  @Override
+  public String getReplication() {
+    return getCodec() + EC_REPLICATION_PARAMS_DELIMITER
+        + getData() + EC_REPLICATION_PARAMS_DELIMITER
+        + getParity() + EC_REPLICATION_PARAMS_DELIMITER
+        + getEcChunkSize();
   }
 
   public HddsProtos.ECReplicationConfig toProto() {
