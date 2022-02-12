@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * This class is used for storing Ozone tenant info.
@@ -69,8 +70,11 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     bucketPolicyGroupName = tInfo[4];
   }
 
-  public int compareTo(OmDBTenantInfo otherOmDBTenantInfo) {
-    return this.tenantId.compareTo(otherOmDBTenantInfo.tenantId);
+  public int compareTo(@NotNull OmDBTenantInfo o) {
+    if (this == o) {
+      return 0;
+    }
+    return this.tenantId.compareTo(o.tenantId);
   }
 
   public String getTenantId() {
