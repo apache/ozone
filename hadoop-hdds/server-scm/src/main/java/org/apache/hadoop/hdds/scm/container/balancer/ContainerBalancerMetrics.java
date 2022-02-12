@@ -36,16 +36,26 @@ public final class ContainerBalancerMetrics {
 
   private final MetricsSystem ms;
 
-  @Metric(about = "The amount of Gigabytes that Container Balancer moved" +
-      " in the last iteration.")
-  private MutableCounterLong dataSizeMovedGB;
+  @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
+      " in the latest iteration.")
+  private MutableCounterLong dataSizeMovedGBInLatestIteration;
 
   @Metric(about = "Number of containers that Container Balancer moved" +
-      " in the last iteration.")
-  private MutableCounterLong movedContainersNum;
+      " in the latest iteration.")
+  private MutableCounterLong movedContainersNumInLatestIteration;
 
   @Metric(about = "Number of iterations that Container Balancer has run for.")
   private MutableCounterLong countIterations;
+
+  @Metric(about = "Number of datanodes that were involved in balancing in the" +
+      " latest iteration.")
+  private MutableCounterLong datanodesNumInvolvedInLatestIteration;
+
+  @Metric(about = "Amount of data in Gigabytes that is causing unbalance.")
+  private MutableCounterLong dataSizeCausingUnbalanceGB;
+
+  @Metric(about = "Number of unbalanced datanodes.")
+  private MutableCounterLong datanodesNumUnbalanced;
 
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
@@ -64,36 +74,39 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Gets the amount of data moved by Container Balancer in the last iteration.
+   * Gets the amount of data moved by Container Balancer in the latest
+   * iteration.
    * @return size in GB
    */
-  public long getDataSizeMovedGB() {
-    return dataSizeMovedGB.value();
+  public long getDataSizeMovedGBInLatestIteration() {
+    return dataSizeMovedGBInLatestIteration.value();
   }
 
-  public void incrementDataSizeMovedGB(long valueToAdd) {
-    this.dataSizeMovedGB.incr(valueToAdd);
+  public void incrementDataSizeMovedGBInLatestIteration(long valueToAdd) {
+    this.dataSizeMovedGBInLatestIteration.incr(valueToAdd);
   }
 
-  public void resetDataSizeMovedGB() {
-    dataSizeMovedGB.incr(-getDataSizeMovedGB());
+  public void resetDataSizeMovedGBInLatestIteration() {
+    dataSizeMovedGBInLatestIteration.incr(
+        -getDataSizeMovedGBInLatestIteration());
   }
 
   /**
-   * Gets the number of containers moved by Container Balancer in the last
+   * Gets the number of containers moved by Container Balancer in the latest
    * iteration.
    * @return number of containers
    */
-  public long getMovedContainersNum() {
-    return movedContainersNum.value();
+  public long getMovedContainersNumInLatestIteration() {
+    return movedContainersNumInLatestIteration.value();
   }
 
-  public void incrementMovedContainersNum(long valueToAdd) {
-    this.movedContainersNum.incr(valueToAdd);
+  public void incrementMovedContainersNumInLatestIteration(long valueToAdd) {
+    this.movedContainersNumInLatestIteration.incr(valueToAdd);
   }
 
-  public void resetMovedContainersNum() {
-    movedContainersNum.incr(-getMovedContainersNum());
+  public void resetMovedContainersNumInLatestIteration() {
+    movedContainersNumInLatestIteration.incr(
+        -getMovedContainersNumInLatestIteration());
   }
 
   /**
@@ -106,5 +119,55 @@ public final class ContainerBalancerMetrics {
 
   public void incrementCountIterations(long valueToAdd) {
     countIterations.incr(valueToAdd);
+  }
+
+  /**
+   * Gets number of datanodes that were involved in balancing in the latest
+   * iteration.
+   * @return number of datanodes
+   */
+  public long getDatanodesNumInvolvedInLatestIteration() {
+    return datanodesNumInvolvedInLatestIteration.value();
+  }
+
+  public void incrementDatanodesNumInvolvedInLatestIteration(long valueToAdd) {
+    datanodesNumInvolvedInLatestIteration.incr(valueToAdd);
+  }
+
+  public void resetDatanodesNumInvolvedInLatestIteration() {
+    datanodesNumInvolvedInLatestIteration.incr(
+        -getDatanodesNumInvolvedInLatestIteration());
+  }
+
+  /**
+   * Gets the amount of data in Gigabytes that is causing unbalance.
+   * @return size of data as a long value
+   */
+  public long getDataSizeCausingUnbalanceGB() {
+    return dataSizeCausingUnbalanceGB.value();
+  }
+
+  public void incrementDataSizeCausingUnbalanceGB(long valueToAdd) {
+    dataSizeCausingUnbalanceGB.incr(valueToAdd);
+  }
+
+  public void resetDataSizeCausingUnbalanceGB() {
+    dataSizeCausingUnbalanceGB.incr(-getDataSizeCausingUnbalanceGB());
+  }
+
+  /**
+   * Gets the number of datanodes that are unbalanced.
+   * @return long value
+   */
+  public long getDatanodesNumUnbalanced() {
+    return datanodesNumUnbalanced.value();
+  }
+
+  public void incrementDatanodesNumUnbalanced(long valueToAdd) {
+    datanodesNumUnbalanced.incr(valueToAdd);
+  }
+
+  public void resetDatanodesNumUnbalanced() {
+    datanodesNumUnbalanced.incr(-getDatanodesNumUnbalanced());
   }
 }

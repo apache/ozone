@@ -268,15 +268,9 @@ public class ContainerBalancer {
         datanodeUsageInfo.getDatanodeDetails()));
 
     this.totalNodesInCluster = datanodeUsageInfos.size();
-    this.clusterCapacity = 0L;
-    this.clusterUsed = 0L;
-    this.clusterRemaining = 0L;
-    this.selectedContainers.clear();
-    this.overUtilizedNodes.clear();
-    this.underUtilizedNodes.clear();
-    this.unBalancedNodes.clear();
-    this.countDatanodesInvolvedPerIteration = 0;
-    this.sizeMovedPerIteration = 0;
+
+    // reset some variables and metrics for this iteration
+    resetState();
 
     clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
     if (LOG.isDebugEnabled()) {
@@ -314,6 +308,7 @@ public class ContainerBalancer {
       }
       if (Double.compare(utilization, upperLimit) > 0) {
         overUtilizedNodes.add(datanodeUsageInfo);
+        metrics.incrementDatanodesNumUnbalanced(1);
 
         // amount of bytes greater than upper limit in this node
         Long overUtilizedBytes = ratioToBytes(
@@ -324,6 +319,7 @@ public class ContainerBalancer {
         totalOverUtilizedBytes += overUtilizedBytes;
       } else if (Double.compare(utilization, lowerLimit) < 0) {
         underUtilizedNodes.add(datanodeUsageInfo);
+        metrics.incrementDatanodesNumUnbalanced(1);
 
         // amount of bytes lesser than lower limit in this node
         Long underUtilizedBytes = ratioToBytes(
@@ -336,6 +332,9 @@ public class ContainerBalancer {
         withinThresholdUtilizedNodes.add(datanodeUsageInfo);
       }
     }
+    metrics.incrementDataSizeCausingUnbalanceGB(
+        Math.max(totalOverUtilizedBytes, totalUnderUtilizedBytes) /
+            OzoneConsts.GB);
     Collections.reverse(underUtilizedNodes);
 
     unBalancedNodes = new ArrayList<>(
@@ -356,8 +355,6 @@ public class ContainerBalancer {
         nodeManager, replicationManager, containerManager, findSourceStrategy);
     sourceToTargetMap = new HashMap<>(overUtilizedNodes.size() +
         withinThresholdUtilizedNodes.size());
-    metrics.resetDataSizeMovedGB();
-    metrics.resetMovedContainersNum();
     return true;
   }
 
@@ -445,7 +442,7 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-            metrics.incrementMovedContainersNum(1);
+            metrics.incrementMovedContainersNumInLatestIteration(1);
             LOG.info("Move completed for container {} to target {}",
                 container.containerID(),
                 moveSelection.getTargetNode().getUuidString());
@@ -456,7 +453,8 @@ public class ContainerBalancer {
           }
         }
       } catch (InterruptedException e) {
-        LOG.warn("Container move for container {} was interrupted.",
+        LOG.warn("Interrupted while waiting for container move result for " +
+                "container {}.",
             moveSelection.getContainerID(), e);
         Thread.currentThread().interrupt();
       } catch (ExecutionException e) {
@@ -469,7 +467,9 @@ public class ContainerBalancer {
     }
     countDatanodesInvolvedPerIteration =
         sourceToTargetMap.size() + selectedTargets.size();
-    metrics.incrementDataSizeMovedGB(
+    metrics.incrementDatanodesNumInvolvedInLatestIteration(
+        countDatanodesInvolvedPerIteration);
+    metrics.incrementDataSizeMovedGBInLatestIteration(
         sizeMovedPerIteration / OzoneConsts.GB);
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
             "in this iteration: {}B.",
@@ -732,6 +732,26 @@ public class ContainerBalancer {
 
     // update sizeEnteringNode map with the recent moveSelection
     findTargetStrategy.increaseSizeEntering(target, size);
+  }
+
+  /**
+   * Resets some variables and metrics for this iteration.
+   */
+  private void resetState() {
+    this.clusterCapacity = 0L;
+    this.clusterUsed = 0L;
+    this.clusterRemaining = 0L;
+    this.selectedContainers.clear();
+    this.overUtilizedNodes.clear();
+    this.underUtilizedNodes.clear();
+    this.unBalancedNodes.clear();
+    this.countDatanodesInvolvedPerIteration = 0;
+    this.sizeMovedPerIteration = 0;
+    metrics.resetDataSizeMovedGBInLatestIteration();
+    metrics.resetMovedContainersNumInLatestIteration();
+    metrics.resetDatanodesNumInvolvedInLatestIteration();
+    metrics.resetDataSizeCausingUnbalanceGB();
+    metrics.resetDatanodesNumUnbalanced();
   }
 
   /**
