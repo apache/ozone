@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -56,6 +57,11 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   // The wall-clock ms since the epoch at which the current state enters.
   private Instant stateEnterTime;
   private String owner;
+  // This is JsonIgnored as originally this class held a long in instead of
+  // a containerID object. By emitting this in Json, it changes the JSON output.
+  // Therefore the method getContainerID is annotated to return the original
+  // field and hence maintain the original output.
+  @JsonIgnore
   private ContainerID containerID;
   // Delete Transaction Id is updated when new transaction for a container
   // is stored in SCM delete Table.
@@ -133,6 +139,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
    * {@link ContainerID} object.
    */
   @Deprecated
+  @JsonProperty
   public long getContainerID() {
     return containerID.getId();
   }
