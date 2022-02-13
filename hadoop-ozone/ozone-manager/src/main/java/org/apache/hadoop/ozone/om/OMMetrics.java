@@ -635,7 +635,9 @@ public class OMMetrics {
   }
 
   @VisibleForTesting
-  public long getNumFSOBucketCreates() { return numFSOBucketCreates.value(); }
+  public long getNumFSOBucketCreates() {
+    return numFSOBucketCreates.value();
+  }
 
   @VisibleForTesting
   public long getNumBucketInfos() {
