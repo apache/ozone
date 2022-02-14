@@ -104,9 +104,7 @@ public class PipelineEndpoint {
               .setDatanodes(datanodes)
               .setDuration(duration)
               .setStatus(pipeline.getPipelineState())
-              .setReplicationFactor(
-                  pipeline.getReplicationConfig().getReplication())
-              .setReplicationType(pipeline.getType().toString());
+              .setReplicationConfig(pipeline.getReplicationConfig());
       // If any metrics service providers like Prometheus
       // is configured, then query it for metrics and populate
       // leader election count and last leader election time

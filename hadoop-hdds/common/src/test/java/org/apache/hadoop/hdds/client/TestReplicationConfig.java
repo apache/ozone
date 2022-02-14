@@ -170,11 +170,10 @@ public class TestReplicationConfig {
     ReplicationConfig config =
         ReplicationConfig.fromProto(ReplicationType.EC, null, proto);
 
-    String ecReplicationParamsDelimiter = "-";
-    Assert.assertEquals(
-        EcCodec.valueOf(codec) + ecReplicationParamsDelimiter
-            + data + ecReplicationParamsDelimiter
-            + parity + ecReplicationParamsDelimiter
+    Assert.assertEquals(EcCodec.valueOf(
+        codec) + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
+            + data + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
+            + parity + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + chunkSize, config.getReplication());
   }
 

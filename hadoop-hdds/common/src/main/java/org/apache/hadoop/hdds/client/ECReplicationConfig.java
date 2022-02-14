@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  */
 public class ECReplicationConfig implements ReplicationConfig {
 
-  private static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
+  public static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
 
   /**
    * Enum defining the allowed list of ECCodecs.

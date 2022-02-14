@@ -106,9 +106,7 @@ public class NodeEndpoint {
           String leaderNode = pipeline.getLeaderNode().getHostName();
           DatanodePipeline datanodePipeline =
               new DatanodePipeline(pipelineID.getId(),
-                  pipeline.getReplicationConfig().getReplicationType()
-                      .toString(),
-                  pipeline.getReplicationConfig().getReplication(), leaderNode);
+                  pipeline.getReplicationConfig(), leaderNode);
           pipelines.add(datanodePipeline);
           if (datanode.getUuid().equals(pipeline.getLeaderId())) {
             leaderCount.getAndIncrement();

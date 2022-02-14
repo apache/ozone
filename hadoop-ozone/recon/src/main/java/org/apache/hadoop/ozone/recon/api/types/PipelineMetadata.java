@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -202,13 +203,9 @@ public final class PipelineMetadata {
       return this;
     }
 
-    public Builder setReplicationType(String replicationType) {
-      this.replicationType = replicationType;
-      return this;
-    }
-
-    public Builder setReplicationFactor(String replicationFactor) {
-      this.replicationFactor = replicationFactor;
+    public Builder setReplicationConfig(ReplicationConfig replicationConfig) {
+      this.replicationType = replicationConfig.getReplicationType().toString();
+      this.replicationFactor = replicationConfig.getReplication();
       return this;
     }
 
