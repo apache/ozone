@@ -85,7 +85,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         Table<String, OmKeyInfo> omKeyInfoTable =
             omMetadataManager.getKeyTable(bucketLayout);
 
-        if(omKeyInfoTable == null) {
+        if (omKeyInfoTable == null) {
           continue;
         }
 

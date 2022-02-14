@@ -165,7 +165,7 @@ public class ContainerEndpoint {
           Table<String, OmKeyInfo> omKeyInfoTable =
               omMetadataManager.getKeyTable(bucketLayout);
 
-          if(omKeyInfoTable == null) {
+          if (omKeyInfoTable == null) {
             // keyTable for current bucketLayout not found, continue.
             continue;
           }
@@ -176,7 +176,7 @@ public class ContainerEndpoint {
           omKeyInfo =
               omKeyInfoTable.getSkipCache(containerKeyPrefix.getKeyPrefix());
 
-          if(omKeyInfo != null) {
+          if (omKeyInfo != null) {
             // we found the key, so break out of the loop.
             break;
           }
