@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -145,8 +146,8 @@ public class TestReplicatedFileChecksumHelper {
     OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
-    Options.ChecksumCombineMode combineMode =
-        Options.ChecksumCombineMode.MD5MD5CRC;
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
         mockVolume, bucket, "dummy", 10, combineMode, mockRpcClient);
@@ -230,8 +231,8 @@ public class TestReplicatedFileChecksumHelper {
     OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
-    Options.ChecksumCombineMode combineMode =
-        Options.ChecksumCombineMode.MD5MD5CRC;
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
         mockVolume, bucket, "dummy", 10, combineMode, mockRpcClient);
@@ -318,8 +319,8 @@ public class TestReplicatedFileChecksumHelper {
         out.write(value.getBytes(UTF_8));
       }
 
-      Options.ChecksumCombineMode combineMode =
-          Options.ChecksumCombineMode.MD5MD5CRC;
+      OzoneClientConfig.ChecksumCombineMode combineMode =
+          OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 
       ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
           volume, bucket, keyName, 10, combineMode, rpcClient);

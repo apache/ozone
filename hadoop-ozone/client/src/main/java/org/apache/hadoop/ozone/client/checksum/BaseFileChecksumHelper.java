@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.checksum;
 import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
-import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
@@ -54,7 +54,7 @@ public abstract class BaseFileChecksumHelper {
   private final long length;
 
   private ClientProtocol rpcClient;
-  private Options.ChecksumCombineMode combineMode;
+  private OzoneClientConfig.ChecksumCombineMode combineMode;
 
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
   private XceiverClientFactory xceiverClientFactory;
@@ -68,7 +68,7 @@ public abstract class BaseFileChecksumHelper {
   BaseFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName,
       long length,
-      Options.ChecksumCombineMode checksumCombineMode,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
       ClientProtocol rpcClient) throws IOException {
 
     this.volume = volume;
@@ -97,7 +97,7 @@ public abstract class BaseFileChecksumHelper {
     return rpcClient;
   }
 
-  protected Options.ChecksumCombineMode getCombineMode() {
+  protected OzoneClientConfig.ChecksumCombineMode getCombineMode() {
     return combineMode;
   }
 

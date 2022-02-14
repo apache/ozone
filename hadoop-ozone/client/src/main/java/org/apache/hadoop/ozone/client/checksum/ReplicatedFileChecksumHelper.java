@@ -18,12 +18,12 @@
 package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.fs.PathIOException;
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -48,7 +48,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
   public ReplicatedFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
-      Options.ChecksumCombineMode checksumCombineMode,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
       ClientProtocol rpcClient) throws IOException {
     super(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
   }
