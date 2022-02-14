@@ -166,7 +166,7 @@ public class TestKeyManagerImpl {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    ExitUtils.assertNotTerminated();
+    ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
