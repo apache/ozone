@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -144,8 +145,11 @@ public class TestReplicatedFileChecksumHelper {
     OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
+    Options.ChecksumCombineMode combineMode =
+        Options.ChecksumCombineMode.MD5MD5CRC;
+
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        mockVolume, bucket, "dummy", 10, mockRpcClient);
+        mockVolume, bucket, "dummy", 10, combineMode, mockRpcClient);
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
@@ -154,7 +158,7 @@ public class TestReplicatedFileChecksumHelper {
 
     // test negative length
     helper = new ReplicatedFileChecksumHelper(
-        mockVolume, bucket, "dummy", -1, mockRpcClient);
+        mockVolume, bucket, "dummy", -1, combineMode, mockRpcClient);
     helper.compute();
     assertNull(helper.getKeyLocationInfoList());
   }
@@ -226,8 +230,11 @@ public class TestReplicatedFileChecksumHelper {
     OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
+    Options.ChecksumCombineMode combineMode =
+        Options.ChecksumCombineMode.MD5MD5CRC;
+
     ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        mockVolume, bucket, "dummy", 10, mockRpcClient);
+        mockVolume, bucket, "dummy", 10, combineMode, mockRpcClient);
 
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
@@ -311,8 +318,11 @@ public class TestReplicatedFileChecksumHelper {
         out.write(value.getBytes(UTF_8));
       }
 
+      Options.ChecksumCombineMode combineMode =
+          Options.ChecksumCombineMode.MD5MD5CRC;
+
       ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-          volume, bucket, keyName, 10, rpcClient);
+          volume, bucket, keyName, 10, combineMode, rpcClient);
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
