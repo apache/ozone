@@ -227,7 +227,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
-      case GetS3Volume:
+      case GetS3VolumeContext:
         GetS3VolumeContextResponse s3VolumeContextResponse =
             getS3VolumeContext();
         responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
