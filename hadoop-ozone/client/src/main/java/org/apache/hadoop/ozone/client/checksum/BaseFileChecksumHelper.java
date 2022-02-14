@@ -188,12 +188,13 @@ public abstract class BaseFileChecksumHelper {
    */
   private FileChecksum makeFinalResult() throws IOException {
     switch (getCombineMode()) {
-      case MD5MD5CRC:
-        return makeMd5CrcResult();
-      case COMPOSITE_CRC:
-        return makeCompositeCrcResult();
-      default:
-        throw new IOException("Unknown ChecksumCombineMode: " + getCombineMode());
+    case MD5MD5CRC:
+      return makeMd5CrcResult();
+    case COMPOSITE_CRC:
+      return makeCompositeCrcResult();
+    default:
+      throw new IOException("Unknown ChecksumCombineMode: " +
+          getCombineMode());
     }
   }
 
