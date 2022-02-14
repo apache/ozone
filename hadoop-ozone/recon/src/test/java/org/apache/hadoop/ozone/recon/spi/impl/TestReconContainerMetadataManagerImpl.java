@@ -300,9 +300,6 @@ public class TestReconContainerMetadataManagerImpl {
     long nextContainerId = 2L;
     populateKeysInContainers(containerId, nextContainerId);
 
-    ContainerKeyPrefix containerKeyPrefix2 = new ContainerKeyPrefix(
-        containerId, keyPrefix2, 0);
-
     Map<KeyPrefixContainer, Integer> keyPrefixMap =
         reconContainerMetadataManager.getContainerForKeyPrefixes(keyPrefix1, 0);
     assertEquals(1, keyPrefixMap.size());
