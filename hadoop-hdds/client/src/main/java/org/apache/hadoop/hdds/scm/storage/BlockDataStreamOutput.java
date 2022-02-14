@@ -429,7 +429,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     } else {
       byteBufferList = null;
     }
-    flush();
+    waitFuturesComplete();
     if (close) {
       dataStreamCloseReply = out.closeAsync();
     }
@@ -485,8 +485,16 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   @Override
   public void flush() throws IOException {
+    if (xceiverClientFactory != null && xceiverClient != null
+        && !config.isStreamBufferFlushDelay()) {
+      waitFuturesComplete();
+    }
+  }
+
+  public void waitFuturesComplete() throws IOException {
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
+      futures.clear();
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
       throw new IOException(e);
