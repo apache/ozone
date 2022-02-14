@@ -251,6 +251,11 @@ function get_count_integration_files() {
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
     )
+    # Ozone's unit test naming convention: Test*.java
+    # The following makes this filter ignore all tests except those in
+    # integration-test and fault-injection-test.
+    # Directories starting with `i` under hadoop-ozone need to be listed
+    # explicitly, other subdirectories are captured by the second item.
     local ignore_array=(
         "^hadoop-hdds/.*/src/test/java/.*/Test.*.java"
         "^hadoop-ozone/[a-eghj-z].*/src/test/java/.*/Test.*.java"
