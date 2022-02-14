@@ -29,6 +29,7 @@ import java.util.Map;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.junit.Assert;
 import org.junit.Before;
@@ -290,6 +291,33 @@ public class TestReconContainerMetadataManagerImpl {
 
     keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
         10L, "");
+    assertEquals(0, keyPrefixMap.size());
+  }
+
+  @Test
+  public void testGetContainerForKeyPrefixesWithKeyPrefix() throws Exception {
+    long containerId = 1L;
+    long nextContainerId = 2L;
+    populateKeysInContainers(containerId, nextContainerId);
+
+    ContainerKeyPrefix containerKeyPrefix2 = new ContainerKeyPrefix(
+        containerId, keyPrefix2, 0);
+
+    Map<KeyPrefixContainer, Integer> keyPrefixMap =
+        reconContainerMetadataManager.getContainerForKeyPrefixes(keyPrefix1, 0);
+    assertEquals(1, keyPrefixMap.size());
+
+    keyPrefixMap = reconContainerMetadataManager.getContainerForKeyPrefixes(
+        keyPrefix3, 0);
+    assertEquals(1, keyPrefixMap.size());
+
+    keyPrefixMap = reconContainerMetadataManager.getContainerForKeyPrefixes(
+        keyPrefix3, 2);
+    assertEquals(0, keyPrefixMap.size());
+
+    // test for negative cases
+    keyPrefixMap = reconContainerMetadataManager.getContainerForKeyPrefixes(
+        "V3/B1/invalid", -1);
     assertEquals(0, keyPrefixMap.size());
   }
 

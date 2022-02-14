@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 
 /**
@@ -190,4 +191,20 @@ public interface ReconContainerMetadataManager {
    */
   void incrementContainerCountBy(long count);
 
+  /**
+   * Get iterator to the entire Key_Container DB.
+   * @return TableIterator
+   */
+  TableIterator getKeyContainerTableIterator() throws IOException;
+
+  /**
+   * Get the stored key prefixes for the given containerId starting
+   * after the given keyPrefix.
+   *
+   * @param prevKeyPrefix the key prefix to seek to and start scanning.
+   * @param keyVersion the key version to seek
+   * @return Map of Key prefix -> count.
+   */
+  Map<KeyPrefixContainer, Integer> getContainerForKeyPrefixes(
+      String prevKeyPrefix, long keyVersion) throws IOException;
 }

@@ -19,12 +19,15 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -40,6 +43,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -64,6 +68,7 @@ public class ReconContainerMetadataManagerImpl
       LoggerFactory.getLogger(ReconContainerMetadataManagerImpl.class);
 
   private Table<ContainerKeyPrefix, Integer> containerKeyTable;
+  private Table<KeyPrefixContainer, Integer> keyContainerTable;
   private Table<Long, Long> containerKeyCountTable;
   private Table<Long, ContainerReplicaHistoryList>
       containerReplicaHistoryTable;
@@ -96,13 +101,19 @@ public class ReconContainerMetadataManagerImpl
       throws IOException {
     // clear and re-init all container-related tables
     truncateTable(this.containerKeyTable);
+    truncateTable(this.keyContainerTable);
     truncateTable(this.containerKeyCountTable);
     initializeTables();
 
     if (containerKeyPrefixCounts != null) {
+      KeyPrefixContainer tmpKeyPreifxContainer;
       for (Map.Entry<ContainerKeyPrefix, Integer> entry :
           containerKeyPrefixCounts.entrySet()) {
         containerKeyTable.put(entry.getKey(), entry.getValue());
+        tmpKeyPreifxContainer = entry.getKey().toKeyPrefixContainer();
+        if (tmpKeyPreifxContainer != null) {
+          keyContainerTable.put(tmpKeyPreifxContainer, entry.getValue());
+        }
       }
     }
 
@@ -116,6 +127,12 @@ public class ReconContainerMetadataManagerImpl
   private void initializeTables() {
     try {
       this.containerKeyTable = CONTAINER_KEY.getTable(containerDbStore);
+      this.keyContainerTable = KEY_CONTAINER.getTable(containerDbStore);
+      if (keyContainerTable.isEmpty()) {
+        LOG.info("KEY_CONTAINER Table is empty, " +
+            "initializing from CONTAINER_KEY Table ...");
+        initializeKeyContainerTable();
+      }
       this.containerKeyCountTable =
           CONTAINER_KEY_COUNT.getTable(containerDbStore);
       this.containerReplicaHistoryTable =
@@ -138,6 +155,9 @@ public class ReconContainerMetadataManagerImpl
                                        Integer count)
       throws IOException {
     containerKeyTable.put(containerKeyPrefix, count);
+    if (containerKeyPrefix.toKeyPrefixContainer() != null) {
+      keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), count);
+    }
   }
 
   /**
@@ -413,6 +433,9 @@ public class ReconContainerMetadataManagerImpl
   public void deleteContainerMapping(ContainerKeyPrefix containerKeyPrefix)
       throws IOException {
     containerKeyTable.delete(containerKeyPrefix);
+    if (!StringUtils.isEmpty(containerKeyPrefix.getKeyPrefix())) {
+      keyContainerTable.delete(containerKeyPrefix.toKeyPrefixContainer());
+    }
   }
 
   /**
@@ -432,6 +455,11 @@ public class ReconContainerMetadataManagerImpl
   @Override
   public TableIterator getContainerTableIterator() {
     return containerKeyTable.iterator();
+  }
+
+  @Override
+  public TableIterator getKeyContainerTableIterator() {
+    return keyContainerTable.iterator();
   }
 
   /**
@@ -454,5 +482,85 @@ public class ReconContainerMetadataManagerImpl
   public void incrementContainerCountBy(long count) {
     long containersCount = getCountForContainers();
     storeContainerCount(containersCount + count);
+  }
+
+  /**
+   * Use the DB's prefix seek iterator to start the scan from the given
+   * key prefix and key version.
+   *
+   * @param keyPrefix the given keyPrefix.
+   * @param keyVersion the given keyVersion.
+   * @return Map of (KeyPrefixContainer, Integer).
+   */
+  @Override
+  public Map<KeyPrefixContainer, Integer> getContainerForKeyPrefixes(
+      String keyPrefix, long keyVersion) throws IOException {
+
+    Map<KeyPrefixContainer, Integer> containers = new LinkedHashMap<>();
+    TableIterator<KeyPrefixContainer, ? extends KeyValue<KeyPrefixContainer,
+        Integer>> keyIterator = keyContainerTable.iterator();
+    KeyPrefixContainer seekKey;
+    if (keyVersion != -1) {
+      seekKey = new KeyPrefixContainer(keyPrefix, keyVersion);
+    } else {
+      seekKey = new KeyPrefixContainer(keyPrefix);
+    }
+    KeyValue<KeyPrefixContainer, Integer> seekKeyValue =
+        keyIterator.seek(seekKey);
+
+    // check if RocksDB was able to seek correctly to the given key prefix
+    // if not, then return empty result
+    // In case of an empty prevKeyPrefix, all the keys in the container are
+    // returned
+    if (seekKeyValue == null ||
+        (keyVersion != -1 &&
+            seekKeyValue.getKey().getKeyVersion() != keyVersion)) {
+      return containers;
+    }
+
+    while (keyIterator.hasNext()) {
+      KeyValue<KeyPrefixContainer, Integer> keyValue = keyIterator.next();
+      KeyPrefixContainer keyPrefixContainer = keyValue.getKey();
+
+      // The prefix seek only guarantees that the iterator's head will be
+      // positioned at the first prefix match. We still have to check the key
+      // prefix.
+      if (keyPrefixContainer.getKeyPrefix().equals(keyPrefix)) {
+        if (keyPrefixContainer.getContainerId() != -1 &&
+            (keyVersion == -1 ||
+            keyPrefixContainer.getKeyVersion() == keyVersion)) {
+          containers.put(new KeyPrefixContainer(keyPrefix,
+                  keyPrefixContainer.getKeyVersion(),
+                  keyPrefixContainer.getContainerId()),
+              keyValue.getValue());
+        } else {
+          LOG.warn("Null container returned for keyPrefix = {}," +
+                  " keyVersion = {} ", keyPrefix, keyVersion);
+        }
+      } else {
+        break; //Break when the first mismatch occurs.
+      }
+    }
+    return containers;
+  }
+
+  private void initializeKeyContainerTable() throws IOException {
+    Instant start = Instant.now();
+    TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix,
+        Integer>> iterator = containerKeyTable.iterator();
+    KeyValue<ContainerKeyPrefix, Integer> keyValue;
+    long count = 0;
+    while (iterator.hasNext()) {
+      keyValue = iterator.next();
+      ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
+      if (!StringUtils.isEmpty(containerKeyPrefix.getKeyPrefix()) &&
+          containerKeyPrefix.getContainerId() != -1) {
+        keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), 1);
+      }
+      count++;
+    }
+    long duration = Duration.between(start, Instant.now()).toMillis();
+    LOG.info("It took {} seconds to initialized {} records" +
+        " to KEY_CONTAINER table", (double) duration / 1000, count);
   }
 }

@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
+import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -171,18 +172,23 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   private void  deleteOMKeyFromContainerDB(String key)
       throws IOException {
 
-    TableIterator<ContainerKeyPrefix, ? extends
-        Table.KeyValue<ContainerKeyPrefix, Integer>> containerIterator =
-        reconContainerMetadataManager.getContainerTableIterator();
+    TableIterator<KeyPrefixContainer, ? extends
+        Table.KeyValue<KeyPrefixContainer, Integer>> keyContainerIterator =
+        reconContainerMetadataManager.getKeyContainerTableIterator();
 
     Set<ContainerKeyPrefix> keysToBeDeleted = new HashSet<>();
 
-    while (containerIterator.hasNext()) {
-      Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
-          containerIterator.next();
+    keyContainerIterator.seek(new KeyPrefixContainer(key));
+    while (keyContainerIterator.hasNext()) {
+      Table.KeyValue<KeyPrefixContainer, Integer> keyValue =
+          keyContainerIterator.next();
       String keyPrefix = keyValue.getKey().getKeyPrefix();
       if (keyPrefix.equals(key)) {
-        keysToBeDeleted.add(keyValue.getKey());
+        if (keyValue.getKey().getContainerId() != -1) {
+          keysToBeDeleted.add(keyValue.getKey().toContainerKeyPrefix());
+        }
+      } else {
+        break;
       }
     }
 
