@@ -31,8 +31,8 @@ public class S3VolumeContext {
   private final OmVolumeArgs omVolumeArgs;
 
   /**
-   * Volume name to be created for this tenant.
-   * Default volume name would be the same as tenant name if unspecified.
+   * Piggybacked username (principal) response.
+   * To be used for client-side operations involving KMS like getDEK().
    */
   private final String userPrincipal;
 
