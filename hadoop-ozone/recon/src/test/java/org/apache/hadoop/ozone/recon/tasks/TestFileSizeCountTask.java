@@ -33,6 +33,8 @@ import org.jooq.DSLContext;
 import org.jooq.Record3;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.AdditionalAnswers;
 
 import java.io.IOException;
@@ -40,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.recon.ReconUtils.getBucketLayoutList;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
@@ -54,11 +57,22 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test for File Size Count Task.
  */
+@RunWith(Parameterized.class)
 public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   private FileCountBySizeDao fileCountBySizeDao;
   private FileSizeCountTask fileSizeCountTask;
   private DSLContext dslContext;
+  private final BucketLayout bucketLayout;
+
+  public TestFileSizeCountTask(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  @Parameterized.Parameters
+  public static List<BucketLayout> data() {
+    return getBucketLayoutList();
+  }
 
   @Before
   public void setUp() {
@@ -94,6 +108,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
     TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> fileTable = mock(TypedTable.class);
 
     TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
         .TypedTableIterator.class);
@@ -101,7 +116,12 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
+    when(fileTable.iterator()).thenReturn(mockKeyIter);
+    when(omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)).thenReturn(
+        keyTable);
+    when(omMetadataManager.getKeyTable(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(
+        fileTable);
     when(mockKeyIter.hasNext())
         .thenReturn(true)
         .thenReturn(true)
@@ -275,7 +295,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
+    when(omMetadataManager.getKeyTable(this.bucketLayout)).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
     when(mockKeyIter.next()).thenReturn(mockKeyValue);
@@ -415,9 +435,5 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     recordToFind.value1("vol2");
     assertEquals(1, fileCountBySizeDao.findById(recordToFind)
         .getCount().longValue());
-  }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 }

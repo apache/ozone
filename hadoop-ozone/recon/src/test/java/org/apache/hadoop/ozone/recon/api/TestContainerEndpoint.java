@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.ReconUtils.getBucketLayoutList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -90,10 +91,13 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Test for container endpoint.
  */
+@RunWith(Parameterized.class)
 public class TestContainerEndpoint {
 
   @Rule
@@ -111,11 +115,21 @@ public class TestContainerEndpoint {
   private Pipeline pipeline;
   private PipelineID pipelineID;
   private long keyCount = 5L;
+  private final BucketLayout bucketLayout;
 
   private UUID uuid1;
   private UUID uuid2;
   private UUID uuid3;
   private UUID uuid4;
+
+  public TestContainerEndpoint(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  @Parameterized.Parameters
+  public static List<BucketLayout> data() {
+    return getBucketLayoutList();
+  }
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -227,8 +241,11 @@ public class TestContainerEndpoint {
     //Generate Recon container DB data.
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table tableMock = mock(Table.class);
-    when(tableMock.getName()).thenReturn("KeyTable");
-    when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
+    String tableName =
+        this.bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED ? "fileTable" :
+            "keyTable";
+    when(tableMock.getName()).thenReturn(tableName);
+    when(omMetadataManagerMock.getKeyTable(this.bucketLayout))
         .thenReturn(tableMock);
     ContainerKeyMapperTask containerKeyMapperTask  =
         new ContainerKeyMapperTask(reconContainerMetadataManager);
@@ -759,9 +776,5 @@ public class TestContainerEndpoint {
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L);
     reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L);
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L);
-  }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 }

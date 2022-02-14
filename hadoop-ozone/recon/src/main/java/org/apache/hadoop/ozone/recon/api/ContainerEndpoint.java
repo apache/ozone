@@ -398,8 +398,4 @@ public class ContainerEndpoint {
     }
     return blockIds;
   }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
 }

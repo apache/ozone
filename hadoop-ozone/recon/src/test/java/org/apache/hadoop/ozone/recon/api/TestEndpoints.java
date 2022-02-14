@@ -86,6 +86,8 @@ import org.jooq.DSLContext;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
@@ -93,6 +95,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.ReconUtils.getBucketLayoutList;
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.Assert.assertEquals;
@@ -124,6 +127,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Test for Recon API endpoints.
  */
+@RunWith(Parameterized.class)
 public class TestEndpoints extends AbstractReconSqlDBTest {
   private NodeEndpoint nodeEndpoint;
   private PipelineEndpoint pipelineEndpoint;
@@ -151,6 +155,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
+  private final BucketLayout bucketLayout;
+
+  public TestEndpoints(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  @Parameterized.Parameters
+  public static List<BucketLayout> data() {
+    return getBucketLayoutList();
+  }
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -629,6 +643,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
     TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> fileTable = mock(TypedTable.class);
 
     TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
         .TypedTableIterator.class);
@@ -636,7 +651,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
+    when(fileTable.iterator()).thenReturn(mockKeyIter);
+    when(omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)).thenReturn(
+        keyTable);
+    when(omMetadataManager.getKeyTable(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(
+        fileTable);
+    when(omMetadataManager.getKeyTable(this.bucketLayout)).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenReturn(true)
         .thenReturn(true)
@@ -717,9 +738,5 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
-  }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 }

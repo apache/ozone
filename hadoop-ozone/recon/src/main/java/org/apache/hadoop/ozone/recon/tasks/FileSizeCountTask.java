@@ -227,10 +227,6 @@ public class FileSizeCountTask implements ReconOmTask {
     fileSizeCountMap.put(key, count);
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
-
   /**
    * Calculate and update the count of files being tracked by
    * fileSizeCountMap.

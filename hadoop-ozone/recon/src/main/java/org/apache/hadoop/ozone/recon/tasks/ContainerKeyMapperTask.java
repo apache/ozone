@@ -261,9 +261,4 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           .incrementContainerCountBy(containerCountToIncrement);
     }
   }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
-
 }
