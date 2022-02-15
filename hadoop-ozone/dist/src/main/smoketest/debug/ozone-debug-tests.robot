@@ -43,6 +43,8 @@ Test ozone debug chunkinfo
 
 Test ozone debug read-replicas
     ${directory} =                      Execute read-replicas CLI tool
+    ${count_files} =                    Count Files In Directory    ${directory}
+    Should Be Equal As Integers         ${count_files}     7
     ${dn1_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_1.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_1.ozone_default | md5sum | awk '{print $1}'
     ${dn2_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default | md5sum | awk '{print $1}'
     ${dn3_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_3.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_3.ozone_default | md5sum | awk '{print $1}'
@@ -53,3 +55,4 @@ Test ozone debug read-replicas
     ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
     ${json} =                           Evaluate        json.loads('''${manifest}''')        json
     Compare JSON                        ${json}
+    Check for all datanodes             ${json}

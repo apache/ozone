@@ -37,4 +37,5 @@ Test ozone debug read-replicas with corrupt block replica
     ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
     ${json} =                           Evaluate        json.loads('''${manifest}''')        json
     Compare JSON                        ${json}
+    Check for all datanodes             ${json}
     Check checksum mismatch error       ${json}         ozone_datanode_2.ozone_default

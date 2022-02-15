@@ -21,11 +21,9 @@ Resource            ../lib/os.robot
 *** Keywords ***
 Execute read-replicas CLI tool
     Execute                         ozone debug read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    ${directory} =                  Execute     find /opt/hadoop -maxdepth 1 -name '${VOLUME}_${BUCKET}_${TESTFILE}_*' | tail -n 1
+    ${directory} =                  Execute     ls -d /opt/hadoop/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
     Directory Should Exist          ${directory}
     File Should Exist               ${directory}/${TESTFILE}_manifest
-    ${count_files} =                Count Files In Directory    ${directory}
-    Should Be Equal As Integers     ${count_files}     7
     [Return]                        ${directory}
 
 Compare JSON
@@ -38,17 +36,23 @@ Compare JSON
     Should Not Be Empty             Convert To String       ${json}[blocks][0][localId]
     Should Be Equal As Integers     ${json}[blocks][0][length]          1048576
     Should Not Be Empty             Convert To String       ${json}[blocks][0][offset]
-    ${datanodes_b1} =               Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
-    ${datanodes_expected_b1} =      Create List  ozone_datanode_1.ozone_default  ozone_datanode_2.ozone_default  ozone_datanode_3.ozone_default
-    Lists Should Be Equal	        ${datanodes_b1}    ${datanodes_expected_b1}   ignore_order=True
     Should Be Equal As Integers     ${json}[blocks][1][blockIndex]      2
     Should Not Be Empty             Convert To String       ${json}[blocks][1][containerId]
     Should Not Be Empty             Convert To String       ${json}[blocks][1][localId]
     Should Be Equal As Integers     ${json}[blocks][1][length]          451424
     Should Not Be Empty             Convert To String       ${json}[blocks][1][offset]
+
+Check for datanodes
+    [arguments]                     ${datanodes}    ${datanodes_expected}
+    Lists Should Be Equal	        ${datanodes}    ${datanodes_expected}   ignore_order=True
+
+Check for all datanodes
+    [arguments]                     ${json}
+    ${datanodes_expected} =         Create List  ozone_datanode_1.ozone_default  ozone_datanode_2.ozone_default  ozone_datanode_3.ozone_default
+    ${datanodes_b1} =               Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]   ${json}[blocks][0][replicas][2][hostname]
+    Check for datanodes             ${datanodes_b1}    ${datanodes_expected}
     ${datanodes_b2} =               Create List   ${json}[blocks][1][replicas][0][hostname]    ${json}[blocks][1][replicas][1][hostname]   ${json}[blocks][1][replicas][2][hostname]
-    ${datanodes_expected_b2} =      Create List  ozone_datanode_1.ozone_default  ozone_datanode_2.ozone_default  ozone_datanode_3.ozone_default
-    Lists Should Be Equal	        ${datanodes_b2}    ${datanodes_expected_b2}   ignore_order=True
+    Check for datanodes             ${datanodes_b2}    ${datanodes_expected}
 
 Check checksum mismatch error
     [arguments]                     ${json}     ${datanode}
