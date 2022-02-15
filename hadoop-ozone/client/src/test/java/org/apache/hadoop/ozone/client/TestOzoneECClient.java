@@ -194,7 +194,7 @@ public class TestOzoneECClient {
     Assert.assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
-      for (int i=0; i<dataBlocks; i++) {
+      for (int i = 0; i < dataBlocks; i++) {
         Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
         Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
       }
@@ -389,7 +389,7 @@ public class TestOzoneECClient {
 
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
-    try (OzoneOutputStream out = bucket.createKey("mykey", 6*inputSize)) {
+    try (OzoneOutputStream out = bucket.createKey("mykey", 6 * inputSize)) {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
       // Block Size is 2kb, so to create 3 blocks we need 6 iterations here
       for (int j = 0; j < 6; j++) {
@@ -449,7 +449,7 @@ public class TestOzoneECClient {
     try (OzoneOutputStream out = bucket.createKey(keyName, inputSize,
         new ECReplicationConfig(dataBlocks, parityBlocks,
             ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
-      for (int i = 0; i < inputChunks[0].length-1; i++) {
+      for (int i = 0; i < inputChunks[0].length - 1; i++) {
         out.write(inputChunks[0][i]);
       }
     }
@@ -486,7 +486,7 @@ public class TestOzoneECClient {
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
-      for (int i=0; i<2; i++) {
+      for (int i = 0; i < 2; i++) {
         Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
         Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
       }

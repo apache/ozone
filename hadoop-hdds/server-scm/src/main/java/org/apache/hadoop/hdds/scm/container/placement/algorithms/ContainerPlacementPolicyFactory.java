@@ -63,7 +63,7 @@ public final class ContainerPlacementPolicyFactory {
   public static PlacementPolicy getECPolicy(
       ConfigurationSource conf, final NodeManager nodeManager,
       NetworkTopology clusterMap, final boolean fallback,
-      SCMContainerPlacementMetrics metrics) throws SCMException{
+      SCMContainerPlacementMetrics metrics) throws SCMException {
     // TODO: Change default placement policy for EC
     final Class<? extends PlacementPolicy> placementClass = conf
         .getClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,
@@ -77,7 +77,7 @@ public final class ContainerPlacementPolicyFactory {
       Class<? extends PlacementPolicy> placementClass,
       ConfigurationSource conf, final NodeManager nodeManager,
       NetworkTopology clusterMap, final boolean fallback,
-      SCMContainerPlacementMetrics metrics) throws SCMException{
+      SCMContainerPlacementMetrics metrics) throws SCMException {
     Constructor<? extends PlacementPolicy> constructor;
     try {
       constructor = placementClass.getDeclaredConstructor(NodeManager.class,

@@ -73,7 +73,7 @@ public class TestECBlockReconstructedInputStream {
   public void testBlockLengthReturned() throws IOException {
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(4, 5);
-    try(ECBlockReconstructedStripeInputStream stripeStream
+    try (ECBlockReconstructedStripeInputStream stripeStream
         = createStripeInputStream(dnMap, 12345L)) {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
@@ -87,8 +87,8 @@ public class TestECBlockReconstructedInputStream {
   public void testBlockIDReturned() throws IOException {
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 4, 5);
-    try(ECBlockReconstructedStripeInputStream stripeStream
-            = createStripeInputStream(dnMap, 12345L)) {
+    try (ECBlockReconstructedStripeInputStream stripeStream
+        = createStripeInputStream(dnMap, 12345L)) {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {
@@ -112,8 +112,8 @@ public class TestECBlockReconstructedInputStream {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
-    try(ECBlockReconstructedStripeInputStream stripeStream
-            = createStripeInputStream(dnMap, blockLength)) {
+    try (ECBlockReconstructedStripeInputStream stripeStream
+        = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {
@@ -150,8 +150,8 @@ public class TestECBlockReconstructedInputStream {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
-    try(ECBlockReconstructedStripeInputStream stripeStream
-            = createStripeInputStream(dnMap, blockLength)) {
+    try (ECBlockReconstructedStripeInputStream stripeStream
+        = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {
@@ -182,8 +182,8 @@ public class TestECBlockReconstructedInputStream {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
-    try(ECBlockReconstructedStripeInputStream stripeStream
-            = createStripeInputStream(dnMap, blockLength)) {
+    try (ECBlockReconstructedStripeInputStream stripeStream
+        = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {
@@ -218,8 +218,8 @@ public class TestECBlockReconstructedInputStream {
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
     byte[] buf = new byte[1024];
-    try(ECBlockReconstructedStripeInputStream stripeStream
-            = createStripeInputStream(dnMap, blockLength)) {
+    try (ECBlockReconstructedStripeInputStream stripeStream
+        = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {
@@ -255,8 +255,8 @@ public class TestECBlockReconstructedInputStream {
 
     Map<DatanodeDetails, Integer> dnMap
         = ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
-    try(ECBlockReconstructedStripeInputStream stripeStream
-            = createStripeInputStream(dnMap, blockLength)) {
+    try (ECBlockReconstructedStripeInputStream stripeStream
+        = createStripeInputStream(dnMap, blockLength)) {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {

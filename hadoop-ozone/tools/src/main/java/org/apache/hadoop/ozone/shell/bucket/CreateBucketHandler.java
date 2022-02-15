@@ -121,7 +121,7 @@ public class CreateBucketHandler extends BucketHandler {
       }
     }
 
-    if(replicationType!=null) {
+    if (replicationType != null) {
       if (replication != null) {
         ReplicationConfig replicationConfig = ReplicationConfig
             .parse(ReplicationType.valueOf(replicationType),

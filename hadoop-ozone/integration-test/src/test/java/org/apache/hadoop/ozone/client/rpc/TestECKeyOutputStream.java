@@ -185,7 +185,7 @@ public class TestECKeyOutputStream {
     }
     byte[] buf = new byte[chunkSize];
     try (OzoneInputStream in = bucket.readKey(keyString)) {
-      for (int i=0; i< inputChunks.length; i++) {
+      for (int i = 0; i < inputChunks.length; i++) {
         int read = in.read(buf, 0, chunkSize);
         Assert.assertEquals(chunkSize, read);
         Assert.assertTrue(Arrays.equals(buf, inputChunks[i]));

@@ -93,7 +93,7 @@ public class DefaultReplicationConfig {
   }
 
   public int getRequiredNodes() {
-    if(this.type == ReplicationType.EC){
+    if (this.type == ReplicationType.EC) {
       return ecReplicationConfig.getRequiredNodes();
     }
     return this.factor.getValue();

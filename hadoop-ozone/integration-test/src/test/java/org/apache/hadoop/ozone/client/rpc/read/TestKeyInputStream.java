@@ -229,7 +229,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     int dataLength = (9 * BLOCK_SIZE + ecChunkSize);
 
     byte[] inputData = writeRandomBytes(keyName, repConfig, dataLength);
-    try(KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
       validate(keyInputStream, inputData, 0, ecChunkSize + 1234);
 

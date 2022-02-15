@@ -209,7 +209,7 @@ public class TestECBlockInputStreamProxy {
     ByteBuffer readBuffer = ByteBuffer.allocate(100);
     dataGenerator = new SplittableRandom(randomSeed);
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
-      while(true) {
+      while (true) {
         int read = bis.read(readBuffer);
         ECStreamTestUtil.assertBufferMatches(readBuffer, dataGenerator);
         readBuffer.clear();
@@ -237,7 +237,7 @@ public class TestECBlockInputStreamProxy {
     ByteBuffer readBuffer = ByteBuffer.allocate(100);
     dataGenerator = new SplittableRandom(randomSeed);
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
-      while(true) {
+      while (true) {
         int read = bis.read(readBuffer);
         ECStreamTestUtil.assertBufferMatches(readBuffer, dataGenerator);
         readBuffer.clear();
@@ -277,7 +277,7 @@ public class TestECBlockInputStreamProxy {
       // stream.
       streamFactory.getStreams().get(false).setShouldError(true, 151,
           new BadDataLocationException(badDN, "Simulated Error"));
-      while(true) {
+      while (true) {
         readBuffer.clear();
         read = bis.read(readBuffer);
         ECStreamTestUtil.assertBufferMatches(readBuffer, dataGenerator);

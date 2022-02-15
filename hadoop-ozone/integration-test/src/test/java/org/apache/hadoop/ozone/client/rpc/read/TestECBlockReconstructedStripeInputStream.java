@@ -537,7 +537,7 @@ public class TestECBlockReconstructedStripeInputStream {
     }
   }
 
-  @Test(expected=InsufficientLocationsException.class)
+  @Test(expected = InsufficientLocationsException.class)
   public void testAllLocationsFailOnFirstRead() throws IOException {
     // This test simulates stale nodes. When the nodes are stale, but not yet
     // dead, the locations will still be given to the client and it will try to

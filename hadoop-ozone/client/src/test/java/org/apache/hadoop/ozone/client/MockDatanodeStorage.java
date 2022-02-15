@@ -42,7 +42,7 @@ public class MockDatanodeStorage {
 
   private boolean failed = false;
 
-  public void setStorageFailed(){
+  public void setStorageFailed() {
     this.failed = true;
   }
 
@@ -87,7 +87,7 @@ public class MockDatanodeStorage {
         + chunkInfo.getChunkName() + "_" + chunkInfo.getOffset();
   }
 
-  public Map<String, ByteString> getAllBlockData(){
+  public Map<String, ByteString> getAllBlockData() {
     return this.data;
   }
 

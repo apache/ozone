@@ -110,7 +110,7 @@ public final class ECStreamTestUtil {
       SplittableRandom rand, int length) {
     Preconditions.assertTrue(totalSpaceAvailable(bufs) >= length);
     int remaining = length;
-    while(remaining > 0) {
+    while (remaining > 0) {
       for (ByteBuffer b : bufs) {
         int toWrite = Math.min(stripeSize, remaining);
         for (int i = 0; i < toWrite; i++) {
@@ -147,7 +147,7 @@ public final class ECStreamTestUtil {
    */
   public static void assertBufferMatches(ByteBuffer b, SplittableRandom rand) {
     b.flip();
-    int i=0;
+    int i = 0;
     while (b.hasRemaining()) {
       i++;
       Assert.assertEquals("Failed on iteration " + i,

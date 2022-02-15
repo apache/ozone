@@ -270,7 +270,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       return EOF;
     }
     validateBuffers(bufs);
-    while(true) {
+    while (true) {
       try {
         assignBuffers(bufs);
         clearParityBuffers();
@@ -472,7 +472,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       })));
     }
     boolean exceptionOccurred = false;
-    while(!pendingReads.isEmpty()) {
+    while (!pendingReads.isEmpty()) {
       int index = -1;
       try {
         ImmutablePair<Integer, Future<Void>> pair = pendingReads.poll();

@@ -39,7 +39,7 @@ import static org.junit.Assert.assertThrows;
 @RunWith(Parameterized.class)
 public class TestReplicationConfig {
 
-  private static final int MB = 1024*1024;
+  private static final int MB = 1024 * 1024;
   private static final int KB = 1024;
 
   @SuppressWarnings("checkstyle:VisibilityModifier")

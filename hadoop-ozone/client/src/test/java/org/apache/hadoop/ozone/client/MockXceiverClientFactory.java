@@ -41,7 +41,7 @@ public class MockXceiverClientFactory
 
   public void setFailedStorages(List<DatanodeDetails> failedStorages) {
     List<DatanodeDetails> remainingFailNodes = new ArrayList<>();
-    for(int i=0; i< failedStorages.size(); i++){
+    for (int i = 0; i < failedStorages.size(); i++) {
       DatanodeDetails failedDN = failedStorages.get(i);
       boolean isCurrentNodeMarked = false;
       final Iterator<Map.Entry<DatanodeDetails, MockDatanodeStorage>> iterator =
@@ -55,7 +55,7 @@ public class MockXceiverClientFactory
           isCurrentNodeMarked = true;
         }
       }
-      if(!isCurrentNodeMarked){
+      if (!isCurrentNodeMarked) {
         //This node does not initialized by client yet.
         remainingFailNodes.add(failedDN);
       }
