@@ -64,7 +64,7 @@ public class TestContainerBalancerOperations {
 
   @AfterClass
   public static void cleanup() throws Exception {
-    if(cluster != null) {
+    if (cluster != null) {
       cluster.shutdown();
     }
   }
@@ -100,7 +100,7 @@ public class TestContainerBalancerOperations {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(100);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);

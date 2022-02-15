@@ -145,7 +145,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
         // retry according to retry policy.
         chunks = getChunkInfos();
         break;
-      } catch(SCMSecurityException ex) {
+      } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
         refreshPipeline(ex);
@@ -302,9 +302,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
         } else {
           throw e;
         }
-      } catch(SCMSecurityException ex) {
+      } catch (SCMSecurityException ex) {
         throw ex;
-      } catch(IOException ex) {
+      } catch (IOException ex) {
         // We got a IOException which might be due
         // to DN down or connectivity issue.
         if (shouldRetryRead(ex)) {

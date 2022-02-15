@@ -592,7 +592,7 @@ public class PipelineManagerImpl implements PipelineManager {
       backgroundPipelineCreator.stop();
     }
 
-    if(pmInfoBean != null) {
+    if (pmInfoBean != null) {
       MBeans.unregister(this.pmInfoBean);
       pmInfoBean = null;
     }

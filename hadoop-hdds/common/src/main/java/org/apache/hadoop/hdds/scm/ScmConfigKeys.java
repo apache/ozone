@@ -527,7 +527,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_LOG_PURGE_GAP =
           "ozone.scm.ha.ratis.log.purge.gap";
-  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT =1000000;
+  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT = 1000000;
 
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD =
           "ozone.scm.ha.ratis.snapshot.threshold";

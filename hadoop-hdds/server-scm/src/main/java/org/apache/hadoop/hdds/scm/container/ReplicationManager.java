@@ -494,7 +494,7 @@ public class ReplicationManager implements SCMService {
         updateInflightAction(container, inflightReplication,
             action -> replicas.stream()
                 .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
-            ()-> metrics.incrNumReplicationCmdsTimeout(),
+            () -> metrics.incrNumReplicationCmdsTimeout(),
             action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
@@ -631,7 +631,7 @@ public class ReplicationManager implements SCMService {
       final List<InflightAction> actions = inflightActions.get(id);
 
       Iterator<InflightAction> iter = actions.iterator();
-      while(iter.hasNext()) {
+      while (iter.hasNext()) {
         try {
           InflightAction a = iter.next();
           NodeStatus status = nodeManager.getNodeStatus(a.datanode);
@@ -926,7 +926,7 @@ public class ReplicationManager implements SCMService {
    */
   private boolean isPolicySatisfiedAfterMove(ContainerInfo cif,
                     DatanodeDetails srcDn, DatanodeDetails targetDn,
-                    final List<ContainerReplica> replicas){
+                    final List<ContainerReplica> replicas) {
     Set<ContainerReplica> movedReplicas =
         replicas.stream().collect(Collectors.toSet());
     movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
@@ -1164,7 +1164,7 @@ public class ReplicationManager implements SCMService {
 
       if (replicaSet.isSufficientlyReplicated()
           && placementStatus.isPolicySatisfied()) {
-        LOG.info("The container {} with replicas {} is sufficiently "+
+        LOG.info("The container {} with replicas {} is sufficiently " +
             "replicated and is not mis-replicated",
             container.getContainerID(), replicaSet);
         return;
@@ -1355,8 +1355,8 @@ public class ReplicationManager implements SCMService {
     ContainerReplicaCount replicaCount =
         getContainerReplicaCount(cif, replicaSet);
 
-    if(!replicaSet.stream()
-        .anyMatch(r -> r.getDatanodeDetails().equals(srcDn))){
+    if (!replicaSet.stream()
+        .anyMatch(r -> r.getDatanodeDetails().equals(srcDn))) {
       // if the target is present but source disappears somehow,
       // we can consider move is successful.
       compleleteMoveFutureWithResult(cid, MoveResult.COMPLETED);
@@ -1661,7 +1661,7 @@ public class ReplicationManager implements SCMService {
     try {
       return nodeManager.getNodeStatus(dn);
     } catch (NodeNotFoundException e) {
-      throw new IllegalStateException("Unable to find NodeStatus for "+dn, e);
+      throw new IllegalStateException("Unable to find NodeStatus for " + dn, e);
     }
   }
 
@@ -1951,7 +1951,7 @@ public class ReplicationManager implements SCMService {
       try {
         cid = ContainerID.getFromProtobuf(contianerIDProto);
         mp = MoveDataNodePair.getFromProtobuf(mdnpp);
-        if(!inflightMove.containsKey(cid)) {
+        if (!inflightMove.containsKey(cid)) {
           transactionBuffer.addToBuffer(moveTable, cid, mp);
           inflightMove.putIfAbsent(cid, mp);
         }
@@ -2062,8 +2062,8 @@ public class ReplicationManager implements SCMService {
       boolean isTgtExist = replicas.stream()
           .anyMatch(r -> r.getDatanodeDetails().equals(v.getTgt()));
 
-      if(isSrcExist) {
-        if(isTgtExist) {
+      if (isSrcExist) {
+        if (isTgtExist) {
           //the former scm leader may or may not send the deletion command
           //before reelection.here, we just try to send the command again.
           deleteSrcDnForMove(cif, replicas);
@@ -2088,8 +2088,8 @@ public class ReplicationManager implements SCMService {
    * complete the CompletableFuture of the container in the given Map with
    * a given MoveResult.
    */
-  private void compleleteMoveFutureWithResult(ContainerID cid, MoveResult mr){
-    if(inflightMoveFuture.containsKey(cid)) {
+  private void compleleteMoveFutureWithResult(ContainerID cid, MoveResult mr) {
+    if (inflightMoveFuture.containsKey(cid)) {
       inflightMoveFuture.get(cid).complete(mr);
       inflightMoveFuture.remove(cid);
     }

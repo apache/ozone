@@ -254,22 +254,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OmBucketInfo bucketInfo, PrefixManager prefixManager) {
     List<OzoneAcl> acls = new ArrayList<>();
 
-    if(keyArgs.getAclsList() != null) {
+    if (keyArgs.getAclsList() != null) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
 
     // Inherit DEFAULT acls from prefix.
-    if(prefixManager != null) {
+    if (prefixManager != null) {
       List< OmPrefixInfo > prefixList = prefixManager.getLongestPrefixPath(
           OZONE_URI_DELIMITER +
               keyArgs.getVolumeName() + OZONE_URI_DELIMITER +
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if(prefixList.size() > 0) {
+      if (prefixList.size() > 0) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
-        if(prefixInfo  != null) {
+        if (prefixInfo  != null) {
           if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls())) {
             return acls;
           }

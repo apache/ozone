@@ -326,7 +326,7 @@ public class TestRatisPipelineProvider {
         provider.create(new RatisReplicationConfig(factor));
         Assert.fail("Expected SCMException for large container size with " +
             "replication factor " + factor.toString());
-      } catch(SCMException ex) {
+      } catch (SCMException ex) {
         Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
@@ -342,7 +342,7 @@ public class TestRatisPipelineProvider {
         provider.create(new RatisReplicationConfig(factor));
         Assert.fail("Expected SCMException for large metadata size with " +
             "replication factor " + factor.toString());
-      } catch(SCMException ex) {
+      } catch (SCMException ex) {
         Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }

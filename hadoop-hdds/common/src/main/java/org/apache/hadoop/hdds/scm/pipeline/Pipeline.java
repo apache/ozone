@@ -464,7 +464,7 @@ public final class Pipeline {
     private UUID suggestedLeaderId = null;
     private Map<DatanodeDetails, Integer> replicaIndexes = new HashMap<>();
 
-    public Builder() {}
+    public Builder() { }
 
     public Builder(Pipeline pipeline) {
       this.id = pipeline.id;
@@ -551,10 +551,10 @@ public final class Pipeline {
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
-        for(int i = 0; i < nodeOrder.size(); i++) {
+        for (int i = 0; i < nodeOrder.size(); i++) {
           int nodeIndex = nodeOrder.get(i);
           Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-          while(it.hasNext() && nodeIndex >= 0) {
+          while (it.hasNext() && nodeIndex >= 0) {
             DatanodeDetails node = it.next();
             if (nodeIndex == 0) {
               nodesWithOrder.add(node);
@@ -568,7 +568,7 @@ public final class Pipeline {
               nodesWithOrder, id);
         }
         pipeline.setNodesInOrder(nodesWithOrder);
-      } else if (nodesInOrder != null){
+      } else if (nodesInOrder != null) {
         // This branch is for pipeline clone
         pipeline.setNodesInOrder(nodesInOrder);
       }

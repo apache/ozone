@@ -121,7 +121,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     long quotaInBytes = 100L;
-    long quotaInNamespace= 100L;
+    long quotaInNamespace = 100L;
 
     OMRequest originalRequest =
         OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,

@@ -38,6 +38,18 @@ public class OzoneClientConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientConfig.class);
 
+  /**
+   * Enum for indicating what mode to use when combining chunk and block
+   * checksums to define an aggregate FileChecksum. This should be considered
+   * a client-side runtime option rather than a persistent property of any
+   * stored metadata, which is why this is not part of ChecksumOpt, which
+   * deals with properties of files at rest.
+   */
+  public enum ChecksumCombineMode {
+    MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
+    COMPOSITE_CRC  // Block/chunk-independent composite CRC
+  }
+
   @Config(key = "stream.buffer.flush.size",
       defaultValue = "16MB",
       type = ConfigType.SIZE,
@@ -138,6 +150,20 @@ public class OzoneClientConfig {
           " life of the client",
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
+
+  @Config(key = "checksum.combine.mode",
+      defaultValue = "COMPOSITE_CRC",
+      description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
+          + "determines which algorithm would be used to compute file checksum."
+          + "COMPOSITE_CRC calculates the combined CRC of the whole file, "
+          + "where the lower-level chunk/block checksums are combined into "
+          + "file-level checksum."
+          + "MD5MD5CRC calculates the MD5 of MD5 of checksums of individual "
+          + "chunks."
+          + "Default checksum type is COMPOSITE_CRC.",
+      tags = ConfigTag.CLIENT)
+  private String checksumCombineMode =
+      ChecksumCombineMode.COMPOSITE_CRC.name();
 
   @PostConstruct
   private void validate() {
@@ -249,5 +275,17 @@ public class OzoneClientConfig {
 
   public int getBufferIncrement() {
     return bufferIncrement;
+  }
+
+  public ChecksumCombineMode getChecksumCombineMode() {
+    try {
+      return ChecksumCombineMode.valueOf(checksumCombineMode);
+    } catch (IllegalArgumentException iae) {
+      LOG.warn("Bad checksum combine mode: {}. Using default {}",
+          checksumCombineMode,
+          ChecksumCombineMode.COMPOSITE_CRC.name());
+      return ChecksumCombineMode.valueOf(
+          ChecksumCombineMode.COMPOSITE_CRC.name());
+    }
   }
 }

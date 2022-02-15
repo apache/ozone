@@ -37,7 +37,7 @@ public class TestObjectKeyNameAdapter {
         getAdapter().marshal("a+b+c/"));
   }
 
-  private XmlAdapter<String, String> getAdapter(){
+  private XmlAdapter<String, String> getAdapter() {
     return (new ObjectKeyNameAdapter());
   }
 }

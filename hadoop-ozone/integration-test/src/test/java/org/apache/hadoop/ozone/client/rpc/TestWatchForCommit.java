@@ -364,7 +364,7 @@ public class TestWatchForCommit {
           .watchForCommit(reply.getLogIndex() +
                   new Random().nextInt(100) + 10);
       Assert.fail("Expected exception not thrown");
-    } catch(Exception e) {
+    } catch (Exception e) {
       Assert.assertTrue(HddsClientUtils
           .checkForException(e) instanceof GroupMismatchException);
     }
