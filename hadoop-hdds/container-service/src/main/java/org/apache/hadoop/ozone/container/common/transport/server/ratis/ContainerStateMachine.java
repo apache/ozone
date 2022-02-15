@@ -200,7 +200,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     this.executor = Executors.newFixedThreadPool(numContainerOpExecutors,
         new ThreadFactoryBuilder()
-            .setNameFormat("ContainerOP-" + gid.getUuid() + "-%d")
+            .setNameFormat("ContainerOp-" + gid.getUuid() + "-%d")
             .build());
 
     this.containerTaskQueues = new ConcurrentHashMap<>();
