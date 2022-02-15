@@ -81,7 +81,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
@@ -229,9 +229,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
-      case GetS3Volume:
-        GetS3VolumeResponse s3VolumeResponse = getS3Volume();
-        responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
+      case GetS3VolumeContext:
+        GetS3VolumeContextResponse s3VolumeContextResponse =
+            getS3VolumeContext();
+        responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
         break;
       case TenantGetUserInfo:
         TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
@@ -713,12 +714,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
-  private GetS3VolumeResponse getS3Volume()
+  private GetS3VolumeContextResponse getS3VolumeContext()
       throws IOException {
-    OmVolumeArgs s3VolArgs = impl.getS3Volume();
-    return GetS3VolumeResponse.newBuilder()
-        .setVolumeInfo(s3VolArgs.getProtobuf())
-        .build();
+    return impl.getS3VolumeContext().getProtobuf();
   }
 
   public OzoneManager getOzoneManager() {

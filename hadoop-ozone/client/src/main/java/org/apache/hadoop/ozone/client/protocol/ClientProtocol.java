@@ -43,17 +43,19 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -124,11 +126,13 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * @return The {@link OzoneVolume} that should be used to for this S3
-   * request based on its access ID.
+   * @return Raw GetS3VolumeContextResponse.
+   * S3Auth won't be updated with actual userPrincipal by this call.
    * @throws IOException
    */
-  OzoneVolume getS3VolumeDetails() throws IOException;
+  S3VolumeContext getS3VolumeContext() throws IOException;
+
+  OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**
    * Checks if a Volume exists and the user with a role specified has access
@@ -609,8 +613,9 @@ public interface ClientProtocol {
    * Delete a tenant.
    * @param tenantId tenant name.
    * @throws IOException
+   * @return DeleteTenantInfo
    */
-  DeleteTenantResponse deleteTenant(String tenantId) throws IOException;
+  DeleteTenantInfo deleteTenant(String tenantId) throws IOException;
 
   /**
    * Assign a user to a tenant.

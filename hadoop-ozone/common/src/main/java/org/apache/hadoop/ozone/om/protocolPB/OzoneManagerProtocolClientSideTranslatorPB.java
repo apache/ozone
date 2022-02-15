@@ -34,6 +34,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -55,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -986,7 +988,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantInfo deleteTenant(String tenantId) throws IOException {
     final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
         .setTenantId(tenantId)
         .build();
@@ -994,8 +996,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDeleteTenantRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-
-    return handleError(omResponse).getDeleteTenantResponse();
+    final DeleteTenantResponse resp =
+        handleError(omResponse).getDeleteTenantResponse();
+    return DeleteTenantInfo.fromProtobuf(resp);
   }
 
   /**
@@ -1124,17 +1127,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public OmVolumeArgs getS3Volume() throws IOException {
-    final GetS3VolumeRequest request = GetS3VolumeRequest.newBuilder()
+  public S3VolumeContext getS3VolumeContext() throws IOException {
+    final GetS3VolumeContextRequest request = GetS3VolumeContextRequest
+        .newBuilder()
         .build();
-    final OMRequest omRequest = createOMRequest(Type.GetS3Volume)
-        .setGetS3VolumeRequest(request)
+    final OMRequest omRequest = createOMRequest(Type.GetS3VolumeContext)
+        .setGetS3VolumeContextRequest(request)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-    final GetS3VolumeResponse resp = handleError(omResponse)
-        .getGetS3VolumeResponse();
-
-    return OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo());
+    final GetS3VolumeContextResponse resp =
+        handleError(omResponse).getGetS3VolumeContextResponse();
+    return S3VolumeContext.fromProtobuf(resp);
   }
 
   /**

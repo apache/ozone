@@ -84,6 +84,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -104,6 +105,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -115,7 +117,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -437,12 +438,11 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public OzoneVolume getS3VolumeDetails() throws IOException {
-    OmVolumeArgs volume = ozoneManagerClient.getS3Volume();
-    return buildOzoneVolume(volume);
+  public S3VolumeContext getS3VolumeContext() throws IOException {
+    return ozoneManagerClient.getS3VolumeContext();
   }
 
-  private OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
+  public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
     return new OzoneVolume(
         conf,
         this,
@@ -770,7 +770,7 @@ public class RpcClient implements ClientProtocol {
    * {@inheritDoc}
    */
   @Override
-  public DeleteTenantResponse deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantInfo deleteTenant(String tenantId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantId),
         "tenantId cannot be null or empty.");
     return ozoneManagerClient.deleteTenant(tenantId);
@@ -1062,8 +1062,10 @@ public class RpcClient implements ClientProtocol {
       UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
       UserGroupInformation proxyUser;
       if (getThreadLocalS3Auth() != null) {
+        String userPrincipal = getThreadLocalS3Auth().getUserPrincipal();
+        Preconditions.checkNotNull(userPrincipal);
         UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
-            getThreadLocalS3Auth().getAccessID());
+            userPrincipal);
         proxyUser = UserGroupInformation.createProxyUser(
             s3gUGI.getShortUserName(), loginUser);
         decrypted = proxyUser.doAs(
