@@ -114,7 +114,7 @@ enum Type {
   TenantAssignAdmin = 102;
   TenantRevokeAdmin = 103;
 
-  GetS3Volume = 104;
+  GetS3VolumeContext = 104;
   TenantListUser = 105;
 
   SetS3Secret = 106;
@@ -214,7 +214,7 @@ message OMRequest {
   optional TenantAssignAdminRequest         TenantAssignAdminRequest       = 102;
   optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 103;
 
-  optional GetS3VolumeRequest               getS3VolumeRequest             = 104;
+  optional GetS3VolumeContextRequest        getS3VolumeContextRequest      = 104;
   optional TenantListUserRequest            tenantListUserRequest          = 105;
 
   optional SetS3SecretRequest               SetS3SecretRequest             = 106;
@@ -307,7 +307,7 @@ message OMResponse {
   optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 102;
   optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 103;
 
-  optional GetS3VolumeResponse               getS3VolumeResponse           = 104;
+  optional GetS3VolumeContextResponse        getS3VolumeContextResponse    = 104;
   optional TenantListUserResponse            tenantListUserResponse        = 105;
 
   optional SetS3SecretResponse               SetS3SecretResponse           = 106;
@@ -1504,7 +1504,7 @@ message TenantRevokeAdminRequest {
     optional string tenantName = 2;
 }
 
-message GetS3VolumeRequest {
+message GetS3VolumeContextRequest {
 
 }
 
@@ -1541,8 +1541,10 @@ message OmDBAccessInfo {
   optional bool isDelegatedAdmin = 4;
 }
 
-message GetS3VolumeResponse {
+message GetS3VolumeContextResponse {
   optional VolumeInfo volumeInfo = 1;
+  // Piggybacked username (principal) response to be used for KMS client operations
+  optional string userPrincipal = 2;
 }
 
 /**

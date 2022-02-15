@@ -91,9 +91,11 @@ public class OzoneClientProducer {
 
       String awsAccessId = signatureInfo.getAwsAccessId();
       validateAccessId(awsAccessId);
+      // Note: userPrincipal is initialized to be the same value as accessId,
+      //  could be updated later in RpcClient#getS3Volume
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
-          awsAccessId);
+          awsAccessId, awsAccessId);
     } catch (OS3Exception ex) {
       LOG.debug("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);

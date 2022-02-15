@@ -263,7 +263,7 @@ public final class OmUtils {
     case ListMultipartUploads:
     case FinalizeUpgradeProgress:
     case PrepareStatus:
-    case GetS3Volume:
+    case GetS3VolumeContext:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
