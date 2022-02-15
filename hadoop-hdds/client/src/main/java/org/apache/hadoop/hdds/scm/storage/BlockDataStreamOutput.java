@@ -318,7 +318,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // the bufferFull condition in async write path.
     long streamWindow = config.getStreamWindowSize() / config
         .getDataStreamMinPacketSize();
-    if (!bufferList.isEmpty() && bufferList.size() % boundary == 0) {
+    if (!bufferList.isEmpty() && bufferList.size() % boundary == 0 &&
+        buffersForPutBlock != null && !buffersForPutBlock.isEmpty()) {
       updateFlushLength();
       executePutBlock(false, false);
     }
