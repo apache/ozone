@@ -38,7 +38,7 @@ Prepare For Tests
 Test Bucket Creation
     ${result} =     Execute             ozone sh volume create /${prefix}vol1
                     Should not contain  ${result}       Failed
-    ${result} =     Execute             ozone sh bucket create /${prefix}vol1/${prefix}ratis
+    ${result} =     Execute             ozone sh bucket create --replication 3 --type RATIS /${prefix}vol1/${prefix}ratis
                     Should not contain  ${result}       Failed
     ${result} =     Execute             ozone sh bucket list /${prefix}vol1 | jq -r '.[] | select(.name | contains("${prefix}ratis")) | .replicationConfig.replicationType'
                     Should contain      ${result}       RATIS
