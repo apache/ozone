@@ -206,6 +206,7 @@ public class ContainerBalancer {
           } catch (InterruptedException e) {
             LOG.info("Container Balancer was interrupted while waiting for" +
                 "datanodes refreshing volume usage info");
+            Thread.currentThread().interrupt();
             return;
           }
         }
