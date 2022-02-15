@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -50,7 +51,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator;
 import org.rocksdb.WriteBatch;
@@ -309,9 +309,9 @@ public class TestOMDBUpdatesHandler {
 
   @NotNull
   private List<byte[]> getBytesFromOmMetaManager(int getUpdatesSince)
-      throws RocksDBException {
+      throws RocksDBException, IOException {
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
-    RocksDB rocksDB = rdbStore.getDb();
+    final RocksDatabase rocksDB = rdbStore.getDb();
     // Get all updates from source DB
     TransactionLogIterator transactionLogIterator =
         rocksDB.getUpdatesSince(getUpdatesSince);

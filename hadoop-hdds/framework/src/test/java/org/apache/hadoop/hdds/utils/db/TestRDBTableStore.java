@@ -104,7 +104,7 @@ public class TestRDBTableStore {
   public void getHandle() throws Exception {
     try (Table testTable = rdbStore.getTable("First")) {
       Assertions.assertNotNull(testTable);
-      Assertions.assertNotNull(((RDBTable) testTable).getHandle());
+      Assertions.assertNotNull(((RDBTable) testTable).getColumnFamily());
     }
   }
 
