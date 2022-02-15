@@ -15,7 +15,6 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ExecutableType;
-import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.SimpleAnnotationValueVisitor8;
 import javax.tools.Diagnostic;
@@ -36,8 +35,6 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC =
       "Only static methods can be annotated with the RequestFeatureValidator"
           + " annotation.";
-  public static final String ERROR_UNEXPECTED_PARAMETER_TYPE =
-      "Unexpected parameter type, it has to be a declared type. Found: %s";
   public static final String ERROR_UNEXPECTED_PARAMETER_COUNT =
       "Unexpected parameter count. Expected: %d; found: %d.";
   public static final String ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST =
@@ -111,7 +108,6 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     List<? extends TypeMirror> paramTypes =
         ((ExecutableType) elem.asType()).getParameterTypes();
     ensureParameterCount(isPreprocessor, paramTypes);
-    ensureParametersHaveDeclaredTypes(paramTypes);
     ensureParameterRequirements(paramTypes, 0, OM_REQUEST_CLASS_NAME,
         ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST);
     if (!isPreprocessor) {
@@ -122,16 +118,6 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     ensureParameterRequirements(paramTypes, contextOrder,
         VALIDATION_CONTEXT_CLASS_NAME,
         ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
-  }
-
-  private void ensureParametersHaveDeclaredTypes(
-      List<? extends TypeMirror> paramTypes) {
-    paramTypes.forEach(t -> {
-      if (!t.getKind().equals(TypeKind.DECLARED)) {
-        emitErrorMsg(String.format(
-            ERROR_UNEXPECTED_PARAMETER_TYPE, t.getKind()));
-      }
-    });
   }
 
   private void ensureParameterCount(boolean isPreprocessor,
@@ -191,23 +177,22 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       if (hasInvalidValidationCondition(entry)) {
         emitErrorMsg(ERROR_CONDITION_IS_EMPTY);
       }
-      isPreprocessor = evaluateProcessingPhase(entry);
+      if (isProcessingPhaseValue(entry)) {
+        isPreprocessor = evaluateProcessingPhase(entry);
+      }
     }
     return isPreprocessor;
   }
 
   private boolean evaluateProcessingPhase(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
-    boolean isPreprocessor = false;
-    if (isProcessingPhaseValue(entry)) {
-      String procPhase = visit(entry, new ProcessingPhaseVisitor());
-      if (procPhase.equals(PROCESSING_PHASE_PRE_PROCESS)) {
-        isPreprocessor = true;
-      } else if (procPhase.equals(PROCESSING_PHASE_POST_PROCESS)){
-        isPreprocessor = false;
-      }
+    String procPhase = visit(entry, new ProcessingPhaseVisitor());
+    if (procPhase.equals(PROCESSING_PHASE_PRE_PROCESS)) {
+      return true;
+    } else if (procPhase.equals(PROCESSING_PHASE_POST_PROCESS)){
+      return false;
     }
-    return isPreprocessor;
+    return false;
   }
 
   private boolean isProcessingPhaseValue(

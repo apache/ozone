@@ -144,6 +144,7 @@ public class ValidatorRegistry {
     for (Method m : describedValidators) {
       RequestFeatureValidator descriptor =
           m.getAnnotation(RequestFeatureValidator.class);
+      m.setAccessible(true);
 
       for (ValidationCondition condition : descriptor.conditions()) {
         EnumMap<Type, Pair<List<Method>, List<Method>>> requestTypeMap =
