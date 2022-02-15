@@ -28,7 +28,8 @@ import java.nio.ByteBuffer;
 @InterfaceAudience.Private
 public final class RSUtil {
 
-  private RSUtil(){}
+  private RSUtil() {
+  }
 
   // We always use the byte system (with symbol size 8, field size 256,
   // primitive polynomial 285, and primitive root 2).

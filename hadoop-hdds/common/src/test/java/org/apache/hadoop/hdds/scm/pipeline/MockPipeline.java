@@ -97,7 +97,7 @@ public final class MockPipeline {
   public static Pipeline createEcPipeline(ECReplicationConfig repConfig) {
 
     List<DatanodeDetails> nodes = new ArrayList<>();
-    for (int i=0; i<repConfig.getRequiredNodes(); i++) {
+    for (int i = 0; i < repConfig.getRequiredNodes(); i++) {
       nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     Map<DatanodeDetails, Integer> nodeIndexes = new HashMap<>();

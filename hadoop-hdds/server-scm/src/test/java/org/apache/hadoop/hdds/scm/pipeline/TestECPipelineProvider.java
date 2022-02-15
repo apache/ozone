@@ -72,7 +72,7 @@ public class TestECPipelineProvider {
         Mockito.anyLong()))
         .thenAnswer(invocation -> {
           List<DatanodeDetails> dns = new ArrayList<>();
-          for (int i=0; i<(int)invocation.getArguments()[2]; i++) {
+          for (int i = 0; i < (int) invocation.getArguments()[2]; i++) {
             dns.add(MockDatanodeDetails.randomDatanodeDetails());
           }
           return dns;
@@ -90,9 +90,9 @@ public class TestECPipelineProvider {
         pipeline.getNodes().size());
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     List<DatanodeDetails> dns = pipeline.getNodes();
-    for (int i=0; i<ecConf.getRequiredNodes(); i++) {
+    for (int i = 0; i < ecConf.getRequiredNodes(); i++) {
       // EC DN indexes are numbered starting from 1 to N.
-      Assert.assertEquals(i+1, pipeline.getReplicaIndex(dns.get(i)));
+      Assert.assertEquals(i + 1, pipeline.getReplicaIndex(dns.get(i)));
     }
   }
 

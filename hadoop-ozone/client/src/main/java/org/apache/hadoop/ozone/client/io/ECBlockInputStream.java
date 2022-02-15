@@ -176,7 +176,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
       OmKeyLocationInfo blkInfo = new OmKeyLocationInfo.Builder()
           .setBlockID(blockInfo.getBlockID())
-          .setLength(internalBlockLength(locationIndex+1))
+          .setLength(internalBlockLength(locationIndex + 1))
           .setPipeline(blockInfo.getPipeline())
           .setToken(blockInfo.getToken())
           .setPartNumber(blockInfo.getPartNumber())
@@ -262,7 +262,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     }
 
     int totalRead = 0;
-    while(strategy.getTargetLength() > 0 && remaining() > 0) {
+    while (strategy.getTargetLength() > 0 && remaining() > 0) {
       try {
         int currentIndex = currentStreamIndex();
         BlockExtendedInputStream stream = getOrOpenStream(currentIndex);
@@ -337,7 +337,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       // might be corrupt.
       throw new IOException("Expected to read " + expectedRead + " but got EOF"
           + " from blockGroup " + stream.getBlockID() + " index "
-          + currentStreamIndex()+1);
+          + currentStreamIndex() + 1);
     }
     return actualRead;
   }

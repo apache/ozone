@@ -402,7 +402,7 @@ public class TestECBlockInputStream {
 
   private void validateBufferContents(ByteBuffer buf, int from, int to,
       byte val) {
-    for (int i=from; i<to; i++){
+    for (int i = from; i < to; i++) {
       Assert.assertEquals(val, buf.get(i));
     }
   }
@@ -486,7 +486,7 @@ public class TestECBlockInputStream {
       }
 
       int toRead = Math.min(buf.remaining(), (int)getRemaining());
-      for (int i=0; i<toRead; i++) {
+      for (int i = 0; i < toRead; i++) {
         buf.put(dataVal);
       }
       position += toRead;

@@ -270,7 +270,7 @@ public class MockOmTransport implements OmTransport {
   private InfoBucketResponse infoBucket(InfoBucketRequest infoBucketRequest) {
     BucketInfo bucketInfo = buckets.get(infoBucketRequest.getVolumeName())
         .get(infoBucketRequest.getBucketName());
-    if(!bucketInfo.hasDefaultReplicationConfig()) {
+    if (!bucketInfo.hasDefaultReplicationConfig()) {
       final ReplicationConfig replicationConfig = ReplicationConfig
           .getDefault(new OzoneConfiguration());
 
@@ -354,7 +354,7 @@ public class MockOmTransport implements OmTransport {
     return CreateBucketResponse.newBuilder().build();
   }
 
-  public Map<String, Map<String, Map<String, KeyInfo>>> getKeys(){
+  public Map<String, Map<String, Map<String, KeyInfo>>> getKeys() {
     return this.keys;
   }
 

@@ -59,7 +59,7 @@ import static org.apache.ratis.util.Preconditions.assertInstanceOf;
  * an internal ECBlockOutputStream instance with a single node pipeline, that
  * is derived from the original EC pipeline.
  */
-public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
+public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   private final ECReplicationConfig replicationConfig;
   private final long length;
 
@@ -140,11 +140,11 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
     }
   }
 
-  public void forceToFirstParityBlock(){
+  public void forceToFirstParityBlock() {
     currentStreamIdx = replicationConfig.getData();
   }
 
-  public void resetToFirstEntry(){
+  public void resetToFirstEntry() {
     currentStreamIdx = 0;
   }
 
@@ -158,7 +158,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
 
   @Override
   void incCurrentPosition(long len) {
-    if (isWritingParity()){
+    if (isWritingParity()) {
       return;
     }
     super.incCurrentPosition(len);
@@ -209,7 +209,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry{
   }
 
   void updateBlockGroupToAckedPosition(long len) {
-    if (isWritingParity()){
+    if (isWritingParity()) {
       return;
     }
     this.successfulBlkGrpAckedLen += len;

@@ -40,7 +40,7 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
 /**
  * Handles the chunk EC writes for an EC internal block.
  */
-public class ECBlockOutputStream extends BlockOutputStream{
+public class ECBlockOutputStream extends BlockOutputStream {
 
   private final DatanodeDetails datanodeDetails;
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>

@@ -1314,7 +1314,7 @@ public class OzoneBucket extends WithMetadata {
     return bucketLayout;
   }
 
-  public ReplicationConfig getReplicationConfig(){
+  public ReplicationConfig getReplicationConfig() {
     return this.defaultReplication;
   }
 }

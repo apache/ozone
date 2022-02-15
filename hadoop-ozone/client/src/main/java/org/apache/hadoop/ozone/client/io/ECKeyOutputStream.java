@@ -384,7 +384,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, (int) len);
     handleOutputStreamWrite(currIdx, len, isFullCell, false);
 
-    if(pos == ecChunkSize){
+    if (pos == ecChunkSize) {
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
     return pos;
@@ -729,7 +729,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
       final ByteBuffer buf = dataBuffers[i];
       final int pos = buf.position() + len;
       Preconditions.checkState(pos <= cellSize,
-          "Position("+pos+") is greater than the cellSize("+cellSize+").");
+          "Position(" + pos + ") is greater than the cellSize("
+              + cellSize + ").");
       buf.put(b, off, len);
       return pos;
     }

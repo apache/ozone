@@ -67,8 +67,8 @@ public class TestBlockInputStreamFactoryImpl {
     ReplicationConfig repConfig =
         new ECReplicationConfig(3, 2);
 
-    OmKeyLocationInfo blockInfo = createKeyLocationInfo(repConfig, 5,
-        1024*1024*10);
+    OmKeyLocationInfo blockInfo =
+        createKeyLocationInfo(repConfig, 5, 1024 * 1024 * 10);
 
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),

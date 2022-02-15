@@ -58,7 +58,7 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
     }
   }
 
-  public List<HddsProtos.DatanodeDetailsProto> getClusterDns(){
+  public List<HddsProtos.DatanodeDetailsProto> getClusterDns() {
     return this.clusterDns;
   }
 

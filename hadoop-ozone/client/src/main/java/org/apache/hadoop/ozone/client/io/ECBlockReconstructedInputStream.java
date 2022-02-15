@@ -115,7 +115,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
 
   private long readBufferToDest(ByteBuffer src, ByteBuffer dest) {
     int initialRemaining = dest.remaining();
-    while(dest.hasRemaining() && src.hasRemaining()) {
+    while (dest.hasRemaining() && src.hasRemaining()) {
       dest.put(src.get());
     }
     int read = initialRemaining - dest.remaining();

@@ -183,7 +183,8 @@ public final class OzoneClientUtils {
 
     String clientConfiguredDefaultReplication =
         clientSideConfig.get(OZONE_REPLICATION);
-    if (userPassedReplication == null && clientConfiguredDefaultReplication != null) {
+    if (userPassedReplication == null
+        && clientConfiguredDefaultReplication != null) {
       clientReplication = clientConfiguredDefaultReplication;
     }
 

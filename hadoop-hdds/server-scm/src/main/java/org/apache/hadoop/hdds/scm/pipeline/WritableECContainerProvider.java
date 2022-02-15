@@ -92,7 +92,7 @@ public class WritableECContainerProvider
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
-    synchronized(this) {
+    synchronized (this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
       if (openPipelineCount < providerConfig.getMinimumPipelines()) {
@@ -136,7 +136,7 @@ public class WritableECContainerProvider
               return containerInfo;
             }
           }
-        } catch(PipelineNotFoundException | ContainerNotFoundException e){
+        } catch (PipelineNotFoundException | ContainerNotFoundException e) {
           LOG.warn("Pipeline or container not found when selecting a writable "
               + "container", e);
           existingPipelines.remove(pipeline);
@@ -147,7 +147,7 @@ public class WritableECContainerProvider
     // If we get here, all the pipelines we tried were no good. So try to
     // allocate a new one and usePipelineManagerV2Impl.java it.
     try {
-      synchronized(this) {
+      synchronized (this) {
         return allocateContainer(repConfig, size, owner, excludeList);
       }
     } catch (IOException e) {

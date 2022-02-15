@@ -213,19 +213,19 @@ public class BlockOutputStream extends OutputStream {
     return ioException.get();
   }
 
-  XceiverClientSpi getXceiverClientSpi(){
+  XceiverClientSpi getXceiverClientSpi() {
     return this.xceiverClient;
   }
 
-  BlockData.Builder getContainerBlockData(){
+  BlockData.Builder getContainerBlockData() {
     return this.containerBlockData;
   }
 
-  Token<? extends TokenIdentifier> getToken(){
+  Token<? extends TokenIdentifier> getToken() {
     return this.token;
   }
 
-  ExecutorService getResponseExecutor(){
+  ExecutorService getResponseExecutor() {
     return this.responseExecutor;
   }
 

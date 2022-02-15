@@ -243,8 +243,9 @@ public final class GaloisField {
     int idx1, idx2;
     for (int i = 0; i < len - 1; i++) {
       for (int j = len - 1; j > i; j--) {
-        for (idx2 = outputOffsets[j-1], idx1 = outputOffsets[j];
-             idx1 < outputOffsets[j] + dataLen; idx1++, idx2++) {
+        for (idx2 = outputOffsets[j - 1], idx1 =
+            outputOffsets[j]; idx1 < outputOffsets[j] + dataLen;
+            idx1++, idx2++) {
           y[j][idx1] = (byte) (y[j][idx1] ^ mulTable[x[i]][y[j - 1][idx2] &
               0x000000FF]);
         }
@@ -259,7 +260,7 @@ public final class GaloisField {
         }
       }
       for (int j = i; j < len - 1; j++) {
-        for (idx2 = outputOffsets[j+1], idx1 = outputOffsets[j];
+        for (idx2 = outputOffsets[j + 1], idx1 = outputOffsets[j];
              idx1 < outputOffsets[j] + dataLen; idx1++, idx2++) {
           y[j][idx1] = (byte) (y[j][idx1] ^ y[j + 1][idx2]);
         }
@@ -276,9 +277,9 @@ public final class GaloisField {
     for (int i = 0; i < len - 1; i++) {
       for (int j = len - 1; j > i; j--) {
         p = y[j];
-        for (idx1 = p.position(), idx2 = y[j-1].position();
-             idx1 < p.limit(); idx1++, idx2++) {
-          p.put(idx1, (byte) (p.get(idx1) ^ mulTable[x[i]][y[j-1].get(idx2) &
+        for (idx1 = p.position(), idx2 = y[j - 1].position(); idx1 < p
+            .limit(); idx1++, idx2++) {
+          p.put(idx1, (byte) (p.get(idx1) ^ mulTable[x[i]][y[j - 1].get(idx2) &
               0x000000FF]));
         }
       }
@@ -295,9 +296,9 @@ public final class GaloisField {
 
       for (int j = i; j < len - 1; j++) {
         p = y[j];
-        for (idx1 = p.position(), idx2 = y[j+1].position();
-             idx1 < p.limit(); idx1++, idx2++) {
-          p.put(idx1, (byte) (p.get(idx1) ^ y[j+1].get(idx2)));
+        for (idx1 = p.position(), idx2 = y[j + 1].position(); idx1 < p
+            .limit(); idx1++, idx2++) {
+          p.put(idx1, (byte) (p.get(idx1) ^ y[j + 1].get(idx2)));
         }
       }
     }
@@ -521,7 +522,7 @@ public final class GaloisField {
    * fat matrix (number of rows &gt; number of columns).
    */
   public void gaussianElimination(int[][] matrix) {
-    assert(matrix != null && matrix.length > 0 && matrix[0].length > 0
+    assert (matrix != null && matrix.length > 0 && matrix[0].length > 0
         && matrix.length < matrix[0].length);
     int height = matrix.length;
     int width = matrix[0].length;
@@ -551,7 +552,7 @@ public final class GaloisField {
         }
       }
     }
-    for (int i = height - 1; i >=0; i--) {
+    for (int i = height - 1; i >= 0; i--) {
       for (int j = 0; j < i; j++) {
         int lead = matrix[j][i];
         for (int k = i; k < width; k++) {

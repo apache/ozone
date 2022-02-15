@@ -58,9 +58,9 @@ public final class SCMContainerPlacementRackScatter
   private final NetworkTopology networkTopology;
   private static final int RACK_LEVEL = 1;
   // OUTER_LOOP is to avoid infinity choose on all racks
-  private static final int OUTER_LOOP_MAX_RETRY= 3;
+  private static final int OUTER_LOOP_MAX_RETRY = 3;
   // INNER_LOOP is to choose node in each rack
-  private static final int INNER_LOOP_MAX_RETRY= 5;
+  private static final int INNER_LOOP_MAX_RETRY = 5;
   private final SCMContainerPlacementMetrics metrics;
 
   /**
@@ -239,7 +239,7 @@ public final class SCMContainerPlacementRackScatter
   private Node chooseNode(String scope, List<Node> excludedNodes,
       long metadataSizeRequired, long dataSizeRequired) {
     int maxRetry = INNER_LOOP_MAX_RETRY;
-    while(true) {
+    while (true) {
       metrics.incrDatanodeChooseAttemptCount();
       Node node = networkTopology.chooseRandom(scope, excludedNodes);
       if (node == null) {
@@ -316,7 +316,7 @@ public final class SCMContainerPlacementRackScatter
   }
 
   private List<Node> getAllRacks() {
-    int rackLevel = networkTopology.getMaxLevel()-1;
+    int rackLevel = networkTopology.getMaxLevel() - 1;
     List<Node> racks = networkTopology.getNodes(rackLevel);
     Collections.shuffle(racks);
     return racks;
