@@ -268,41 +268,6 @@ public final class ContainerTestHelper {
   }
 
   /**
-   * Returns a delete Request.
-   *
-   * @param pipeline pipeline.
-   * @param writeRequest - write request
-   * @return request
-   */
-  public static ContainerCommandRequestProto getDeleteChunkRequest(
-      Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
-      throws IOException {
-    return newDeleteChunkRequestBuilder(pipeline, writeRequest).build();
-  }
-
-  public static Builder newDeleteChunkRequestBuilder(Pipeline pipeline,
-      ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest)
-      throws IOException {
-    LOG.trace("deleteChunk blockID={} from pipeline={}",
-        writeRequest.getBlockID(), pipeline);
-
-    ContainerProtos.DeleteChunkRequestProto.Builder deleteRequest =
-        ContainerProtos.DeleteChunkRequestProto
-            .newBuilder();
-
-    deleteRequest.setChunkData(writeRequest.getChunkData());
-    deleteRequest.setBlockID(writeRequest.getBlockID());
-
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
-    request.setCmdType(ContainerProtos.Type.DeleteChunk);
-    request.setContainerID(writeRequest.getBlockID().getContainerID());
-    request.setDeleteChunk(deleteRequest);
-    request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request;
-  }
-
-  /**
    * Returns a create container command for test purposes. There are a bunch of
    * tests where we need to just send a request and get a reply.
    *
@@ -679,11 +644,6 @@ public final class ContainerTestHelper {
       builder.setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
           .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo)
           .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1).build());
-      break;
-    case DeleteChunk:
-      builder
-          .setDeleteChunk(ContainerProtos.DeleteChunkRequestProto.newBuilder()
-              .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo).build());
       break;
     case GetSmallFile:
       builder
