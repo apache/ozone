@@ -242,18 +242,30 @@ function get_count_doc_files() {
     start_end::group_end
 }
 
-function get_count_junit_files() {
-    start_end::group_start "Count junit test files"
+function get_count_integration_files() {
+    start_end::group_start "Count integration test files"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/integration.sh"
-        "^hadoop-ozone/dev-support/checks/unit.sh"
+        "^hadoop-ozone/integration-test"
+        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
-        "src/test/resources"
+    )
+    # Ozone's unit test naming convention: Test*.java
+    # The following makes this filter ignore all tests except those in
+    # integration-test and fault-injection-test.
+    # Directories starting with `i` under hadoop-ozone need to be listed
+    # explicitly, other subdirectories are captured by the second item.
+    local ignore_array=(
+        "^hadoop-hdds/.*/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/[a-eghj-z].*/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/insight/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/interface-client/src/test/java/.*/Test.*.java"
+        "^hadoop-ozone/interface-storage/src/test/java/.*/Test.*.java"
     )
     filter_changed_files true
-    COUNT_JUNIT_CHANGED_FILES=${match_count}
-    readonly COUNT_JUNIT_CHANGED_FILES
+    COUNT_INTEGRATION_CHANGED_FILES=${match_count}
+    readonly COUNT_INTEGRATION_CHANGED_FILES
     start_end::group_end
 }
 
@@ -308,7 +320,7 @@ function check_needs_author() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} author"
+        add_basic_check author
     fi
 
     start_end::group_end
@@ -324,7 +336,7 @@ function check_needs_bats() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} bats"
+        add_basic_check bats
     fi
 
     start_end::group_end
@@ -344,7 +356,7 @@ function check_needs_checkstyle() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} checkstyle"
+        add_basic_check checkstyle
     fi
 
     start_end::group_end
@@ -352,7 +364,7 @@ function check_needs_checkstyle() {
 
 function check_needs_docs() {
     if [[ ${COUNT_DOC_CHANGED_FILES} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} docs"
+        add_basic_check docs
     fi
 }
 
@@ -388,7 +400,7 @@ function check_needs_findbugs() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} findbugs"
+        add_basic_check findbugs
     fi
 
     start_end::group_end
@@ -399,19 +411,18 @@ function check_needs_unit_test() {
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/unit.sh"
-        "pom.xml"
-        "src/..../java"
-        "src/..../resources"
+        "src/test/java"
+        "src/test/resources"
     )
     local ignore_array=(
         "^hadoop-ozone/dist"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "^hadoop-ozone/integration-test"
     )
-    filter_changed_files
+    filter_changed_files true
 
     if [[ ${match_count} != "0" ]]; then
-        BASIC_CHECKS="${BASIC_CHECKS} unit"
+        add_basic_check unit
     fi
 
     start_end::group_end
@@ -438,6 +449,13 @@ function get_count_misc_files() {
     start_end::group_end
 }
 
+function add_basic_check() {
+    local check="$1"
+    if [[ "$BASIC_CHECKS" != *${check}* ]]; then
+        BASIC_CHECKS="${BASIC_CHECKS} ${check}"
+    fi
+}
+
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
     verbosity::store_exit_on_error_status
@@ -457,13 +475,14 @@ function calculate_test_types_to_run() {
         compose_tests_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
+        add_basic_check unit
     else
         echo "All ${COUNT_ALL_CHANGED_FILES} changed files are known to be handled by specific checks."
         echo
         if [[ ${COUNT_COMPOSE_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             compose_tests_needed="true"
         fi
-        if [[ ${COUNT_JUNIT_CHANGED_FILES} != "0" ]]; then
+        if [[ ${COUNT_INTEGRATION_CHANGED_FILES} != "0" ]]; then
             integration_tests_needed="true"
         fi
         if [[ ${COUNT_KUBERNETES_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
@@ -519,7 +538,7 @@ check_if_tests_are_needed_at_all
 get_count_all_files
 get_count_compose_files
 get_count_doc_files
-get_count_junit_files
+get_count_integration_files
 get_count_kubernetes_files
 get_count_robot_files
 get_count_misc_files
