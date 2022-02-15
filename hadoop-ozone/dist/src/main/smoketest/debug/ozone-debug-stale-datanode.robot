@@ -25,7 +25,7 @@ ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 
 *** Test Cases ***
-Test ozone debug read-replicas with one datanode unavailable
+Test ozone debug read-replicas with one datanode STALE
     ${directory} =                      Execute read-replicas CLI tool
     ${corrupted_block1} =               Get File Size   ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default
     ${corrupted_block2} =               Get File Size   ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default
@@ -39,4 +39,26 @@ Test ozone debug read-replicas with one datanode unavailable
     ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
     ${json} =                           Evaluate        json.loads('''${manifest}''')        json
     Compare JSON                        ${json}
+    Check for all datanodes             ${json}
+    Check unavailable datanode error    ${json}         ozone_datanode_2.ozone_default
+
+Test ozone debug read-replicas with one datanode DEAD
+    ${directory} =                      Execute read-replicas CLI tool
+    ${corrupted_block1} =               Get File Size   ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default
+    ${corrupted_block2} =               Get File Size   ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default
+    Should Be Equal As Integers         ${corrupted_block1}     0
+    Should Be Equal As Integers         ${corrupted_block2}     0
+    ${dn1_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_1.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_1.ozone_default | md5sum | awk '{print $1}'
+    ${dn3_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_3.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_3.ozone_default | md5sum | awk '{print $1}'
+    ${testfile_md5sum} =                Execute     md5sum testfile | awk '{print $1}'
+    Should Be Equal                     ${dn1_md5sum}   ${testfile_md5sum}
+    Should Be Equal                     ${dn3_md5sum}   ${testfile_md5sum}
+    ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
+    ${json} =                           Evaluate        json.loads('''${manifest}''')        json
+    Compare JSON                        ${json}
+    ${datanodes_expected} =             Create List  ozone_datanode_1.ozone_default  ozone_datanode_3.ozone_default
+    ${datanodes_b1} =                   Create List   ${json}[blocks][0][replicas][0][hostname]    ${json}[blocks][0][replicas][1][hostname]
+    Check for datanodes                 ${datanodes_b1}    ${datanodes_expected}
+    ${datanodes_b2} =                   Create List   ${json}[blocks][1][replicas][0][hostname]    ${json}[blocks][1][replicas][1][hostname]
+    Check for datanodes                 ${datanodes_b2}    ${datanodes_expected}
     Check unavailable datanode error    ${json}         ozone_datanode_2.ozone_default
