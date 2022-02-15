@@ -77,7 +77,7 @@ public class OzoneClientProducer {
 
   @PreDestroy
   public void destroy() throws IOException {
-    client.getObjectStore().getClientProxy().clearTheadLocalS3Auth();
+    client.getObjectStore().getClientProxy().clearThreadLocalS3Auth();
   }
   @Produces
   public S3Auth getSignature() {
