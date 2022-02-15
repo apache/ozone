@@ -22,69 +22,21 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.ratis.statemachine.StateMachine;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 
 /**
  * This class is used to get the DataChannel for streaming.
  */
-class KeyValueStreamDataChannel implements StateMachine.DataChannel {
-  private final RandomAccessFile randomAccessFile;
-  private final File file;
-
-  private final ContainerData containerData;
-  private final ContainerMetrics metrics;
-
+class KeyValueStreamDataChannel extends StreamDataChannelBase {
   KeyValueStreamDataChannel(File file, ContainerData containerData,
                             ContainerMetrics metrics)
       throws StorageContainerException {
-    try {
-      this.file = file;
-      this.randomAccessFile = new RandomAccessFile(file, "rw");
-    } catch (FileNotFoundException e) {
-      throw new StorageContainerException("BlockFile not exists with " +
-          "container Id " + containerData.getContainerID() +
-          " file " + file.getAbsolutePath(),
-          ContainerProtos.Result.IO_EXCEPTION);
-    }
-    this.containerData = containerData;
-    this.metrics = metrics;
+    super(file, containerData, metrics);
   }
 
   @Override
-  public void force(boolean metadata) throws IOException {
-    randomAccessFile.getChannel().force(metadata);
-  }
-
-  @Override
-  public int write(ByteBuffer src) throws IOException {
-    int writeBytes = randomAccessFile.getChannel().write(src);
-    metrics
-        .incContainerBytesStats(ContainerProtos.Type.StreamWrite, writeBytes);
-    containerData.updateWriteStats(writeBytes, false);
-    return writeBytes;
-  }
-
-  @Override
-  public boolean isOpen() {
-    return randomAccessFile.getChannel().isOpen();
-  }
-
-  @Override
-  public void close() throws IOException {
-    randomAccessFile.close();
-  }
-
-  @Override
-  public String toString() {
-    return "KeyValueStreamDataChannel{" +
-        "File=" + file.getAbsolutePath() +
-        ", containerID=" + containerData.getContainerID() +
-        '}';
+  ContainerProtos.Type getType() {
+    return ContainerProtos.Type.StreamWrite;
   }
 }
