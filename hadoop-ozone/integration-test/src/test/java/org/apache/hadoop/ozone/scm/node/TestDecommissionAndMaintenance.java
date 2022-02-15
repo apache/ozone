@@ -358,14 +358,14 @@ public class TestDecommissionAndMaintenance {
     Set<ContainerReplica> replicas = getContainerReplicas(container);
 
     List<DatanodeDetails> forMaintenance = new ArrayList<>();
-    replicas.forEach(r ->forMaintenance.add(r.getDatanodeDetails()));
+    replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
 
@@ -379,7 +379,7 @@ public class TestDecommissionAndMaintenance {
         .collect(Collectors.toList()));
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachOpState(dn, IN_SERVICE);
     }
 
@@ -400,26 +400,26 @@ public class TestDecommissionAndMaintenance {
     Set<ContainerReplica> replicas = getContainerReplicas(container);
 
     List<DatanodeDetails> forMaintenance = new ArrayList<>();
-    replicas.forEach(r ->forMaintenance.add(r.getDatanodeDetails()));
+    replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to entering_maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachPersistedOpState(dn, ENTERING_MAINTENANCE);
     }
     cluster.restartStorageContainerManager(true);
     setManagers();
 
     List<DatanodeDetails> newDns = new ArrayList<>();
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       newDns.add(nm.getNodeByUuid(dn.getUuid().toString()));
     }
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : newDns) {
+    for (DatanodeDetails dn : newDns) {
       waitForDnToReachOpState(dn, IN_MAINTENANCE);
     }
 
@@ -550,7 +550,7 @@ public class TestDecommissionAndMaintenance {
    */
   private void generateData(int keyCount, String keyPrefix,
       ReplicationFactor repFactor, ReplicationType repType) throws IOException {
-    for (int i=0; i<keyCount; i++) {
+    for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, repFactor, repType,
           "this is the content");
     }
@@ -610,7 +610,7 @@ public class TestDecommissionAndMaintenance {
    * @return host:port for the given DN.
    */
   private String getDNHostAndPort(DatanodeDetails dn) {
-    return dn.getHostName()+":"+dn.getPorts().get(0).getValue();
+    return dn.getHostName() + ":" + dn.getPorts().get(0).getValue();
   }
 
   /**

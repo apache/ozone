@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerDummyImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
@@ -29,7 +29,7 @@ import java.io.File;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -37,7 +37,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Interface of parameters for testing different chunk layout implementations.
  */
-public enum ChunkLayoutTestInfo {
+public enum ContainerLayoutTestInfo {
 
   DUMMY {
     @Override
@@ -51,7 +51,7 @@ public enum ChunkLayoutTestInfo {
     }
 
     @Override
-    public ChunkLayOutVersion getLayout() {
+    public ContainerLayoutVersion getLayout() {
       return null;
     }
 
@@ -73,8 +73,8 @@ public enum ChunkLayoutTestInfo {
     }
 
     @Override
-    public ChunkLayOutVersion getLayout() {
-      return ChunkLayOutVersion.FILE_PER_CHUNK;
+    public ContainerLayoutVersion getLayout() {
+      return ContainerLayoutVersion.FILE_PER_CHUNK;
     }
   },
 
@@ -90,8 +90,8 @@ public enum ChunkLayoutTestInfo {
     }
 
     @Override
-    public ChunkLayOutVersion getLayout() {
-      return ChunkLayOutVersion.FILE_PER_BLOCK;
+    public ContainerLayoutVersion getLayout() {
+      return ContainerLayoutVersion.FILE_PER_BLOCK;
     }
   };
 
@@ -101,10 +101,10 @@ public enum ChunkLayoutTestInfo {
   public abstract void validateFileCount(File dir, long blockCount,
       long chunkCount);
 
-  public abstract ChunkLayOutVersion getLayout();
+  public abstract ContainerLayoutVersion getLayout();
 
   public void updateConfig(OzoneConfiguration config) {
-    config.set(OZONE_SCM_CHUNK_LAYOUT_KEY, getLayout().name());
+    config.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, getLayout().name());
   }
 
   private static void assertFileCount(File dir, long count) {
@@ -116,8 +116,8 @@ public enum ChunkLayoutTestInfo {
     assertEquals(count, files.length);
   }
 
-  public static Iterable<Object[]> chunkLayoutParameters() {
-    return ChunkLayOutVersion.getAllVersions().stream()
+  public static Iterable<Object[]> containerLayoutParameters() {
+    return ContainerLayoutVersion.getAllVersions().stream()
         .map(each -> new Object[] {each})
         .collect(toList());
   }

@@ -128,8 +128,8 @@ public final class OzoneConsts {
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
   public static final String CRL_DB_SUFFIX = "crl.db";
-  public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
-  public static final String DN_CRL_DB = "dn-"+ CRL_DB_SUFFIX;
+  public static final String DN_CONTAINER_DB = "-dn-" + CONTAINER_DB_SUFFIX;
+  public static final String DN_CRL_DB = "dn-" + CRL_DB_SUFFIX;
   public static final String CRL_DB_DIRECTORY_NAME = "crl";
   public static final String OM_DB_NAME = "om.db";
   public static final String SCM_DB_NAME = "scm.db";
@@ -187,7 +187,7 @@ public final class OzoneConsts {
 
   public static final String OM_KEY_PREFIX = "/";
   public static final String OM_USER_PREFIX = "$";
-  public static final String OM_S3_PREFIX ="S3:";
+  public static final String OM_S3_PREFIX = "S3:";
   public static final String OM_S3_VOLUME_PREFIX = "s3";
   public static final String OM_S3_SECRET = "S3Secret:";
   public static final String OM_PREFIX = "Prefix:";
@@ -213,7 +213,7 @@ public final class OzoneConsts {
   /**
    * Quota Units.
    */
-  public enum Units {TB, GB, MB, KB, B}
+  public enum Units { TB, GB, MB, KB, B }
 
   /**
    * Max number of keys returned per list buckets operation.
@@ -335,6 +335,7 @@ public final class OzoneConsts {
   public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
   public static final String SOURCE_VOLUME = "sourceVolume";
   public static final String SOURCE_BUCKET = "sourceBucket";
+  public static final String BUCKET_LAYOUT = "bucketLayout";
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
 
@@ -401,7 +402,7 @@ public final class OzoneConsts {
   public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
           Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
 
-  public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
+  public static final String FS_FILE_COPYING_TEMP_SUFFIX = "._COPYING_";
 
   // Transaction Info
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";

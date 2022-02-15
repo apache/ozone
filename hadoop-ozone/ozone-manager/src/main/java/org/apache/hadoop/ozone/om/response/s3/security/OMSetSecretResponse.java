@@ -67,7 +67,8 @@ public class OMSetSecretResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    assert(getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK);
+    assert (getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.OK);
 
     if (s3SecretValue != null) {
       LOG.debug("Updating TenantAccessIdTable");

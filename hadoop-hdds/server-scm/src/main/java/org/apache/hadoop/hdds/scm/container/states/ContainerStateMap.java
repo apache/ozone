@@ -147,6 +147,7 @@ public class ContainerStateMap {
       ownerMap.remove(info.getOwner(), id);
       repConfigMap.remove(info.getReplicationConfig(), id);
       typeMap.remove(info.getReplicationType(), id);
+      replicaMap.remove(id);
       // Flush the cache of this container type.
       flushCache(info);
       LOG.trace("Container {} removed from ContainerStateMap.", id);
@@ -358,7 +359,7 @@ public class ContainerStateMap {
 
     final ContainerQueryKey queryKey =
         new ContainerQueryKey(state, owner, repConfig);
-    if(resultCache.containsKey(queryKey)){
+    if (resultCache.containsKey(queryKey)) {
       return resultCache.get(queryKey);
     }
 

@@ -212,7 +212,7 @@ public class TestMultiTenantVolume {
       throws IOException {
     try {
       store.getS3Bucket(bucketName);
-    } catch(OMException ex) {
+    } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw ex;
       }
@@ -221,7 +221,7 @@ public class TestMultiTenantVolume {
     try {
       OzoneVolume volume = store.getS3Volume();
       volume.getBucket(bucketName);
-    } catch(OMException ex) {
+    } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw ex;
       }

@@ -919,13 +919,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
-      getBucketIterator(){
+      getBucketIterator() {
     return bucketTable.cacheIterator();
   }
 
   @Override
   public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-      getKeyIterator(){
+      getKeyIterator() {
     return keyTable.iterator();
   }
 
@@ -976,7 +976,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
 
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
-    Set<String> deletedKeySet = new TreeSet<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
         keyTable.cacheIterator();
 
@@ -996,12 +995,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
       // Making sure that entry in cache is not for delete key request.
 
-      if (omKeyInfo != null) {
-        if (key.startsWith(seekPrefix) && key.compareTo(seekKey) >= 0) {
-          cacheKeyMap.put(key, omKeyInfo);
-        }
-      } else {
-        deletedKeySet.add(key);
+      if (omKeyInfo != null
+          && key.startsWith(seekPrefix)
+          && key.compareTo(seekKey) >= 0) {
+        cacheKeyMap.put(key, omKeyInfo);
       }
     }
 
@@ -1019,7 +1016,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
           // Entry should not be marked for delete, consider only those
           // entries.
-          if(!deletedKeySet.contains(kv.getKey())) {
+          CacheValue<OmKeyInfo> cacheValue =
+              keyTable.getCacheValue(new CacheKey<>(kv.getKey()));
+          if (cacheValue == null || cacheValue.getCacheValue() != null) {
             cacheKeyMap.put(kv.getKey(), kv.getValue());
             currentCount++;
           }
@@ -1050,7 +1049,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     // Clear map and set.
     cacheKeyMap.clear();
-    deletedKeySet.clear();
 
     return result;
   }
@@ -1192,7 +1190,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         if (kv != null) {
           RepeatedOmKeyInfo infoList = kv.getValue();
           // Get block keys as a list.
-          for(OmKeyInfo info : infoList.getOmKeyInfoList()){
+          for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
             OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
             List<BlockID> item = latest.getLocationList().stream()
                 .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))

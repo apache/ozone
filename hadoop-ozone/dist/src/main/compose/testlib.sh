@@ -401,9 +401,10 @@ prepare_for_binary_image() {
 prepare_for_runner_image() {
   local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
   local v=${1:-${runner_version}} # prefer explicit argument
 
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="apache/ozone-runner:${v}"
+  export OZONE_IMAGE="${runner_image}:${v}"
 }
 

@@ -82,7 +82,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     if (StringUtils.isEmpty(tenantName)) {
       tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
           ozoneManager.getMetadataManager(), accessId);
-      assert(tenantName != null);
+      assert (tenantName != null);
     }
 
     // Caller should be an Ozone admin or this tenant's delegated admin
@@ -185,7 +185,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantId().equals(tenantId));
+      assert (oldAccessIdInfo.getTenantId().equals(tenantId));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =

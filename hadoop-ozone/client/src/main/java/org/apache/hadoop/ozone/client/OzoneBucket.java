@@ -611,7 +611,7 @@ public class OzoneBucket extends WithMetadata {
    * @return {@code Iterator<OzoneKey>}
    */
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix)
-      throws IOException{
+      throws IOException {
     return listKeys(keyPrefix, null);
   }
 
@@ -910,7 +910,7 @@ public class OzoneBucket extends WithMetadata {
    * @param userName new owner
    * @throws IOException
    */
-  public boolean setOwner(String userName) throws IOException{
+  public boolean setOwner(String userName) throws IOException {
     boolean result = proxy.setBucketOwner(volumeName, name, userName);
     this.owner = userName;
     return result;
@@ -939,7 +939,7 @@ public class OzoneBucket extends WithMetadata {
      * The returned keys match key prefix.
      * @param keyPrefix
      */
-    KeyIterator(String keyPrefix, String prevKey) throws IOException{
+    KeyIterator(String keyPrefix, String prevKey) throws IOException {
       setKeyPrefix(keyPrefix);
       this.currentValue = null;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
@@ -947,7 +947,7 @@ public class OzoneBucket extends WithMetadata {
 
     @Override
     public boolean hasNext() {
-      if(!currentIterator.hasNext() && currentValue != null) {
+      if (!currentIterator.hasNext() && currentValue != null) {
         try {
           currentIterator =
               getNextListOfKeys(currentValue.getName()).iterator();
@@ -960,7 +960,7 @@ public class OzoneBucket extends WithMetadata {
 
     @Override
     public OzoneKey next() {
-      if(hasNext()) {
+      if (hasNext()) {
         currentValue = currentIterator.next();
         return currentValue;
       }
@@ -1008,7 +1008,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * Note: Does not guarantee to return the list of keys in a sorted order.
    */
-  private class KeyIteratorWithFSO extends KeyIterator{
+  private class KeyIteratorWithFSO extends KeyIterator {
 
     private Stack<String> stack;
     private List<OzoneKey> pendingItemsToBeBatched;

@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -82,18 +82,18 @@ public class TestKeyValueHandler {
 
   private static final long DUMMY_CONTAINER_ID = 9999;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
 
-  public TestKeyValueHandler(ChunkLayOutVersion layout) {
+  public TestKeyValueHandler(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -261,7 +261,7 @@ public class TestKeyValueHandler {
   }
 
   @Test
-  public void testVolumeSetInKeyValueHandler() throws Exception{
+  public void testVolumeSetInKeyValueHandler() throws Exception {
     File path = GenericTestUtils.getRandomizedTestDir();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
@@ -296,7 +296,7 @@ public class TestKeyValueHandler {
       try {
         new KeyValueHandler(conf,
             context.getParent().getDatanodeDetails().getUuidString(),
-            cset, volumeSet, metrics, c->{});
+            cset, volumeSet, metrics, c -> { });
       } catch (RuntimeException ex) {
         GenericTestUtils.assertExceptionContains("class org.apache.hadoop" +
             ".ozone.container.common.impl.HddsDispatcher not org.apache" +
