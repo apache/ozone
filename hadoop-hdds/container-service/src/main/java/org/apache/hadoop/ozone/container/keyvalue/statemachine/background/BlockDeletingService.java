@@ -453,9 +453,8 @@ public class BlockDeletingService extends BackgroundService {
           // Handler.deleteBlock calls deleteChunk to delete all the chunks
           // in the block. The ContainerData stats (DB and in-memory) are not
           // updated with decremented used bytes during deleteChunk. This is
-          // done here so that all the DB update for block delete can be
+          // done here so that all the DB updates for block delete can be
           // batched together while committing to DB.
-          meta.getStore().getBatchHandler().commitBatchOperation(batch);
           containerData.updateAndCommitDBCounters(meta, batch,
               deletedBlocksCount, releasedBytes);
 
