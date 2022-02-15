@@ -431,30 +431,50 @@ execute_debug_tests() {
 
   execute_robot_test datanode debug/ozone-debug-tests.robot
 
-  docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${OZONE_DEBUG_VOLUME}/${OZONE_DEBUG_BUCKET}/${OZONE_DEBUG_KEY}" > /tmp/blocks
-  block=$(cat /tmp/blocks | jq -r '.KeyLocations[0][0].Locations.files[0]')
-  docker exec ozone_datanode_2 sed -i -e '1s/^/a/' "${block}"
+  corrupt_block_on_datanode
   execute_robot_test datanode debug/ozone-debug-corrupt-block.robot
 
   docker stop ozone_datanode_2
-  execute_robot_test datanode debug/ozone-debug-modified-env.robot
+
+  wait_for_datanode datanode_2 STALE 60
+  execute_robot_test datanode debug/ozone-debug-stale-datanode.robot
+  wait_for_datanode datanode_2 DEAD 60
+  execute_robot_test datanode debug/ozone-debug-dead-datanode.robot
 
   docker start ozone_datanode_2
 
-  SECONDS=0
-  while [[ $SECONDS -lt 60 ]]; do
-    local command="ozone admin datanode list"
-    docker-compose exec -T ${SCM} bash -c "$command" | grep -A2 "datanode_2" > /tmp/dn_check
-    health=$(grep -c "State: HEALTHY" /tmp/dn_check)
-    operational=$(grep -c "State: IN_SERVICE" /tmp/dn_check)
+  wait_for_datanode datanode_2 HEALTHY 60
+}
 
-    if [[ "$health" -eq 1 && "$operational" -eq 1 ]]; then
-      echo "datanode_2 is HEALTHY and IN_SERVICE"
+## @description  Corrupt a block on a datanode
+corrupt_block_on_datanode() {
+  docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${OZONE_DEBUG_VOLUME}/${OZONE_DEBUG_BUCKET}/${OZONE_DEBUG_KEY}" > /tmp/blocks
+  block=$(cat /tmp/blocks | jq -r '.KeyLocations[0][0].Locations.files[0]')
+  docker exec ozone_datanode_2 sed -i -e '1s/^/a/' "${block}"
+}
+
+## @description  Wait for datanode state
+## @param        Datanode name, eg datanode_1 datanode_2
+## @param        State to check for
+## @param        The maximum time to wait in seconds
+wait_for_datanode() {
+  local datanode=$1
+  local state=$2
+  local timeout=$3
+
+  SECONDS=0
+  while [[ $SECONDS -lt $timeout ]]; do
+    local command="ozone admin datanode list"
+    docker-compose exec -T ${SCM} bash -c "$command" | grep -A2 "$datanode" > /tmp/dn_check
+    local health=$(grep -c "State: $state" /tmp/dn_check)
+
+    if [[ "$health" -eq 1 ]]; then
+      echo "$datanode is $state"
       return
     else
-      echo "Waiting for datanode_2"
+      echo "Waiting for $datanode to be $state"
     fi
     echo "SECONDS: $SECONDS"
   done
-  echo "WARNING: datanode_2 is still not available"
+  echo "WARNING: $datanode is still not $state"
 }
