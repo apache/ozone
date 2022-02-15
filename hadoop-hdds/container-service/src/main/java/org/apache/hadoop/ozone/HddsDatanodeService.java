@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
@@ -453,16 +452,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DatanodeDetails initializeDatanodeDetails()
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     if (idFile.exists()) {
@@ -487,16 +476,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);
