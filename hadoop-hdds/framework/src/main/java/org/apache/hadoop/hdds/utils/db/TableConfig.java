@@ -30,6 +30,11 @@ import org.rocksdb.ColumnFamilyOptions;
  * Class that maintains Table Configuration.
  */
 public class TableConfig {
+  static TableConfig newTableConfig(byte[] bytes) {
+    return new TableConfig(StringUtils.bytes2String(bytes),
+        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions());
+  }
+
   private final String name;
   private final ColumnFamilyOptions columnFamilyOptions;
 
@@ -58,7 +63,7 @@ public class TableConfig {
    */
   public ColumnFamilyDescriptor getDescriptor() {
     return  new ColumnFamilyDescriptor(StringUtils.string2Bytes(name),
-        columnFamilyOptions);
+        new ColumnFamilyOptions(columnFamilyOptions));
   }
 
   /**
