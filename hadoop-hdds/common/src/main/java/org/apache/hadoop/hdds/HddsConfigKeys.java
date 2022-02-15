@@ -151,7 +151,7 @@ public final class HddsConfigKeys {
    */
   public static final String HDDS_X509_MAX_DURATION = "hdds.x509.max.duration";
   // Limit Certificate duration to a max value of 5 years.
-  public static final String HDDS_X509_MAX_DURATION_DEFAULT= "P1865D";
+  public static final String HDDS_X509_MAX_DURATION_DEFAULT = "P1865D";
   public static final String HDDS_X509_SIGNATURE_ALGO =
       "hdds.x509.signature.algorithm";
   public static final String HDDS_X509_SIGNATURE_ALGO_DEFAULT = "SHA256withRSA";

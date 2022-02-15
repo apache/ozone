@@ -90,7 +90,7 @@ public class ResourceSemaphore extends Semaphore {
 
   @Override
   public String toString() {
-    return (isClosed()? "closed/": availablePermits() + "/") + limit;
+    return (isClosed() ? "closed/" : availablePermits() + "/") + limit;
   }
 
   /**
@@ -101,7 +101,7 @@ public class ResourceSemaphore extends Semaphore {
 
     public Group(int... limits) {
       final List<ResourceSemaphore> list = new ArrayList<>(limits.length);
-      for(int limit : limits) {
+      for (int limit : limits) {
         list.add(new ResourceSemaphore(limit));
       }
       this.resources = Collections.unmodifiableList(list);
@@ -131,7 +131,7 @@ public class ResourceSemaphore extends Semaphore {
       }
 
       // failed at i, releasing all previous resources
-      for(i--; i >= 0; i--) {
+      for (i--; i >= 0; i--) {
         resources.get(i).release(permits[i]);
       }
       return false;
@@ -147,13 +147,13 @@ public class ResourceSemaphore extends Semaphore {
     }
 
     protected void release(int... permits) {
-      for(int i = resources.size() - 1; i >= 0; i--) {
+      for (int i = resources.size() - 1; i >= 0; i--) {
         resources.get(i).release(permits[i]);
       }
     }
 
     public void close() {
-      for(int i = resources.size() - 1; i >= 0; i--) {
+      for (int i = resources.size() - 1; i >= 0; i--) {
         resources.get(i).close();
       }
     }

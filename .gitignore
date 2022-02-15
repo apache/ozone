@@ -68,6 +68,7 @@ hadoop-ozone/recon/node_modules
 .mvn
 
 .dev-tools
-
+dev-support/ci/bats-assert
+dev-support/ci/bats-support
 
 hadoop-ozone/dist/src/main/license/current.txt

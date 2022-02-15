@@ -229,7 +229,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
 
-      OzoneClientConfig clientConfig =new OzoneClientConfig();
+      OzoneClientConfig clientConfig = new OzoneClientConfig();
       clientConfig.setStreamBufferFlushSize(8 * 1024 * 1024);
       clientConfig.setStreamBufferMaxSize(16 * 1024 * 1024);
       clientConfig.setStreamBufferSize(4 * 1024);
@@ -331,7 +331,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   public Set<OzoneManager> omToFail() {
     int numNodesToFail = getNumberOfOmToFail();
-    if (failedOmSet.size() >= numOzoneManagers/2) {
+    if (failedOmSet.size() >= numOzoneManagers / 2) {
       return Collections.emptySet();
     }
 
@@ -359,7 +359,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   // Should the selected node be stopped or started.
   public boolean shouldStopOm() {
-    if (failedOmSet.size() >= numOzoneManagers/2) {
+    if (failedOmSet.size() >= numOzoneManagers / 2) {
       return false;
     }
     return RandomUtils.nextBoolean();
@@ -407,7 +407,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   public Set<StorageContainerManager> scmToFail() {
     int numNodesToFail = getNumberOfScmToFail();
-    if (failedScmSet.size() >= numStorageContainerManagers/2) {
+    if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return Collections.emptySet();
     }
 
@@ -434,7 +434,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   // Should the selected node be stopped or started.
   public boolean shouldStopScm() {
-    if (failedScmSet.size() >= numStorageContainerManagers/2) {
+    if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return false;
     }
     return RandomUtils.nextBoolean();

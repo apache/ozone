@@ -248,7 +248,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   /**
    * Increases current position by one. Used in writes.
    */
-  void incCurrentPosition(){
+  void incCurrentPosition() {
     currentPosition++;
   }
 
@@ -280,7 +280,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.blockID = id;
   }
 
-  OzoneClientConfig getConf(){
+  OzoneClientConfig getConf() {
     return this.config;
   }
 
@@ -305,7 +305,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    * OMKeyLocationInfo.
    * @return
    */
-  Pipeline getPipelineForOMLocationReport(){
+  Pipeline getPipelineForOMLocationReport() {
     return getPipeline();
   }
 

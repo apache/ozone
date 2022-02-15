@@ -164,7 +164,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       try {
         processContainerReplica(datanodeDetails, replicaProto, publisher);
       } catch (ContainerNotFoundException e) {
-        if(unknownContainerHandleAction.equals(
+        if (unknownContainerHandleAction.equals(
             UNKNOWN_CONTAINER_ACTION_WARN)) {
           LOG.error("Received container report for an unknown container" +
               " {} from datanode {}.", replicaProto.getContainerID(),

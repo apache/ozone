@@ -69,7 +69,7 @@ public class TestReconScmSnapshot {
     testSnapshot(ozoneCluster);
   }
 
-  public static void testSnapshot(MiniOzoneCluster cluster) throws Exception{
+  public static void testSnapshot(MiniOzoneCluster cluster) throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(LoggerFactory.getLogger(
         ReconStorageContainerManagerFacade.class));

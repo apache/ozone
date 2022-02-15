@@ -51,7 +51,7 @@ public final class UniqueId {
   /**
    * Private constructor so that no one can instantiate this class.
    */
-  private UniqueId() {}
+  private UniqueId() { }
 
   /**
    * Calculate and returns next unique id based on System#currentTimeMillis.

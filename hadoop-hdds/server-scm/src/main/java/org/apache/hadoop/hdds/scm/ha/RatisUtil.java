@@ -133,7 +133,7 @@ public final class RatisUtil {
                 ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT,
                 ScmConfigKeys.
                         OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT_DEFAULT,
-                TimeUnit.MILLISECONDS)+200L,
+                TimeUnit.MILLISECONDS) + 200L,
             TimeUnit.MILLISECONDS));
     Rpc.setSlownessTimeout(properties, TimeDuration.valueOf(
             ozoneConf.getTimeDuration(

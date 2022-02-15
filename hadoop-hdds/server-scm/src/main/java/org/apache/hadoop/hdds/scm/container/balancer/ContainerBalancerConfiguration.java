@@ -378,8 +378,8 @@ public final class ContainerBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %d%n" +
-            "%-50s %dGB%n"+
-            "%-50s %dGB%n"+
+            "%-50s %dGB%n" +
+            "%-50s %dGB%n" +
             "%-50s %dGB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Involve per Iteration(percent)",
         maxDatanodesPercentageToInvolvePerIteration,

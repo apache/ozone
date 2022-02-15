@@ -370,7 +370,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     }
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
-      for(DatanodeDetails dn : dns) {
+      for (DatanodeDetails dn : dns) {
         if (misRepWhenDnPresent != null
             && dn.getUuid().equals(misRepWhenDnPresent)) {
           return true;

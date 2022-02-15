@@ -197,7 +197,7 @@ public class TestContainerBalancer {
       // modify this after balancer is fully completed
       try {
         Thread.sleep(100);
-      } catch (InterruptedException e) {}
+      } catch (InterruptedException e) { }
 
       expectedUnBalancedNodes =
           determineExpectedUnBalancedNodes(randomThreshold);
@@ -230,7 +230,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(100);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     Assert.assertEquals(0, containerBalancer.getUnBalancedNodes().size());
@@ -255,7 +255,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     Assert.assertFalse(
         containerBalancer.getCountDatanodesInvolvedPerIteration() >
@@ -277,7 +277,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
 
@@ -297,7 +297,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     // check whether all selected containers are closed
@@ -321,7 +321,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     // balancer should not have moved more size than the limit
     Assert.assertFalse(containerBalancer.getSizeMovedPerIteration() >
@@ -341,7 +341,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
@@ -368,7 +368,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     Map<DatanodeDetails, ContainerMoveSelection> sourceToTargetMap =
@@ -439,7 +439,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     Set<ContainerID> containers = new HashSet<>();
@@ -466,7 +466,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(1000);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     Set<ContainerID> excludeContainers =
@@ -501,7 +501,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(500);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     // balancer should have identified unbalanced nodes
@@ -524,7 +524,7 @@ public class TestContainerBalancer {
     // modify this after balancer is fully completed
     try {
       Thread.sleep(500);
-    } catch (InterruptedException e) {}
+    } catch (InterruptedException e) { }
 
     containerBalancer.stop();
     ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
