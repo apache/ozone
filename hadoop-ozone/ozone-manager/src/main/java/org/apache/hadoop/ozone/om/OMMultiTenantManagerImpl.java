@@ -442,7 +442,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // Add user principal (not accessId!) to the role
       final String roleId = authorizer.assignUser(
           new BasicUserPrincipal(userPrincipal), roleJsonStr, delegated);
-      assert(roleId != null);
+      assert (roleId != null);
 
       // TODO: update some in-memory mappings?
 

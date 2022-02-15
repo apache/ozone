@@ -235,7 +235,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
     final String tenantId = request.getTenantName();
     final String principal = request.getTenantUsername();
 
-    assert(accessId.equals(request.getAccessId()));
+    assert (accessId.equals(request.getAccessId()));
     IOException exception = null;
 
     String volumeName = null;

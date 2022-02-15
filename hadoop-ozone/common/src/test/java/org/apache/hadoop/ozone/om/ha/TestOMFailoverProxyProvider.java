@@ -180,7 +180,7 @@ public class TestOMFailoverProxyProvider {
       String nodeId = NODE_ID_BASE_STR + i;
       ozoneConf.set(
           ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
-          nodeId), nodeAddrs.get(i-1));
+          nodeId), nodeAddrs.get(i - 1));
       allNodeIds.add(nodeId);
     }
     ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),

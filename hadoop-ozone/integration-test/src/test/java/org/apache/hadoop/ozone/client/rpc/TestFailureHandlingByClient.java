@@ -212,7 +212,7 @@ public class TestFailureHandlingByClient {
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 0);
     String data = ContainerTestHelper
-        .getFixedLengthString(keyString,  chunkSize/2);
+        .getFixedLengthString(keyString,  chunkSize / 2);
     key.write(data.getBytes(UTF_8));
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);

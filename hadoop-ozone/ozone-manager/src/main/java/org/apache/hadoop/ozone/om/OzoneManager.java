@@ -2406,11 +2406,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
-        String volumeName = obj.getVolumeName() != null?
-                "Volume:" + obj.getVolumeName() + " ": "";
-        String bucketName = obj.getBucketName() != null?
-                "Bucket:" + obj.getBucketName() + " ": "";
-        String keyName = obj.getKeyName() != null?
+        String volumeName = obj.getVolumeName() != null ?
+                "Volume:" + obj.getVolumeName() + " " : "";
+        String bucketName = obj.getBucketName() != null ?
+                "Bucket:" + obj.getBucketName() + " " : "";
+        String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
         LOG.warn("User {} doesn't have {} permission to access {} {}{}{}",
             context.getClientUgi().getUserName(), context.getAclRights(),
@@ -2972,7 +2972,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     while (iterator.hasNext()) {
       final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
       final OmDBTenantInfo omDBTenantInfo = dbEntry.getValue();
-      assert(dbEntry.getKey().equals(omDBTenantInfo.getTenantId()));
+      assert (dbEntry.getKey().equals(omDBTenantInfo.getTenantId()));
       tenantInfoList.add(TenantInfo.newBuilder()
           .setTenantName(omDBTenantInfo.getTenantId())
           .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
@@ -3022,7 +3022,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               accessId);
           throw new NullPointerException("accessIdInfo is null");
         }
-        assert(accessIdInfo.getUserPrincipal().equals(userPrincipal));
+        assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
             .setTenantName(accessIdInfo.getTenantId())
@@ -3981,7 +3981,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
 
       // Commit to DB.
-      try(BatchOperation batchOperation =
+      try (BatchOperation batchOperation =
           metadataManager.getStore().initBatchOperation()) {
         metadataManager.getVolumeTable().putWithBatch(batchOperation,
             dbVolumeKey, omVolumeArgs);

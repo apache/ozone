@@ -165,7 +165,7 @@ public class OmKeyLocationInfoGroup {
     }
   }
 
-  void removeBlocks(long versionToRemove){
+  void removeBlocks(long versionToRemove) {
     locationVersionMap.remove(versionToRemove);
   }
 
@@ -181,7 +181,7 @@ public class OmKeyLocationInfoGroup {
     sb.append("version:").append(version).append(" ");
     sb.append("isMultipartKey:").append(isMultipartKey);
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
-      for(OmKeyLocationInfo kli: kliList) {
+      for (OmKeyLocationInfo kli: kliList) {
         sb.append(kli.getLocalID()).append(" || ");
       }
     }

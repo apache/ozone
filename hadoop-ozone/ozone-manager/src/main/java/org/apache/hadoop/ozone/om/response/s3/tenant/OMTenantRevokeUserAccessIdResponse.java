@@ -75,7 +75,7 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    assert(accessId != null);
+    assert (accessId != null);
     // TODO: redundant check? Is status always OK when addToDBBatch is called
     if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
       omMetadataManager.getS3SecretTable().deleteWithBatch(batchOperation,

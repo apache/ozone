@@ -278,7 +278,7 @@ public class TestOzoneTenantShell {
    * @return String array.
    */
   private String[] getHASetConfStrings(int numOfArgs) {
-    assert(numOfArgs >= 0);
+    assert (numOfArgs >= 0);
     String[] res = new String[1 + 1 + numOfOMs + numOfArgs];
     final int indexOmServiceIds = 0;
     final int indexOmNodes = 1;
@@ -294,7 +294,7 @@ public class TestOzoneTenantShell {
 
     String[] omNodesArr = omNodesVal.split(",");
     // Sanity check
-    assert(omNodesArr.length == numOfOMs);
+    assert (omNodesArr.length == numOfOMs);
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
           getSetConfStringFromConf(ConfUtils.addKeySuffixes(

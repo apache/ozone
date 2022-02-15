@@ -129,7 +129,7 @@ public final class OzoneTestUtils {
    */
   public static void performOperationOnKeyContainers(
       CheckedConsumer<BlockID, Exception> consumer,
-      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups) throws Exception{
+      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups) throws Exception {
 
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup :
         omKeyLocationInfoGroups) {

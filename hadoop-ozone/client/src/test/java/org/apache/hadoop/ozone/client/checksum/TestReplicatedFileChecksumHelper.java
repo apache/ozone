@@ -232,7 +232,7 @@ public class TestReplicatedFileChecksumHelper {
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
-    assertEquals(1, helper.getKeyLocationInfos().size());
+    assertEquals(1, helper.getKeyLocationInfoList().size());
   }
 
   private XceiverClientReply buildValidResponse() {
@@ -317,7 +317,7 @@ public class TestReplicatedFileChecksumHelper {
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
       assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
-      assertEquals(1, helper.getKeyLocationInfos().size());
+      assertEquals(1, helper.getKeyLocationInfoList().size());
     }
   }
 }

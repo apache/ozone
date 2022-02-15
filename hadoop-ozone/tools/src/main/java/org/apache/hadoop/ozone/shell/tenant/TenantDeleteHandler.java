@@ -43,7 +43,7 @@ public class TenantDeleteHandler extends TenantHandler {
           client.getObjectStore().deleteTenant(tenantId);
       out().println("Deleted tenant '" + tenantId + "'.");
       long volumeRefCount = resp.getVolRefCount();
-      assert(volumeRefCount >= 0L);
+      assert (volumeRefCount >= 0L);
       final String volumeName = resp.getVolumeName();
       final String extraPrompt =
           "But the associated volume '" + volumeName + "' is not removed. ";

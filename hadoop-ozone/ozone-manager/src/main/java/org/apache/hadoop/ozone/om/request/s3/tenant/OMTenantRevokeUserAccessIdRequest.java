@@ -101,8 +101,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     }
 
     final String tenantName = accessIdInfo.getTenantId();
-    assert(tenantName != null);
-    assert(tenantName.length() > 0);
+    assert (tenantName != null);
+    assert (tenantName.length() > 0);
 
     // Caller should be an Ozone admin or this tenant's delegated admin
     OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantName);
@@ -169,12 +169,12 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       // Remove accessId from principalToAccessIdsTable
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
-      assert(omDBAccessIdInfo != null);
+      assert (omDBAccessIdInfo != null);
       userPrincipal = omDBAccessIdInfo.getUserPrincipal();
-      assert(userPrincipal != null);
+      assert (userPrincipal != null);
       OmDBKerberosPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
-      assert(principalInfo != null);
+      assert (principalInfo != null);
       principalInfo.removeAccessId(accessId);
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),

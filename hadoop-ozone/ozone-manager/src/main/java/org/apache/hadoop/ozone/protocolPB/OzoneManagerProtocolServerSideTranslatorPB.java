@@ -164,7 +164,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           // TODO: Note: Due to HDDS-6055, createClientRequest() could now
           //  return null, which triggered the findbugs warning.
           //  Added the assertion.
-          assert(omClientRequest != null);
+          assert (omClientRequest != null);
           request = omClientRequest.preExecute(ozoneManager);
         } catch (IOException ex) {
           // As some of the preExecute returns error. So handle here.

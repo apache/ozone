@@ -153,7 +153,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         this.metadata.get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
                 String.valueOf(this.isVersionEnabled));
-    if(this.storageType != null){
+    if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }
     if (this.ownerName != null) {
@@ -241,16 +241,16 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName);
-    if(isVersionEnabled != null) {
+    if (isVersionEnabled != null) {
       builder.setIsVersionEnabled(isVersionEnabled);
     }
-    if(storageType != null) {
+    if (storageType != null) {
       builder.setStorageType(storageType.toProto());
     }
-    if(quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET) {
+    if (quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET) {
       builder.setQuotaInBytes(quotaInBytes);
     }
-    if(quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
+    if (quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
       builder.setQuotaInNamespace(quotaInNamespace);
     }
     if (ownerName != null) {

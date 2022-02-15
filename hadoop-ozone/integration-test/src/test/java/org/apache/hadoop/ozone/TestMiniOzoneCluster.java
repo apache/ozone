@@ -119,7 +119,7 @@ public class TestMiniOzoneCluster {
     cluster.waitForClusterToBeReady();
     List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
     assertEquals(numberOfNodes, datanodes.size());
-    for(HddsDatanodeService dn : datanodes) {
+    for (HddsDatanodeService dn : datanodes) {
       // Create a single member pipe line
       List<DatanodeDetails> dns = new ArrayList<>();
       dns.add(dn.getDatanodeDetails());
@@ -132,7 +132,7 @@ public class TestMiniOzoneCluster {
           .build();
 
       // Verify client is able to connect to the container
-      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)){
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
         client.connect();
         assertTrue(client.isConnected(pipeline.getFirstNode()));
       }
@@ -285,7 +285,7 @@ public class TestMiniOzoneCluster {
   }
 
   private void createMalformedIDFile(File malformedFile)
-      throws IOException{
+      throws IOException {
     malformedFile.delete();
     DatanodeDetails id = randomDatanodeDetails();
     ContainerUtils.writeDatanodeDetailsTo(id, malformedFile);

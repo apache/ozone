@@ -63,7 +63,7 @@ public class StreamingGenerator extends BaseFreonGenerator
   @CommandLine.Option(names = {"--size"},
       description = "Size of the generated files.",
       defaultValue = "104857600")
-  private int fileSize;
+  private long fileSize;
 
   private static final String SUB_DIR_NAME = "dir1";
 

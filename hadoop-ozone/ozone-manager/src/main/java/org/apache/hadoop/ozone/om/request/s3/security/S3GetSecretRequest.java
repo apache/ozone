@@ -145,7 +145,7 @@ public class S3GetSecretRequest extends OMClientRequest {
 
     final GetS3SecretRequest getS3SecretRequest =
             getOmRequest().getGetS3SecretRequest();
-    assert(getS3SecretRequest.hasCreateIfNotExist());
+    assert (getS3SecretRequest.hasCreateIfNotExist());
     final boolean createIfNotExist = getS3SecretRequest.getCreateIfNotExist();
     // See Note 1 above
     final String accessId = getS3SecretRequest.getKerberosID();
@@ -154,7 +154,7 @@ public class S3GetSecretRequest extends OMClientRequest {
       final UpdateGetS3SecretRequest updateGetS3SecretRequest =
               getOmRequest().getUpdateGetS3SecretRequest();
       awsSecret = updateGetS3SecretRequest.getAwsSecret();
-      assert(accessId.equals(updateGetS3SecretRequest.getKerberosID()));
+      assert (accessId.equals(updateGetS3SecretRequest.getKerberosID()));
     }
 
     try {
@@ -187,7 +187,7 @@ public class S3GetSecretRequest extends OMClientRequest {
       // Throw ACCESSID_NOT_FOUND to the client if accessId doesn't exist
       //  when createIfNotExist is false.
       if (awsSecret == null) {
-        assert(!createIfNotExist);
+        assert (!createIfNotExist);
         throw new OMException("accessId '" + accessId + "' doesn't exist",
                 OMException.ResultCodes.ACCESSID_NOT_FOUND);
       }
