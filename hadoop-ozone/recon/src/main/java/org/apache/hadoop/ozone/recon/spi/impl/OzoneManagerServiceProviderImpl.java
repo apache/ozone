@@ -372,17 +372,21 @@ public class OzoneManagerServiceProviderImpl
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     int loopCount = 0;
-    long originalFromSequenceNumber = fromSequenceNumber;
-    long resultCount = Long.MAX_VALUE;
+    LOG.info("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
+    long deltaUpdateCnt = Long.MAX_VALUE;
+    long inLoopStartSequenceNumber = fromSequenceNumber;
+    long inLoopLatestSequenceNumber;
     while (loopCount < deltaUpdateLoopLimit &&
-        resultCount >= deltaUpdateLimit) {
-      resultCount = innerGetAndApplyDeltaUpdatesFromOM(fromSequenceNumber,
+        deltaUpdateCnt >= deltaUpdateLimit) {
+      innerGetAndApplyDeltaUpdatesFromOM(inLoopStartSequenceNumber,
           omdbUpdatesHandler);
-      fromSequenceNumber += resultCount;
+      inLoopLatestSequenceNumber = getCurrentOMDBSequenceNumber();
+      deltaUpdateCnt = inLoopLatestSequenceNumber - inLoopStartSequenceNumber;
+      inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
       loopCount++;
     }
     LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
-        fromSequenceNumber - originalFromSequenceNumber
+        getCurrentOMDBSequenceNumber() - fromSequenceNumber
     );
   }
 
@@ -395,23 +399,21 @@ public class OzoneManagerServiceProviderImpl
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  long innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
+  void innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
       OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
-    int recordCount = 0;
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
         .setSequenceNumber(fromSequenceNumber)
         .setLimitCount(deltaUpdateLimit)
         .build();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
-    if (null != dbUpdates) {
+    int numUpdates = 0;
+    if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       RocksDB rocksDB = rocksDBStore.getDb();
-      int numUpdates = dbUpdates.getData().size();
-      LOG.info("Number of updates received from OM : {}", numUpdates);
+      numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
-        recordCount = numUpdates;
       }
       for (byte[] data : dbUpdates.getData()) {
         try (WriteBatch writeBatch = new WriteBatch(data)) {
@@ -425,7 +427,8 @@ public class OzoneManagerServiceProviderImpl
         }
       }
     }
-    return recordCount;
+    LOG.info("Number of updates received from OM : {}, SequenceNumber diff: {}",
+        numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber);
   }
 
   /**
