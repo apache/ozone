@@ -118,14 +118,15 @@ public class ContainerBalancer {
    * new ContainerBalancerConfiguration and ContainerBalancerMetrics.
    * Container Balancer does not start on construction.
    *
-   * @param scm        the storage container manager
+   * @param scm the storage container manager
    */
   public ContainerBalancer(StorageContainerManager scm) {
     this.nodeManager = scm.getScmNodeManager();
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
     this.ozoneConfiguration = scm.getConfiguration();
-    this.config = new ContainerBalancerConfiguration();
+    this.config = ozoneConfiguration.getObject(
+        ContainerBalancerConfiguration.class);
     this.metrics = ContainerBalancerMetrics.create();
     this.scmContext = scm.getScmContext();
     this.eventPublisher = scm.getEventQueue();
@@ -947,7 +948,15 @@ public class ContainerBalancer {
           + " since current SCM is not leader.", nle);
       return;
     }
-    nodeManager.getAllNodes().forEach(datanode -> eventPublisher
+    nodeManager.getAllNodes().stream().filter(dn -> {
+      boolean isHealthy = false;
+      try {
+        isHealthy = nodeManager.getNodeStatus(dn).isHealthy();
+      } catch (NodeNotFoundException nnfe) {
+        LOG.warn("datanode {} is not found", dn.getIpAddress());
+      }
+      return isHealthy;
+    }).forEach(datanode -> eventPublisher
         .fireEvent(SCMEvents.DATANODE_COMMAND,
             new CommandForDatanode<>(datanode.getUuid(),
                 refreshVolumeUsageCommand)));
