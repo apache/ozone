@@ -159,7 +159,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   private synchronized void connectToDatanode(DatanodeDetails dn)
       throws IOException {
-    if (isConnected(dn)){
+    if (isConnected(dn)) {
       return;
     }
     // read port from the data node, on failure use default configured
@@ -269,10 +269,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         Thread.currentThread().interrupt();
       }
     }
-    try{
+    try {
       for (Map.Entry<DatanodeDetails,
               CompletableFuture<ContainerCommandResponseProto> >
-              entry : futureHashMap.entrySet()){
+              entry : futureHashMap.entrySet()) {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
       }
     } catch (InterruptedException e) {
@@ -553,7 +553,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private synchronized void checkOpen(DatanodeDetails dn)
-      throws IOException{
+      throws IOException {
     if (closed) {
       throw new IOException("This channel is not connected.");
     }

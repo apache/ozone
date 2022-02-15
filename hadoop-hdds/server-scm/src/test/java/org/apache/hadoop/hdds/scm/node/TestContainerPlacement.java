@@ -212,7 +212,7 @@ public class TestContainerPlacement {
       assertEquals(remaining * nodeCount,
           (long) scmNodeManager.getStats().getRemaining().get());
 
-      xceiverClientManager= new XceiverClientManager(conf);
+      xceiverClientManager = new XceiverClientManager(conf);
 
       ContainerInfo container = containerManager
           .allocateContainer(

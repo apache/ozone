@@ -444,7 +444,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setCloseContainer(CloseContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
-    if(encodedToken != null) {
+    if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
     client.sendCommand(request.build(), getValidatorList());
@@ -468,7 +468,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
-    if(encodedToken != null) {
+    if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
     ContainerCommandResponseProto response =
@@ -570,8 +570,8 @@ public final class ContainerProtocolCalls  {
     ContainerCommandRequestProto request = builder.build();
     Map<DatanodeDetails, ContainerCommandResponseProto> responses =
             xceiverClient.sendCommandOnAllNodes(request);
-    for(Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
-           responses.entrySet()){
+    for (Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
+           responses.entrySet()) {
       datanodeToResponseMap.put(entry.getKey(), entry.getValue().getGetBlock());
     }
     return datanodeToResponseMap;

@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 /**
  * This class is for maintaining Topology aware container placement statistics.
  */
-@Metrics(about="SCM Container Placement Metrics", context = OzoneConsts.OZONE)
+@Metrics(about = "SCM Container Placement Metrics", context = OzoneConsts.OZONE)
 public class SCMContainerPlacementMetrics implements MetricsSource {
   public static final String SOURCE_NAME =
       SCMContainerPlacementMetrics.class.getSimpleName();

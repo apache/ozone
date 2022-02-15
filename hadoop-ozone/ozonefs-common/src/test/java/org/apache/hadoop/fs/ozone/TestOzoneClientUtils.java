@@ -16,15 +16,25 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.IOException;
+
+import static org.junit.Assert.assertNull;
+import static org.mockito.Mockito.mock;
 
 /**
  * Tests the behavior of OzoneClientUtils APIs.
@@ -36,6 +46,31 @@ public class TestOzoneClientUtils {
       new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
   private ReplicationConfig ratis1ReplicationConfig =
       new RatisReplicationConfig(HddsProtos.ReplicationFactor.ONE);
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testNegativeLength() throws IOException {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    String keyName = "dummy";
+    ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
+        -1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC, clientProtocol);
+
+  }
+
+  @Test
+  public void testEmptyKeyName() throws IOException {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    String keyName = "";
+    ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    FileChecksum checksum =
+        OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
+            1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC,
+            clientProtocol);
+
+    assertNull(checksum);
+  }
 
   @Test
   public void testResolveClientSideRepConfigWhenBucketHasEC() {

@@ -51,7 +51,7 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
     boolean execReturn = scmClient.inSafeMode();
 
     // Output data list
-    if(execReturn){
+    if (execReturn) {
       LOG.info("SCM is in safe mode.");
       if (verbose) {
         for (Map.Entry<String, Pair<Boolean, String>> entry :

@@ -43,7 +43,7 @@ public class MockGatheringChannel implements GatheringByteChannel {
       throws IOException {
 
     checkElementIndex(offset, srcs.length, "offset");
-    checkElementIndex(offset+length-1, srcs.length, "offset+length");
+    checkElementIndex(offset + length - 1, srcs.length, "offset+length");
 
     long bytes = 0;
     for (ByteBuffer b : srcs) {

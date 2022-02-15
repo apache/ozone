@@ -248,7 +248,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   /**
    * Increases current position by one. Used in writes.
    */
-  void incCurrentPosition(){
+  void incCurrentPosition() {
     currentPosition++;
   }
 
@@ -281,7 +281,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.blockID = id;
   }
 
-  OzoneClientConfig getConf(){
+  OzoneClientConfig getConf() {
     return this.config;
   }
 
@@ -296,6 +296,18 @@ public class BlockOutputStreamEntry extends OutputStream {
   @VisibleForTesting
   public Pipeline getPipeline() {
     return this.pipeline;
+  }
+
+  /**
+   * Gets the Pipeline based on which the location report can be sent to the OM.
+   * This is necessary, as implementors might use special pipeline information
+   * that can be created during commit, but not during initialization,
+   * and might need to update some Pipeline information returned in
+   * OMKeyLocationInfo.
+   * @return
+   */
+  Pipeline getPipelineForOMLocationReport() {
+    return getPipeline();
   }
 
   long getCurrentPosition() {

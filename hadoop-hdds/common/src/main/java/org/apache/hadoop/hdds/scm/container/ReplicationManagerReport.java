@@ -238,7 +238,7 @@ public class ReplicationManagerReport {
     increment(stat);
     List<ContainerID> list = containerSample
         .computeIfAbsent(stat, k -> new ArrayList<>());
-    synchronized(list) {
+    synchronized (list) {
       if (list.size() < SAMPLE_LIMIT) {
         list.add(container);
       }

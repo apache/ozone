@@ -272,7 +272,7 @@ public class KeyValueContainerData extends ContainerData {
       builder.setBytesUsed(this.getBytesUsed());
     }
 
-    if(this.getContainerType() != null) {
+    if (this.getContainerType() != null) {
       builder.setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
     }
 

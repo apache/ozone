@@ -349,7 +349,7 @@ public class TestOzoneNativeAuthorizer {
     List<OzoneAcl> acls;
     String user = testUgi.getUserName();
     String group = (testUgi.getGroups().size() > 0) ?
-        testUgi.getGroups().get(0): "";
+        testUgi.getGroups().get(0) : "";
 
     RequestContext.Builder builder = new RequestContext.Builder()
         .setClientUgi(testUgi)
@@ -372,7 +372,7 @@ public class TestOzoneNativeAuthorizer {
       // Reset acls to only one right.
       if (obj.getResourceType() == VOLUME) {
         setVolumeAcl(Collections.singletonList(newAcl));
-      } else if (obj.getResourceType() == BUCKET){
+      } else if (obj.getResourceType() == BUCKET) {
         setBucketAcl(Collections.singletonList(newAcl));
       } else {
         aclImplementor.setAcl(obj, Collections.singletonList(newAcl));
@@ -450,7 +450,7 @@ public class TestOzoneNativeAuthorizer {
           // only DB not cache.
           if (obj.getResourceType() == VOLUME) {
             addVolumeAcl(addAcl);
-          } else if (obj.getResourceType() == BUCKET){
+          } else if (obj.getResourceType() == BUCKET) {
             addBucketAcl(addAcl);
           } else {
             aclImplementor.addAcl(obj, addAcl);

@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -397,8 +398,8 @@ public final class HddsServerUtil {
    */
   public static String getDatanodeIdFilePath(ConfigurationSource conf) {
     String dataNodeIDDirPath =
-        conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-    if (dataNodeIDDirPath == null) {
+        conf.getTrimmed(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
+    if (Strings.isNullOrEmpty(dataNodeIDDirPath)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       if (metaDirPath == null) {
         // this means meta data is not found, in theory should not happen at

@@ -49,7 +49,7 @@ public class WritableContainerFactory {
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
-    switch(repConfig.getReplicationType()) {
+    switch (repConfig.getReplicationType()) {
     case STAND_ALONE:
       return standaloneProvider
           .getContainer(size, repConfig, owner, excludeList);

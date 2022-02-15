@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -273,7 +274,7 @@ public class TestOzoneShellHA {
    * @return String array.
    */
   private String[] getHASetConfStrings(int numOfArgs) {
-    assert(numOfArgs >= 0);
+    assert (numOfArgs >= 0);
     String[] res = new String[1 + 1 + numOfOMs + numOfArgs];
     final int indexOmServiceIds = 0;
     final int indexOmNodes = 1;
@@ -289,7 +290,7 @@ public class TestOzoneShellHA {
 
     String[] omNodesArr = omNodesVal.split(",");
     // Sanity check
-    assert(omNodesArr.length == numOfOMs);
+    assert (omNodesArr.length == numOfOMs);
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
           getSetConfStringFromConf(ConfUtils.addKeySuffixes(
@@ -584,17 +585,22 @@ public class TestOzoneShellHA {
       Assert.assertEquals(0, res);
       // Verify key1 creation
       FileStatus statusPathKey1 = fs.getFileStatus(pathKey1);
+
+      FileChecksum previousFileChecksum = fs.getFileChecksum(pathKey1);
+
       Assert.assertEquals(strKey1, statusPathKey1.getPath().toString());
       // rm without -skipTrash. since trash interval > 0, should moved to trash
       res = ToolRunner.run(shell, new String[]{"-rm", strKey1});
       Assert.assertEquals(0, res);
+
+      FileChecksum afterFileChecksum = fs.getFileChecksum(trashPathKey1);
+
       // Verify that the file is moved to the correct trash location
       FileStatus statusTrashPathKey1 = fs.getFileStatus(trashPathKey1);
       // It'd be more meaningful if we actually write some content to the file
       Assert.assertEquals(
           statusPathKey1.getLen(), statusTrashPathKey1.getLen());
-      Assert.assertEquals(
-          fs.getFileChecksum(pathKey1), fs.getFileChecksum(trashPathKey1));
+      Assert.assertEquals(previousFileChecksum, afterFileChecksum);
 
       // Check delete skip trash behavior
       res = ToolRunner.run(shell, new String[]{"-touch", strKey2});
@@ -633,7 +639,7 @@ public class TestOzoneShellHA {
 
     // create volume: vol1 with bucket: bucket1
     final String testVolBucket = "/vol1/bucket1";
-    final String testKey = testVolBucket+"/key1";
+    final String testKey = testVolBucket + "/key1";
 
     final String[] volBucketArgs = new String[] {"-mkdir", "-p", testVolBucket};
     final String[] keyArgs = new String[] {"-touch", testKey};
@@ -661,7 +667,7 @@ public class TestOzoneShellHA {
 
     final String[] rmKeyArgs = new String[] {"-rm", "-R", testKey};
     final String[] rmTrashArgs = new String[] {"-rm", "-R",
-                                               testVolBucket+"/.Trash"};
+                                               testVolBucket + "/.Trash"};
     final Path trashPathKey1 = Path.mergePaths(new Path(
             new OFSPath(testKey).getTrashRoot(), new Path("Current")),
             new Path(testKey));
@@ -675,11 +681,11 @@ public class TestOzoneShellHA {
       Assert.assertEquals(0, res);
 
       LOG.info("Executing testDeleteTrashNoSkipTrash: key1 deleted moved to"
-              +" Trash: "+trashPathKey1.toString());
+              + " Trash: " + trashPathKey1.toString());
       fs.getFileStatus(trashPathKey1);
 
       LOG.info("Executing testDeleteTrashNoSkipTrash: deleting trash FsShell "
-              +"with args{}: ", Arrays.asList(rmTrashArgs));
+              + "with args{}: ", Arrays.asList(rmTrashArgs));
       res = ToolRunner.run(shell, rmTrashArgs);
       Assert.assertEquals(0, res);
 

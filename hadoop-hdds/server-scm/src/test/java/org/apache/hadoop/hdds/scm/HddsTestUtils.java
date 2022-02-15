@@ -613,7 +613,7 @@ public final class HddsTestUtils {
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:0");
     conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    if(scmStore.getState() != Storage.StorageState.INITIALIZED) {
+    if (scmStore.getState() != Storage.StorageState.INITIALIZED) {
       String clusterId = UUID.randomUUID().toString();
       String scmId = UUID.randomUUID().toString();
       scmStore.setClusterId(clusterId);

@@ -81,18 +81,18 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private void randomSeek(int dataLength, KeyInputStream keyInputStream,
       byte[] inputData) throws Exception {
     // Do random seek.
-    for (int i=0; i<dataLength - 300; i+=20) {
+    for (int i = 0; i < dataLength - 300; i += 20) {
       validate(keyInputStream, inputData, i, 200);
     }
 
     // Seek to end and read in reverse order. And also this is partial chunks
     // as readLength is 20, chunk length is 100.
-    for (int i=dataLength - 100; i>=100; i-=20) {
+    for (int i = dataLength - 100; i >= 100; i -= 20) {
       validate(keyInputStream, inputData, i, 20);
     }
 
     // Start from begin and seek such that we read partially chunks.
-    for (int i=0; i<dataLength - 300; i+=20) {
+    for (int i = 0; i < dataLength - 300; i += 20) {
       validate(keyInputStream, inputData, i, 90);
     }
 
@@ -198,7 +198,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     KeyInputStream keyInputStream = getKeyInputStream(keyName);
 
     // Seek to some where end.
-    validate(keyInputStream, inputData, dataLength-200, 100);
+    validate(keyInputStream, inputData, dataLength - 200, 100);
 
     // Now seek to start.
     validate(keyInputStream, inputData, 0, 140);

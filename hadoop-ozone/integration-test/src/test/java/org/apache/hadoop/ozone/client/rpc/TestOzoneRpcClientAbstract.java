@@ -207,7 +207,7 @@ public abstract class TestOzoneRpcClientAbstract {
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
   static void shutdownCluster() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
@@ -228,7 +228,7 @@ public abstract class TestOzoneRpcClientAbstract {
     TestOzoneRpcClientAbstract.ozClient = ozClient;
   }
 
-  public static void setOzoneManager(OzoneManager ozoneManager){
+  public static void setOzoneManager(OzoneManager ozoneManager) {
     TestOzoneRpcClientAbstract.ozoneManager = ozoneManager;
   }
 
@@ -1095,7 +1095,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
   private void writeKey(OzoneBucket bucket, String keyName,
       ReplicationFactor replication, String value, int valueLength)
-      throws IOException{
+      throws IOException {
     OzoneOutputStream out = bucket.createKey(keyName, valueLength, RATIS,
         replication, new HashMap<>());
     out.write(value.getBytes(UTF_8));
@@ -1104,7 +1104,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
   private void writeFile(OzoneBucket bucket, String keyName,
       ReplicationFactor replication, String value, int valueLength)
-      throws IOException{
+      throws IOException {
     OzoneOutputStream out = bucket.createFile(keyName, valueLength, RATIS,
         replication, true, true);
     out.write(value.getBytes(UTF_8));
@@ -1905,33 +1905,33 @@ public abstract class TestOzoneRpcClientAbstract {
     String volBase = "vol-list-";
     //Create 10 volume vol-list-a-0-<random> to vol-list-a-9-<random>
     String volBaseNameA = volBase + "a-";
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       store.createVolume(
           volBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5));
     }
     //Create 10 volume vol-list-b-0-<random> to vol-list-b-9-<random>
     String volBaseNameB = volBase + "b-";
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       store.createVolume(
           volBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
     }
     Iterator<? extends OzoneVolume> volIterator = store.listVolumes(volBase);
     int totalVolumeCount = 0;
-    while(volIterator.hasNext()) {
+    while (volIterator.hasNext()) {
       volIterator.next();
       totalVolumeCount++;
     }
     Assert.assertEquals(20, totalVolumeCount);
     Iterator<? extends OzoneVolume> volAIterator = store.listVolumes(
         volBaseNameA);
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       Assert.assertTrue(volAIterator.next().getName()
           .startsWith(volBaseNameA + i + "-"));
     }
     Assert.assertFalse(volAIterator.hasNext());
     Iterator<? extends OzoneVolume> volBIterator = store.listVolumes(
         volBaseNameB);
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       Assert.assertTrue(volBIterator.next().getName()
           .startsWith(volBaseNameB + i + "-"));
     }
@@ -1954,7 +1954,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     //Create 10 buckets in  vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameA = "bucket-a-";
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       volA.createBucket(
           bucketBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5));
       volB.createBucket(
@@ -1962,7 +1962,7 @@ public abstract class TestOzoneRpcClientAbstract {
     }
     //Create 10 buckets in vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameB = "bucket-b-";
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       volA.createBucket(
           bucketBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
       volB.createBucket(
@@ -1971,7 +1971,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneBucket> volABucketIter =
         volA.listBuckets("bucket-");
     int volABucketCount = 0;
-    while(volABucketIter.hasNext()) {
+    while (volABucketIter.hasNext()) {
       volABucketIter.next();
       volABucketCount++;
     }
@@ -1979,7 +1979,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneBucket> volBBucketIter =
         volA.listBuckets("bucket-");
     int volBBucketCount = 0;
-    while(volBBucketIter.hasNext()) {
+    while (volBBucketIter.hasNext()) {
       volBBucketIter.next();
       volBBucketCount++;
     }
@@ -1988,7 +1988,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneBucket> volABucketAIter =
         volA.listBuckets("bucket-a-");
     int volABucketACount = 0;
-    while(volABucketAIter.hasNext()) {
+    while (volABucketAIter.hasNext()) {
       volABucketAIter.next();
       volABucketACount++;
     }
@@ -1996,21 +1996,21 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneBucket> volBBucketBIter =
         volA.listBuckets("bucket-b-");
     int volBBucketBCount = 0;
-    while(volBBucketBIter.hasNext()) {
+    while (volBBucketBIter.hasNext()) {
       volBBucketBIter.next();
       volBBucketBCount++;
     }
     Assert.assertEquals(10, volBBucketBCount);
     Iterator<? extends OzoneBucket> volABucketBIter = volA.listBuckets(
         "bucket-b-");
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       Assert.assertTrue(volABucketBIter.next().getName()
           .startsWith(bucketBaseNameB + i + "-"));
     }
     Assert.assertFalse(volABucketBIter.hasNext());
     Iterator<? extends OzoneBucket> volBBucketAIter = volB.listBuckets(
         "bucket-a-");
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       Assert.assertTrue(volBBucketAIter.next().getName()
           .startsWith(bucketBaseNameA + i + "-"));
     }
@@ -2025,7 +2025,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     Iterator<? extends OzoneBucket> buckets = vol.listBuckets("");
-    while(buckets.hasNext()) {
+    while (buckets.hasNext()) {
       fail();
     }
   }
@@ -2119,7 +2119,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneKey> volABucketAIter =
         volAbucketA.listKeys("key-");
     int volABucketAKeyCount = 0;
-    while(volABucketAIter.hasNext()) {
+    while (volABucketAIter.hasNext()) {
       volABucketAIter.next();
       volABucketAKeyCount++;
     }
@@ -2127,7 +2127,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneKey> volABucketBIter =
         volAbucketB.listKeys("key-");
     int volABucketBKeyCount = 0;
-    while(volABucketBIter.hasNext()) {
+    while (volABucketBIter.hasNext()) {
       volABucketBIter.next();
       volABucketBKeyCount++;
     }
@@ -2135,7 +2135,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneKey> volBBucketAIter =
         volBbucketA.listKeys("key-");
     int volBBucketAKeyCount = 0;
-    while(volBBucketAIter.hasNext()) {
+    while (volBBucketAIter.hasNext()) {
       volBBucketAIter.next();
       volBBucketAKeyCount++;
     }
@@ -2143,7 +2143,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneKey> volBBucketBIter =
         volBbucketB.listKeys("key-");
     int volBBucketBKeyCount = 0;
-    while(volBBucketBIter.hasNext()) {
+    while (volBBucketBIter.hasNext()) {
       volBBucketBIter.next();
       volBBucketBKeyCount++;
     }
@@ -2151,14 +2151,14 @@ public abstract class TestOzoneRpcClientAbstract {
     Iterator<? extends OzoneKey> volABucketAKeyAIter =
         volAbucketA.listKeys("key-a-");
     int volABucketAKeyACount = 0;
-    while(volABucketAKeyAIter.hasNext()) {
+    while (volABucketAKeyAIter.hasNext()) {
       volABucketAKeyAIter.next();
       volABucketAKeyACount++;
     }
     Assert.assertEquals(10, volABucketAKeyACount);
     Iterator<? extends OzoneKey> volABucketAKeyBIter =
         volAbucketA.listKeys("key-b-");
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       Assert.assertTrue(volABucketAKeyBIter.next().getName()
           .startsWith("key-b-" + i + "-"));
     }
@@ -2175,7 +2175,7 @@ public abstract class TestOzoneRpcClientAbstract {
     vol.createBucket(bucket);
     OzoneBucket buc = vol.getBucket(bucket);
     Iterator<? extends OzoneKey> keys = buc.listKeys("");
-    while(keys.hasNext()) {
+    while (keys.hasNext()) {
       fail();
     }
   }
@@ -2825,11 +2825,11 @@ public abstract class TestOzoneRpcClientAbstract {
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(1, partName1);
 
-    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(2, partName2);
 
-    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(3, partName3);
 
@@ -2876,11 +2876,11 @@ public abstract class TestOzoneRpcClientAbstract {
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(1, partName1);
 
-    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(2, partName2);
 
-    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(3, partName3);
 
@@ -3265,7 +3265,7 @@ public abstract class TestOzoneRpcClientAbstract {
     List<OzoneAcl> expectedAcls = getAclList(new OzoneConfiguration());
 
     // Case:1 Add new acl permission to existing acl.
-    if(expectedAcls.size()>0) {
+    if (expectedAcls.size() > 0) {
       OzoneAcl oldAcl = expectedAcls.get(0);
       OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
           ACLType.READ_ACL, oldAcl.getAclScope());

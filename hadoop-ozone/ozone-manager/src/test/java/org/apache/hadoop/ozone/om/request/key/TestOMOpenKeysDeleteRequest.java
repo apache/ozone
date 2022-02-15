@@ -337,7 +337,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   private List<String> getFullOpenKeyNames(OpenKeyBucket... openKeyBuckets) {
     List<String> fullKeyNames = new ArrayList<>();
 
-    for(OpenKeyBucket keysPerBucket: openKeyBuckets) {
+    for (OpenKeyBucket keysPerBucket: openKeyBuckets) {
       String volume = keysPerBucket.getVolumeName();
       String bucket = keysPerBucket.getBucketName();
 

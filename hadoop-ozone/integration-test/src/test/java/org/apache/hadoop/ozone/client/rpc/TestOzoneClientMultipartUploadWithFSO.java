@@ -140,7 +140,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
   static void shutdownCluster() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
@@ -609,11 +609,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(1, partName1);
 
-    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(2, partName2);
 
-    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(3, partName3);
 
@@ -711,11 +711,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(1, partName1);
 
-    String partName2 =uploadPart(bucket, keyName, uploadID, 2,
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(2, partName2);
 
-    String partName3 =uploadPart(bucket, keyName, uploadID, 3,
+    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
         generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
     partsMap.put(3, partName3);
 

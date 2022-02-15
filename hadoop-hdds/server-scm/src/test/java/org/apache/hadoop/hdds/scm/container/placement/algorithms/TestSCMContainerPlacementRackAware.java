@@ -556,7 +556,7 @@ public class TestSCMContainerPlacementRackAware {
       dn.setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
     }
 
-    for (int i=0; i<10; i++) {
+    for (int i = 0; i < 10; i++) {
       // Set a random DN to in_service and ensure it is always picked
       int index = new Random().nextInt(dnInfos.size());
       dnInfos.get(index).setNodeStatus(NodeStatus.inServiceHealthy());

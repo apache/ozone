@@ -225,7 +225,7 @@ public final class OmKeyLocationInfo {
         getPipeline(keyLocation),
         keyLocation.getLength(),
         keyLocation.getOffset(), keyLocation.getPartNumber());
-    if(keyLocation.hasToken()) {
+    if (keyLocation.hasToken()) {
       info.token = (Token<OzoneBlockTokenIdentifier>)
               OzonePBHelper.tokenFromProto(keyLocation.getToken());
     }

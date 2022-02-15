@@ -54,7 +54,7 @@ public final class MockPipeline {
   public static Pipeline createPipeline(int numNodes) throws IOException {
     Preconditions.checkArgument(numNodes >= 1);
     final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
-    for(int i = 0; i < numNodes; i++) {
+    for (int i = 0; i < numNodes; i++) {
       ids.add(MockDatanodeDetails.randomLocalDatanodeDetails());
     }
     return createPipeline(ids);
