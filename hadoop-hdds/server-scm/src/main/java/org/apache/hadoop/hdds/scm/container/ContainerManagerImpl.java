@@ -157,19 +157,38 @@ public class ContainerManagerImpl implements ContainerManager {
     final List<ContainerID> containersIds =
         new ArrayList<>(containerStateManager.getContainerIDs());
     Collections.sort(containersIds);
-    return containersIds.stream()
-        .filter(id -> id.getId() >= start).limit(count)
-        .map(ContainerID::getProtobuf)
-        .map(containerStateManager::getContainer)
-        .collect(Collectors.toList());
+    List<ContainerInfo> containers;
+    lock.lock();
+    try {
+      containers = containersIds.stream()
+          .filter(id -> id.getId() >= start).limit(count)
+          .map(ContainerID::getProtobuf)
+          .map(containerStateManager::getContainer)
+          .collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    return containers;
   }
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
-    return containerStateManager.getContainerIDs(state).stream()
-        .map(ContainerID::getProtobuf)
-        .map(containerStateManager::getContainer)
-        .filter(Objects::nonNull).collect(Collectors.toList());
+    List<ContainerInfo> containers;
+    lock.lock();
+    try {
+      containers = containerStateManager.getContainerIDs(state).stream()
+          .map(ContainerID::getProtobuf)
+          .map(containerStateManager::getContainer)
+          .filter(Objects::nonNull).collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    return containers;
+  }
+
+  @Override
+  public int getContainerStateCount(final LifeCycleState state) {
+    return containerStateManager.getContainerIDs(state).size();
   }
 
   @Override
