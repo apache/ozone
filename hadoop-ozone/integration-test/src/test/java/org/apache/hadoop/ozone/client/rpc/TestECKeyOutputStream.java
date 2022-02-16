@@ -346,7 +346,7 @@ public class TestECKeyOutputStream {
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         // We wrote "inputData" twice, so do two reads and ensure the correct
         // data comes back.
-        for (int i = 0; i < 2; i++){
+        for (int i = 0; i < 2; i++) {
           byte[] fileContent = new byte[inputData.length];
           Assert.assertEquals(inputData.length, is.read(fileContent));
           Assert.assertEquals(new String(inputData, UTF_8),
