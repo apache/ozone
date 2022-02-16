@@ -41,6 +41,13 @@ import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERRO
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
+/**
+ * Compile tests against the annotation processor for the
+ * {@link RequestFeatureValidator} annotation.
+ *
+ * The processor should ensure the method signatures and return values, based
+ * on annotation arguments provided.
+ */
 public class TestRequestFeatureValidatorProcessor {
 
   private static final String CLASSNAME = "Validation";

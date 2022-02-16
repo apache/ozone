@@ -211,7 +211,7 @@ public class TestValidatorRegistry {
   }
 
   @Test
-  public void testValidatorsAreReturnedForMultiCondition(){
+  public void testValidatorsAreReturnedForMultiCondition() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(

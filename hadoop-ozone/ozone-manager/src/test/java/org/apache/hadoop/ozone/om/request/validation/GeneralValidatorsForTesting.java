@@ -33,8 +33,21 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 
-public class GeneralValidatorsForTesting {
+/**
+ * Some annotated request validator method, and facilities to help check if
+ * validations were properly called from tests where applicable.
+ */
+public final class GeneralValidatorsForTesting {
 
+  private GeneralValidatorsForTesting() { }
+
+  /**
+   * Interface to easily add listeners that get notified if a certain validator
+   * method defined in this class was called.
+   *
+   * @see TestRequestValidations for more details on how this intercace is
+   *      being used.
+   */
   @FunctionalInterface
   public interface ValidationListener {
     void validationCalled(String calledMethodName);
@@ -42,7 +55,7 @@ public class GeneralValidatorsForTesting {
 
   private static List<ValidationListener> listeners = new ArrayList<>();
 
-  public static void addListener(ValidationListener listener){
+  public static void addListener(ValidationListener listener) {
     listeners.add(listener);
   }
 
@@ -59,7 +72,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest preFinalizePreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx){
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("preFinalizePreProcessCreateKeyValidator");
     return req;
   }
@@ -69,7 +82,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse preFinalizePostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx){
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("preFinalizePostProcessCreateKeyValidator");
     return resp;
   }
@@ -79,7 +92,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest newClientPreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx){
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("newClientPreProcessCreateKeyValidator");
     return req;
   }
@@ -89,7 +102,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse newClientPostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx){
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("newClientPostProcessCreateKeyValidator");
     return resp;
   }
@@ -99,7 +112,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest oldClientPreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx){
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("oldClientPreProcessCreateKeyValidator");
     return req;
   }
@@ -109,7 +122,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse oldClientPostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx){
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("oldClientPostProcessCreateKeyValidator");
     return resp;
   }
@@ -119,7 +132,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest unconditionalPreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx){
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("unconditionalPreProcessCreateKeyValidator");
     return req;
   }
@@ -129,7 +142,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse unconditionalPostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx){
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("unconditionalPostProcessCreateKeyValidator");
     return resp;
   }
@@ -139,7 +152,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateVolume)
   public static OMRequest multiPurposePreProcessCreateVolumeValidator(
-      OMRequest req, ValidationContext ctx){
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("multiPurposePreProcessCreateVolumeValidator");
     return req;
   }
@@ -150,7 +163,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateVolume)
   public static OMResponse multiPurposePostProcessCreateVolumeValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx){
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("multiPurposePostProcessCreateVolumeValidator");
     return resp;
   }
@@ -160,7 +173,7 @@ public class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse newClientPostProcessCreateKeyValidator2(
-      OMRequest req, OMResponse resp, ValidationContext ctx){
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("newClientPostProcessCreateKeyValidator2");
     return resp;
   }

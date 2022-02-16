@@ -17,16 +17,15 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.ClientVersions;
 import org.apache.hadoop.ozone.om.request.validation.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import sun.jvm.hotspot.utilities.AssertionFailure;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,9 +35,14 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testing the RequestValidations class that is used to run the validation for
+ * any given request that arrives to OzoneManager.
+ */
 public class TestRequestValidations {
   private static final String PACKAGE =
       "org.apache.hadoop.ozone.om.request.validation";
@@ -63,8 +67,8 @@ public class TestRequestValidations {
   public void testUsingRegistryWithoutLoading() throws ServiceException {
     new RequestValidations()
         .fromPackage(PACKAGE)
-        .withinContext(of(aFinalizedVersionManager(), 0))
-        .validateRequest(aCreateKeyRequest(0));
+        .withinContext(of(aFinalizedVersionManager()))
+        .validateRequest(aCreateKeyRequest(currentClientVersion()));
   }
 
   @Test(expected = NullPointerException.class)
@@ -72,15 +76,15 @@ public class TestRequestValidations {
     new RequestValidations()
         .fromPackage(PACKAGE)
         .load()
-        .validateRequest(aCreateKeyRequest(0));
+        .validateRequest(aCreateKeyRequest(currentClientVersion()));
   }
 
   @Test
   public void testUsingRegistryWithoutPackage() throws ServiceException {
     new RequestValidations()
-        .withinContext(of(aFinalizedVersionManager(), 0))
+        .withinContext(of(aFinalizedVersionManager()))
         .load()
-        .validateRequest(aCreateKeyRequest(0));
+        .validateRequest(aCreateKeyRequest(currentClientVersion()));
 
     validationListener.assertNumOfEvents(1);
     validationListener
@@ -91,7 +95,7 @@ public class TestRequestValidations {
   public void testNoPreValdiationsWithoutValidationMethods()
       throws ServiceException {
     int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadEmptyValidations(ctx);
 
     validations.validateRequest(aCreateKeyRequest(omVersion));
@@ -102,12 +106,11 @@ public class TestRequestValidations {
   @Test
   public void testNoPostValdiationsWithoutValidationMethods()
       throws ServiceException {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadEmptyValidations(ctx);
 
-    validations
-        .validateResponse(aCreateKeyRequest(omVersion), aCreateKeyResponse());
+    validations.validateResponse(
+        aCreateKeyRequest(currentClientVersion()), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(0);
   }
@@ -115,11 +118,10 @@ public class TestRequestValidations {
   @Test
   public void testNoPreValidationsRunningForRequestTypeWithoutValidators()
       throws ServiceException {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
-    validations.validateRequest(aRenameKeyRequest(omVersion));
+    validations.validateRequest(aRenameKeyRequest(currentClientVersion()));
 
     validationListener.assertNumOfEvents(0);
   }
@@ -127,12 +129,11 @@ public class TestRequestValidations {
   @Test
   public void testNoPostValidationsAreRunningForRequestTypeWithoutValidators()
       throws ServiceException {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
-    validations.
-        validateResponse(aRenameKeyRequest(omVersion), aRenameKeyResponse());
+    validations.validateResponse(
+        aRenameKeyRequest(currentClientVersion()), aRenameKeyResponse());
 
     validationListener.assertNumOfEvents(0);
   }
@@ -140,11 +141,10 @@ public class TestRequestValidations {
   @Test
   public void testUnconditionalPreProcessValidationsAreCalled()
       throws ServiceException {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
-    validations.validateRequest(aCreateKeyRequest(omVersion));
+    validations.validateRequest(aCreateKeyRequest(currentClientVersion()));
 
     validationListener.assertNumOfEvents(1);
     validationListener
@@ -154,12 +154,11 @@ public class TestRequestValidations {
   @Test
   public void testUnconditionalPostProcessValidationsAreCalled()
       throws ServiceException {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
-    validations.
-        validateResponse(aCreateKeyRequest(omVersion), aCreateKeyResponse());
+    validations.validateResponse(
+        aCreateKeyRequest(currentClientVersion()), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(1);
     validationListener
@@ -168,14 +167,13 @@ public class TestRequestValidations {
 
   @Test
   public void testPreProcessorExceptionHandling() {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
     try {
-      validations.validateRequest(aDeleteKeysRequest(omVersion));
-      Assert.fail("ServiceException was expected but was not thrown.");
-    } catch (ServiceException ignored) {}
+      validations.validateRequest(aDeleteKeysRequest(currentClientVersion()));
+      fail("ServiceException was expected but was not thrown.");
+    } catch (ServiceException ignored) { }
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertCalled("throwingPreProcessValidator");
@@ -183,15 +181,14 @@ public class TestRequestValidations {
 
   @Test
   public void testPostProcessorExceptionHandling() {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
     try {
       validations.validateResponse(
-          aDeleteKeysRequest(omVersion), aDeleteKeysResponse());
-      Assert.fail("ServiceException was expected but was not thrown.");
-    } catch (ServiceException ignored) {}
+          aDeleteKeysRequest(currentClientVersion()), aDeleteKeysResponse());
+      fail("ServiceException was expected but was not thrown.");
+    } catch (ServiceException ignored) { }
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertCalled("throwingPostProcessValidator");
@@ -200,11 +197,10 @@ public class TestRequestValidations {
   @Test
   public void testNewClientConditionIsRecognizedAndPreValidatorsApplied()
       throws ServiceException {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
-    validations.validateRequest(aCreateKeyRequest(omVersion + 1));
+    validations.validateRequest(aCreateKeyRequest(newerClientVersion()));
 
     validationListener.assertNumOfEvents(2);
     validationListener.assertAllCalled(
@@ -215,12 +211,11 @@ public class TestRequestValidations {
   @Test
   public void testNewClientConditionIsRecognizedAndPostValidatorsApplied()
       throws ServiceException {
-    int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
-        aCreateKeyRequest(omVersion + 1), aCreateKeyResponse());
+        aCreateKeyRequest(newerClientVersion()), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(3);
     validationListener.assertAllCalled(
@@ -232,11 +227,10 @@ public class TestRequestValidations {
   @Test
   public void testOldClientConditionIsRecognizedAndPreValidatorsApplied()
       throws ServiceException {
-    int omVersion = 2;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
-    validations.validateRequest(aCreateKeyRequest(omVersion - 1));
+    validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
 
     validationListener.assertNumOfEvents(2);
     validationListener.assertAllCalled(
@@ -247,12 +241,11 @@ public class TestRequestValidations {
   @Test
   public void testOldClientConditionIsRecognizedAndPostValidatorsApplied()
       throws ServiceException {
-    int omVersion = 2;
-    ValidationContext ctx = of(aFinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
-        aCreateKeyRequest(omVersion - 1), aCreateKeyResponse());
+        aCreateKeyRequest(olderClientVersion()), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(2);
     validationListener.assertAllCalled(
@@ -261,14 +254,12 @@ public class TestRequestValidations {
   }
 
   @Test
-  public void
-  testPreFinalizedWithOldClientConditionIsRecognizedAndPreValidatorsApplied()
+  public void testPreFinalizedWithOldClientConditionPreProcValidatorsApplied()
       throws ServiceException {
-    int omVersion = 2;
-    ValidationContext ctx = of(anUnfinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(anUnfinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
-    validations.validateRequest(aCreateKeyRequest(omVersion - 1));
+    validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
 
     validationListener.assertNumOfEvents(3);
     validationListener.assertAllCalled(
@@ -278,15 +269,13 @@ public class TestRequestValidations {
   }
 
   @Test
-  public void
-  testPreFinalizedWithOldClientConditionIsRecognizedAndPostValidatorsApplied()
+  public void testPreFinalizedWithOldClientConditionPostProcValidatorsApplied()
       throws ServiceException {
-    int omVersion = 2;
-    ValidationContext ctx = of(anUnfinalizedVersionManager(), omVersion);
+    ValidationContext ctx = of(anUnfinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
-        aCreateKeyRequest(omVersion - 1), aCreateKeyResponse());
+        aCreateKeyRequest(olderClientVersion()), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(3);
     validationListener.assertAllCalled(
@@ -309,21 +298,33 @@ public class TestRequestValidations {
         .load();
   }
 
-  private OMRequest aCreateKeyRequest(int version) {
-    return aRequest(CreateKey, version);
+  private int olderClientVersion() {
+    return ClientVersions.CURRENT_VERSION - 1;
   }
 
-  private OMRequest aDeleteKeysRequest(int version) {
-    return aRequest(DeleteKeys, version);
+  private int currentClientVersion() {
+    return ClientVersions.CURRENT_VERSION;
   }
 
-  private OMRequest aRenameKeyRequest(int version) {
-    return aRequest(RenameKey, version);
+  private int newerClientVersion() {
+    return ClientVersions.CURRENT_VERSION + 1;
   }
 
-  private OMRequest aRequest(Type type, int version) {
+  private OMRequest aCreateKeyRequest(int clientVersion) {
+    return aRequest(CreateKey, clientVersion);
+  }
+
+  private OMRequest aDeleteKeysRequest(int clientVersion) {
+    return aRequest(DeleteKeys, clientVersion);
+  }
+
+  private OMRequest aRenameKeyRequest(int clientVersion) {
+    return aRequest(RenameKey, clientVersion);
+  }
+
+  private OMRequest aRequest(Type type, int clientVersion) {
     return OMRequest.newBuilder()
-        .setVersion(version)
+        .setVersion(clientVersion)
         .setCmdType(type)
         .setClientId("TestClient")
         .build();
@@ -361,14 +362,14 @@ public class TestRequestValidations {
   }
 
   private static class ValidationListenerImpl implements ValidationListener {
-    List<String> calledMethods = new ArrayList<>();
+    private List<String> calledMethods = new ArrayList<>();
 
     @Override
     public void validationCalled(String calledMethodName) {
       calledMethods.add(calledMethodName);
     }
 
-    public void attach(){
+    public void attach() {
       GeneralValidatorsForTesting.addListener(this);
     }
 
@@ -384,8 +385,7 @@ public class TestRequestValidations {
     public void assertCalled(String... methodNames) {
       for (String methodName : methodNames) {
         if (!calledMethods.contains(methodName)) {
-          throw new AssertionFailure("Expected method call for " + methodName
-              + " did not happened.");
+          fail("Expected method call for " + methodName + " did not happened.");
         }
       }
     }
@@ -394,19 +394,18 @@ public class TestRequestValidations {
       List<String> calls = new ArrayList<>(calledMethods);
       for (String methodName : methodNames) {
         if (!calls.remove(methodName)) {
-          throw new AssertionFailure("Expected method call for " + methodName
-              + " did not happened.");
+          fail("Expected method call for " + methodName + " did not happened.");
         }
       }
       if (!calls.isEmpty()) {
-        throw new AssertionFailure("Some of the methods were not called."
+        fail("Some of the methods were not called."
             + "Missing calls for: " + calls);
       }
     }
 
     public void assertNumOfEvents(int count) {
       if (calledMethods.size() != count) {
-        throw new AssertionFailure("Unexpected validation call count."
+        fail("Unexpected validation call count."
             + " Expected: " + count + "; Happened: " + calledMethods.size());
       }
     }
