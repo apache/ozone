@@ -62,17 +62,32 @@ Create Key
                    Should not contain  ${output}       Failed
     Log            Uploaded ${file} to ${key}
 
+Verify Bucket Default Replication Config
+    [arguments]    ${bucket}
+    ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig'
+                   Should Be Equal          ${result}       null
+
+Verify Bucket Legacy Replication Config
+    [arguments]    ${bucket}    ${type}    ${factor}
+    ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig.replicationType, .replicationConfig.replicationFactor'
+                   Verify Legacy Replication Config     ${result}   ${type}     ${factor}
+
+Verify Legacy Replication Config
+    [arguments]    ${result}    ${type}    ${factor}
+                   Should Match Regexp      ${result}       ^(?m)${type}$
+                   Should Match Regexp      ${result}       ^(?m)${factor}$
+
 Verify Bucket EC Replication Config
     [arguments]    ${bucket}    ${encoding}    ${data}    ${parity}    ${chunksize}
     ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
-                   Verify Replication Config    ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
+                   Verify EC Replication Config     ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
 
 Verify Key EC Replication Config
     [arguments]    ${key}    ${encoding}    ${data}    ${parity}    ${chunksize}
     ${result} =    Execute                      ozone sh key info ${key} | jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize'
-                   Verify Replication Config    ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
+                   Verify EC Replication Config     ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
 
-Verify Replication Config
+Verify EC Replication Config
     [arguments]    ${result}    ${encoding}    ${data}    ${parity}    ${chunksize}
                    Should Match Regexp      ${result}       ^(?m)EC$
                    Should Match Regexp      ${result}       ^(?m)${encoding}$

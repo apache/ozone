@@ -38,10 +38,12 @@ Prepare For Tests
 Test Bucket Creation
     ${result} =     Execute             ozone sh volume create /${prefix}vol1
                     Should not contain  ${result}       Failed
+    ${result} =     Execute             ozone sh bucket create /${prefix}vol1/${prefix}bucket
+                    Should not contain  ${result}       Failed
+                    Verify Bucket Default Replication Config    /${prefix}vol1/${prefix}bucket
     ${result} =     Execute             ozone sh bucket create --replication 3 --type RATIS /${prefix}vol1/${prefix}ratis
                     Should not contain  ${result}       Failed
-    ${result} =     Execute             ozone sh bucket list /${prefix}vol1 | jq -r '.[] | select(.name | contains("${prefix}ratis")) | .replicationConfig.replicationType'
-                    Should contain      ${result}       RATIS
+                    Verify Bucket Legacy Replication Config     /${prefix}vol1/${prefix}ratis   RATIS   THREE
     ${result} =     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /${prefix}vol1/${prefix}ec
                     Should not contain  ${result}       Failed
                     Verify Bucket EC Replication Config    /${prefix}vol1/${prefix}ec    RS    3    2    1048576
