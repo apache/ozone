@@ -37,8 +37,8 @@ public class RequestValidations {
   private static final String DEFAULT_PACKAGE = "org.apache.hadoop.ozone";
 
   private String validationsPackageName = DEFAULT_PACKAGE;
-  private ValidationContext context = ValidationContext.of(null, -1);
-  private ValidatorRegistry registry = ValidatorRegistry.emptyRegistry();
+  private ValidationContext context = null;
+  private ValidatorRegistry registry = null;
 
   public RequestValidations fromPackage(String packageName) {
     validationsPackageName = packageName;

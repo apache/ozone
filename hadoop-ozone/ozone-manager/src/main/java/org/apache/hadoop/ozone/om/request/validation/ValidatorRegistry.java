@@ -24,9 +24,12 @@ import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 
 import java.lang.reflect.Method;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -38,14 +41,13 @@ import java.util.Set;
  */
 public class ValidatorRegistry {
 
-  private
-      EnumMap<
-          ValidationCondition, EnumMap<Type, Pair<List<Method>, List<Method>>>>
+  private final EnumMap<
+      ValidationCondition, EnumMap<Type, Pair<List<Method>, List<Method>>>>
       validators = new EnumMap<>(ValidationCondition.class);
 
   /**
    * Creates a {@link ValidatorRegistry} instance that discovers validation
-   * methods in the provided package and its sub-packages.
+   * methods in the provided package and the packages in the same resource.
    * A validation method is recognized by the {@link RequestFeatureValidator}
    * annotation that contains important information about how and when to use
    * the validator.
@@ -53,8 +55,27 @@ public class ValidatorRegistry {
    *                         be discovered.
    */
   ValidatorRegistry(String validatorPackage) {
-    initMaps(validatorPackage);
-    System.out.println(validators.entrySet());
+    this(ClasspathHelper.forPackage(validatorPackage));
+  }
+
+  /**
+   * Creates a {@link ValidatorRegistry} instance that discovers validation
+   * methods under the provided URL.
+   * A validation method is recognized by the {@link RequestFeatureValidator}
+   * annotation that contains important information about how and when to use
+   * the validator.
+   * @param searchUrls the path in which the annotated methods are searched.
+   */
+  ValidatorRegistry(Collection<URL> searchUrls) {
+    Reflections reflections = new Reflections(new ConfigurationBuilder()
+        .setUrls(searchUrls)
+        .setScanners(new MethodAnnotationsScanner())
+        .useParallelExecutor()
+    );
+
+    Set<Method> describedValidators =
+        reflections.getMethodsAnnotatedWith(RequestFeatureValidator.class);
+    initMaps(describedValidators);
   }
 
   /**
@@ -76,13 +97,13 @@ public class ValidatorRegistry {
       return Collections.emptyList();
     }
 
-    List<Method> returnValue =
-        validationsFor(conditions.get(0), requestType, phase);
+    Set<Method> returnValue =
+        new HashSet<>(validationsFor(conditions.get(0), requestType, phase));
 
     for (int i = 1; i < conditions.size(); i++) {
       returnValue.addAll(validationsFor(conditions.get(i), requestType, phase));
     }
-    return returnValue;
+    return new ArrayList<>(returnValue);
   }
 
   /**
@@ -113,9 +134,9 @@ public class ValidatorRegistry {
 
     List<Method> returnValue = new LinkedList<>();
     if (phase.equals(RequestProcessingPhase.PRE_PROCESS)) {
-      returnValue = phases.getLeft();
+      returnValue.addAll(phases.getLeft());
     } else if (phase.equals(RequestProcessingPhase.POST_PROCESS)) {
-      returnValue = phases.getRight();
+      returnValue.addAll(phases.getRight());
     }
     return returnValue;
   }
@@ -128,19 +149,9 @@ public class ValidatorRegistry {
    *     - values are Pair of lists, in which
    *       - left side is the pre-processing validations list
    *       - right side is the post-processing validations list
-   * @param validatorPackage the package in which the methods annotated with
-   *                         {@link RequestFeatureValidator} are gathered.
+   * @param describedValidators collection of the annotated methods to process.
    */
-  void initMaps(String validatorPackage) {
-    Reflections reflections = new Reflections(new ConfigurationBuilder()
-        .setUrls(ClasspathHelper.forPackage(validatorPackage))
-        .setScanners(new MethodAnnotationsScanner())
-        .useParallelExecutor()
-    );
-
-    Set<Method> describedValidators =
-        reflections.getMethodsAnnotatedWith(RequestFeatureValidator.class);
-
+  void initMaps(Collection<Method> describedValidators) {
     for (Method m : describedValidators) {
       RequestFeatureValidator descriptor =
           m.getAnnotation(RequestFeatureValidator.class);
@@ -165,10 +176,6 @@ public class ValidatorRegistry {
   }
 
   private <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
-    if (defaultValue == null) {
-      throw new NullPointerException(
-          "Entry can not be initialized with null value.");
-    }
     V inMapValue = from.get(key);
     if (inMapValue == null || !from.containsKey(key)) {
       from.put(key, defaultValue);
@@ -189,19 +196,6 @@ public class ValidatorRegistry {
 
   private Pair<List<Method>, List<Method>> newListPair() {
     return Pair.of(new ArrayList<>(), new ArrayList<>());
-  }
-
-  static ValidatorRegistry emptyRegistry() {
-    return new ValidatorRegistry("") {
-      @Override
-      List<Method> validationsFor(List<ValidationCondition> conditions,
-          Type requestType, RequestProcessingPhase phase) {
-        return Collections.emptyList();
-      }
-
-      @Override
-      void initMaps(String validatorPackage) { }
-    };
   }
 
 }
