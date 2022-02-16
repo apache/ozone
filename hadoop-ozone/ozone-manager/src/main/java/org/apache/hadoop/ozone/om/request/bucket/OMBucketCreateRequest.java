@@ -149,7 +149,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
     }
-
+    if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
+      omMetrics.incNumFSOBucketCreates();
+    }
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
