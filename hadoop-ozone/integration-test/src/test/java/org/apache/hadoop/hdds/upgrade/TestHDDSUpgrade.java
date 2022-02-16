@@ -28,7 +28,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE;
@@ -78,6 +77,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
@@ -155,8 +155,9 @@ public class TestHDDSUpgrade {
         .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)
         .setHbInterval(500)
         .setHbProcessorInterval(500)
-        .setScmLayoutVersion(INITIAL_VERSION.layoutVersion())
-        .setDnLayoutVersion(INITIAL_VERSION.layoutVersion());
+        .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion())
+        .setScmLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
     // Setting the provider to a max of 100 clusters. Some of the tests here
     // use multiple clusters, so its hard to know exactly how many will be
@@ -189,7 +190,7 @@ public class TestHDDSUpgrade {
    * Some tests repeatedly modify the cluster. Helper function to reload the
    * latest SCM state.
    */
-  private void loadSCMState(){
+  private void loadSCMState() {
     scm = cluster.getStorageContainerManager();
     scmContainerManager = scm.getContainerManager();
     scmPipelineManager = scm.getPipelineManager();
@@ -219,7 +220,7 @@ public class TestHDDSUpgrade {
    * Helper function to test Pre-Upgrade conditions on the SCM
    */
   private void testPreUpgradeConditionsSCM() {
-    Assert.assertEquals(INITIAL_VERSION.layoutVersion(),
+    Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
     for (ContainerInfo ci : scmContainerManager.getContainers()) {
       Assert.assertEquals(HddsProtos.LifeCycleState.OPEN, ci.getState());
@@ -503,7 +504,7 @@ public class TestHDDSUpgrade {
       IOException {
     // For some tests this could get called in a different thread context.
     // We need to guard concurrent updates to the cluster.
-    synchronized(cluster) {
+    synchronized (cluster) {
       cluster.restartStorageContainerManager(true);
       loadSCMState();
     }
@@ -1090,7 +1091,7 @@ public class TestHDDSUpgrade {
     // Verify that new pipeline can be created with upgraded datanodes.
     try {
       testPostUpgradePipelineCreation();
-    } catch(SCMException e) {
+    } catch (SCMException e) {
       // If pipeline creation fails, make sure that there is a valid reason
       // for this i.e. all datanodes are already part of some pipeline.
       for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {

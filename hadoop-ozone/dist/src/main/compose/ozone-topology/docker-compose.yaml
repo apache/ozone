@@ -17,7 +17,7 @@
 version: "3"
 services:
    datanode_1:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
@@ -33,7 +33,7 @@ services:
          net:
             ipv4_address: 10.5.0.4
    datanode_2:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
@@ -49,7 +49,7 @@ services:
          net:
             ipv4_address: 10.5.0.5
    datanode_3:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
@@ -65,7 +65,7 @@ services:
          net:
             ipv4_address: 10.5.0.6
    datanode_4:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
@@ -81,7 +81,7 @@ services:
          net:
             ipv4_address: 10.5.0.7
    datanode_5:
-     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
      privileged: true #required by the profiler
      volumes:
        - ../..:/opt/hadoop
@@ -97,7 +97,7 @@ services:
        net:
          ipv4_address: 10.5.0.8
    datanode_6:
-     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
      privileged: true #required by the profiler
      volumes:
        - ../..:/opt/hadoop
@@ -113,7 +113,7 @@ services:
        net:
          ipv4_address: 10.5.0.9
    om:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -130,7 +130,7 @@ services:
          net:
             ipv4_address: 10.5.0.70
    scm:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop

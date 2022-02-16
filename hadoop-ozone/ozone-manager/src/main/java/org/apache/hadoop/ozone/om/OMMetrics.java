@@ -31,7 +31,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  * This class is for maintaining Ozone Manager statistics.
  */
 @InterfaceAudience.Private
-@Metrics(about="Ozone Manager Metrics", context="dfs")
+@Metrics(about = "Ozone Manager Metrics", context = "dfs")
 public class OMMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
@@ -246,17 +246,17 @@ public class OMMetrics {
 
   public void setNumKeys(long val) {
     long oldVal = this.numKeys.value();
-    this.numKeys.incr(val- oldVal);
+    this.numKeys.incr(val - oldVal);
   }
 
   public void setNumDirs(long val) {
     long oldVal = this.numDirs.value();
-    this.numDirs.incr(val- oldVal);
+    this.numDirs.incr(val - oldVal);
   }
 
   public void setNumFiles(long val) {
     long oldVal = this.numDirs.value();
-    this.numDirs.incr(val- oldVal);
+    this.numDirs.incr(val - oldVal);
   }
 
   public void decNumKeys(long val) {

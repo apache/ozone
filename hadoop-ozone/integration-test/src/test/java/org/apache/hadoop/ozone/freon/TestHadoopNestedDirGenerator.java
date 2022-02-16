@@ -152,28 +152,28 @@ public class TestHadoopNestedDirGenerator {
                         int span, int actualDepth) throws IOException {
     int depth = 0;
     Path p = null;
-    if(span > 0){
+    if (span > 0) {
       depth = 0;
-    } else if(span == 0){
+    } else if (span == 0) {
       depth = 1;
-    } else{
+    } else {
       LOG.info("Span value can never be negative");
     }
     LinkedList<FileStatus> queue = new LinkedList<FileStatus>();
     FileStatus f1 = fileStatuses[0];
     queue.add(f1);
-    while(queue.size() != 0){
+    while (queue.size() != 0) {
       FileStatus f = queue.poll();
       FileStatus[] temp = fs.listStatus(f.getPath());
-      if(temp.length > 0){
+      if (temp.length > 0) {
         ++depth;
-        for(int i = 0; i < temp.length; i++){
+        for (int i = 0; i < temp.length; i++) {
           queue.add(temp[i]);
         }
       }
-      if(span == 0){
+      if (span == 0) {
         p = f.getPath();
-      } else{
+      } else {
         p = f.getPath().getParent();
       }
     }
@@ -188,17 +188,17 @@ public class TestHadoopNestedDirGenerator {
      * and count the span directories.
      */
 
-  private int spanCheck(FileSystem fs, int span, Path p) throws IOException{
+  private int spanCheck(FileSystem fs, int span, Path p) throws IOException {
     int sp = 0;
     int depth = 0;
-    if(span >= 0){
+    if (span >= 0) {
       depth = 0;
-    } else{
+    } else {
       LOG.info("Span value can never be negative");
     }
     FileStatus[] fileStatuses = fs.listStatus(p);
-    for (FileStatus fileStatus : fileStatuses){
-      if(fileStatus.isDirectory()){
+    for (FileStatus fileStatus : fileStatuses) {
+      if (fileStatus.isDirectory()) {
         ++sp;
       }
     }

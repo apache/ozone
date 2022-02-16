@@ -263,7 +263,7 @@ public final class OmUtils {
     case ListMultipartUploads:
     case FinalizeUpgradeProgress:
     case PrepareStatus:
-    case GetS3Volume:
+    case GetS3VolumeContext:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
@@ -495,7 +495,7 @@ public final class OmUtils {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
-    if(Boolean.valueOf(keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
+    if (Boolean.valueOf(keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
@@ -505,7 +505,7 @@ public final class OmUtils {
     // Set the updateID
     keyInfo.setUpdateID(trxnLogIndex, isRatisEnabled);
 
-    if(repeatedOmKeyInfo == null) {
+    if (repeatedOmKeyInfo == null) {
       //The key doesn't exist in deletedTable, so create a new instance.
       repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyInfo);
     } else {

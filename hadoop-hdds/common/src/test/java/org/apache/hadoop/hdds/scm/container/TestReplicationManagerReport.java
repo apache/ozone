@@ -22,7 +22,10 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Tests for the ReplicationManagerReport class.
@@ -109,5 +112,51 @@ public class TestReplicationManagerReport {
     for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT; i++) {
       Assert.assertEquals(new ContainerID(i), sample.get(i));
     }
+  }
+
+  @Test
+  public void testSerializeToProtoAndBack() {
+    report.setTimestamp(12345);
+    Random rand = ThreadLocalRandom.current();
+    for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
+      report.setStat(s.toString(), rand.nextInt(Integer.MAX_VALUE));
+    }
+    for (ReplicationManagerReport.HealthState s :
+        ReplicationManagerReport.HealthState.values()) {
+      report.setStat(s.toString(), rand.nextInt(Integer.MAX_VALUE));
+      List<ContainerID> containers = new ArrayList<>();
+      for (int i = 0; i < 10; i++) {
+        containers.add(ContainerID.valueOf(rand.nextInt(Integer.MAX_VALUE)));
+      }
+      report.setSample(s.toString(), containers);
+    }
+    HddsProtos.ReplicationManagerReportProto proto = report.toProtobuf();
+    ReplicationManagerReport newReport
+        = ReplicationManagerReport.fromProtobuf(proto);
+    Assert.assertEquals(report.getReportTimeStamp(),
+        newReport.getReportTimeStamp());
+
+    for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
+      Assert.assertEquals(report.getStat(s), newReport.getStat(s));
+    }
+
+    for (ReplicationManagerReport.HealthState s :
+        ReplicationManagerReport.HealthState.values()) {
+      Assert.assertTrue(report.getSample(s).equals(newReport.getSample(s)));
+    }
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testStatCannotBeSetTwice() {
+    report.setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10);
+    report.setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10);
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testSampleCannotBeSetTwice() {
+    List<ContainerID> containers = new ArrayList<>();
+    containers.add(ContainerID.valueOf(1));
+    report.setSample(HddsProtos.LifeCycleState.CLOSED.toString(), containers);
+    report.setSample(HddsProtos.LifeCycleState.CLOSED.toString(), containers);
   }
 }

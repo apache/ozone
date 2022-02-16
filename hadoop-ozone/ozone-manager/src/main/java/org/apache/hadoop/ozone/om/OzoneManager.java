@@ -128,6 +128,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
@@ -2236,7 +2237,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     UserGroupInformation user;
     if (getS3Auth() != null) {
       String principal =
-          OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId());
+          OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId());
       user = UserGroupInformation.createRemoteUser(principal);
     } else {
       user = ProtobufRpcEngine.Server.getRemoteUser();
@@ -2408,11 +2409,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
-        String volumeName = obj.getVolumeName() != null?
-                "Volume:" + obj.getVolumeName() + " ": "";
-        String bucketName = obj.getBucketName() != null?
-                "Bucket:" + obj.getBucketName() + " ": "";
-        String keyName = obj.getKeyName() != null?
+        String volumeName = obj.getVolumeName() != null ?
+                "Volume:" + obj.getVolumeName() + " " : "";
+        String bucketName = obj.getBucketName() != null ?
+                "Bucket:" + obj.getBucketName() + " " : "";
+        String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
         LOG.warn("User {} doesn't have {} permission to access {} {}{}{}",
             context.getClientUgi().getUserName(), context.getAclRights(),
@@ -3062,7 +3063,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               accessId);
           throw new NullPointerException("accessIdInfo is null");
         }
-        assert(accessIdInfo.getUserPrincipal().equals(userPrincipal));
+        assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
             .setTenantName(accessIdInfo.getTenantId())
@@ -3135,12 +3136,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public OmVolumeArgs getS3Volume() throws IOException {
+  public S3VolumeContext getS3VolumeContext() throws IOException {
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
     // to the default S3 volume.
     String s3Volume = HddsClientUtils.getDefaultS3VolumeName(configuration);
     S3Authentication s3Auth = getS3Auth();
+    String userPrincipal = Server.getRemoteUser().getShortUserName();
 
     if (s3Auth != null) {
       String accessID = s3Auth.getAccessId();
@@ -3168,6 +3170,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                   "tenant {} is directed to the volume {}.", accessID, tenantId,
               s3Volume);
         }
+
+        // Inject user name to the response to be used for KMS on the client
+        userPrincipal = OzoneAclUtils.accessIdToUserPrincipal(accessID);
       } else if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
             "requests to default s3 volume {}.", accessID, s3Volume);
@@ -3181,8 +3186,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           s3Volume);
     }
 
-    // This call performs acl checks and checks volume existence.
-    return getVolumeInfo(s3Volume);
+    // getVolumeInfo() performs acl checks and checks volume existence.
+    final S3VolumeContext.Builder s3VolumeContext = S3VolumeContext.newBuilder()
+        .setOmVolumeArgs(getVolumeInfo(s3Volume))
+        .setUserPrincipal(userPrincipal);
+
+    return s3VolumeContext.build();
   }
 
   @Override
@@ -3920,7 +3929,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (getS3Auth() != null) {
         ugi = UserGroupInformation
             .createRemoteUser(
-                OzoneAclUtils.principalToAccessID(getS3Auth().getAccessId()));
+                OzoneAclUtils.accessIdToUserPrincipal(
+                    getS3Auth().getAccessId()));
       }
       InetAddress remoteIp = Server.getRemoteIp();
       resolved = resolveBucketLink(requested, new HashSet<>(),
@@ -4018,7 +4028,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       // Add volume and user info to DB and cache.
 
-      OmVolumeArgs omVolumeArgs = createS3VolumeInfo(s3VolumeName, objectID);
+      OmVolumeArgs omVolumeArgs = createS3VolumeContext(s3VolumeName, objectID);
 
       String dbUserKey = metadataManager.getUserKey(userName);
       PersistedUserVolumeInfo userVolumeInfo =
@@ -4029,7 +4039,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
 
       // Commit to DB.
-      try(BatchOperation batchOperation =
+      try (BatchOperation batchOperation =
           metadataManager.getStore().initBatchOperation()) {
         metadataManager.getVolumeTable().putWithBatch(batchOperation,
             dbVolumeKey, omVolumeArgs);
@@ -4052,7 +4062,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private OmVolumeArgs createS3VolumeInfo(String s3Volume,
+  private OmVolumeArgs createS3VolumeContext(String s3Volume,
       long objectID) throws IOException {
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
     long time = Time.now();

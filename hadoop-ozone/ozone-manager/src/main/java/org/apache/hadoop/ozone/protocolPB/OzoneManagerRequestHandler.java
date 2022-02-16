@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
@@ -80,7 +81,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
@@ -91,6 +92,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -227,9 +229,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
-      case GetS3Volume:
-        GetS3VolumeResponse s3VolumeResponse = getS3Volume();
-        responseBuilder.setGetS3VolumeResponse(s3VolumeResponse);
+      case GetS3VolumeContext:
+        GetS3VolumeContextResponse s3VolumeContextResponse =
+            getS3VolumeContext();
+        responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
         break;
       case TenantGetUserInfo:
         TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
@@ -372,6 +375,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   private TenantGetUserInfoResponse tenantGetUserInfo(
       TenantGetUserInfoRequest request) throws IOException {
 
@@ -390,6 +394,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   private TenantListUserResponse tenantListUsers(
       TenantListUserRequest request) throws IOException {
     TenantListUserResponse.Builder builder =
@@ -406,6 +411,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
   private ListTenantResponse listTenant(
       ListTenantRequest request) throws IOException {
 
@@ -708,12 +714,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
-  private GetS3VolumeResponse getS3Volume()
+  private GetS3VolumeContextResponse getS3VolumeContext()
       throws IOException {
-    OmVolumeArgs s3VolArgs = impl.getS3Volume();
-    return GetS3VolumeResponse.newBuilder()
-        .setVolumeInfo(s3VolArgs.getProtobuf())
-        .build();
+    return impl.getS3VolumeContext().getProtobuf();
   }
 
   public OzoneManager getOzoneManager() {
