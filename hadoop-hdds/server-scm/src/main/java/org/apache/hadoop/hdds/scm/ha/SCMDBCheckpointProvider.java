@@ -37,7 +37,7 @@ public class SCMDBCheckpointProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMDBCheckpointProvider.class);
-  private transient DBStore scmDbStore;;
+  private transient DBStore scmDbStore;
 
   public SCMDBCheckpointProvider(DBStore scmDbStore) {
     this.scmDbStore = scmDbStore;
