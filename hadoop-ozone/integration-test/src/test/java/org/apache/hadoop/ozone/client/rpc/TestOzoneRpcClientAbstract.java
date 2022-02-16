@@ -591,7 +591,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testCreateBucketWithVersioning()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -639,6 +639,23 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testCreateBucketWithReplicationConfig()
+      throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    ReplicationConfig repConfig = new ECReplicationConfig(3, 2);
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(repConfig))
+        .build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    Assert.assertEquals(bucketName, bucket.getName());
+    Assert.assertEquals(repConfig, bucket.getReplicationConfig());
+  }
+
+  @Test
   public void testCreateBucketWithAllArgument()
       throws IOException {
     String volumeName = UUID.randomUUID().toString();
@@ -647,18 +664,21 @@ public abstract class TestOzoneRpcClientAbstract {
         ACLType.ALL, ACCESS);
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(userAcl);
+    ReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVersioning(true)
         .setStorageType(StorageType.SSD)
-        .setAcls(acls);
+        .setAcls(acls)
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(repConfig));
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertEquals(true, bucket.getVersioning());
     Assert.assertEquals(StorageType.SSD, bucket.getStorageType());
     Assert.assertTrue(bucket.getAcls().contains(userAcl));
+    Assert.assertEquals(repConfig, bucket.getReplicationConfig());
   }
 
   @Test
@@ -672,7 +692,6 @@ public abstract class TestOzoneRpcClientAbstract {
         "Bucket or Volume name has an unsupported" +
             " character : #",
         () -> volume.createBucket(bucketName));
-
   }
 
   @Test
@@ -800,7 +819,6 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(bucketName, newBucket.getName());
     Assert.assertEquals(StorageType.SSD, newBucket.getStorageType());
   }
-
 
   @Test
   public void testDeleteBucket()
@@ -2015,7 +2033,6 @@ public abstract class TestOzoneRpcClientAbstract {
           .startsWith(bucketBaseNameA + i + "-"));
     }
     Assert.assertFalse(volBBucketAIter.hasNext());
-
   }
 
   @Test
@@ -2028,6 +2045,43 @@ public abstract class TestOzoneRpcClientAbstract {
     while (buckets.hasNext()) {
       fail();
     }
+  }
+
+  @Test
+  public void testListBucketsReplicationConfig()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+
+    // bucket-level replication config: null (default)
+    String bucketName = UUID.randomUUID().toString();
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.listBuckets(bucketName).next();
+    Assert.assertNull(bucket.getReplicationConfig());
+
+    // bucket-level replication config: EC/rs-3-2-1024k
+    String ecBucketName = UUID.randomUUID().toString();
+    ReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+    BucketArgs ecBucketArgs = BucketArgs.newBuilder()
+        .setDefaultReplicationConfig(
+            new DefaultReplicationConfig(ecRepConfig))
+        .build();
+    volume.createBucket(ecBucketName, ecBucketArgs);
+    OzoneBucket ecBucket = volume.listBuckets(ecBucketName).next();
+    Assert.assertEquals(ecRepConfig, ecBucket.getReplicationConfig());
+
+    // bucket-level replication config: RATIS/THREE
+    String ratisBucketName = UUID.randomUUID().toString();
+    ReplicationConfig ratisRepConfig = ReplicationConfig
+        .fromTypeAndFactor(RATIS, THREE);
+    BucketArgs ratisBucketArgs = BucketArgs.newBuilder()
+        .setDefaultReplicationConfig(
+            new DefaultReplicationConfig(ratisRepConfig))
+        .build();
+    volume.createBucket(ratisBucketName, ratisBucketArgs);
+    OzoneBucket ratisBucket = volume.listBuckets(ratisBucketName).next();
+    Assert.assertEquals(ratisRepConfig, ratisBucket.getReplicationConfig());
   }
 
   @Test
