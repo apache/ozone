@@ -3682,16 +3682,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
-    final String replication = configuration.get(
+    final String replication = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_KEY,
-        OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT
-    );
-    final String type = configuration.get(
+        OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
+    final String type = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
-        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT
-    );
+        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
     return ReplicationConfig.parse(ReplicationType.valueOf(type),
-        replication, new OzoneConfiguration());
+        replication, configuration);
   }
 
   public String getOMDefaultBucketLayout() {
