@@ -98,7 +98,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
                     .GrpcOmTransportConfig.class)
                 .getPort()));
       } else {
-        LOG.error("expected host address not defined: {}", rpcAddrKey);
+        LOG.error("expected host address not defined for: {}", rpcAddrKey);
         throw new ConfigurationException(rpcAddrKey + "is not defined");
       }
       omNodeIDList.add(nodeId);

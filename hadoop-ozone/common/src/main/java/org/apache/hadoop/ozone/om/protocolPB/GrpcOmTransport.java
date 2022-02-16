@@ -199,7 +199,7 @@ public class GrpcOmTransport implements OmTransport {
     return grpcException;
   }
 
-  private boolean shouldRetry(Exception ex) {
+  private synchronized boolean shouldRetry(Exception ex) {
     boolean retry = false;
     RetryPolicy.RetryAction action = null;
     try {
