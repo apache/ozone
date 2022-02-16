@@ -2983,7 +2983,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       final OmDBTenantInfo tenantInfo = cacheEntry.getValue().getCacheValue();
       if (tenantInfo != null) {
         // Sanity check. Key should be the same as tenantId in OmDBTenantInfo
-        assert(tenantId.equals(tenantInfo.getTenantId()));
+        assert (tenantId.equals(tenantInfo.getTenantId()));
         tenantInfoSet.add(tenantInfo);
       } else {
         // CacheValue is null indicates the tenant entry is invalidated
@@ -3007,7 +3007,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         // Tenant is already deleted, skip it
         continue;
       }
-      assert(tenantId.equals(tenantInfo.getTenantId()));
+      assert (tenantId.equals(tenantInfo.getTenantId()));
       // Add to the TreeSet first so it is sorted
       tenantInfoSet.add(tenantInfo);
     }
