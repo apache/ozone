@@ -110,7 +110,7 @@ public class TestMiniOzoneCluster {
     FileUtils.deleteQuietly(READ_TMP);
   }
 
-  @Test(timeout = 60000)
+  @Test(timeout = 120000)
   public void testStartMultipleDatanodes() throws Exception {
     final int numberOfNodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -305,8 +305,8 @@ public class TestMiniOzoneCluster {
    * Test that a DN can register with SCM even if it was started before the SCM.
    * @throws Exception
    */
-  @Test (timeout = 100000)
-  public void testDNstartAfterSCM() throws Exception {
+  @Test(timeout = 200000)
+  public void testDNStartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -351,7 +351,7 @@ public class TestMiniOzoneCluster {
    * Test that multiple datanode directories are created in MiniOzoneCluster.
    * @throws Exception
    */
-  @Test (timeout = 60000)
+  @Test(timeout = 60000)
   public void testMultipleDataDirs() throws Exception {
     // Start a cluster with 3 DN and configure reserved space in each DN
     String reservedSpace = "1B";
