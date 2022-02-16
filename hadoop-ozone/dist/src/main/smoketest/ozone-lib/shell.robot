@@ -62,17 +62,22 @@ Create Key
                    Should not contain  ${output}       Failed
     Log            Uploaded ${file} to ${key}
 
-Verify Bucket Default Replication Config
+Verify Bucket Empty Replication Config
     [arguments]    ${bucket}
     ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig'
                    Should Be Equal          ${result}       null
 
-Verify Bucket Legacy Replication Config
+Verify Bucket Replica Replication Config
     [arguments]    ${bucket}    ${type}    ${factor}
     ${result} =    Execute                      ozone sh bucket info ${bucket} | jq -r '.replicationConfig.replicationType, .replicationConfig.replicationFactor'
-                   Verify Legacy Replication Config     ${result}   ${type}     ${factor}
+                   Verify Replica Replication Config    ${result}   ${type}     ${factor}
 
-Verify Legacy Replication Config
+Verify Key Replica Replication Config
+    [arguments]    ${key}    ${type}    ${factor}
+    ${result} =    Execute                      ozone sh key info ${key} | jq -r '.replicationConfig.replicationType, .replicationConfig.replicationFactor'
+                   Verify Replica Replication Config    ${result}   ${type}     ${factor}
+
+Verify Replica Replication Config
     [arguments]    ${result}    ${type}    ${factor}
                    Should Match Regexp      ${result}       ^(?m)${type}$
                    Should Match Regexp      ${result}       ^(?m)${factor}$
