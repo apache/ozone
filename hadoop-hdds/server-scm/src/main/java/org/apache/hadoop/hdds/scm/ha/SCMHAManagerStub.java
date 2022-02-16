@@ -42,7 +42,8 @@ import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.protocol.TermIndex;
 
 /**
- * SCMHAManagerStub implementation for Recon and testing.
+ * SCMHAManagerStub implementation for Recon and testing. It uses
+ * RatisServerStub for HA implementation of components in Recon.
  */
 public final class SCMHAManagerStub implements SCMHAManager {
 
@@ -63,7 +64,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
    * Creates SCMHAManagerStub instance.
    */
   private SCMHAManagerStub(boolean isLeader) {
-    this(isLeader, new MockSCMHADBTransactionBuffer());
+    this(isLeader, new SCMHADBTransactionBufferStub());
   }
 
   private SCMHAManagerStub(boolean isLeader, DBTransactionBuffer buffer) {

@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -139,7 +139,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testCreatePipeline() throws Exception {
     SCMHADBTransactionBuffer buffer1 =
-        new MockSCMHADBTransactionBuffer(dbStore);
+        new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer1);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
@@ -156,7 +156,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
 
     SCMHADBTransactionBuffer buffer2 =
-        new MockSCMHADBTransactionBuffer(dbStore);
+        new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
@@ -188,7 +188,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testUpdatePipelineStates() throws Exception {
-    SCMHADBTransactionBuffer buffer = new MockSCMHADBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =
@@ -470,7 +470,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
     SCMHADBTransactionBuffer buffer1 =
-        new MockSCMHADBTransactionBuffer(dbStore);
+        new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer1);
 
@@ -651,7 +651,7 @@ public class TestPipelineManagerImpl {
   public void testAddContainerWithClosedPipeline() throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
             captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
-    SCMHADBTransactionBuffer buffer = new MockSCMHADBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
             createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =
