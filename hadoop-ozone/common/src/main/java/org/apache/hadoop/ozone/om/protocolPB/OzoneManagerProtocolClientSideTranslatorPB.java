@@ -1506,6 +1506,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     dbUpdatesWrapper.setCurrentSequenceNumber(
         dbUpdatesResponse.getSequenceNumber());
+    dbUpdatesWrapper.setLatestSequenceNumber(
+        dbUpdatesResponse.getLatestSequenceNumber());
     return dbUpdatesWrapper;
   }
 
