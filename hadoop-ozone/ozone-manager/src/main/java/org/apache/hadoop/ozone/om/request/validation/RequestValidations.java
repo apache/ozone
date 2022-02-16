@@ -41,7 +41,7 @@ public class RequestValidations {
   private ValidationContext context = null;
   private ValidatorRegistry registry = null;
 
-  public RequestValidations fromPackage(String packageName) {
+  public synchronized RequestValidations fromPackage(String packageName) {
     validationsPackageName = packageName;
     return this;
   }

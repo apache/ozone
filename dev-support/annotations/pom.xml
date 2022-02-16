@@ -30,6 +30,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <build>
     <plugins>
+      <!--
+       | It is required to add spotbugs dependency here, so that CI can check
+       | this package properly and does not fail the findbugs check.
+      -->
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
@@ -40,6 +44,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <includeTests>true</includeTests>
         </configuration>
       </plugin>
+      <!--
+       | Compiler plugin configuration have to be modified to compile the
+       | annotation processor, without having any annotation processor applied
+       | as due to the presence of
+       | META-INF/services/javac.annotation.processing.Processor the compilation
+       | would fail as the linked processor class can not be find while we are
+       | compiling it.
+      -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -57,13 +69,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <include>org/apache/ozone/annotations/**</include>
               </includes>
             </configuration>
-          </execution>
-          <execution>
-            <id>compile-project</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>compile</goal>
-            </goals>
           </execution>
         </executions>
       </plugin>

@@ -164,6 +164,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
 
     <findbugs.version>3.0.0</findbugs.version>
+    <!--
+      | Keep this in sync with the version used in
+      | /dev-support/annotatons/pom.xml
+      -->
     <spotbugs.version>3.1.12</spotbugs.version>
     <dnsjava.version>2.1.7</dnsjava.version>
 
