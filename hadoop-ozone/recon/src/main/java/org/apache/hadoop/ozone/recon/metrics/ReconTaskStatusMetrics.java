@@ -75,7 +75,7 @@ public class ReconTaskStatusMetrics implements MetricsSource {
               rts.getTaskName()));
       builder.addGauge(RECORD_INFO_LAST_UPDATED_TS,
           rts.getLastUpdatedTimestamp());
-      builder.addGauge(RECORD_INFO_LAST_UPDATED_SEQ,
+      builder.addCounter(RECORD_INFO_LAST_UPDATED_SEQ,
           rts.getLastUpdatedSeqNumber());
       builder.endRecord();
     });
