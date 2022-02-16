@@ -41,7 +41,7 @@ import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERRO
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
-public class TestRequestFeatureValidator {
+public class TestRequestFeatureValidatorProcessor {
 
   private static final String CLASSNAME = "Validation";
 
