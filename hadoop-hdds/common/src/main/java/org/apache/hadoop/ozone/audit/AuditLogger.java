@@ -38,7 +38,7 @@ public class AuditLogger {
    * Parametrized Constructor to initialize logger.
    * @param type Audit Logger Type
    */
-  public AuditLogger(AuditLoggerType type){
+  public AuditLogger(AuditLoggerType type) {
     initializeLogger(type);
   }
 
@@ -46,7 +46,7 @@ public class AuditLogger {
    * Initializes the logger with specific type.
    * @param loggerType specified one of the values from enum AuditLoggerType.
    */
-  private void initializeLogger(AuditLoggerType loggerType){
+  private void initializeLogger(AuditLoggerType loggerType) {
     this.logger = LogManager.getContext(false).getLogger(loggerType.getType());
   }
 

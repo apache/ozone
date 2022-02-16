@@ -133,7 +133,7 @@ public class TestOneReplicaPipelineSafeModeRule {
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
-    firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount -1));
+    firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount - 1));
 
     // As 90% of 7 with ceil is 7, if we send 6 pipeline reports, rule
     // validate should be still false.
@@ -144,7 +144,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     Assert.assertFalse(rule.validate());
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.subList(pipelineFactorThreeCount -1,
+    firePipelineEvent(pipelines.subList(pipelineFactorThreeCount - 1,
             pipelineFactorThreeCount));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
@@ -181,13 +181,13 @@ public class TestOneReplicaPipelineSafeModeRule {
         pipelineManager.getPipelines(
             new RatisReplicationConfig(ReplicationFactor.THREE));
 
-    firePipelineEvent(pipelines.subList(0, pipelineCountThree -1));
+    firePipelineEvent(pipelines.subList(0, pipelineCountThree - 1));
 
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 6"), 1000, 5000);
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.subList(pipelineCountThree -1,
+    firePipelineEvent(pipelines.subList(pipelineCountThree - 1,
             pipelineCountThree));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);

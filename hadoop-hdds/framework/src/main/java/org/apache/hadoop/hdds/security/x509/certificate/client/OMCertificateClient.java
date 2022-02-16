@@ -37,8 +37,8 @@ public class OMCertificateClient extends CommonCertificateClient {
   public OMCertificateClient(SecurityConfig securityConfig,
       String certSerialId, String localCrlId) {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
-    this.setLocalCrlId(localCrlId!=null ?
-        Long.parseLong(localCrlId): 0);
+    this.setLocalCrlId(localCrlId != null ?
+        Long.parseLong(localCrlId) : 0);
   }
 
   public OMCertificateClient(SecurityConfig securityConfig,

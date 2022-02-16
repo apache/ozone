@@ -36,6 +36,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -47,6 +48,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
@@ -1065,5 +1067,21 @@ public class BasicRootedOzoneClientAdapterImpl
   public boolean isFSOptimizedBucket() {
     // TODO: Need to refine this part.
     return false;
+  }
+
+  @Override
+  public FileChecksum getFileChecksum(String keyName, long length)
+      throws IOException {
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+
+    OFSPath ofsPath = new OFSPath(keyName);
+
+    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    return OzoneClientUtils.getFileChecksumWithCombineMode(
+        volume, bucket, ofsPath.getKeyName(),
+        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
+
   }
 }

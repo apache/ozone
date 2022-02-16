@@ -31,6 +31,8 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -55,6 +58,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -89,6 +94,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
@@ -531,7 +537,7 @@ public class RpcClient implements ClientProtocol {
 
     List<OzoneAcl> listOfAcls = getAclList();
     //ACLs from BucketArgs
-    if(bucketArgs.getAcls() != null) {
+    if (bucketArgs.getAcls() != null) {
       listOfAcls.addAll(bucketArgs.getAcls());
     }
 
@@ -850,7 +856,7 @@ public class RpcClient implements ClientProtocol {
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation);
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
-      try{
+      try {
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
         builder.addAllMetadata(gKey.getKeyDetails());
       } catch (Exception e) {
@@ -921,6 +927,63 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> >
+      getKeysEveryReplicas(String volumeName,
+                         String bucketName,
+                         String keyName) throws IOException {
+
+    Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> > result
+        = new LinkedHashMap<>();
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setRefreshPipeline(true)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
+        .build();
+
+    OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+    List<OmKeyLocationInfo> keyLocationInfos
+        = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
+
+    for (OmKeyLocationInfo keyLocationInfo : keyLocationInfos) {
+      Map<DatanodeDetails, OzoneInputStream> blocks = new HashMap<>();
+
+      Pipeline pipelineBefore = keyLocationInfo.getPipeline();
+      List<DatanodeDetails> datanodes = pipelineBefore.getNodes();
+
+      for (DatanodeDetails dn : datanodes) {
+        List<DatanodeDetails> nodes = new ArrayList<>();
+        nodes.add(dn);
+        Pipeline pipeline
+            = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
+            .setId(PipelineID.randomId()).build();
+        keyLocationInfo.setPipeline(pipeline);
+
+        List<OmKeyLocationInfo> keyLocationInfoList = new ArrayList<>();
+        keyLocationInfoList.add(keyLocationInfo);
+        OmKeyLocationInfoGroup keyLocationInfoGroup
+            = new OmKeyLocationInfoGroup(0, keyLocationInfoList);
+        List<OmKeyLocationInfoGroup> keyLocationInfoGroups = new ArrayList<>();
+        keyLocationInfoGroups.add(keyLocationInfoGroup);
+
+        keyInfo.setKeyLocationVersions(keyLocationInfoGroups);
+        OzoneInputStream is = createInputStream(keyInfo, Function.identity());
+
+        blocks.put(dn, is);
+      }
+
+      result.put(keyLocationInfo, blocks);
+    }
+
+    return result;
+  }
+
+  @Override
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive)
       throws IOException {
@@ -952,7 +1015,7 @@ public class RpcClient implements ClientProtocol {
       String fromKeyName, String toKeyName) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    if(checkKeyNameEnabled){
+    if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(toKeyName);
     }
     HddsClientUtils.checkNotNull(fromKeyName, toKeyName);
@@ -1094,13 +1157,13 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    if(checkKeyNameEnabled) {
+    if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName, uploadID);
-    Preconditions.checkArgument(partNumber > 0 && partNumber <=10000, "Part " +
+    Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000, "Part " +
         "number should be greater than zero and less than or equal to 10000");
-    Preconditions.checkArgument(size >=0, "size should be greater than or " +
+    Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
     String requestId = UUID.randomUUID().toString();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -1445,7 +1508,7 @@ public class RpcClient implements ClientProtocol {
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
-      for(LengthInputStream lengthInputStream : lengthInputStreams) {
+      for (LengthInputStream lengthInputStream : lengthInputStreams) {
         final OzoneCryptoInputStream ozoneCryptoInputStream =
             new OzoneCryptoInputStream(lengthInputStream,
                 OzoneKMSUtil.getCryptoCodec(conf, feInfo),
@@ -1483,11 +1546,11 @@ public class RpcClient implements ClientProtocol {
               decrypted.getMaterial(), feInfo.getIV());
       return new OzoneOutputStream(cryptoOut);
     } else {
-      try{
+      try {
         GDPRSymmetricKey gk;
         Map<String, String> openKeyMetadata =
             openKey.getKeyInfo().getMetadata();
-        if(Boolean.valueOf(openKeyMetadata.get(OzoneConsts.GDPR_FLAG))){
+        if (Boolean.valueOf(openKeyMetadata.get(OzoneConsts.GDPR_FLAG))) {
           gk = new GDPRSymmetricKey(
               openKeyMetadata.get(OzoneConsts.GDPR_SECRET),
               openKeyMetadata.get(OzoneConsts.GDPR_ALGORITHM)
@@ -1496,7 +1559,7 @@ public class RpcClient implements ClientProtocol {
           return new OzoneOutputStream(
               new CipherOutputStream(keyOutputStream, gk.getCipher()));
         }
-      }catch (Exception ex){
+      }  catch (Exception ex) {
         throw new IOException(ex);
       }
 

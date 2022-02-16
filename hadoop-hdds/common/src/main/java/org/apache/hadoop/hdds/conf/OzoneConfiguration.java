@@ -296,7 +296,7 @@ public class OzoneConfiguration extends Configuration
     return configMap;
   }
 
-  private static void addDeprecatedKeys(){
+  private static void addDeprecatedKeys() {
     Configuration.addDeprecations(new DeprecationDelta[]{
         new DeprecationDelta("ozone.datanode.pipeline.limit",
             ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT),
@@ -305,7 +305,9 @@ public class OzoneConfiguration extends Configuration
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
         new DeprecationDelta("dfs.datanode.keytab.file",
-            DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY)
+            DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+        new DeprecationDelta("ozone.scm.chunk.layout",
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY)
     });
   }
 }

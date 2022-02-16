@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.freon;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 /**
  * Test for HadoopDirTreeGenerator - prefix layout.
@@ -27,7 +27,7 @@ public class TestHadoopDirTreeGeneratorWithFSO
 
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true);
+    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     return conf;
   }
 
