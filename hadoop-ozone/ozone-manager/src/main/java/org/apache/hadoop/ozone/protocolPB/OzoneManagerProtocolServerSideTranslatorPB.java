@@ -121,9 +121,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         new RequestValidations()
             .fromPackage(OM_REQUESTS_PACKAGE)
             .withinContext(
-                ValidationContext.of(
-                    ozoneManager.getVersionManager(),
-                    getServerProtocolVersion()))
+                ValidationContext.of(ozoneManager.getVersionManager()))
             .load();
   }
 
@@ -140,11 +138,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         request.getCmdType(), request.getTraceID());
     
     return requestValidations.validateResponse(request, response);
-  }
-
-  //TODO find out versioning and where it comes from...
-  private int getServerProtocolVersion() {
-    return 0;
   }
 
   private OMResponse processRequest(OMRequest request) throws

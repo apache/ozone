@@ -16,11 +16,13 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
  * A context that contains useful information for request validator instances.
  */
+@InterfaceStability.Evolving
 public interface ValidationContext {
 
   /**
@@ -33,30 +35,17 @@ public interface ValidationContext {
   LayoutVersionManager versionManager();
 
   /**
-   * Provides the protocol version of the server side running.
-   * @return the server side protocol version
-   */
-  int serverVersion();
-
-  /**
    * Creates a context object based on the given parameters.
    *
    * @param versionManager the {@link LayoutVersionManager} of the service
-   * @param serverVersion the server side protocol version
    * @return the {@link ValidationContext} specified by the parameters.
    */
-  static ValidationContext of(
-      LayoutVersionManager versionManager,
-      int serverVersion) {
+  static ValidationContext of(LayoutVersionManager versionManager) {
+
     return new ValidationContext() {
       @Override
       public LayoutVersionManager versionManager() {
         return versionManager;
-      }
-
-      @Override
-      public int serverVersion() {
-        return serverVersion;
       }
     };
   }

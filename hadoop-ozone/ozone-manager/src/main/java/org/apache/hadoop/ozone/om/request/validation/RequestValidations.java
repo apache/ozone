@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.ClientVersions;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -91,8 +92,8 @@ public class RequestValidations {
   private List<ValidationCondition> conditions(OMRequest request) {
     List<ValidationCondition> conditions = new LinkedList<>();
     conditions.add(ValidationCondition.UNCONDITIONAL);
-    if (context.serverVersion() != request.getVersion()) {
-      if (context.serverVersion() < request.getVersion()) {
+    if (ClientVersions.CURRENT_VERSION != request.getVersion()) {
+      if (ClientVersions.CURRENT_VERSION < request.getVersion()) {
         conditions.add(ValidationCondition.NEWER_CLIENT_REQUESTS);
       } else {
         conditions.add(ValidationCondition.OLDER_CLIENT_REQUESTS);
