@@ -388,10 +388,6 @@ public class TestOzoneContainer {
           .getChunksCount();
       ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
 
-      // Delete block must fail on a closed container.
-      request =
-          ContainerTestHelper.getDeleteBlockRequest(client.getPipeline(),
-              putBlockRequest.getPutBlock());
       response = client.sendCommand(request);
       Assert.assertNotNull(response);
       Assert.assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO,

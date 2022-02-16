@@ -470,34 +470,6 @@ public final class ContainerTestHelper {
         response.getGetBlock().getBlockData().getChunksCount());
   }
 
-  /**
-   * @param pipeline - pipeline.
-   * @param putBlockRequest - putBlockRequest.
-   * @return - Request
-   */
-  public static ContainerCommandRequestProto getDeleteBlockRequest(
-      Pipeline pipeline, ContainerProtos.PutBlockRequestProto putBlockRequest)
-      throws IOException {
-    return newDeleteBlockRequestBuilder(pipeline, putBlockRequest).build();
-  }
-
-  public static Builder newDeleteBlockRequestBuilder(Pipeline pipeline,
-      ContainerProtos.PutBlockRequestProtoOrBuilder putBlockRequest)
-      throws IOException {
-    DatanodeBlockID blockID = putBlockRequest.getBlockData().getBlockID();
-    LOG.trace("deleteBlock: name={}", blockID);
-    ContainerProtos.DeleteBlockRequestProto.Builder delRequest =
-        ContainerProtos.DeleteBlockRequestProto.newBuilder();
-    delRequest.setBlockID(blockID);
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
-    request.setCmdType(ContainerProtos.Type.DeleteBlock);
-    request.setContainerID(blockID.getContainerID());
-    request.setDeleteBlock(delRequest);
-    request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request;
-  }
-
   public static Builder newGetCommittedBlockLengthBuilder(Pipeline pipeline,
       ContainerProtos.PutBlockRequestProtoOrBuilder putBlock)
       throws IOException {
