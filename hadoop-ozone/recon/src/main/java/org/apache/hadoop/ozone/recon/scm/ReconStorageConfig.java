@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_STORAGE_DIR;
 
 import java.io.IOException;
@@ -40,8 +41,10 @@ public class ReconStorageConfig extends SCMStorageConfig {
   public static final String RECON_ID = "uuid";
 
   @Inject
-  public ReconStorageConfig(OzoneConfiguration conf) throws IOException {
-    super(NodeType.RECON, ReconUtils.getReconScmDbDir(conf), RECON_STORAGE_DIR);
+  public ReconStorageConfig(OzoneConfiguration conf, ReconUtils reconUtils)
+      throws IOException {
+    super(NodeType.RECON, reconUtils.getReconDbDir(conf, OZONE_RECON_DB_DIR),
+        RECON_STORAGE_DIR);
   }
 
   public void setReconCertSerialId(String certSerialId) throws IOException {
