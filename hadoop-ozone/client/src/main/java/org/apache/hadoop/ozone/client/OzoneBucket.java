@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -153,7 +152,8 @@ public class OzoneBucket extends WithMetadata {
     this.volumeName = volumeName;
     this.name = bucketName;
 
-    this.defaultReplication = ReplicationConfig.getDefault(conf);
+    // Bucket level replication is not configured by default.
+    this.defaultReplication = null;
 
     this.proxy = proxy;
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
@@ -249,14 +249,8 @@ public class OzoneBucket extends WithMetadata {
                   .fromTypeAndFactor(defaultReplicationConfig.getType(),
                       defaultReplicationConfig.getFactor());
     } else {
-      // This can happen when talk to old server. So, using old client side
-      // defaults.
-      this.defaultReplication = ReplicationConfig.parse(
-          ReplicationType.valueOf(
-              conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-                  OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT)),
-          conf.get(OzoneConfigKeys.OZONE_REPLICATION,
-              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT), conf);
+      // Bucket level replication is not configured by default.
+      this.defaultReplication = null;
     }
   }
 
