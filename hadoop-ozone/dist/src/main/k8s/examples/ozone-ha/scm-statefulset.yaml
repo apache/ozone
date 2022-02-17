@@ -61,6 +61,9 @@ spec:
         envFrom:
         - configMapRef:
             name: config
+        volumeMounts:
+          - name: data
+            mountPath: /data
       containers:
       - name: scm
         image: '@docker.image@'
@@ -77,12 +80,6 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /data
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 2Gi
+      volumes:
+      - name: data
+        emptyDir: {}
