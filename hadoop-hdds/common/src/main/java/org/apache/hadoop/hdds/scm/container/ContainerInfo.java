@@ -135,10 +135,9 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   /**
-   * This method is depricated, use {@code containerID()} which returns
-   * {@link ContainerID} object.
+   * Unless the long value of the ContainerID is needed, use the containerID()
+   * method to obtain the {@link ContainerID} object.
    */
-  @Deprecated
   @JsonProperty
   public long getContainerID() {
     return containerID.getId();

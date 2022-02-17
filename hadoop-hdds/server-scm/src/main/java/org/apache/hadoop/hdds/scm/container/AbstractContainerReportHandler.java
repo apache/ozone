@@ -92,17 +92,17 @@ public class AbstractContainerReportHandler {
    *
    * @param datanodeDetails DatanodeDetails of the node which reported
    *                        this replica
-   * @param container ContainerInfo represending the container
+   * @param containerInfo ContainerInfo represending the container
    * @param replicaProto ContainerReplica
    * @param publisher EventPublisher instance
    *
    * @throws IOException In case of any Exception while processing the report
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
-      final ContainerInfo container, final ContainerReplicaProto replicaProto,
-      final EventPublisher publisher)
+      final ContainerInfo containerInfo,
+      final ContainerReplicaProto replicaProto, final EventPublisher publisher)
       throws IOException, InvalidStateTransitionException {
-    final ContainerID containerId = container.containerID();
+    final ContainerID containerId = containerInfo.containerID();
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
@@ -110,9 +110,9 @@ public class AbstractContainerReportHandler {
     }
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
-    synchronized (container) {
-      updateContainerStats(datanodeDetails, container, replicaProto);
-      if (!updateContainerState(datanodeDetails, container, replicaProto,
+    synchronized (containerInfo) {
+      updateContainerStats(datanodeDetails, containerInfo, replicaProto);
+      if (!updateContainerState(datanodeDetails, containerInfo, replicaProto,
           publisher)) {
         updateContainerReplica(datanodeDetails, containerId, replicaProto);
       }
