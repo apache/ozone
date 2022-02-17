@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
@@ -189,8 +190,10 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
+        boolean readOnly = ContainerInspectorUtil.isReadOnly(
+            ContainerProtos.ContainerType.KeyValueContainer);
         store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, true);
+            kvContainerData, config, readOnly);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
@@ -254,6 +257,11 @@ public final class KeyValueContainerUtil {
       if (!isBlockMetadataSet) {
         initializeUsedBytesAndBlockCount(store, kvContainerData);
       }
+
+      // Run advanced container inspection/repair operations if specified on
+      // startup. If this method is called but not as a part of startup,
+      // The inspectors will be unloaded and this will be a no-op.
+      ContainerInspectorUtil.process(kvContainerData, store);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
