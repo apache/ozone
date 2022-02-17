@@ -111,10 +111,6 @@ public class TestRefreshVolumeUsageHandler {
     key.write("test".getBytes(UTF_8));
     key.close();
 
-    //we set HDDS_NODE_REPORT_INTERVAL to 1s , let the cluster run for
-    // 5s to enable several node report.
-    Thread.sleep(5000L);
-
     //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
     //so scm does not get the latest usage info of this datanode for now.
     Assert.assertTrue(
