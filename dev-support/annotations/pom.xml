@@ -64,7 +64,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
        | as due to the presence of
        | META-INF/services/javac.annotation.processing.Processor the compilation
        | would fail as the linked processor class can not be find while we are
-       | compiling it.
+       | compiling it, hence the compiler argument -proc:none is specified here.
       -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
