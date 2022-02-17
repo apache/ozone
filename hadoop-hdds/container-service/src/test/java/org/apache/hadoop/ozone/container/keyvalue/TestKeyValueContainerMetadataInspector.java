@@ -108,39 +108,6 @@ public class TestKeyValueContainerMetadataInspector
   }
 
   @Test
-  public void testMissingChunksDir() throws Exception {
-    // Create container with missing chunks dir.
-    // The metadata in the DB will not be set in this fake container.
-    KeyValueContainer container = createClosedContainer(0);
-    KeyValueContainerData containerData = container.getContainerData();
-    String chunksDirStr = containerData.getChunksPath();
-    File chunksDirFile = new File(chunksDirStr);
-    FileUtils.deleteDirectory(chunksDirFile);
-    Assert.assertFalse(chunksDirFile.exists());
-
-    // In inspect mode, missing chunks dir should be detected but not fixed.
-    JsonObject inspectJson = runInspectorAndGetReport(containerData,
-        KeyValueContainerMetadataInspector.Mode.INSPECT);
-    // The block count and used bytes should be null in this container, but
-    // because it has no block keys that should not be an error.
-    Assert.assertEquals(1,
-        inspectJson.getAsJsonArray("errors").size());
-    checkJsonErrorsReport(inspectJson, "chunksDirectory.present",
-        new JsonPrimitive(true), new JsonPrimitive(false), false);
-    Assert.assertFalse(chunksDirFile.exists());
-
-    // In repair mode, missing chunks dir should be detected and fixed.
-    JsonObject repairJson = runInspectorAndGetReport(containerData,
-        KeyValueContainerMetadataInspector.Mode.REPAIR);
-    Assert.assertEquals(1,
-        inspectJson.getAsJsonArray("errors").size());
-    checkJsonErrorsReport(repairJson, "chunksDirectory.present",
-        new JsonPrimitive(true), new JsonPrimitive(false), true);
-    Assert.assertTrue(chunksDirFile.exists());
-    Assert.assertTrue(chunksDirFile.isDirectory());
-  }
-
-  @Test
   public void testIncorrectTotalsNoData() throws Exception {
     int createBlocks = 0;
     int setBlocks = -3;

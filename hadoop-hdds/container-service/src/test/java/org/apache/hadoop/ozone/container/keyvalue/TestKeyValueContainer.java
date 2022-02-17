@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.volume
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.ozone.test.GenericTestUtils;
@@ -157,34 +158,24 @@ public class TestKeyValueContainer {
         "DB does not exist");
   }
 
-
+  /**
+   * Tests repair of containers affected by the bug reported in HDDS-6235.
+   */
   @Test
-  public void testEmptyContainerImportExport() throws Exception {
+  public void testMissingChunksDirCreated() throws Exception {
+    // Create an empty container and delete its chunks directory.
     createContainer();
     closeContainer();
-
+    // Sets the checksum.
+    populate(0);
     KeyValueContainerData data = keyValueContainer.getContainerData();
+    File chunksDir = new File(data.getChunksPath());
+    Assert.assertTrue(chunksDir.delete());
 
-    // Check state of original container.
-    checkContainerFilesPresent(data, 0);
-
-    //destination path
-    File exportTar = folder.newFile("exported.tar.gz");
-    TarContainerPacker packer = new TarContainerPacker();
-    //export the container
-    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
-      keyValueContainer.exportContainerData(fos, packer);
-    }
-
-    keyValueContainer.delete();
-
-    // import container.
-    try (FileInputStream fis = new FileInputStream(exportTar)) {
-      keyValueContainer.importContainerData(fis, packer);
-    }
-
-    // Make sure empty chunks dir was unpacked.
-    checkContainerFilesPresent(data, 0);
+    // When the container is loaded, the missing chunks directory should
+    // be created.
+    KeyValueContainerUtil.parseKVContainerData(data, CONF);
+    Assert.assertTrue(chunksDir.exists());
   }
 
   @Test
