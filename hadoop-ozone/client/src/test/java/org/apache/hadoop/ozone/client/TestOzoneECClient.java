@@ -763,6 +763,86 @@ public class TestOzoneECClient {
     }
   }
 
+  @Test
+  public void testLargeWriteOfMultipleStripesWithStripeFailure()
+      throws IOException {
+    close();
+    OzoneConfiguration con = new OzoneConfiguration();
+    // block size of 3KB could hold 3 full stripes
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 3, StorageUnit.KB);
+    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
+            15);
+    createNewClient(con, blkAllocator);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // should write > 1 full stripe to trigger potential issue
+    int numFullStripesBeforeFailure = 2;
+    int numChunksToWriteAfterFailure = dataBlocks;
+    int numExpectedBlockGrps = 2;
+    // fail the DNs for parity blocks
+    int[] nodesIndexesToMarkFailure = {3, 4};
+
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        1024 * dataBlocks * numFullStripesBeforeFailure
+            + numChunksToWriteAfterFailure,
+        new ECReplicationConfig(dataBlocks, parityBlocks,
+            ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      for (int j = 0; j < numFullStripesBeforeFailure; j++) {
+        for (int i = 0; i < dataBlocks; i++) {
+          out.write(inputChunks[i]);
+        }
+      }
+
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
+      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
+        failedDNs.add(DatanodeDetails
+            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      }
+
+      // First let's set storage as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
+        out.write(inputChunks[i % dataBlocks]);
+      }
+    }
+
+    final OzoneKeyDetails key = bucket.getKey(keyName);
+    // Data supposed to store in single block group. Since we introduced the
+    // failures after first stripe, the second stripe data should have been
+    // written into new block group. So, we should have numExpectedBlockGrps.
+    // That means two keyLocations.
+    Assert
+        .assertEquals(numExpectedBlockGrps, key.getOzoneKeyLocations().size());
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      for (int i = 0; i < dataBlocks * numFullStripesBeforeFailure; i++) {
+        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+            is.read(fileContent));
+        Assert.assertTrue(
+            "Expected: " + new String(inputChunks[i % dataBlocks], UTF_8)
+                + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
+      }
+      for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
+        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+            is.read(fileContent));
+        Assert.assertTrue(
+            "Expected: " + new String(inputChunks[i % dataBlocks],
+                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
+      }
+    }
+  }
+
   @Test(expected = NotImplementedException.class)
   public void testFlushShouldThrowNotImplementedException() throws IOException {
     store.createVolume(volumeName);
