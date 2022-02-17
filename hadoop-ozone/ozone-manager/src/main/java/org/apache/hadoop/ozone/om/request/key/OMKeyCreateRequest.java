@@ -129,19 +129,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       final long requestedSize = keyArgs.getDataSize() > 0 ?
           keyArgs.getDataSize() : scmBlockSize;
 
-      boolean useRatis = ozoneManager.shouldUseRatis();
-
       HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
-      if (factor == null) {
-        factor = useRatis ? HddsProtos.ReplicationFactor.THREE :
-            HddsProtos.ReplicationFactor.ONE;
-      }
-
       HddsProtos.ReplicationType type = keyArgs.getType();
-      if (type == null) {
-        type = useRatis ? HddsProtos.ReplicationType.RATIS :
-            HddsProtos.ReplicationType.STAND_ALONE;
-      }
+
       final OmBucketInfo bucketInfo = ozoneManager
           .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
       final ReplicationConfig repConfig = OzoneConfigUtil
