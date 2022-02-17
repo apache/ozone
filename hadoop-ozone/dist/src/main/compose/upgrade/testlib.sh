@@ -95,7 +95,6 @@ run_test() {
   fi
 
   copy_results "$test_subdir" "$ALL_RESULT_DIR"
-  generate_report 'upgrade' "$RESULT_DIR"
 }
 
 ## @description Generates data on the cluster.
