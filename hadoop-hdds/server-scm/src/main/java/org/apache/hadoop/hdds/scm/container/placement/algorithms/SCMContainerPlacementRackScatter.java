@@ -242,30 +242,26 @@ public final class SCMContainerPlacementRackScatter
     while (true) {
       metrics.incrDatanodeChooseAttemptCount();
       Node node = networkTopology.chooseRandom(scope, excludedNodes);
-      if (node == null) {
-        // cannot find the node which meets all constrains
-        LOG.warn("Failed to find the datanode for container. excludedNodes:" +
-            (excludedNodes == null ? "" : excludedNodes.toString()) +
-            ", rack:" + scope);
-        return null;
+      if (node != null) {
+        DatanodeDetails datanodeDetails = (DatanodeDetails) node;
+        if (isValidNode(datanodeDetails, metadataSizeRequired,
+            dataSizeRequired)) {
+          metrics.incrDatanodeChooseSuccessCount();
+          return node;
+        }
+        // exclude the unavailable node for the following retries.
+        excludedNodes.add(node);
+      } else {
+        LOG.debug("Failed to find the datanode for container. excludedNodes: " +
+            "{}, rack {}", excludedNodes, scope);
       }
-
-      DatanodeDetails datanodeDetails = (DatanodeDetails)node;
-      if (isValidNode(datanodeDetails, metadataSizeRequired,
-          dataSizeRequired)) {
-        metrics.incrDatanodeChooseSuccessCount();
-        return node;
-      }
-      // exclude the unavailable node for the following retries.
-      excludedNodes.add(node);
-
       maxRetry--;
       if (maxRetry == 0) {
         // avoid the infinite loop
-        String errMsg = "No satisfied datanode to meet the space constrains. "
-            + "metadatadata size required: " + metadataSizeRequired +
-            " data size required: " + dataSizeRequired;
-        LOG.info(errMsg);
+        LOG.info("No satisfied datanode to meet the constraints. "
+            + "Metadatadata size required: {} Data size required: {}, scope "
+            + "{}, excluded nodes {}",
+            metadataSizeRequired, dataSizeRequired, scope, excludedNodes);
         return null;
       }
     }
@@ -304,6 +300,9 @@ public final class SCMContainerPlacementRackScatter
       List<DatanodeDetails> excludedNodes) {
     Set<Node> lessPreferredRacks = excludedNodes.stream()
         .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
+        // Dead Nodes have been removed from the topology and so have a
+        // null rack. We need to exclude those from the rack list.
+        .filter(node -> node != null)
         .collect(Collectors.toSet());
     List <Node> result = new ArrayList<>();
     for (Node rack : racks) {

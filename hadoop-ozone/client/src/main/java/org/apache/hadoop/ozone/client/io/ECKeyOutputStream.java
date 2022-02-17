@@ -532,7 +532,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
       closeCurrentStreamEntry();
       Preconditions.checkArgument(writeOffset == offset);
-      blockOutputStreamEntryPool.getCurrentStreamEntry().close();
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
