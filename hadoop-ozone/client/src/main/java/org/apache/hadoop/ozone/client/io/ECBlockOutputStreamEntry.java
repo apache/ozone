@@ -212,7 +212,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     if (isWritingParity()) {
       return;
     }
-    this.successfulBlkGrpAckedLen += len;
+    this.successfulBlkGrpAckedLen = len;
   }
 
   /**
