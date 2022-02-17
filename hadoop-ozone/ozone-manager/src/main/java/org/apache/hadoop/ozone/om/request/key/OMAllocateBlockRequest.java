@@ -83,8 +83,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = allocateBlockRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+    keyPath = validateAndNormalizeKey(keyPath, getBucketLayout());
 
     ExcludeList excludeList = new ExcludeList();
     if (allocateBlockRequest.hasExcludeList()) {

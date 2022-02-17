@@ -86,8 +86,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+    keyPath = validateAndNormalizeKey(keyPath, getBucketLayout());
 
     return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
         multipartUploadCompleteRequest.toBuilder().setKeyArgs(
@@ -264,7 +263,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
       String volumeName, String bucketName, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
-    if (ozoneManager.getEnableFileSystemPaths()) {
+    if (getBucketLayout().isFileSystemOptimized()) {
       if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
               omMetadataManager)) {
         throw new OMException("Can not Complete MPU for file: " + keyName +

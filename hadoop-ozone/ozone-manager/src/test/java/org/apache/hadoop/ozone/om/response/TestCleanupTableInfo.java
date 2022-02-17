@@ -185,7 +185,6 @@ public class TestCleanupTableInfo {
   @Test
   public void testKeyCreateRequestSetsAllTouchedTableCachesForEviction() {
     OMKeyCreateRequest request = anOMKeyCreateRequest();
-    when(om.getEnableFileSystemPaths()).thenReturn(true);
 
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 

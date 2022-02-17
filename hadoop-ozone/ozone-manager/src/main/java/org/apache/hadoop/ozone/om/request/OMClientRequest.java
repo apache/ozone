@@ -484,10 +484,11 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
-  public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
-      String keyPath, BucketLayout bucketLayout) throws OMException {
+  public static String validateAndNormalizeKey(String keyPath,
+                                               BucketLayout bucketLayout)
+      throws OMException {
     LOG.debug("Bucket Layout: {}", bucketLayout);
-    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+    if (bucketLayout.isFileSystemOptimized()) {
       keyPath = validateAndNormalizeKey(true, keyPath);
       if (keyPath.endsWith("/")) {
         throw new OMException(

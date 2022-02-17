@@ -79,8 +79,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     KeyArgs keyArgs =
         getOmRequest().getAbortMultiPartUploadRequest().getKeyArgs();
     String keyPath = keyArgs.getKeyName();
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+    keyPath = validateAndNormalizeKey(keyPath, getBucketLayout());
 
     return getOmRequest().toBuilder().setAbortMultiPartUploadRequest(
         getOmRequest().getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(

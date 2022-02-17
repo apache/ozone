@@ -24,7 +24,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -45,12 +44,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests OMCreateKeyRequest class.
@@ -414,88 +411,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setCreateKeyRequest(createKeyRequest).build();
   }
 
-  @Test
-  public void testKeyCreateWithFileSystemPathsEnabled() throws Exception {
-
-    OzoneConfiguration configuration = getOzoneConfiguration();
-    configuration.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    when(ozoneManager.getConfiguration()).thenReturn(configuration);
-    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
-
-    // Add volume and bucket entries to DB.
-    addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-
-
-    keyName = "dir1/dir2/dir3/file1";
-    createAndCheck(keyName);
-
-    // Key with leading '/'.
-    String keyName = "/a/b/c/file1";
-    createAndCheck(keyName);
-
-    // Commit openKey entry.
-    addToKeyTable(keyName);
-
-    // Now create another file in same dir path.
-    keyName = "/a/b/c/file2";
-    createAndCheck(keyName);
-
-    // Create key with multiple /'s
-    // converted to a/b/c/file5
-    keyName = "///a/b///c///file5";
-    createAndCheck(keyName);
-
-    // converted to a/b/c/.../file3
-    keyName = "///a/b///c//.../file3";
-    createAndCheck(keyName);
-
-    // converted to r1/r2
-    keyName = "././r1/r2/";
-    createAndCheck(keyName);
-
-    // converted to ..d1/d2/d3
-    keyName = "..d1/d2/d3/";
-    createAndCheck(keyName);
-
-    // Create a file, where a file already exists in the path.
-    // Now try with a file exists in path. Should fail.
-    keyName = "/a/b/c/file1/file3";
-    checkNotAFile(keyName);
-
-    // Empty keyName.
-    keyName = "";
-    checkNotAValidPath(keyName);
-
-    // Key name ends with /
-    keyName = "/a/./";
-    checkNotAValidPath(keyName);
-
-    keyName = "/////";
-    checkNotAValidPath(keyName);
-
-    keyName = "../../b/c";
-    checkNotAValidPath(keyName);
-
-    keyName = "../../b/c/";
-    checkNotAValidPath(keyName);
-
-    keyName = "../../b:/c/";
-    checkNotAValidPath(keyName);
-
-    keyName = ":/c/";
-    checkNotAValidPath(keyName);
-
-    keyName = "";
-    checkNotAValidPath(keyName);
-
-    keyName = "../a/b";
-    checkNotAValidPath(keyName);
-
-    keyName = "/../a/b";
-    checkNotAValidPath(keyName);
-
-  }
 
   protected void addToKeyTable(String keyName) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
@@ -503,7 +418,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
 
-  private void checkNotAValidPath(String keyName) {
+  protected void checkNotAValidPath(String keyName) {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 
@@ -519,7 +434,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
 
   }
-  private void checkNotAFile(String keyName) throws Exception {
+  protected void checkNotAFile(String keyName) throws Exception {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
@@ -537,7 +452,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
 
-  private void createAndCheck(String keyName) throws Exception {
+  protected void createAndCheck(String keyName) throws Exception {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);

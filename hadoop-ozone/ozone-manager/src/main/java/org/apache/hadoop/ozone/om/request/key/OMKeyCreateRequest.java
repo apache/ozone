@@ -103,8 +103,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     }
 
     String keyPath = keyArgs.getKeyName();
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+    keyPath = validateAndNormalizeKey(keyPath, getBucketLayout());
 
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with
@@ -239,7 +238,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
       List< OzoneAcl > inheritAcls;
-      if (ozoneManager.getEnableFileSystemPaths()) {
+      if (getBucketLayout().isFileSystemOptimized()) {
         OMFileRequest.OMPathInfo pathInfo =
             OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
                 bucketName, keyName, Paths.get(keyName));

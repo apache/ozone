@@ -30,11 +30,17 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMCreateKeyRequestWithFSO class.
@@ -68,7 +74,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   @Override
   protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
-    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName,
+    keyName = omKeyCreateRequest.validateAndNormalizeKey(keyName,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     // Check intermediate directories created or not.
     Path keyPath = Paths.get(keyName);
@@ -150,5 +156,86 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Test
+  public void testKeyCreateWithFileSystemPathsEnabled() throws Exception {
+
+    OzoneConfiguration configuration = getOzoneConfiguration();
+    configuration.set(OZONE_DEFAULT_BUCKET_LAYOUT,
+        OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    when(ozoneManager.getConfiguration()).thenReturn(configuration);
+
+    // Add volume and bucket entries to DB.
+    addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    keyName = "dir1/dir2/dir3/file1";
+    createAndCheck(keyName);
+
+    // Key with leading '/'.
+    String keyName = "/a/b/c/file1";
+    createAndCheck(keyName);
+
+    // Commit openKey entry.
+    addToKeyTable(keyName);
+
+    // Now create another file in same dir path.
+    keyName = "/a/b/c/file2";
+    createAndCheck(keyName);
+
+    // Create key with multiple /'s
+    // converted to a/b/c/file5
+    keyName = "///a/b///c///file5";
+    createAndCheck(keyName);
+
+    // converted to a/b/c/.../file3
+    keyName = "///a/b///c//.../file3";
+    createAndCheck(keyName);
+
+    // converted to r1/r2
+    keyName = "././r1/r2/";
+    createAndCheck(keyName);
+
+    // converted to ..d1/d2/d3
+    keyName = "..d1/d2/d3/";
+    createAndCheck(keyName);
+
+    // Create a file, where a file already exists in the path.
+    // Now try with a file exists in path. Should fail.
+    keyName = "/a/b/c/file1/file3";
+    checkNotAFile(keyName);
+
+    // Empty keyName.
+    keyName = "";
+    checkNotAValidPath(keyName);
+
+    // Key name ends with /
+    keyName = "/a/./";
+    checkNotAValidPath(keyName);
+
+    keyName = "/////";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b/c";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b:/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = ":/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = "";
+    checkNotAValidPath(keyName);
+
+    keyName = "../a/b";
+    checkNotAValidPath(keyName);
+
+    keyName = "/../a/b";
+    checkNotAValidPath(keyName);
   }
 }

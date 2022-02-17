@@ -338,9 +338,7 @@ public class KeyManagerImpl implements KeyManager {
     BucketLayout bucketLayout =
         getBucketLayout(metadataManager, args.getVolumeName(),
             args.getBucketName());
-    keyName = OMClientRequest
-        .validateAndNormalizeKey(enableFileSystemPaths, keyName,
-            bucketLayout);
+    keyName = OMClientRequest.validateAndNormalizeKey(keyName, bucketLayout);
 
     OmKeyInfo value = null;
     try {

@@ -84,8 +84,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+    keyPath = validateAndNormalizeKey(keyPath, getBucketLayout());
 
     return getOmRequest().toBuilder().setCommitMultiPartUploadRequest(
         multipartCommitUploadPartRequest.toBuilder().setKeyArgs(
