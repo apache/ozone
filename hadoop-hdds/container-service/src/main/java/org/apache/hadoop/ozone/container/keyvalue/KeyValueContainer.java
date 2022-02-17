@@ -690,24 +690,33 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   /**
-   * Add the given localID of a block to the pendingPutBlockCache.
-   */
-  public void addToPendingPutBlockCache(long localID) {
-    pendingPutBlockCache.add(localID);
-  }
-
-  /**
    * Return whether the given localID of a block is present in the
    * pendingPutBlockCache or not.
    */
   public boolean isBlockInPendingPutBlockCache(long localID) {
-    return pendingPutBlockCache.contains(localID);
+    if (pendingPutBlockCache != null) {
+      return pendingPutBlockCache.contains(localID);
+    } else {
+      pendingPutBlockCache = new ArrayList<>();
+      return false;
+    }
+  }
+
+  /**
+   * Add the given localID of a block to the pendingPutBlockCache.
+   */
+  public void addToPendingPutBlockCache(long localID) {
+    // Since this method is always called after isBlockInPendingPutBlockCache
+    // in BlockManagerImpl#persistPutBlock, we do not need a null check here
+    pendingPutBlockCache.add(localID);
   }
 
   /**
    * Remove the given localID of a block from the pendingPutBlockCache.
    */
   public void removeFromPendingPutBlockCache(long localID) {
+    // Since this method is always called after isBlockInPendingPutBlockCache
+    // in BlockManagerImpl#persistPutBlock, we do not need a null check here
     pendingPutBlockCache.remove(localID);
   }
 
