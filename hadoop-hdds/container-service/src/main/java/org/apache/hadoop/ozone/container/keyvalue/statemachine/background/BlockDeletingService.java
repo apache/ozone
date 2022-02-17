@@ -87,14 +87,13 @@ public class BlockDeletingService extends BackgroundService {
 
   // Task priority is useful when a to-delete block has weight.
   private static final int TASK_PRIORITY_DEFAULT = 1;
-  // Core pool size for container tasks
-  private static final int BLOCK_DELETING_SERVICE_CORE_POOL_SIZE = 10;
 
   public BlockDeletingService(OzoneContainer ozoneContainer,
-      long serviceInterval, long serviceTimeout, TimeUnit timeUnit,
-      ConfigurationSource conf) {
+                              long serviceInterval, long serviceTimeout,
+                              TimeUnit timeUnit, int workerSize,
+                              ConfigurationSource conf) {
     super("BlockDeletingService", serviceInterval, timeUnit,
-        BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
+        workerSize, serviceTimeout);
     this.ozoneContainer = ozoneContainer;
     try {
       containerDeletionPolicy = conf.getClass(

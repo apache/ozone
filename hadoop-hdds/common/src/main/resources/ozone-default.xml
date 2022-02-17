@@ -399,6 +399,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.block.deleting.service.workers</name>
+    <value>10</value>
+    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <description>Number of workers executed of block deletion service. This
+      configuration should be set to greater than 0.
+    </description>
+  </property>
+  <property>
     <name>ozone.UnsafeByteOperations.enabled</name>
     <value>true</value>
     <tag>OZONE, PERFORMANCE, CLIENT</tag>

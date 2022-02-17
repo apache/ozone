@@ -66,6 +66,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 import org.apache.hadoop.util.Timer;
@@ -184,9 +186,13 @@ public class OzoneContainer {
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
+
+    int serviceWorkerSize = config
+        .getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+            OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
     blockDeletingService =
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
-            TimeUnit.MILLISECONDS, config);
+            TimeUnit.MILLISECONDS, serviceWorkerSize, config);
 
     if (certClient != null && secConf.isGrpcTlsEnabled()) {
       List<X509Certificate> x509Certificates =
