@@ -23,8 +23,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
@@ -90,20 +92,9 @@ public class RequestValidations {
   }
 
   private List<ValidationCondition> conditions(OMRequest request) {
-    List<ValidationCondition> conditions = new LinkedList<>();
-    conditions.add(ValidationCondition.UNCONDITIONAL);
-    if (ClientVersions.CURRENT_VERSION != request.getVersion()) {
-      if (ClientVersions.CURRENT_VERSION < request.getVersion()) {
-        conditions.add(ValidationCondition.NEWER_CLIENT_REQUESTS);
-      } else {
-        conditions.add(ValidationCondition.OLDER_CLIENT_REQUESTS);
-      }
-    }
-    if (context.versionManager() != null
-        && context.versionManager().needsFinalization()) {
-      conditions.add(ValidationCondition.CLUSTER_NEEDS_FINALIZATION);
-    }
-    return conditions;
+    return Arrays.stream(ValidationCondition.values())
+        .filter(c -> c.shouldApply(request, context))
+        .collect(Collectors.toList());
   }
 
 }
