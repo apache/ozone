@@ -19,19 +19,17 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import java.util.UUID;
-
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.junit.Assert;
+import org.junit.Test;
 
-import static org.mockito.Mockito.when;
+import java.util.UUID;
 
 /**
  * Tests OMBucketDeleteRequest class which handles DeleteBucket request.
@@ -41,9 +39,6 @@ public class TestOMBucketDeleteRequestWithFSO
 
   @Test
   public void testValidateAndUpdateCacheWithFSO() throws Exception {
-    /*when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());*/
-
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -57,7 +52,7 @@ public class TestOMBucketDeleteRequestWithFSO
 
     // Create Volume and bucket entries in DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1,
         ozoneManagerDoubleBufferHelper);
