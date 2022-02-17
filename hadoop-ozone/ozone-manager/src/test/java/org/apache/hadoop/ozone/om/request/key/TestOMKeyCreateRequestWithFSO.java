@@ -174,7 +174,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     createAndCheck(keyName);
 
     // Key with leading '/'.
-    String keyName = "/a/b/c/file1";
+    keyName = "/a/b/c/file1";
     createAndCheck(keyName);
 
     // Commit openKey entry.
