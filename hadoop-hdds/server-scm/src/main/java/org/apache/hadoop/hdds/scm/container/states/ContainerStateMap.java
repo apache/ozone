@@ -358,7 +358,7 @@ public class ContainerStateMap {
 
     final ContainerQueryKey queryKey =
         new ContainerQueryKey(state, owner, repConfig);
-    if(resultCache.containsKey(queryKey)){
+    if (resultCache.containsKey(queryKey)) {
       return resultCache.get(queryKey);
     }
 

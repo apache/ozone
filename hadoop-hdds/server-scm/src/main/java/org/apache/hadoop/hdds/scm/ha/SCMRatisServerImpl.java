@@ -258,7 +258,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
               peer.getAddress().concat(isLocal ?
                   ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
                   ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
-                  .concat(":".concat(peer.getId().toString()))));
+                  .concat(":".concat(peer.getId().toString()))
+                  .concat(":".concat(peerInetAddress.getHostAddress()))));
     }
     return ratisRoles;
   }

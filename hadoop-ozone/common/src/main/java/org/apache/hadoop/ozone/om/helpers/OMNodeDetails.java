@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
@@ -163,13 +163,13 @@ public final class OMNodeDetails extends NodeDetails {
     if (isHttpPolicy) {
       if (StringUtils.isNotEmpty(getHttpAddress())) {
         return "http://" + getHttpAddress() +
-            OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT +
+            OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
             "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     } else {
       if (StringUtils.isNotEmpty(getHttpsAddress())) {
         return "https://" + getHttpsAddress() +
-            OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT +
+            OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
             "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     }

@@ -20,7 +20,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.container.common.statemachine
     .DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -72,15 +72,15 @@ public class TestCloseContainerCommandHandler {
   private CloseContainerCommandHandler subject =
       new CloseContainerCommandHandler();
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestCloseContainerCommandHandler(ChunkLayOutVersion layout) {
+  public TestCloseContainerCommandHandler(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -214,7 +214,7 @@ public class TestCloseContainerCommandHandler {
     } catch (IOException e) {
 
       GenericTestUtils.assertExceptionContains("The Container " +
-                      "is not found. ContainerID: "+containerID, e);
+                      "is not found. ContainerID: " + containerID, e);
     }
   }
 
@@ -227,7 +227,7 @@ public class TestCloseContainerCommandHandler {
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("The Container is in " +
               "the MissingContainerSet hence we can't close it. " +
-              "ContainerID: "+containerID, e);
+              "ContainerID: " + containerID, e);
     }
   }
 
