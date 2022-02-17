@@ -44,7 +44,8 @@ public class RefreshVolumeUsageCommand
   @Override
   public RefreshVolumeUsageCommandProto getProto() {
     RefreshVolumeUsageCommandProto.Builder builder =
-        RefreshVolumeUsageCommandProto.newBuilder();
+        RefreshVolumeUsageCommandProto
+            .newBuilder().setCmdId(getId());
     return builder.build();
   }
 

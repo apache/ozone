@@ -17,35 +17,21 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import java.util.HashMap;
-
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -53,10 +39,20 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import java.util.HashMap;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DU_FACTORY_CLASSNAME;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+
 /**
- * Test to behaviour of the datanode when receive close container command.
+ * Test the behaviour of the datanode and scm when communicating
+ * with refresh volume usage command.
  */
-public class TestCloseContainerHandler {
+public class TestRefreshVolumeUsageHandler {
 
   /**
     * Set a timeout for each test.
@@ -72,6 +68,9 @@ public class TestCloseContainerHandler {
     //setup a cluster (1G free space is enough for a unit test)
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
+    conf.set(HDDS_NODE_REPORT_INTERVAL, "1s");
+    conf.set(HDDS_DATANODE_DU_FACTORY_CLASSNAME,
+        "org.apache.hadoop.ozone.container.common.volume.HddsVolumeFactory");
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
@@ -91,65 +90,49 @@ public class TestCloseContainerHandler {
   @Test
   public void test() throws Exception {
     cluster.waitForClusterToBeReady();
+    DatanodeDetails datanodeDetails =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    DatanodeUsageInfo usageInfo1 = cluster.getStorageContainerManager()
+        .getScmNodeManager().getUsageInfo(datanodeDetails);
 
-    //the easiest way to create an open container is creating a key
+    //creating a key to take some storage space
     OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume("test");
     objectStore.getVolume("test").createBucket("test");
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey("test", 1024, ReplicationType.RATIS,
+        .createKey("test", 4096, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
     key.write("test".getBytes(UTF_8));
     key.close();
 
-    //get the name of a valid container
-    OmKeyArgs keyArgs =
-        new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
-            .setDataSize(1024)
-            .setKeyName("test")
-            .setRefreshPipeline(true)
-            .build();
+    //we set HDDS_NODE_REPORT_INTERVAL to 1s , let the cluster run for
+    // 5s to enable several node report.
+    Thread.sleep(5000L);
 
-    OmKeyLocationInfo omKeyLocationInfo =
-        cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
-            .get(0).getBlocksLatestVersionOnly().get(0);
+    //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
+    //so scm does not get the latest usage info of this datanode for now.
+    Assert.assertTrue(
+        usageInfo1.getScmNodeStat().getScmUsed().get().longValue() == 0);
 
-    ContainerID containerId = ContainerID.valueOf(
-        omKeyLocationInfo.getContainerID());
-    ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(containerId);
-    Pipeline pipeline = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipeline(container.getPipelineID());
-
-    Assert.assertFalse(isContainerClosed(cluster, containerId.getId()));
-
-    DatanodeDetails datanodeDetails =
-        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
-    //send the order to close the container
-    SCMCommand<?> command = new CloseContainerCommand(
-        containerId.getId(), pipeline.getId());
-
+    //send refresh volume usage command to datanode
+    SCMCommand<?> command = new RefreshVolumeUsageCommand();
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
 
+    //waiting for the new usage info is refreshed
     GenericTestUtils.waitFor(() ->
-            isContainerClosed(cluster, containerId.getId()),
+            isUsageInfoRefreshed(cluster, datanodeDetails),
             500,
             5 * 1000);
-
-    //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(cluster, containerId.getId()));
   }
 
-  private static Boolean isContainerClosed(MiniOzoneCluster cluster,
-      long containerID) {
-    ContainerData containerData;
-    containerData = cluster.getHddsDatanodes().get(0)
-        .getDatanodeStateMachine().getContainer().getContainerSet()
-        .getContainer(containerID).getContainerData();
-    return !containerData.isOpen();
+  private static Boolean isUsageInfoRefreshed(MiniOzoneCluster cluster,
+                                              DatanodeDetails datanodeDetails) {
+    return cluster.getStorageContainerManager().getScmNodeManager()
+        .getUsageInfo(datanodeDetails).getScmNodeStat()
+        .getScmUsed().get().longValue() > 0L;
   }
-
 }

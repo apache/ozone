@@ -269,5 +269,7 @@ public final class HddsConfigKeys {
           "hdds.container.checksum.verification.enabled";
   public static final boolean
           HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT = true;
+  public static final String HDDS_DATANODE_DU_FACTORY_CLASSNAME =
+      "hdds.datanode.du.factory.classname";
 
 }
