@@ -110,15 +110,13 @@ public class TestRefreshVolumeUsageHandler {
 
     //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
     //so scm does not get the latest usage info of this datanode for now.
-    Assert.assertTrue(
-        usageInfo1.getScmNodeStat().getScmUsed().get().longValue() == 0);
+    long currentScmUsed = usageInfo1.getScmNodeStat().getScmUsed().get();
+    LOG.info("current ScmUsed is {}", currentScmUsed);
+    Assert.assertEquals(0, currentScmUsed);
 
     try {
-      //waiting for the new usage info is refreshed
       GenericTestUtils.waitFor(() ->
-              isUsageInfoRefreshed(cluster, datanodeDetails),
-          500,
-          5 * 1000);
+          isUsageInfoRefreshed(cluster, datanodeDetails), 500, 5 * 1000);
     } catch (TimeoutException te) {
       //no op , this is to show that if we do not trigger refresh volume
       //usage info command, we can not get the latest usage info within
@@ -134,15 +132,13 @@ public class TestRefreshVolumeUsageHandler {
 
     //waiting for the new usage info is refreshed
     GenericTestUtils.waitFor(() ->
-            isUsageInfoRefreshed(cluster, datanodeDetails),
-            500,
-            5 * 1000);
+        isUsageInfoRefreshed(cluster, datanodeDetails), 500, 5 * 1000);
   }
 
   private static Boolean isUsageInfoRefreshed(MiniOzoneCluster cluster,
                                               DatanodeDetails datanodeDetails) {
     return cluster.getStorageContainerManager().getScmNodeManager()
-        .getUsageInfo(datanodeDetails).getScmNodeStat()
-        .getScmUsed().get().longValue() > 0L;
+      .getUsageInfo(datanodeDetails).getScmNodeStat()
+      .getScmUsed().get() > 0L;
   }
 }
