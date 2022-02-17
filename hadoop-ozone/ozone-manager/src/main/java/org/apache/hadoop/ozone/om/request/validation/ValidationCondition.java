@@ -56,8 +56,8 @@ public enum ValidationCondition {
    */
   UNCONDITIONAL(r -> true, ctx -> true);
 
-  private Predicate<OMRequest> shouldApplyTo;
-  private Predicate<ValidationContext> shouldApplyIn;
+  private final Predicate<OMRequest> shouldApplyTo;
+  private final Predicate<ValidationContext> shouldApplyIn;
 
   ValidationCondition(
       Predicate<OMRequest> shouldApplyTo,
