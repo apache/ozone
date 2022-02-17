@@ -347,7 +347,7 @@ public class RangerRestMultiTenantAccessController
 
     HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl,
         jsonConverter.toJsonTree(role));
-    if (!successfulResponseCode(conn.getResponseCode())){
+    if (!successfulResponseCode(conn.getResponseCode())) {
       throw new IOException(String.format("Failed to update role %d. " +
           "Http response code: %d", roleID, conn.getResponseCode()));
     }

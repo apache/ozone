@@ -36,7 +36,7 @@ public class TenantCreateHandler extends TenantHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException{
+      throws IOException {
     try {
       client.getObjectStore().createTenant(tenantId);
       // TODO: Add return value and print volume name?

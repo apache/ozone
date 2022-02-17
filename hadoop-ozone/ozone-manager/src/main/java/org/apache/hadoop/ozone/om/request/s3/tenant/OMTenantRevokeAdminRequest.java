@@ -165,7 +165,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
             + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert(oldAccessIdInfo.getTenantId().equals(tenantId));
+      assert (oldAccessIdInfo.getTenantId().equals(tenantId));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =

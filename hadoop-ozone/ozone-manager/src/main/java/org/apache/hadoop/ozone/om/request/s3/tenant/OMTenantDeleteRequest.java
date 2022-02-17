@@ -110,7 +110,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       final OmDBTenantInfo dbTenantInfo =
           omMetadataManager.getTenantStateTable().get(tenantId);
       volumeName = dbTenantInfo.getBucketNamespaceName();
-      assert(volumeName != null);
+      assert (volumeName != null);
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);
       // decVolumeRefCount is true if volumeName is not empty string

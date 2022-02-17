@@ -64,7 +64,7 @@ public class TestContainerOperations {
 
   @AfterClass
   public static void cleanup() throws Exception {
-    if(cluster != null) {
+    if (cluster != null) {
       cluster.shutdown();
     }
   }

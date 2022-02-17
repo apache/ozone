@@ -304,7 +304,7 @@ public class TestNodeStateManager {
       if (events.size() == 0) {
         return null;
       } else {
-        return events.get(events.size()-1);
+        return events.get(events.size() - 1);
       }
     }
 

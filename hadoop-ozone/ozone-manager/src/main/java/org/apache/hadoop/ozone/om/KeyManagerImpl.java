@@ -749,7 +749,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     } catch (OMException ex) {
       throw ex;
-    } catch (IOException ex){
+    } catch (IOException ex) {
       LOG.error(
           "List Multipart Upload Parts Failed: volume: {}, bucket: {}, ,key: "
               + "{} ",
@@ -1071,7 +1071,7 @@ public class KeyManagerImpl implements KeyManager {
       }
       return hasAccess;
     } catch (IOException ex) {
-      if(ex instanceof OMException) {
+      if (ex instanceof OMException) {
         throw (OMException) ex;
       }
       LOG.error("CheckAccess operation failed for key:{}/{}/{}", volume,
@@ -1397,13 +1397,20 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
+  private boolean isKeyDeleted(String key, Table keyTable) {
+    CacheValue<OmKeyInfo> omKeyInfoCacheValue
+        = keyTable.getCacheValue(new CacheKey(key));
+    return omKeyInfoCacheValue != null
+        && omKeyInfoCacheValue.getCacheValue() == null;
+  }
+
   /**
    * Helper function for listStatus to find key in TableCache.
    */
   private void listStatusFindKeyInTableCache(
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter,
       String keyArgs, String startCacheKey, boolean recursive,
-      TreeMap<String, OzoneFileStatus> cacheKeyMap, Set<String> deletedKeySet) {
+      TreeMap<String, OzoneFileStatus> cacheKeyMap) {
 
     while (cacheIter.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
@@ -1414,23 +1421,20 @@ public class KeyManagerImpl implements KeyManager {
       }
       OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
-      if (cacheOmKeyInfo != null) {
-        if (cacheKey.startsWith(startCacheKey) &&
-            cacheKey.compareTo(startCacheKey) >= 0) {
-          if (!recursive) {
-            String remainingKey = StringUtils.stripEnd(cacheKey.substring(
-                startCacheKey.length()), OZONE_URI_DELIMITER);
-            // For non-recursive, the remaining part of key can't have '/'
-            if (remainingKey.contains(OZONE_URI_DELIMITER)) {
-              continue;
-            }
+      if (cacheOmKeyInfo != null
+          && cacheKey.startsWith(startCacheKey)
+          && cacheKey.compareTo(startCacheKey) >= 0) {
+        if (!recursive) {
+          String remainingKey = StringUtils.stripEnd(cacheKey.substring(
+              startCacheKey.length()), OZONE_URI_DELIMITER);
+          // For non-recursive, the remaining part of key can't have '/'
+          if (remainingKey.contains(OZONE_URI_DELIMITER)) {
+            continue;
           }
-          OzoneFileStatus fileStatus = new OzoneFileStatus(
-              cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
-          cacheKeyMap.put(cacheKey, fileStatus);
         }
-      } else {
-        deletedKeySet.add(cacheKey);
+        OzoneFileStatus fileStatus = new OzoneFileStatus(
+            cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
+        cacheKeyMap.put(cacheKey, fileStatus);
       }
     }
   }
@@ -1488,8 +1492,6 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = args.getKeyName();
     // A map sorted by OmKey to combine results from TableCache and DB.
     TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
-    // A set to keep track of keys deleted in cache but not flushed to DB.
-    Set<String> deletedKeySet = new TreeSet<>();
 
     if (Strings.isNullOrEmpty(startKey)) {
       OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
@@ -1519,7 +1521,7 @@ public class KeyManagerImpl implements KeyManager {
 
       // First, find key in TableCache
       listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
-          recursive, cacheKeyMap, deletedKeySet);
+          recursive, cacheKeyMap);
       iterator = keyTable.iterator();
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
@@ -1545,7 +1547,8 @@ public class KeyManagerImpl implements KeyManager {
           String entryKeyName = omKeyInfo.getKeyName();
           if (recursive) {
             // for recursive list all the entries
-            if (!deletedKeySet.contains(entryInDb)) {
+
+            if (!isKeyDeleted(entryInDb, keyTable)) {
               cacheKeyMap.put(entryInDb, new OzoneFileStatus(omKeyInfo,
                   scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
               countEntries++;
@@ -1559,14 +1562,14 @@ public class KeyManagerImpl implements KeyManager {
                 .getImmediateChild(entryKeyName, keyName);
             boolean isFile = OzoneFSUtils.isFile(immediateChild);
             if (isFile) {
-              if (!deletedKeySet.contains(entryInDb)) {
+              if (!isKeyDeleted(entryInDb, keyTable)) {
                 cacheKeyMap.put(entryInDb,
                     new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
                 countEntries++;
               }
             } else {
               // if entry is a directory
-              if (!deletedKeySet.contains(entryInDb)) {
+              if (!isKeyDeleted(entryInDb, keyTable)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
@@ -1605,7 +1608,6 @@ public class KeyManagerImpl implements KeyManager {
     }
     // Clean up temp map and set
     cacheKeyMap.clear();
-    deletedKeySet.clear();
 
     List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
     fileStatusList.stream().map(s -> s.getKeyInfo()).forEach(keyInfoList::add);
@@ -1763,7 +1765,7 @@ public class KeyManagerImpl implements KeyManager {
       if (fileStatusInfo != null) {
         prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
 
-        if(fileStatusInfo.isDirectory()){
+        if (fileStatusInfo.isDirectory()) {
           seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
               fileStatusInfo.getKeyInfo().getFileName());
 
@@ -2005,7 +2007,7 @@ public class KeyManagerImpl implements KeyManager {
       String cacheKey = entry.getKey().getCacheKey();
       OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
-      if(cacheOmKeyInfo == null){
+      if (cacheOmKeyInfo == null) {
         deletedKeySet.add(cacheKey);
         continue;
       }
@@ -2050,7 +2052,7 @@ public class KeyManagerImpl implements KeyManager {
       String cacheKey = entry.getKey().getCacheKey();
       OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
-      if(cacheOmDirInfo == null){
+      if (cacheOmDirInfo == null) {
         deletedKeySet.add(cacheKey);
         continue;
       }

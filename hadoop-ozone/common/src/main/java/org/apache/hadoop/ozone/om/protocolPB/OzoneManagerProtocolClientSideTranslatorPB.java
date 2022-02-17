@@ -618,7 +618,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName());
 
-    if(args.getAcls() != null) {
+    if (args.getAcls() != null) {
       keyArgs.addAllAcls(args.getAcls().stream().distinct().map(a ->
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
@@ -1471,7 +1471,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OMPBHelper.convertToDelegationToken(resp.getResponse().getToken())
           : null;
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Get delegation token failed.", e,
@@ -1503,7 +1503,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           .getRenewDelegationTokenResponse();
       return resp.getResponse().getNewExpiryTime();
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Renew delegation token failed.", e,
@@ -1532,7 +1532,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     try {
       handleError(submitRequest(omRequest));
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Cancel delegation token failed.", e,
