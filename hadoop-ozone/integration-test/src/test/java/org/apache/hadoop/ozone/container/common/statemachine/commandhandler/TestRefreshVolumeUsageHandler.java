@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -38,8 +39,11 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DU_FACTORY_CLASSNAME;
@@ -54,6 +58,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
  */
 public class TestRefreshVolumeUsageHandler {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(TestRefreshVolumeUsageHandler.class);
   /**
     * Set a timeout for each test.
     */
@@ -114,6 +120,21 @@ public class TestRefreshVolumeUsageHandler {
     //so scm does not get the latest usage info of this datanode for now.
     Assert.assertTrue(
         usageInfo1.getScmNodeStat().getScmUsed().get().longValue() == 0);
+
+    try {
+      //waiting for the new usage info is refreshed
+      GenericTestUtils.waitFor(() ->
+              isUsageInfoRefreshed(cluster, datanodeDetails),
+          500,
+          5 * 1000);
+    } catch (TimeoutException te) {
+      //no op , this is to show that if we do not trigger refresh volume
+      //usage info command, we can not get the latest usage info within
+      // a refresh period
+      LOG.info("can not get the latest usage info within a refresh period");
+    } catch (InterruptedException ie) {
+      //no op
+    }
 
     //send refresh volume usage command to datanode
     SCMCommand<?> command = new RefreshVolumeUsageCommand();
