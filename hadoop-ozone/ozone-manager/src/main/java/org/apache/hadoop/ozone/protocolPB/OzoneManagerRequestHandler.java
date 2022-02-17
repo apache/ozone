@@ -384,11 +384,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     final String userPrincipal = request.getUserPrincipal();
 
     TenantUserInfoValue ret = impl.tenantGetUserInfo(userPrincipal);
+    // Note impl.tenantGetUserInfo() throws if errs
     if (ret != null) {
-      resp.setSuccess(true);
       resp.setTenantUserInfo(ret.getProtobuf());
-    } else {
-      resp.setSuccess(false);
     }
 
     return resp.build();
@@ -400,12 +398,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     TenantListUserResponse.Builder builder =
         TenantListUserResponse.newBuilder();
     TenantUserList usersInTenant =
-        impl.listUsersInTenant(request.getTenantName(), request.getPrefix());
-    if (usersInTenant == null) {
-      builder.setSuccess(false);
-    } else {
-      builder.setSuccess(true);
-      builder.setTenantName(request.getTenantName());
+        impl.listUsersInTenant(request.getTenantId(), request.getPrefix());
+    // Note impl.listUsersInTenant() throws if errs
+    if (usersInTenant != null) {
+      builder.setTenantId(request.getTenantId());
       builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
     }
     return builder.build();
@@ -418,7 +414,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     final ListTenantResponse.Builder resp = ListTenantResponse.newBuilder();
 
     TenantInfoList ret = impl.listTenant();
-    resp.setSuccess(true);
     resp.addAllTenantInfo(ret.getTenantInfoList());
 
     return resp.build();

@@ -62,7 +62,7 @@ public class TenantListUsersHandler extends S3Handler {
       TenantUserList usersInTenant =
           objStore.listUsersInTenant(tenantId, prefix);
       for (TenantUserAccessId accessIdInfo : usersInTenant.getUserAccessIds()) {
-        out().println("- User '" + accessIdInfo.getUser() +
+        out().println("- User '" + accessIdInfo.getUserPrincipal() +
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
       }
     } catch (IOException e) {

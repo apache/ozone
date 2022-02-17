@@ -119,10 +119,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMTenantRequestHelper.checkAdmin(ozoneManager);
 
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
-    final String tenantId = request.getTenantName();
+    final String tenantId = request.getTenantId();
 
     // Check tenantId validity
-    if (tenantId.contains(OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER)) {
+    if (tenantId.contains(OzoneConsts.TENANTID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant name " + tenantId +
           ". Tenant name should not contain delimiter.",
           OMException.ResultCodes.INVALID_VOLUME_NAME);
@@ -181,7 +181,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantDefaultPolicyName(tenantDefaultPolicies)
-                .setTenantName(tenantId))
+                .setTenantId(tenantId))
         .setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         // TODO: Can the three lines below be ignored?
@@ -227,7 +227,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
-    final String tenantId = request.getTenantName();
+    final String tenantId = request.getTenantId();
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
@@ -313,8 +313,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex));
 
       omResponse.setCreateTenantResponse(
-          CreateTenantResponse.newBuilder().setSuccess(true).build()
-      );
+          CreateTenantResponse.newBuilder()
+              .build());
       omClientResponse = new OMTenantCreateResponse(
           omResponse.build(),
           omVolumeArgs, volumeList,
@@ -337,8 +337,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         handleRequestFailure(ozoneManager);
       }
       // Prepare omClientResponse
-      omResponse.setCreateTenantResponse(
-          CreateTenantResponse.newBuilder().setSuccess(false).build());
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
       exception = ex;

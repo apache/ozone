@@ -340,7 +340,7 @@ public final class OzoneConsts {
   public static final String USER_PREFIX = "userPrefix";
 
   // For multi-tenancy
-  public static final String TENANT_NAME_USER_NAME_DELIMITER = "$";
+  public static final String TENANTID_USERNAME_DELIMITER = "$";
   public static final String TENANT_NAME_ROLE_DELIMITER = "-";
   public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
@@ -484,7 +484,7 @@ public final class OzoneConsts {
   public static final String OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT =
       "/service/roles/roles/name/";
 
-  // TODO: Change to delete role endpoint
+  // TODO: Use delete role endpoint
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT =
       "/service/xusers/secure/groups/id/";
 

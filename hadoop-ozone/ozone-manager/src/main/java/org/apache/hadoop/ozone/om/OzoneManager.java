@@ -3015,7 +3015,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Generate result. Should be sorted by tenantId
     for (OmDBTenantInfo omDBTenantInfo : tenantInfoSet) {
       tenantInfoList.add(TenantInfo.newBuilder()
-          .setTenantName(omDBTenantInfo.getTenantId())
+          .setTenantId(omDBTenantInfo.getTenantId())
           .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
           .setAccountNamespaceName(omDBTenantInfo.getAccountNamespaceName())
           .setUserPolicyGroupName(omDBTenantInfo.getUserPolicyGroupName())
@@ -3066,7 +3066,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
-            .setTenantName(accessIdInfo.getTenantId())
+            .setTenantId(accessIdInfo.getTenantId())
             .setIsAdmin(accessIdInfo.getIsAdmin())
             .setIsDelegatedAdmin(accessIdInfo.getIsDelegatedAdmin())
             .build());

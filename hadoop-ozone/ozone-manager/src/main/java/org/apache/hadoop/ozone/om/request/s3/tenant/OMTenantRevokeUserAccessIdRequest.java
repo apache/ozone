@@ -122,7 +122,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         .setTenantRevokeUserAccessIdRequest(
             TenantRevokeUserAccessIdRequest.newBuilder()
                 .setAccessId(accessId)
-                .setTenantName(tenantName)
+                .setTenantId(tenantName)
                 .build())
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId());
@@ -149,7 +149,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     final TenantRevokeUserAccessIdRequest request =
         getOmRequest().getTenantRevokeUserAccessIdRequest();
     final String accessId = request.getAccessId();
-    final String tenantId = request.getTenantName();
+    final String tenantId = request.getTenantId();
 
     boolean acquiredS3SecretLock = false;
     boolean acquiredVolumeLock = false;
@@ -209,17 +209,13 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(
-          TenantRevokeUserAccessIdResponse.newBuilder().setSuccess(true).build()
-      );
+          TenantRevokeUserAccessIdResponse.newBuilder()
+              .build());
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           omResponse.build(), accessId, userPrincipal, principalInfo);
     } catch (IOException ex) {
-      // Error handling: do nothing to Authorizer here?
       exception = ex;
-      // Set response success flag to false
-      omResponse.setTenantRevokeUserAccessIdResponse(
-          TenantRevokeUserAccessIdResponse.newBuilder()
-              .setSuccess(false).build());
+      // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {

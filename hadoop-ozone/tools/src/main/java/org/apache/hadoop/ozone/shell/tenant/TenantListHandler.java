@@ -44,9 +44,9 @@ public class TenantListHandler extends TenantHandler {
   private boolean printHeader;
 
   // TODO: HDDS-6340. Add an option to print JSON result
-  //  @CommandLine.Option(names = {"--json", "-j"},
-  //      description = "Print the result in JSON.")
-  //  private boolean printJson;
+//  @CommandLine.Option(names = {"--json", "-j"},
+//      description = "Print the result in JSON.")
+//  private boolean printJson;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
@@ -59,11 +59,9 @@ public class TenantListHandler extends TenantHandler {
         out().format(longFormat ? "%-17s" : "%s%n",
             "Tenant");
         if (longFormat) {
-          // TODO: rename these fields?
-          // TODO: print JSON by default after rebase.
           out().format("%-17s%-17s%-17s%s%n",
               "BucketNS",
-              "AccountNS",  // == Volume name IIRC ?
+              "AccountNS",
               "UserPolicy",
               "BucketPolicy");
         }
@@ -71,7 +69,7 @@ public class TenantListHandler extends TenantHandler {
 
       tenantInfoList.getTenantInfoList().forEach(tenantInfo -> {
         out().format(longFormat ? "%-17s" : "%s%n",
-            tenantInfo.getTenantName());
+            tenantInfo.getTenantId());
         if (longFormat) {
           out().format("%-17s%-17s%-17s%s%n",
               tenantInfo.getBucketNamespaceName(),

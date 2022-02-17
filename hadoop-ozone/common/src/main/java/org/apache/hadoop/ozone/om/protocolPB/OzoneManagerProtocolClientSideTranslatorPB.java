@@ -976,7 +976,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public void createTenant(OmTenantArgs omTenantArgs) throws IOException {
     final CreateTenantRequest request = CreateTenantRequest.newBuilder()
-        .setTenantName(omTenantArgs.getTenantId())
+        .setTenantId(omTenantArgs.getTenantId())
         .setVolumeName(omTenantArgs.getVolumeName())
         // TODO: Add more args like policy names later
         .build();
@@ -1012,8 +1012,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final TenantAssignUserAccessIdRequest request =
         TenantAssignUserAccessIdRequest.newBuilder()
-        .setTenantUsername(username)
-        .setTenantName(tenantId)
+        .setUserPrincipal(username)
+        .setTenantId(tenantId)
         .setAccessId(accessId)
         .build();
     final OMRequest omRequest = createOMRequest(Type.TenantAssignUserAccessId)
@@ -1056,7 +1056,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setAccessId(accessId)
         .setDelegated(delegated);
     if (tenantName != null) {
-      requestBuilder.setTenantName(tenantName);
+      requestBuilder.setTenantId(tenantName);
     }
     final TenantAssignAdminRequest request = requestBuilder.build();
     final OMRequest omRequest = createOMRequest(Type.TenantAssignAdmin)
@@ -1077,7 +1077,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         TenantRevokeAdminRequest.newBuilder()
             .setAccessId(accessId);
     if (tenantName != null) {
-      requestBuilder.setTenantName(tenantName);
+      requestBuilder.setTenantId(tenantName);
     }
     final TenantRevokeAdminRequest request = requestBuilder.build();
     final OMRequest omRequest = createOMRequest(Type.TenantRevokeAdmin)
@@ -1112,7 +1112,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public TenantUserList listUsersInTenant(String tenantName, String prefix)
       throws IOException {
     TenantListUserRequest.Builder builder =
-        TenantListUserRequest.newBuilder().setTenantName(tenantName);
+        TenantListUserRequest.newBuilder().setTenantId(tenantName);
     if (prefix != null) {
       builder.setPrefix(prefix);
     }

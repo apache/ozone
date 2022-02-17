@@ -404,7 +404,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         .forEach(
             k -> userAccessIds.add(
                 TenantUserAccessId.newBuilder()
-                    .setUser(k.getKey())
+                    .setUserPrincipal(k.getKey())
                     .setAccessId(k.getValue())
                     .build()));
     return new TenantUserList(tenantID, userAccessIds);

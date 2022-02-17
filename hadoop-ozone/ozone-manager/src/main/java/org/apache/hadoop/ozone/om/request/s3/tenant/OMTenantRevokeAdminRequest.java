@@ -76,7 +76,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         getOmRequest().getTenantRevokeAdminRequest();
 
     final String accessId = request.getAccessId();
-    String tenantId = request.getTenantName();
+    String tenantId = request.getTenantId();
 
     // If tenant name is not specified, try figuring it out from accessId.
     if (StringUtils.isEmpty(tenantId)) {
@@ -114,7 +114,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
                 // Regenerate request just in case tenantId is not provided
                 //  by the client
                 TenantRevokeAdminRequest.newBuilder()
-                        .setTenantName(tenantId)
+                        .setTenantId(tenantId)
                         .setAccessId(request.getAccessId())
                         .build())
         .setCmdType(getOmRequest().getCmdType())
@@ -143,7 +143,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     final TenantRevokeAdminRequest request =
         getOmRequest().getTenantRevokeAdminRequest();
     final String accessId = request.getAccessId();
-    final String tenantId = request.getTenantName();
+    final String tenantId = request.getTenantId();
 
     boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
     IOException exception = null;
@@ -188,18 +188,13 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
 
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()
-              .setSuccess(true).build());
+              .build());
       omClientResponse = new OMTenantRevokeAdminResponse(omResponse.build(),
           accessId, newOmDBAccessIdInfo);
 
     } catch (IOException ex) {
-      // Error handling: do nothing to Authorizer (Ranger) here?
-
       exception = ex;
-      // Set success flag to false
-      omResponse.setTenantRevokeAdminResponse(
-          TenantRevokeAdminResponse.newBuilder()
-              .setSuccess(false).build());
+      // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeAdminResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
