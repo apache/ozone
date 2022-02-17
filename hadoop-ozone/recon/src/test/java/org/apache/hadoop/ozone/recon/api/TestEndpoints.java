@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
@@ -74,6 +75,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -200,6 +202,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(urlConnectionMock.getInputStream()).thenReturn(inputStream);
     when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
         anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+    when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
+        anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)

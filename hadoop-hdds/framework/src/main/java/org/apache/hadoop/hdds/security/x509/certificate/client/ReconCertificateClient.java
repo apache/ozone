@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,47 +7,32 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
-
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-
 /**
- * Certificate client for OzoneManager.
+ * Certificate client for Recon.
  */
-public class OMCertificateClient extends CommonCertificateClient {
-
+public class ReconCertificateClient  extends CommonCertificateClient {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMCertificateClient.class);
+      LoggerFactory.getLogger(ReconCertificateClient.class);
 
-  public static final String COMPONENT_NAME = "om";
+  public static final String COMPONENT_NAME = "recon";
 
-  public OMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId, String localCrlId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
-    this.setLocalCrlId(localCrlId != null ?
-        Long.parseLong(localCrlId) : 0);
-  }
-
-  public OMCertificateClient(SecurityConfig securityConfig,
+  public ReconCertificateClient(SecurityConfig securityConfig,
       String certSerialId) {
-    this(securityConfig, certSerialId, null);
-  }
-
-  public OMCertificateClient(SecurityConfig securityConfig) {
-    this(securityConfig, null, null);
+    super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
   }
 
   @Override
