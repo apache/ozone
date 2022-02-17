@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -84,10 +83,8 @@ public class TestOzoneFSWithObjectStoreCreate {
   @BeforeClass
   public static void initClass() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -293,12 +290,14 @@ public class TestOzoneFSWithObjectStoreCreate {
     Arrays.fill(b, (byte)96);
     ozoneOutputStream.write(b);
 
+    // Need to close ozoneOutputStream before creating directory.
+    // S3MultipartUploadCommitPartRequestWithFSO#getOpenKey makes an
+    // OMFileRequest#getParentID call - which will fail due to existing
+    // directory.
+    ozoneOutputStream.close();
+
     // Before close, create directory with same name.
     o3fs.mkdirs(new Path(keyName));
-
-    // This should succeed, as we check during creation of part or during
-    // complete MPU.
-    ozoneOutputStream.close();
 
     Map<Integer, String> partsMap = new HashMap<>();
     partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
