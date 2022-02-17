@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -54,14 +54,13 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
@@ -103,7 +102,8 @@ public class TestECKeyOutputStream {
     // closed state and all in progress writes will get exception. To avoid
     // that, we are just keeping higher timeout and none of the tests depending
     // on deadnode detection timeout currently.
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 300, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 60, TimeUnit.SECONDS);
     conf.setTimeDuration("hdds.ratis.raft.server.rpc.slowness.timeout", 300,
         TimeUnit.SECONDS);
     conf.setTimeDuration(
@@ -248,31 +248,30 @@ public class TestECKeyOutputStream {
     final OzoneBucket bucket = getOzoneBucket();
     ContainerOperationClient containerOperationClient =
         new ContainerOperationClient(conf);
-    List<ContainerInfo> containerInfos =
-        containerOperationClient.listContainer(1, 100);
-    Map<ContainerID, Long> containerKeys = new HashMap<>();
-    for (ContainerInfo info : containerInfos) {
-      containerKeys.put(info.containerID(),
-          containerKeys.getOrDefault(info.containerID(), 0L) + 1);
+
+    ECReplicationConfig repConfig = new ECReplicationConfig(
+        3, 2, ECReplicationConfig.EcCodec.RS, chunkSize);
+    // Close all EC pipelines so we must get a fresh pipeline and hence
+    // container for this test.
+    PipelineManager pm =
+        cluster.getStorageContainerManager().getPipelineManager();
+    for (Pipeline p : pm.getPipelines(repConfig)) {
+      pm.closePipeline(p, true);
     }
 
     String keyName = UUID.randomUUID().toString();
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-            chunkSize), new HashMap<>())) {
+        repConfig, new HashMap<>())) {
       out.write(inputData);
     }
     OzoneKeyDetails key = bucket.getKey(keyName);
     long currentKeyContainerID =
         key.getOzoneKeyLocations().get(0).getContainerID();
-    Long priorKeys = containerKeys.get(new ContainerID(currentKeyContainerID));
-    long expectedKeys = (priorKeys != null ? priorKeys : 0) + 1L;
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return containerOperationClient
-            .listContainer(currentKeyContainerID, 100).get(0)
-            .getNumberOfKeys() == expectedKeys;
+        return containerOperationClient.getContainer(currentKeyContainerID)
+            .getNumberOfKeys() == 1;
       } catch (IOException exception) {
         Assert.fail("Unexpected exception " + exception);
         return false;
@@ -324,13 +323,14 @@ public class TestECKeyOutputStream {
     byte[] inputData = getInputBytes(numChunks);
     final OzoneBucket bucket = getOzoneBucket();
     String keyName = "testWriteShouldSucceedWhenDNKilled" + numChunks;
+    DatanodeDetails nodeToKill = null;
     try {
       try (OzoneOutputStream out = bucket.createKey(keyName, 1024,
           new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
               chunkSize), new HashMap<>())) {
         out.write(inputData);
         // Kill a node from first pipeline
-        DatanodeDetails nodeToKill =
+        nodeToKill =
             ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
                 .get(0).getPipeline().getFirstNode();
         cluster.shutdownHddsDatanode(nodeToKill);
@@ -344,24 +344,18 @@ public class TestECKeyOutputStream {
       }
 
       try (OzoneInputStream is = bucket.readKey(keyName)) {
-        // TODO: this skip can be removed once read handles online recovery.
-        long skip = is.skip(inputData.length);
-        Assert.assertTrue(skip == inputData.length);
-        // All nodes available in second block group. So, lets assert.
-        byte[] fileContent = new byte[inputData.length];
-        Assert.assertEquals(inputData.length, is.read(fileContent));
-        Assert.assertEquals(new String(inputData, UTF_8),
-            new String(fileContent, UTF_8));
+        // We wrote "inputData" twice, so do two reads and ensure the correct
+        // data comes back.
+        for (int i = 0; i < 2; i++) {
+          byte[] fileContent = new byte[inputData.length];
+          Assert.assertEquals(inputData.length, is.read(fileContent));
+          Assert.assertEquals(new String(inputData, UTF_8),
+              new String(fileContent, UTF_8));
+        }
       }
     } finally {
-      // TODO: optimize to just start the killed DN back.
-      resetCluster();
+      cluster.restartHddsDatanode(nodeToKill, true);
     }
-  }
-
-  private void resetCluster() throws Exception {
-    cluster.shutdown();
-    init();
   }
 
   private byte[] getInputBytes(int numChunks) {
