@@ -48,6 +48,8 @@ public class TenantListUsersHandler extends S3Handler {
       description = "Filter users with this prefix.")
   private String prefix;
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();

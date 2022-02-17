@@ -66,6 +66,9 @@ import static org.junit.Assert.fail;
 
 /**
  * Integration test for Ozone tenant shell command. HA enabled.
+ *
+ * TODO: HDDS-6338. Add a Kerberized version of this
+ * TODO: HDDS-6336. Add a mock Ranger server to test Ranger HTTP endpoint calls
  */
 public class TestOzoneTenantShell {
 

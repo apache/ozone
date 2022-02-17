@@ -1383,12 +1383,12 @@ message CancelDelegationTokenResponseProto {
 }
 
 message S3Secret {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     required string awsSecret = 2;
 }
 
 message GetS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     optional bool createIfNotExist = 2;
 }
 
@@ -1469,7 +1469,7 @@ message LayoutVersion {
 }
 
 message RevokeS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
 }
 
 message CreateTenantRequest {
@@ -1552,7 +1552,7 @@ message GetS3VolumeContextResponse {
   OM's.
 */
 message UpdateGetS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     required string awsSecret = 2;
 }
 

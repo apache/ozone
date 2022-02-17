@@ -33,14 +33,6 @@ import java.io.IOException;
     description = "List tenants")
 public class TenantListHandler extends TenantHandler {
 
-//  @CommandLine.Mixin
-//  private ListOptions listOptions;
-
-//  @CommandLine.Option(names = {"--json", "-j"},
-//      description = "Print the result in JSON.")
-//  private boolean printJson;
-
-  // TODO: long == json later.
   @CommandLine.Option(names = {"--long"},
       // Not using -l here as it potentially collides with -l inside ListOptions
       //  if we do need pagination at some point.
@@ -50,6 +42,11 @@ public class TenantListHandler extends TenantHandler {
   @CommandLine.Option(names = {"--header", "-H"},
       description = "Print header")
   private boolean printHeader;
+
+  // TODO: HDDS-6340. Add an option to print JSON result
+  //  @CommandLine.Option(names = {"--json", "-j"},
+  //      description = "Print the result in JSON.")
+  //  private boolean printJson;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
