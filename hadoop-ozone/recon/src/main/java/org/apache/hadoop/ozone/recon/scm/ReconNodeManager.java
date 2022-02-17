@@ -253,6 +253,15 @@ public class ReconNodeManager extends SCMNodeManager {
         reportedDn.getPersistedOpStateExpiryEpochSec());
   }
 
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
+
   @Override
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,

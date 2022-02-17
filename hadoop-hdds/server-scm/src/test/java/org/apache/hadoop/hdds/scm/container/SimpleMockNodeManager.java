@@ -263,6 +263,15 @@ public class SimpleMockNodeManager implements NodeManager {
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
   }
 
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
+
   @Override
   public void processNodeReport(DatanodeDetails datanodeDetails,
                                 NodeReportProto nodeReport) {

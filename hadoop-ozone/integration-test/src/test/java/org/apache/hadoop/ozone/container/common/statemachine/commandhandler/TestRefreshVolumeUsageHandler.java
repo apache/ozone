@@ -29,8 +29,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -131,11 +129,8 @@ public class TestRefreshVolumeUsageHandler {
     }
 
     //send refresh volume usage command to datanode
-    SCMCommand<?> command = new RefreshVolumeUsageCommand();
-    command.setTerm(
-        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+    cluster.getStorageContainerManager()
+        .getScmNodeManager().refreshAllHealthyDnUsageInfo();
 
     //waiting for the new usage info is refreshed
     GenericTestUtils.waitFor(() ->

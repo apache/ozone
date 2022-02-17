@@ -260,6 +260,13 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   void addDatanodeCommand(UUID dnId, SCMCommand command);
 
+
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  void refreshAllHealthyDnUsageInfo();
+
   /**
    * Process node report.
    *

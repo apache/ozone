@@ -30,18 +30,13 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +103,6 @@ public class ContainerBalancer {
   private Set<ContainerID> selectedContainers;
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
-  private final EventPublisher eventPublisher;
   private Map<ContainerMoveSelection,
       CompletableFuture<ReplicationManager.MoveResult>>
       moveSelectionToFutureMap;
@@ -129,7 +123,6 @@ public class ContainerBalancer {
         ContainerBalancerConfiguration.class);
     this.metrics = ContainerBalancerMetrics.create();
     this.scmContext = scm.getScmContext();
-    this.eventPublisher = scm.getEventQueue();
     this.selectedContainers = new HashSet<>();
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
@@ -193,7 +186,7 @@ public class ContainerBalancer {
         // this is helpful for container balancer to make more appropriate
         // decisions. this will increase the disk io load of data nodes, so
         // please enable it with caution.
-        sendRefreshUsageCommandToAllDNs();
+        nodeManager.refreshAllHealthyDnUsageInfo();
         synchronized (this) {
           try {
             long nodeReportInterval =
@@ -932,34 +925,5 @@ public class ContainerBalancer {
     MAX_SIZE_TO_MOVE_REACHED,
     ITERATION_INTERRUPTED,
     CAN_NOT_BALANCE_ANY_MORE
-  }
-
-  /**
-   * Sends refresh usage command to trigger all the datanodes to
-   * refresh disk usage info immediately.
-   */
-  private void sendRefreshUsageCommandToAllDNs() {
-    LOG.info("trigger all the active datanodes to refresh disk usage info");
-    RefreshVolumeUsageCommand refreshVolumeUsageCommand =
-        new RefreshVolumeUsageCommand();
-    try {
-      refreshVolumeUsageCommand.setTerm(scmContext.getTermOfLeader());
-    } catch (NotLeaderException nle) {
-      LOG.warn("Skip sending refreshVolumeUsage command,"
-          + " since current SCM is not leader.", nle);
-      return;
-    }
-    nodeManager.getAllNodes().stream().filter(dn -> {
-      boolean isHealthy = false;
-      try {
-        isHealthy = nodeManager.getNodeStatus(dn).isHealthy();
-      } catch (NodeNotFoundException nnfe) {
-        LOG.warn("datanode {} is not found", dn.getIpAddress());
-      }
-      return isHealthy;
-    }).forEach(datanode -> eventPublisher
-        .fireEvent(SCMEvents.DATANODE_COMMAND,
-            new CommandForDatanode<>(datanode.getUuid(),
-                refreshVolumeUsageCommand)));
   }
 }
