@@ -51,6 +51,26 @@ import java.util.stream.Stream;
  * Container inspector for key value container metadata. It is capable of
  * logging metadata information about a container, and repairing the metadata
  * database values of #BLOCKCOUNT and #BYTESUSED.
+ *
+ * To enable this inspector in inspect mode, pass the java system property
+ * -Dozone.datanode.container.metadata.inspector=inspect on datanode startup.
+ * This will cause the inspector to log metadata information about all
+ * containers on datanode startup whose aggregate values of #BLOCKCOUNT and
+ * #BYTESUSED do not match the sum of their parts in the database at the
+ * ERROR level, and information about correct containers at the TRACE level.
+ * Changing the `inspect` argument to `repair` will update these aggregate
+ * values to match the database.
+ *
+ * When run, the inspector will output json to the logger named in the
+ * {@link KeyValueContainerMetadataInspector#REPORT_LOG} variable. The log4j
+ * configuration can be modified to send this output to a separate file
+ * without log information prefixes interfering with the json. For example:
+ *
+ * log4j.logger.ContainerMetadataInspectorReport=INFO,inspectorAppender
+ * log4j.appender.inspectorAppender=org.apache.log4j.FileAppender
+ * log4j.appender.inspectorAppender.File=${hadoop.log.dir}/\
+ * containerMetadataInspector.log
+ * log4j.appender.inspectorAppender.layout=org.apache.log4j.PatternLayout
  */
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
   public static final Logger LOG =
