@@ -157,9 +157,8 @@ public class BlockDeletingService extends BackgroundService {
         totalBlocks += containerBlockInfo.numBlocksToDelete;
       }
       if (containers.size() > 0) {
-        LOG.info("Plan to choose {} blocks for block deletion, "
-                + "actually deleting {} blocks.", blockLimitPerInterval,
-            totalBlocks);
+        LOG.debug("Queued {} blocks from {} containers for deletion",
+            totalBlocks, containers.size());
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
@@ -381,7 +380,7 @@ public class BlockDeletingService extends BackgroundService {
         }
 
         if (!succeedBlocks.isEmpty()) {
-          LOG.info("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
+          LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                   "task elapsed time: {}ms", containerData.getContainerID(),
               succeedBlocks.size(), releasedBytes,
               Time.monotonicNow() - startTime);
@@ -465,7 +464,7 @@ public class BlockDeletingService extends BackgroundService {
           containerData.decrBytesUsed(releasedBytes);
         }
 
-        LOG.info("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
+        LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                 "task elapsed time: {}ms", containerData.getContainerID(),
             deletedBlocksCount, Time.monotonicNow() - startTime);
 

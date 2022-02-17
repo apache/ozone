@@ -102,15 +102,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private ArrayList<Long> pendingPutBlockCache;
 
   public KeyValueContainer(KeyValueContainerData containerData,
-      ConfigurationSource
-      ozoneConfig) {
+      ConfigurationSource ozoneConfig) {
     Preconditions.checkNotNull(containerData,
             "KeyValueContainerData cannot be null");
     Preconditions.checkNotNull(ozoneConfig,
             "Ozone configuration cannot be null");
     this.config = ozoneConfig;
     this.containerData = containerData;
-    this.pendingPutBlockCache = new ArrayList<>();
+    if (this.containerData.isOpen() || this.containerData.isClosing()) {
+      // If container is not in OPEN or CLOSING state, there cannot be block
+      // writes to the container. So pendingPutBlockCache is not needed.
+      this.pendingPutBlockCache = new ArrayList<>();
+    }
   }
 
   @Override
@@ -299,9 +302,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.CLOSING));
-      // Clear the Block Cache as there will not be any more writes to this
-      // block
-      pendingPutBlockCache.clear();
+      // Do not clear the pendingBlockCache here as a follower can still
+      // receive transactions from leader in CLOSING state. Refer to
+      // KeyValueHandler#checkContainerOpen()
     } finally {
       writeUnlock();
     }
@@ -313,6 +316,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     try {
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.UNHEALTHY));
+      clearPendingPutBlockCache();
     } finally {
       writeUnlock();
     }
@@ -332,6 +336,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // been done outside the lock.
       flushAndSyncDB();
       updateContainerData(containerData::quasiCloseContainer);
+      clearPendingPutBlockCache();
     } finally {
       writeUnlock();
     }
@@ -348,6 +353,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // been done outside the lock.
       flushAndSyncDB();
       updateContainerData(containerData::closeContainer);
+      clearPendingPutBlockCache();
     } finally {
       writeUnlock();
     }
@@ -703,6 +709,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    */
   public void removeFromPendingPutBlockCache(long localID) {
     pendingPutBlockCache.remove(localID);
+  }
+
+  /**
+   * When a container is closed, quasi-closed or marked unhealthy, clear the
+   * pendingPutBlockCache as there won't be any more writes to the container.
+   */
+  private void clearPendingPutBlockCache() {
+    if (pendingPutBlockCache != null) {
+      pendingPutBlockCache.clear();
+      pendingPutBlockCache = null;
+    }
   }
 
   /**

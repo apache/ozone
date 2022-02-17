@@ -289,6 +289,14 @@ public abstract class ContainerData {
   }
 
   /**
+   * checks if the container is closing.
+   * @return - boolean
+   */
+  public synchronized  boolean isClosing() {
+    return ContainerDataProto.State.CLOSING == state;
+  }
+
+  /**
    * checks if the container is invalid.
    * @return - boolean
    */
