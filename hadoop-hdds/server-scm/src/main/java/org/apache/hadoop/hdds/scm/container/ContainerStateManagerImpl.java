@@ -277,10 +277,10 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public ContainerInfo getContainer(final HddsProtos.ContainerID id) {
+  public ContainerInfo getContainer(final ContainerID id) {
     lock.readLock().lock();
     try {
-      return containers.getContainerInfo(ContainerID.getFromProtobuf(id));
+      return containers.getContainerInfo(id);
     } finally {
       lock.readLock().unlock();
     }
@@ -326,11 +326,11 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public boolean contains(final HddsProtos.ContainerID id) {
+  public boolean contains(ContainerID id) {
     lock.readLock().lock();
     try {
       // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
-      return containers.contains(ContainerID.getFromProtobuf(id));
+      return containers.contains(id);
     } finally {
       lock.readLock().unlock();
     }
@@ -370,35 +370,32 @@ public final class ContainerStateManagerImpl
 
 
   @Override
-  public Set<ContainerReplica> getContainerReplicas(
-      final HddsProtos.ContainerID id) {
+  public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {
     lock.readLock().lock();
     try {
-      return containers.getContainerReplicas(
-          ContainerID.getFromProtobuf(id));
+      return containers.getContainerReplicas(id);
     } finally {
       lock.readLock().unlock();
     }
   }
 
   @Override
-  public void updateContainerReplica(final HddsProtos.ContainerID id,
+  public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
     lock.writeLock().lock();
     try {
-      containers.updateContainerReplica(ContainerID.getFromProtobuf(id),
-          replica);
+      containers.updateContainerReplica(id, replica);
     } finally {
       lock.writeLock().unlock();
     }
   }
 
   @Override
-  public void removeContainerReplica(final HddsProtos.ContainerID id,
+  public void removeContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
     lock.writeLock().lock();
     try {
-      containers.removeContainerReplica(ContainerID.getFromProtobuf(id),
+      containers.removeContainerReplica(id,
           replica);
     } finally {
       lock.writeLock().unlock();

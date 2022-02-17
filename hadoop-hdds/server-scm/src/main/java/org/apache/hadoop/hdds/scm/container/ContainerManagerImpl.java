@@ -36,7 +36,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -143,7 +142,7 @@ public class ContainerManagerImpl implements ContainerManager {
   public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {
     return Optional.ofNullable(containerStateManager
-        .getContainer(id.getProtobuf()))
+        .getContainer(id))
         .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
   }
 
@@ -162,7 +161,6 @@ public class ContainerManagerImpl implements ContainerManager {
     try {
       containers = containersIds.stream()
           .filter(id -> id.getId() >= start).limit(count)
-          .map(ContainerID::getProtobuf)
           .map(containerStateManager::getContainer)
           .collect(Collectors.toList());
     } finally {
@@ -177,7 +175,6 @@ public class ContainerManagerImpl implements ContainerManager {
     lock.lock();
     try {
       containers = containerStateManager.getContainerIDs(state).stream()
-          .map(ContainerID::getProtobuf)
           .map(containerStateManager::getContainer)
           .filter(Objects::nonNull).collect(Collectors.toList());
     } finally {
@@ -278,18 +275,17 @@ public class ContainerManagerImpl implements ContainerManager {
         .build();
     containerStateManager.addContainer(containerInfo);
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
-    return containerStateManager.getContainer(containerID.getProtobuf());
+    return containerStateManager.getContainer(containerID);
   }
 
   @Override
-  public void updateContainerState(final ContainerID id,
+  public void updateContainerState(final ContainerID cid,
                                    final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.updateContainerState(cid, event);
+        containerStateManager.updateContainerState(cid.getProtobuf(), event);
       } else {
         throwContainerNotFoundException(cid);
       }
@@ -302,15 +298,14 @@ public class ContainerManagerImpl implements ContainerManager {
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
     return Optional.ofNullable(containerStateManager
-        .getContainerReplicas(id.getProtobuf()))
+        .getContainerReplicas(id))
         .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
   }
 
   @Override
-  public void updateContainerReplica(final ContainerID id,
+  public void updateContainerReplica(final ContainerID cid,
                                      final ContainerReplica replica)
       throws ContainerNotFoundException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(cid, replica);
     } else {
@@ -319,10 +314,9 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public void removeContainerReplica(final ContainerID id,
+  public void removeContainerReplica(final ContainerID cid,
                                      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(cid, replica);
     } else {
@@ -414,13 +408,12 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public void deleteContainer(final ContainerID id)
+  public void deleteContainer(final ContainerID cid)
       throws IOException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.removeContainer(cid);
+        containerStateManager.removeContainer(cid.getProtobuf());
         scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
       } else {
         scmContainerManagerMetrics.incNumFailureDeleteContainers();
@@ -431,28 +424,15 @@ public class ContainerManagerImpl implements ContainerManager {
     }
   }
 
-  @Deprecated
-  private void checkIfContainerExist(final HddsProtos.ContainerID id)
-      throws ContainerNotFoundException {
-    if (!containerStateManager.contains(id)) {
-      throw new ContainerNotFoundException("Container with id #" +
-          id.getId() + " not found.");
-    }
-  }
-
   @Override
   public boolean containerExist(final ContainerID id) {
-    return containerExist(id.getProtobuf());
-  }
-
-  private boolean containerExist(final HddsProtos.ContainerID id) {
     return containerStateManager.contains(id);
   }
 
-  private void throwContainerNotFoundException(final HddsProtos.ContainerID id)
+  private void throwContainerNotFoundException(final ContainerID id)
       throws ContainerNotFoundException {
-    throw new ContainerNotFoundException("Container with id #" +
-        id.getId() + " not found.");
+    throw new ContainerNotFoundException("Container with id " +
+        id + " not found.");
   }
 
   @Override

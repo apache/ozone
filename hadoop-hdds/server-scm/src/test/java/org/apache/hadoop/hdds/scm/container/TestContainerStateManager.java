@@ -120,7 +120,7 @@ public class TestContainerStateManager {
 
     //WHEN
     Set<ContainerReplica> replicas = containerStateManager
-        .getContainerReplicas(c1.containerID().getProtobuf());
+        .getContainerReplicas(c1.containerID());
 
     //THEN
     Assert.assertEquals(3, replicas.size());
@@ -140,7 +140,7 @@ public class TestContainerStateManager {
 
     //WHEN
     Set<ContainerReplica> replicas = containerStateManager
-        .getContainerReplicas(c1.containerID().getProtobuf());
+        .getContainerReplicas(c1.containerID());
 
     Assert.assertEquals(2, replicas.size());
     Assert.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
@@ -153,7 +153,7 @@ public class TestContainerStateManager {
         .setDatanodeDetails(node)
         .build();
     containerStateManager
-        .updateContainerReplica(cont.containerID().getProtobuf(), replica);
+        .updateContainerReplica(cont.containerID(), replica);
   }
 
   private ContainerInfo allocateContainer() throws IOException {
