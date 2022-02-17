@@ -39,7 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 
 /**
  * This class creates the OzoneClient for the Rest endpoints.
@@ -57,9 +57,6 @@ public class OzoneClientProducer {
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
-
-  @Inject
-  private String omServiceID;
 
   @Context
   private ContainerRequestContext context;
@@ -86,7 +83,12 @@ public class OzoneClientProducer {
       }
 
       String awsAccessId = signatureInfo.getAwsAccessId();
-      validateAccessId(awsAccessId);
+      // ONLY validate aws access id when needed.
+      if (awsAccessId == null || awsAccessId.equals("")) {
+        LOG.debug("Malformed s3 header. awsAccessID: ", awsAccessId);
+        throw ACCESS_DENIED;
+      }
+
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
           awsAccessId);
@@ -106,8 +108,7 @@ public class OzoneClientProducer {
     OzoneClient ozoneClient = null;
     try {
       ozoneClient =
-          OzoneClientCache.getOzoneClientInstance(omServiceID,
-              ozoneConfiguration);
+          OzoneClientCache.getOzoneClientInstance(ozoneConfiguration);
     } catch (Exception e) {
       // For any other critical errors during object creation throw Internal
       // error.
@@ -117,14 +118,6 @@ public class OzoneClientProducer {
       throw e;
     }
     return ozoneClient;
-  }
-
-  // ONLY validate aws access id when needed.
-  private void validateAccessId(String awsAccessId) throws Exception {
-    if (awsAccessId == null || awsAccessId.equals("")) {
-      LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
-      throw wrapOS3Exception(MALFORMED_HEADER);
-    }
   }
 
   public synchronized void setOzoneConfiguration(OzoneConfiguration config) {

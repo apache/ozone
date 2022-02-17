@@ -28,12 +28,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
-import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addVolumeAndBucketToDB;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.junit.Assert.fail;
@@ -292,7 +292,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     String openKey = getOpenKey(id);
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
+    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
         omMetadataManager);
 
     // Before calling
@@ -498,7 +498,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   protected void addToKeyTable(String keyName) throws Exception {
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         keyName.substring(1), 0L, RATIS, THREE, omMetadataManager);
   }
 
@@ -574,7 +574,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   protected long checkIntermediatePaths(Path keyPath) throws Exception {
     // Check intermediate paths are created
     keyPath = keyPath.getParent();
-    while(keyPath != null) {
+    while (keyPath != null) {
       Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
           omMetadataManager
               .getOzoneDirKey(volumeName, bucketName, keyPath.toString())));

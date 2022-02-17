@@ -74,7 +74,7 @@ public class ContainerBalancer {
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
   private long sizeMovedPerIteration;
-  private int idleIteration;
+  private int iterations;
   private List<DatanodeUsageInfo> unBalancedNodes;
   private List<DatanodeUsageInfo> overUtilizedNodes;
   private List<DatanodeUsageInfo> underUtilizedNodes;
@@ -155,9 +155,12 @@ public class ContainerBalancer {
         return false;
       }
 
-      balancerRunning = true;
       this.config = balancerConfiguration;
-      validateConfiguration(config);
+      if (!validateConfiguration(config)) {
+        return false;
+      }
+      ozoneConfiguration.setFromObject(balancerConfiguration);
+      balancerRunning = true;
       LOG.info("Starting Container Balancer...{}", this);
 
       //we should start a new balancer thread async
@@ -176,23 +179,12 @@ public class ContainerBalancer {
    * Balances the cluster.
    */
   private void balance() {
-    this.idleIteration = config.getIdleIteration();
-    if(this.idleIteration == -1) {
+    this.iterations = config.getIterations();
+    if (this.iterations == -1) {
       //run balancer infinitely
-      this.idleIteration = Integer.MAX_VALUE;
+      this.iterations = Integer.MAX_VALUE;
     }
-    this.threshold = config.getThreshold();
-    this.maxDatanodesRatioToInvolvePerIteration =
-        config.getMaxDatanodesRatioToInvolvePerIteration();
-    this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
-    if (config.getNetworkTopologyEnable()) {
-      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
-          containerManager, placementPolicy, nodeManager, networkTopology);
-    } else {
-      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
-          placementPolicy, nodeManager);
-    }
-    for (int i = 0; i < idleIteration && balancerRunning; i++) {
+    for (int i = 0; i < iterations && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
         stop();
@@ -215,7 +207,7 @@ public class ContainerBalancer {
 
       // wait for configured time before starting next iteration, unless
       // this was the final iteration
-      if (i != idleIteration - 1) {
+      if (i != iterations - 1) {
         synchronized (this) {
           try {
             wait(config.getBalancingInterval().toMillis());
@@ -256,6 +248,17 @@ public class ContainerBalancer {
             "Manager.");
       }
       return false;
+    }
+    this.threshold = config.getThresholdAsRatio();
+    this.maxDatanodesRatioToInvolvePerIteration =
+        config.getMaxDatanodesRatioToInvolvePerIteration();
+    this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
+    if (config.getNetworkTopologyEnable()) {
+      findTargetStrategy = new FindTargetGreedyByNetworkTopology(
+          containerManager, placementPolicy, nodeManager, networkTopology);
+    } else {
+      findTargetStrategy = new FindTargetGreedyByUsageInfo(containerManager,
+          placementPolicy, nodeManager);
     }
     this.excludeNodes = config.getExcludeNodes();
     this.includeNodes = config.getIncludeNodes();
@@ -520,7 +523,7 @@ public class ContainerBalancer {
   }
 
   /**
-   * Checks if limits maxDatanodesRatioToInvolvePerIteration and
+   * Checks if limits maxDatanodesPercentageToInvolvePerIteration and
    * maxSizeToMovePerIteration have not been hit.
    *
    * @return {@link IterationResult#MAX_DATANODES_TO_INVOLVE_REACHED} if reached
@@ -766,7 +769,7 @@ public class ContainerBalancer {
     LOG.info("Container Balancer stopped successfully.");
   }
 
-  private void validateConfiguration(ContainerBalancerConfiguration conf) {
+  private boolean validateConfiguration(ContainerBalancerConfiguration conf) {
     // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
@@ -776,10 +779,12 @@ public class ContainerBalancer {
     if (conf.getMaxSizeEnteringTarget() <= size) {
       LOG.info("MaxSizeEnteringTarget should be larger than " +
           "ozone.scm.container.size");
+      return false;
     }
     if (conf.getMaxSizeLeavingSource() <= size) {
       LOG.info("MaxSizeLeavingSource should be larger than " +
           "ozone.scm.container.size");
+      return false;
     }
 
     // balancing interval should be greater than DUFactory refresh period
@@ -788,7 +793,9 @@ public class ContainerBalancer {
     if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
       LOG.info("balancing.iteration.interval should be larger than " +
           "hdds.datanode.du.refresh.period.");
+      return false;
     }
+    return true;
   }
 
   public void setNodeManager(NodeManager nodeManager) {
@@ -866,7 +873,7 @@ public class ContainerBalancer {
     return countDatanodesInvolvedPerIteration;
   }
 
-  long getSizeMovedPerIteration() {
+  public long getSizeMovedPerIteration() {
     return sizeMovedPerIteration;
   }
 

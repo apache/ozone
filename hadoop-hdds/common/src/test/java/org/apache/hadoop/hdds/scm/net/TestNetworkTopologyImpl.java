@@ -171,7 +171,7 @@ public class TestNetworkTopologyImpl {
   @Test
   public void testContains() {
     Node nodeNotInMap = createDatanode("8.8.8.8", "/d2/r4");
-    for (int i=0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       assertTrue(cluster.contains(dataNodes[i]));
     }
     assertFalse(cluster.contains(nodeNotInMap));
@@ -238,7 +238,7 @@ public class TestNetworkTopologyImpl {
     assumeTrue(cluster.getMaxLevel() > 2);
     int maxLevel = cluster.getMaxLevel();
     assertTrue(cluster.isSameParent(dataNodes[0], dataNodes[1]));
-    while(maxLevel > 1) {
+    while (maxLevel > 1) {
       assertTrue(cluster.isSameAncestor(dataNodes[0], dataNodes[1],
           maxLevel - 1));
       maxLevel--;
@@ -262,17 +262,17 @@ public class TestNetworkTopologyImpl {
 
   @Test
   public void testAddRemove() {
-    for(int i = 0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       cluster.remove(dataNodes[i]);
     }
-    for(int i = 0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       assertFalse(cluster.contains(dataNodes[i]));
     }
     // no leaf nodes
     assertEquals(0, cluster.getNumOfLeafNode(null));
     // no inner nodes
     assertEquals(0, cluster.getNumOfNodes(2));
-    for(int i = 0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       cluster.add(dataNodes[i]);
     }
     // Inner nodes are created automatically
@@ -467,10 +467,10 @@ public class TestNetworkTopologyImpl {
         }};
     int leafNum = cluster.getNumOfLeafNode(null);
     Map<Node, Integer> frequency;
-    for(Node[] list : excludedNodeLists) {
+    for (Node[] list : excludedNodeLists) {
       List<Node> excludedList = Arrays.asList(list);
       int ancestorGen = 0;
-      while(ancestorGen < cluster.getMaxLevel()) {
+      while (ancestorGen < cluster.getMaxLevel()) {
         frequency = pickNodesAtRandom(leafNum, null, excludedList, ancestorGen);
         List<Node> ancestorList = NetUtils.getAncestorList(cluster,
             excludedList, ancestorGen);
@@ -490,7 +490,7 @@ public class TestNetworkTopologyImpl {
     // all nodes excluded, no node will be picked
     List<Node> excludedList = Arrays.asList(dataNodes);
     int ancestorGen = 0;
-    while(ancestorGen < cluster.getMaxLevel()) {
+    while (ancestorGen < cluster.getMaxLevel()) {
       frequency = pickNodesAtRandom(leafNum, null, excludedList, ancestorGen);
       for (Node key : dataNodes) {
         assertTrue(frequency.get(key) == 0);
@@ -500,7 +500,7 @@ public class TestNetworkTopologyImpl {
     // out scope excluded nodes, each node will be picked
     excludedList = Arrays.asList(createDatanode("1.1.1.1.", "/city1/rack1"));
     ancestorGen = 0;
-    while(ancestorGen < cluster.getMaxLevel()) {
+    while (ancestorGen < cluster.getMaxLevel()) {
       frequency = pickNodes(leafNum, null, excludedList, null, ancestorGen);
       for (Node key : dataNodes) {
         assertTrue(frequency.get(key) != 0);
@@ -536,7 +536,7 @@ public class TestNetworkTopologyImpl {
       while (!path.equals(ROOT)) {
         scope = "~" + path;
         int ancestorGen = 0;
-        while(ancestorGen < cluster.getMaxLevel()) {
+        while (ancestorGen < cluster.getMaxLevel()) {
           for (Node[] list : excludedNodeLists) {
             List<Node> excludedList = Arrays.asList(list);
             frequency =

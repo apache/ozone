@@ -70,7 +70,7 @@ public class TestOzoneManagerLock {
     // Lock re-acquire not allowed by same thread.
     if (resource == OzoneManagerLock.Resource.USER_LOCK ||
         resource == OzoneManagerLock.Resource.S3_SECRET_LOCK ||
-        resource == OzoneManagerLock.Resource.PREFIX_LOCK){
+        resource == OzoneManagerLock.Resource.PREFIX_LOCK) {
       lock.acquireWriteLock(resource, resourceName);
       try {
         lock.acquireWriteLock(resource, resourceName);

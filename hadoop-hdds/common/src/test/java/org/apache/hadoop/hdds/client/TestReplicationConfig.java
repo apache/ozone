@@ -167,7 +167,7 @@ public class TestReplicationConfig {
   @Test
   public void testValidationBasedOnConfig() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_REPLICATION+".allowed-configs",
+    conf.set(OZONE_REPLICATION + ".allowed-configs",
         "^STANDALONE/ONE|RATIS/THREE$");
     conf.set(OZONE_REPLICATION, factor);
     conf.set(OZONE_REPLICATION_TYPE, type);

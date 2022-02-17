@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -79,15 +79,15 @@ public class TestKeyValueContainerMarkUnhealthy {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestKeyValueContainerMarkUnhealthy(ChunkLayOutVersion layout) {
+  public TestKeyValueContainerMarkUnhealthy(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
