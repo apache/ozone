@@ -1761,7 +1761,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Map<String, Integer> nodeStateCount = new HashMap<>();
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
       nodeStateCount.put(state.toString(),
-          containerManager.getContainers(state).size());
+          containerManager.getContainerStateCount(state));
     }
     return nodeStateCount;
   }
