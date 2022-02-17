@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -157,6 +158,34 @@ public class TestReplicationConfig {
         .fromProto(ReplicationType.EC, null, proto);
 
     validate(config, EcCodec.valueOf(codec), data, parity, chunkSize);
+  }
+
+  @Test
+  public void testECReplicationConfigGetReplication() {
+    assumeECType();
+    HddsProtos.ECReplicationConfig proto =
+        HddsProtos.ECReplicationConfig.newBuilder().setCodec(codec)
+            .setData(data).setParity(parity).setEcChunkSize(chunkSize).build();
+
+    ReplicationConfig config =
+        ReplicationConfig.fromProto(ReplicationType.EC, null, proto);
+
+    Assert.assertEquals(EcCodec.valueOf(
+        codec) + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
+            + data + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
+            + parity + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
+            + chunkSize, config.getReplication());
+  }
+
+  @Test
+  public void testReplicationConfigGetReplication() {
+    assumeRatisOrStandaloneType();
+    final ReplicationConfig replicationConfig = ReplicationConfig
+        .fromTypeAndFactor(
+            org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
+            org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor));
+
+    Assert.assertEquals(factor, replicationConfig.getReplication());
   }
 
   @Test
