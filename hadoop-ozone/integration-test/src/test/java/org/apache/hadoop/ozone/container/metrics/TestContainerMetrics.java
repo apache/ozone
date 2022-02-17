@@ -112,7 +112,7 @@ public class TestContainerMetrics {
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
                 containerSet, volumeSet, metrics,
-                c -> {}));
+                c -> { }));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
           volumeSet, handlers, context, metrics, null);
@@ -182,7 +182,7 @@ public class TestContainerMetrics {
       }
       // clean up volume dir
       File file = new File(path);
-      if(file.exists()) {
+      if (file.exists()) {
         FileUtil.fullyDelete(file);
       }
     }

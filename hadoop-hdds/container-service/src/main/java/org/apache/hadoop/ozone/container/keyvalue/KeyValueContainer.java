@@ -382,7 +382,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private void compactDB() throws StorageContainerException {
     try {
-      try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+      try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
         db.getStore().compactDB();
       }
     } catch (StorageContainerException ex) {
@@ -435,7 +435,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     // holding lock and writing data to disk. We can have async implementation
     // to flush the update container data to disk.
     long containerId = containerData.getContainerID();
-    if(!containerData.isValid()) {
+    if (!containerData.isValid()) {
       LOG.debug("Invalid container data. ContainerID: {}", containerId);
       throw new StorageContainerException("Invalid container data. " +
           "ContainerID: " + containerId, INVALID_CONTAINER_STATE);
@@ -789,7 +789,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * @return
    * @throws IOException
    */
-  private File createTempFile(File file) throws IOException{
+  private File createTempFile(File file) throws IOException {
     return File.createTempFile("tmp_" + System.currentTimeMillis() + "_",
         file.getName(), file.getParentFile());
   }

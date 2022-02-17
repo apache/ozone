@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -66,6 +67,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 import org.apache.hadoop.util.Timer;
@@ -184,9 +187,13 @@ public class OzoneContainer {
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
+
+    int serviceWorkerSize = config
+        .getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+            OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
     blockDeletingService =
         new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
-            TimeUnit.MILLISECONDS, config);
+            TimeUnit.MILLISECONDS, serviceWorkerSize, config);
 
     if (certClient != null && secConf.isGrpcTlsEnabled()) {
       List<X509Certificate> x509Certificates =
@@ -215,6 +222,10 @@ public class OzoneContainer {
     ArrayList<Thread> volumeThreads = new ArrayList<>();
     long startTime = System.currentTimeMillis();
 
+    // Load container inspectors that may be triggered at startup based on
+    // system properties set. These can inspect and possibly repair
+    // containers as we iterate them here.
+    ContainerInspectorUtil.load();
     //TODO: diskchecker should be run before this, to see how disks are.
     // And also handle disk failure tolerance need to be added
     while (volumeSetIterator.hasNext()) {
@@ -233,6 +244,10 @@ public class OzoneContainer {
       LOG.error("Volume Threads Interrupted exception", ex);
       Thread.currentThread().interrupt();
     }
+
+    // After all containers have been processed, turn off container
+    // inspectors so they are not hit during normal datanode execution.
+    ContainerInspectorUtil.unload();
 
     LOG.info("Build ContainerSet costs {}s",
         (System.currentTimeMillis() - startTime) / 1000);

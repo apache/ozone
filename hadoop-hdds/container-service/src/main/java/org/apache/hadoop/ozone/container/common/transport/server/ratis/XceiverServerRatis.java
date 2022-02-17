@@ -273,7 +273,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // Set the ratis storage directory
     Collection<String> storageDirPaths =
             HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
-    List<File> storageDirs= new ArrayList<>(storageDirPaths.size());
+    List<File> storageDirs = new ArrayList<>(storageDirPaths.size());
     storageDirPaths.stream().forEach(d -> storageDirs.add(new File(d)));
 
     RaftServerConfigKeys.setStorageDir(properties, storageDirs);
@@ -306,13 +306,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     int logQueueNumElements =
         conf.getInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS,
             OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT);
-    final int logQueueByteLimit = (int) conf.getStorageSize(
+    final long logQueueByteLimit = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setQueueElementLimit(
         properties, logQueueNumElements);
-    RaftServerConfigKeys.Log.setQueueByteLimit(properties, logQueueByteLimit);
+    RaftServerConfigKeys.Log.setQueueByteLimit(properties,
+        SizeInBytes.valueOf(logQueueByteLimit));
 
     int numSyncRetries = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
@@ -693,7 +694,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     long bytesWritten = 0;
     Iterator<org.apache.hadoop.ozone.container.common.interfaces.Container<?>>
         containerIt = containerController.getContainers();
-    while(containerIt.hasNext()) {
+    while (containerIt.hasNext()) {
       ContainerData containerData = containerIt.next().getContainerData();
       if (containerData.getOriginPipelineId()
           .compareTo(pipelineID.getId()) == 0) {

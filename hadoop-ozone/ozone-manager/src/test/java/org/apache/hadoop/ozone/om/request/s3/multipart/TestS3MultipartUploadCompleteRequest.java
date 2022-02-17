@@ -163,7 +163,7 @@ public class TestS3MultipartUploadCompleteRequest
 
     List<Part> partList = new ArrayList<>();
 
-    String partName= getPartName(volumeName, bucketName, keyName,
+    String partName = getPartName(volumeName, bucketName, keyName,
         multipartUploadID, 23);
 
     partList.add(Part.newBuilder().setPartName(partName).setPartNumber(23)

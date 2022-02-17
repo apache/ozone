@@ -107,7 +107,7 @@ public class TestOMDBUpdatesHandler {
         rocksDB.getUpdatesSince(0);
     List<byte[]> writeBatches = new ArrayList<>();
 
-    while(transactionLogIterator.isValid()) {
+    while (transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
       result.writeBatch().markWalTerminationPoint();
@@ -190,7 +190,7 @@ public class TestOMDBUpdatesHandler {
         rocksDB.getUpdatesSince(3);
     List<byte[]> writeBatches = new ArrayList<>();
 
-    while(transactionLogIterator.isValid()) {
+    while (transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
       result.writeBatch().markWalTerminationPoint();

@@ -65,7 +65,7 @@ public final class S3ErrorTable {
 
   public static final OS3Exception MALFORMED_HEADER = new OS3Exception(
       "AuthorizationHeaderMalformed", "The authorization header you provided " +
-      "is invalid.", HTTP_NOT_FOUND);
+      "is invalid.", HTTP_BAD_REQUEST);
 
   public static final OS3Exception NO_SUCH_KEY = new OS3Exception(
       "NoSuchKey", "The specified key does not exist", HTTP_NOT_FOUND);
@@ -120,20 +120,26 @@ public final class S3ErrorTable {
       "NotImplemented", "This part of feature is not implemented yet.",
       HTTP_NOT_IMPLEMENTED);
 
+  public static OS3Exception newError(OS3Exception e, String resource) {
+    return newError(e, resource, null);
+  }
+
   /**
    * Create a new instance of Error.
    * @param e Error Template
    * @param resource Resource associated with this exception
+   * @param ex the original exception, may be null
    * @return creates a new instance of error based on the template
    */
-  public static OS3Exception newError(OS3Exception e, String resource) {
+  public static OS3Exception newError(OS3Exception e, String resource,
+      Exception ex) {
     OS3Exception err =  new OS3Exception(e.getCode(), e.getErrorMessage(),
         e.getHttpCode());
     err.setResource(resource);
     if (e.getHttpCode() == HTTP_INTERNAL_ERROR) {
-      LOG.error("Internal Error: {}", err.toXml(), e);
+      LOG.error("Internal Error: {}", err.toXml(), ex);
     } else if (LOG.isDebugEnabled()) {
-      LOG.debug(err.toXml(), e);
+      LOG.debug(err.toXml(), ex);
     }
     return err;
   }

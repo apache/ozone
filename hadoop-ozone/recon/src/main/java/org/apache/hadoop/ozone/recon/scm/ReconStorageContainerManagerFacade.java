@@ -72,6 +72,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -122,8 +123,8 @@ public class ReconStorageContainerManagerFacade
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
-      ReconContainerMetadataManager reconContainerMetadataManager)
-      throws IOException {
+      ReconContainerMetadataManager reconContainerMetadataManager,
+      ReconUtils reconUtils) throws IOException {
     reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -132,7 +133,7 @@ public class ReconStorageContainerManagerFacade
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
-    this.scmStorageConfig = new ReconStorageConfig(conf);
+    this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
@@ -264,7 +265,7 @@ public class ReconStorageContainerManagerFacade
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);
-    if(isSCMSnapshotEnabled) {
+    if (isSCMSnapshotEnabled) {
       initializeSCMDB();
       LOG.info("SCM DB initialized");
     } else {
@@ -335,7 +336,7 @@ public class ReconStorageContainerManagerFacade
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD,
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
 
-      if(Math.abs(scmContainersCount - reconContainerCount) > threshold) {
+      if (Math.abs(scmContainersCount - reconContainerCount) > threshold) {
         LOG.info("Recon Container Count: {}, SCM Container Count: {}",
             reconContainerCount, scmContainersCount);
         updateReconSCMDBWithNewSnapshot();
