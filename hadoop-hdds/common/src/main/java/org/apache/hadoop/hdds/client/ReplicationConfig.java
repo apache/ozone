@@ -195,4 +195,9 @@ public interface ReplicationConfig {
    */
   int getRequiredNodes();
 
+  /**
+   * Returns the replication option in string format.
+   */
+  String getReplication();
+
 }

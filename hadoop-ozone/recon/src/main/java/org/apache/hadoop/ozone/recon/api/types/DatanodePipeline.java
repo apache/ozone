@@ -26,13 +26,15 @@ import java.util.UUID;
  */
 public class DatanodePipeline {
   private UUID pipelineID;
-  private ReplicationConfig repConfig;
+  private String replicationType;
+  private String replicationFactor;
   private String leaderNode;
 
-  public DatanodePipeline(UUID pipelineID, ReplicationConfig repConfig,
+  public DatanodePipeline(UUID pipelineID, ReplicationConfig replicationConfig,
       String leaderNode) {
     this.pipelineID = pipelineID;
-    this.repConfig = repConfig;
+    this.replicationType = replicationConfig.getReplicationType().toString();
+    this.replicationFactor = replicationConfig.getReplication();
     this.leaderNode = leaderNode;
   }
 
@@ -41,11 +43,11 @@ public class DatanodePipeline {
   }
 
   public String getReplicationType() {
-    return repConfig.getReplicationType().name();
+    return replicationType;
   }
 
-  public ReplicationConfig getReplicationConfig() {
-    return repConfig;
+  public String getReplicationFactor() {
+    return replicationFactor;
   }
 
   public String getLeaderNode() {

@@ -62,6 +62,11 @@ public class RatisReplicationConfig implements ReplicatedReplicationConfig {
   }
 
   @Override
+  public String getReplication() {
+    return String.valueOf(replicationFactor);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

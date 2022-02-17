@@ -414,9 +414,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       Assert.assertEquals(1, datanodeMetadata.getPipelines().size());
       Assert.assertEquals(pipelineId,
           datanodeMetadata.getPipelines().get(0).getPipelineID().toString());
-      Assert.assertEquals(pipeline.getReplicationConfig().getRequiredNodes(),
-          datanodeMetadata.getPipelines().get(0).getReplicationConfig()
-              .getRequiredNodes());
+      Assert.assertEquals(pipeline.getReplicationConfig().getReplication(),
+          datanodeMetadata.getPipelines().get(0).getReplicationFactor());
       Assert.assertEquals(pipeline.getType().toString(),
           datanodeMetadata.getPipelines().get(0).getReplicationType());
       Assert.assertEquals(pipeline.getLeaderNode().getHostName(),
@@ -523,7 +522,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assert.assertEquals(1, pipelineMetadata.getDatanodes().size());
     Assert.assertEquals(pipeline.getType().toString(),
         pipelineMetadata.getReplicationType());
-    Assert.assertEquals(pipeline.getReplicationConfig().getRequiredNodes(),
+    Assert.assertEquals(pipeline.getReplicationConfig().getReplication(),
         pipelineMetadata.getReplicationFactor());
     Assert.assertEquals(datanodeDetails.getHostName(),
         pipelineMetadata.getLeaderNode());
