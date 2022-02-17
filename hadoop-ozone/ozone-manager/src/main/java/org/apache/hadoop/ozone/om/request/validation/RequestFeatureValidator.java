@@ -24,7 +24,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * An annotation to mark methods that does certain request validations.
+ * An annotation to mark methods that do certain request validations.
  *
  * The methods annotated with this annotation are collected by the
  * {@link ValidatorRegistry} class during the initialization of the server.
