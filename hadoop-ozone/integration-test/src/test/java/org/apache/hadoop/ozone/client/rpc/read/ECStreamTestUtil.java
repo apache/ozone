@@ -226,19 +226,20 @@ public final class ECStreamTestUtil {
 
     private Pipeline currentPipeline;
 
-    public List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
+    public synchronized
+        List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
       return blockStreams;
     }
 
-    public void setBlockStreamData(List<ByteBuffer> bufs) {
+    public synchronized void setBlockStreamData(List<ByteBuffer> bufs) {
       this.blockStreamData = bufs;
     }
 
-    public void setCurrentPipeline(Pipeline pipeline) {
+    public synchronized void setCurrentPipeline(Pipeline pipeline) {
       this.currentPipeline = pipeline;
     }
 
-    public void setFailIndexes(List<Integer> fail) {
+    public synchronized void setFailIndexes(List<Integer> fail) {
       failIndexes.addAll(fail);
     }
 
