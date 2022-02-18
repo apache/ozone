@@ -416,6 +416,7 @@ public class TestECBlockInputStream {
       return blockStreams;
     }
 
+    // Not a thread safe create.
     public BlockExtendedInputStream create(ReplicationConfig repConfig,
         OmKeyLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,

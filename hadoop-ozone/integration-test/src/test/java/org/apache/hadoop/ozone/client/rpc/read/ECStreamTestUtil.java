@@ -242,7 +242,8 @@ public final class ECStreamTestUtil {
       failIndexes.addAll(fail);
     }
 
-    public BlockExtendedInputStream create(ReplicationConfig repConfig,
+    public synchronized BlockExtendedInputStream create(
+        ReplicationConfig repConfig,
         OmKeyLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
         XceiverClientFactory xceiverFactory,
