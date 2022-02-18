@@ -62,18 +62,16 @@ public class TestKeyInputStreamEC {
     when(mockStreamFactory.create(anyBoolean(), anyList(), any(), any(),
         anyBoolean(), any(), any())).thenReturn(ecBlockInputStream);
 
-    try (ECBlockInputStreamProxy streamProxy = new ECBlockInputStreamProxy(
-        ec10And4RepConfig, blockInfo, true, null, null, mockStreamFactory)) {
-      byte[] buf = new byte[100];
-
+    try (KeyInputStream kis = new KeyInputStream()) {
+      ECBlockInputStreamProxy streamProxy = new ECBlockInputStreamProxy(
+          ec10And4RepConfig, blockInfo, true, null, null, mockStreamFactory);
       ECBlockInputStreamProxy spyEcBlockInputStream = spy(streamProxy);
-
+      byte[] buf = new byte[100];
       // spy the read(ByteBuffer) method is ok since issue HDDS-6319
       // happens in read(byte[], off, len)
       doReturn(buf.length).when(spyEcBlockInputStream)
           .read(any(ByteBuffer.class));
 
-      KeyInputStream kis = new KeyInputStream();
       kis.addStream(spyEcBlockInputStream);
 
       int readBytes = kis.read(buf, 0, 100);
