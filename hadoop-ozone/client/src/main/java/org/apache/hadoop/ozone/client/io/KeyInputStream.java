@@ -210,6 +210,11 @@ public class KeyInputStream extends ExtendedInputStream {
     blockStreams.add(blockInputStream);
   }
 
+  @VisibleForTesting
+  public void addStream(BlockExtendedInputStream blockInputStream) {
+    blockStreams.add(blockInputStream);
+  }
+
   /**
    * {@inheritDoc}
    */
