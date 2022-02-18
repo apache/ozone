@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -89,8 +88,9 @@ public class TestRefreshVolumeUsageHandler {
     cluster.waitForClusterToBeReady();
     DatanodeDetails datanodeDetails =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
-    DatanodeUsageInfo usageInfo1 = cluster.getStorageContainerManager()
-        .getScmNodeManager().getUsageInfo(datanodeDetails);
+    Long currentScmUsed = cluster.getStorageContainerManager()
+        .getScmNodeManager().getUsageInfo(datanodeDetails)
+        .getScmNodeStat().getScmUsed().get();
 
     //creating a key to take some storage space
     OzoneClient client = OzoneClientFactory.getRpcClient(conf);
@@ -105,12 +105,13 @@ public class TestRefreshVolumeUsageHandler {
 
     //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
     //so scm does not get the latest usage info of this datanode for now.
-    long currentScmUsed = usageInfo1.getScmNodeStat().getScmUsed().get();
-    Assert.assertEquals(0, currentScmUsed);
+    Assert.assertTrue(cluster.getStorageContainerManager()
+            .getScmNodeManager().getUsageInfo(datanodeDetails)
+            .getScmNodeStat().getScmUsed().get().equals(currentScmUsed));
 
     try {
       GenericTestUtils.waitFor(() ->
-          isUsageInfoRefreshed(cluster, datanodeDetails), 500, 5 * 1000);
+          isUsageInfoRefreshed(cluster, datanodeDetails, currentScmUsed), 500, 5 * 1000);
     } catch (TimeoutException te) {
       //no op , this is to show that if we do not trigger refresh volume
       //usage info command, we can not get the latest usage info within
@@ -125,13 +126,14 @@ public class TestRefreshVolumeUsageHandler {
 
     //waiting for the new usage info is refreshed
     GenericTestUtils.waitFor(() ->
-        isUsageInfoRefreshed(cluster, datanodeDetails), 500, 5 * 1000);
+        isUsageInfoRefreshed(cluster, datanodeDetails, currentScmUsed), 500, 5 * 1000);
   }
 
   private static Boolean isUsageInfoRefreshed(MiniOzoneCluster cluster,
-                                              DatanodeDetails datanodeDetails) {
+                                              DatanodeDetails datanodeDetails,
+                                              long currentScmUsed) {
     return cluster.getStorageContainerManager().getScmNodeManager()
       .getUsageInfo(datanodeDetails).getScmNodeStat()
-      .getScmUsed().get() > 0L;
+      .getScmUsed().get().equals(currentScmUsed);
   }
 }
