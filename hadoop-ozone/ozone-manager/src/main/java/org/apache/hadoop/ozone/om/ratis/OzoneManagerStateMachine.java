@@ -470,7 +470,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     LOG.info("StateMachine has shutdown. Shutdown OzoneManager if not " +
         "already shutdown.");
     super.close();
-    if (!ozoneManager.isOmStopped()) {
+    if (!ozoneManager.isStopped()) {
       ozoneManager.stop();
     }
     try {
