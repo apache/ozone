@@ -118,7 +118,8 @@ public class TestS3GrpcOmTransport {
                         .withDescription(ex.getMessage())
                         .asRuntimeException());
                   }
-                }}));
+                }
+              }));
 
   private GrpcOmTransport client;
 
