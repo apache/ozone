@@ -110,8 +110,8 @@ public class TestRefreshVolumeUsageHandler {
             .getScmNodeStat().getScmUsed().get().equals(currentScmUsed));
 
     try {
-      GenericTestUtils.waitFor(() ->
-          isUsageInfoRefreshed(cluster, datanodeDetails, currentScmUsed), 500, 5 * 1000);
+      GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
+          datanodeDetails, currentScmUsed), 500, 5 * 1000);
     } catch (TimeoutException te) {
       //no op , this is to show that if we do not trigger refresh volume
       //usage info command, we can not get the latest usage info within
@@ -125,8 +125,8 @@ public class TestRefreshVolumeUsageHandler {
         .getScmNodeManager().refreshAllHealthyDnUsageInfo();
 
     //waiting for the new usage info is refreshed
-    GenericTestUtils.waitFor(() ->
-        isUsageInfoRefreshed(cluster, datanodeDetails, currentScmUsed), 500, 5 * 1000);
+    GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
+        datanodeDetails, currentScmUsed), 500, 5 * 1000);
   }
 
   private static Boolean isUsageInfoRefreshed(MiniOzoneCluster cluster,
