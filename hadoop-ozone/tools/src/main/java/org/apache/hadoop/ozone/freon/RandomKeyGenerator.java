@@ -313,8 +313,9 @@ public final class RandomKeyGenerator implements Callable<Void> {
     init(ozoneConfiguration);
 
     if (factor != null) {
+      // for backward compatibility
       if (type == null) {
-        type = ReplicationType.RATIS;
+        type = ReplicationType.STAND_ALONE;
       }
       replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
     } else {
