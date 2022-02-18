@@ -36,8 +36,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.concurrent.TimeoutException;
@@ -53,9 +51,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
  * with refresh volume usage command.
  */
 public class TestRefreshVolumeUsageHandler {
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(TestRefreshVolumeUsageHandler.class);
   /**
     * Set a timeout for each test.
     */
@@ -111,7 +106,6 @@ public class TestRefreshVolumeUsageHandler {
     //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
     //so scm does not get the latest usage info of this datanode for now.
     long currentScmUsed = usageInfo1.getScmNodeStat().getScmUsed().get();
-    LOG.info("current ScmUsed is {}", currentScmUsed);
     Assert.assertEquals(0, currentScmUsed);
 
     try {
@@ -121,7 +115,6 @@ public class TestRefreshVolumeUsageHandler {
       //no op , this is to show that if we do not trigger refresh volume
       //usage info command, we can not get the latest usage info within
       // a refresh period
-      LOG.info("can not get the latest usage info within a refresh period");
     } catch (InterruptedException ie) {
       //no op
     }
