@@ -47,6 +47,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
@@ -78,31 +80,31 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     final String accessId = request.getAccessId();
     String tenantId = request.getTenantId();
 
-    // If tenantId (tenant name) is not provided, figure it out from the table
+    // If tenantId (tenant name) is not provided, infer it from the accessId
     if (StringUtils.isEmpty(tenantId)) {
-      tenantId = OMTenantRequestHelper.getTenantNameFromAccessId(
+      tenantId = OMTenantRequestHelper.getTenantIdFromAccessId(
           ozoneManager.getMetadataManager(), accessId);
       assert (tenantId != null);
     }
 
-    // Caller should be an Ozone admin or this tenant's delegated admin
-    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantId);
+    checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
 
-    // TODO: Check tenant existence?
+    // Caller should be an Ozone admin or this tenant's delegated admin
+    checkTenantAdmin(ozoneManager, tenantId);
 
     OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
       throw new OMException("accessId '" + accessId + "' not found.",
-          OMException.ResultCodes.ACCESSID_NOT_FOUND);
+          OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
     }
 
     // Check if accessId is assigned to the tenant
     if (!accessIdInfo.getTenantId().equals(tenantId)) {
       throw new OMException("accessId '" + accessId +
           "' must be assigned to tenant '" + tenantId + "' first.",
-          OMException.ResultCodes.INVALID_TENANT_NAME);
+          OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
     final boolean delegated;

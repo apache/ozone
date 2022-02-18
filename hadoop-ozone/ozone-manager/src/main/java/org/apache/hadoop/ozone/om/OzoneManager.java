@@ -39,7 +39,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +46,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -2968,52 +2966,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final Table<String, OmDBTenantInfo> tenantStateTable =
         metadataManager.getTenantStateTable();
 
-    // Can't acquire VOLUME_LOCK for cache iteration: no tenant is specified,
-    //  hence no volume name to acquire VOLUME_LOCK on.
-    Set<OmDBTenantInfo> tenantInfoSet = new TreeSet<>();
-    Set<String> deletedTenantSet = new TreeSet<>();
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDBTenantInfo>>>
-        cacheIter = tenantStateTable.cacheIterator();
-
-    // Iterate cache first
-    while (cacheIter.hasNext()) {
-      final Map.Entry<CacheKey<String>, CacheValue<OmDBTenantInfo>> cacheEntry =
-          cacheIter.next();
-      final String tenantId = cacheEntry.getKey().getCacheKey();
-      final OmDBTenantInfo tenantInfo = cacheEntry.getValue().getCacheValue();
-      if (tenantInfo != null) {
-        // Sanity check. Key should be the same as tenantId in OmDBTenantInfo
-        assert (tenantId.equals(tenantInfo.getTenantId()));
-        tenantInfoSet.add(tenantInfo);
-      } else {
-        // CacheValue is null indicates the tenant entry is invalidated
-        deletedTenantSet.add(tenantId);
-      }
-    }
+    // Won't iterate cache here, mainly because we can't acquire a read lock
+    // for cache iteration: no tenant is specified, hence no volume name to
+    // acquire VOLUME_LOCK on. There could be a few millis delay before entries
+    // are flushed to the table. This should be acceptable for a list tenant
+    // request.
 
     final TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
         iterator = tenantStateTable.iterator();
 
-    // Call iterator.seek(prefix) if implementing pagination for listTenant
-
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
 
-    // Then iterate table
+    // Iterate table
     while (iterator.hasNext()) {
       final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
       final String tenantId = dbEntry.getKey();
-      final OmDBTenantInfo tenantInfo = dbEntry.getValue();
-      if (deletedTenantSet.contains(tenantId)) {
-        // Tenant is already deleted, skip it
-        continue;
-      }
-      assert (tenantId.equals(tenantInfo.getTenantId()));
-      // Add to the TreeSet first so it is sorted
-      tenantInfoSet.add(tenantInfo);
-    }
-
-    // Generate result. Should be sorted by tenantId
-    for (OmDBTenantInfo omDBTenantInfo : tenantInfoSet) {
+      final OmDBTenantInfo omDBTenantInfo = dbEntry.getValue();
+      assert (tenantId.equals(omDBTenantInfo.getTenantId()));
       tenantInfoList.add(TenantInfo.newBuilder()
           .setTenantId(omDBTenantInfo.getTenantId())
           .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
@@ -3040,6 +3009,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     final List<TenantAccessIdInfo> accessIdInfoList = new ArrayList<>();
+
+    // Won't iterate cache here for a similar reason as in OM#listTenant
+    //  tenantGetUserInfo lists all accessIds assigned to a user across
+    //  multiple tenants.
 
     // Retrieve a list of accessIds associates to this user principal
     final OmDBKerberosPrincipalInfo kerberosPrincipalInfo =
@@ -3102,16 +3075,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
             getMetadataManager(), tenantId);
-    // TODO: Use multiTenantManager.getTenantInfo(tenantId)
-    //  .getTenantBucketNameSpace() after refactoring?
+    // TODO: Maybe use multiTenantManager.getTenantInfo(tenantId)
+    //  .getTenantBucketNameSpace() after refactoring
 
     final Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put(OzoneConsts.VOLUME, volumeName);
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
 
-    boolean lockAcquired = metadataManager.getLock().acquireReadLock(
-            VOLUME_LOCK, volumeName);
+    boolean lockAcquired =
+        metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
     try {
       String userName = getRemoteUser().getUserName();
       if (!multiTenantManager.isTenantAdmin(userName, tenantId)

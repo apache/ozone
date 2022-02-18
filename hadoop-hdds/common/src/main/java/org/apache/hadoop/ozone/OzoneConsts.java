@@ -340,8 +340,8 @@ public final class OzoneConsts {
   public static final String USER_PREFIX = "userPrefix";
 
   // For multi-tenancy
-  public static final String TENANTID_USERNAME_DELIMITER = "$";
-  public static final String TENANT_NAME_ROLE_DELIMITER = "-";
+  public static final String TENANT_ID_USERNAME_DELIMITER = "$";
+  public static final String TENANT_ID_ROLE_DELIMITER = "-";
   public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
   public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";

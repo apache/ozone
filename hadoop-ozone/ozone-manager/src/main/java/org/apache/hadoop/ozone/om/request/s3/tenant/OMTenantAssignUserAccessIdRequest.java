@@ -125,24 +125,24 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String accessId = request.getAccessId();
 
     // Check userPrincipal (username) validity.
-    if (userPrincipal.contains(OzoneConsts.TENANTID_USERNAME_DELIMITER)) {
+    if (userPrincipal.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant username '" + userPrincipal +
           "'. Tenant username shouldn't contain delimiter.",
-          OMException.ResultCodes.INVALID_TENANT_USER_NAME);
+          OMException.ResultCodes.INVALID_TENANT_USERNAME);
     }
 
     // Check tenant name validity.
-    if (tenantId.contains(OzoneConsts.TENANTID_USERNAME_DELIMITER)) {
+    if (tenantId.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant name '" + tenantId +
           "'. Tenant name shouldn't contain delimiter.",
-          OMException.ResultCodes.INVALID_TENANT_NAME);
+          OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
     // Check accessId validity.
     if (accessId.contains(SERIALIZATION_SPLIT_KEY)) {
       throw new OMException("Invalid accessId '" + accessId +
           "'. accessId should not contain '" + SERIALIZATION_SPLIT_KEY + "'",
-          OMException.ResultCodes.INVALID_ACCESSID);
+          OMException.ResultCodes.INVALID_ACCESS_ID);
     }
 
     checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
@@ -252,7 +252,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       if (omMetadataManager.getTenantAccessIdTable().isExist(accessId)) {
         LOG.error("accessId {} already exists", accessId);
         throw new OMException("accessId '" + accessId + "' already exists!",
-            OMException.ResultCodes.TENANT_USER_ACCESSID_ALREADY_EXISTS);
+            OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
       OmDBKerberosPrincipalInfo principalInfo = omMetadataManager
@@ -274,7 +274,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
                 + "to the same tenant more than once. User '" + userPrincipal
                 + "' is already assigned to tenant '" + tenantId + "' with "
                 + "accessId '" + existingAccId + "'.",
-                OMException.ResultCodes.TENANT_USER_ACCESSID_ALREADY_EXISTS);
+                OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
           }
         }
       }
@@ -330,7 +330,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
         throw new OMException("accessId '" + accessId +
             "' already exists in S3SecretTable",
-            OMException.ResultCodes.TENANT_USER_ACCESSID_ALREADY_EXISTS);
+            OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
       omMetadataManager.getS3SecretTable().addCacheEntry(

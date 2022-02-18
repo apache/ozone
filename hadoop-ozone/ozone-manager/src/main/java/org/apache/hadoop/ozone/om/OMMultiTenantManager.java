@@ -113,13 +113,13 @@ public interface OMMultiTenantManager {
   /**
    * Creates a new user that exists for S3 API access to Ozone.
    * @param principal
-   * @param tenantName
-   * @param accessID
+   * @param tenantId
+   * @param accessId
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  String assignUserToTenant(BasicUserPrincipal principal, String tenantName,
-                            String accessID) throws IOException;
+  String assignUserToTenant(BasicUserPrincipal principal, String tenantId,
+                            String accessId) throws IOException;
 
   /**
    * Revoke user accessId.
@@ -136,8 +136,8 @@ public interface OMMultiTenantManager {
    * request (current it runs in preExecute).
    * TODO: Remove this if unneeded when Ranger thread patch lands.
    */
-  void removeUserAccessIdFromCache(String accessID, String userPrincipal,
-                                   String tenantName);
+  void removeUserAccessIdFromCache(String accessId, String userPrincipal,
+                                   String tenantId);
 
   /**
    * Given an accessId, return kerberos user name for the tenant user.
@@ -171,10 +171,10 @@ public interface OMMultiTenantManager {
   /**
    * Check if a user is a tenant Admin.
    * @param user user name.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @return
    */
-  boolean isTenantAdmin(String user, String tenantName);
+  boolean isTenantAdmin(String user, String tenantId);
 
   /**
    * Check if a tenant exists.

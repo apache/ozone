@@ -77,7 +77,7 @@ public class OMSetSecretRequest extends OMClientRequest {
       // Check (old) S3SecretTable
       if (omMetadataManager.getS3SecretTable().get(accessId) == null) {
         throw new OMException("accessId '" + accessId + "' not found.",
-            OMException.ResultCodes.ACCESSID_NOT_FOUND);
+            OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
       }
     }
 
@@ -157,9 +157,9 @@ public class OMSetSecretRequest extends OMClientRequest {
             new CacheValue<>(Optional.of(newS3SecretValue),
                 transactionLogIndex));
       } else {
-        // If S3SecretTable is not updated, throw ACCESSID_NOT_FOUND exception.
+        // If S3SecretTable is not updated, throw ACCESS_ID_NOT_FOUND exception.
         throw new OMException("accessId '" + accessId + "' not found.",
-            OMException.ResultCodes.ACCESSID_NOT_FOUND);
+            OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
       }
 
       // Compose response

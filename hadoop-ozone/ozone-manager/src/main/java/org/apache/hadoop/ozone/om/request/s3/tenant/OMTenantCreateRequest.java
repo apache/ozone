@@ -122,7 +122,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String tenantId = request.getTenantId();
 
     // Check tenantId validity
-    if (tenantId.contains(OzoneConsts.TENANTID_USERNAME_DELIMITER)) {
+    if (tenantId.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant name " + tenantId +
           ". Tenant name should not contain delimiter.",
           OMException.ResultCodes.INVALID_VOLUME_NAME);

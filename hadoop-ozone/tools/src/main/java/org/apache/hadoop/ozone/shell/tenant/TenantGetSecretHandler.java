@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESSID_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_ID_NOT_FOUND;
 
 /**
  * ozone tenant user get-secret.
@@ -66,7 +66,7 @@ public class TenantGetSecretHandler extends TenantHandler {
           out().println(accessIdSecretKeyPair);
         }
       } catch (OMException omEx) {
-        if (omEx.getResult().equals(ACCESSID_NOT_FOUND)) {
+        if (omEx.getResult().equals(ACCESS_ID_NOT_FOUND)) {
           // Print to stderr here in order not to contaminate stdout just in
           // case -e is specified.
           err().println("AccessId '" + accessId + "' doesn't exist");

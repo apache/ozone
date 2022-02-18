@@ -645,7 +645,7 @@ public final class TestSecureOzoneCluster {
       try {
         omClient.setS3Secret(username, secretKeySet);
       } catch (OMException omEx) {
-        assertEquals(OMException.ResultCodes.ACCESSID_NOT_FOUND,
+        assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND,
             omEx.getResult());
       }
 

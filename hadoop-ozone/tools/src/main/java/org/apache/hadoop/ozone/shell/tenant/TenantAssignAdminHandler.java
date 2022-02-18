@@ -59,7 +59,7 @@ public class TenantAssignAdminHandler extends TenantHandler {
     for (final String accessId : accessIds) {
       try {
         objStore.tenantAssignAdmin(accessId, tenantId, delegated);
-        // TODO: Make tenantAssignAdmin return accessId, tenantName, user later.
+        // TODO: Make tenantAssignAdmin return accessId, tenantId, user later.
         err().println("Assigned admin to '" + accessId +
             (tenantId != null ? "' in tenant '" + tenantId : "") + "'");
       } catch (IOException e) {

@@ -52,7 +52,7 @@ public class TenantRevokeAdminHandler extends TenantHandler {
 
     for (final String accessId : accessIds) {
       try {
-        // TODO: Make tenantRevokeAdmin return accessId, tenantName, user later.
+        // TODO: Make tenantRevokeAdmin return accessId, tenantId, user later.
         objStore.tenantRevokeAdmin(accessId, tenantId);
         err().println("Revoked admin role of '" + accessId +
             (tenantId != null ? "' from tenant '" + tenantId + "'" : ""));

@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TENANTID_USERNAME_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 
 /**
  * ozone tenant user assign.
@@ -62,7 +62,7 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   // TODO: HDDS-6340. Add an option to print JSON result
 
   private String getDefaultAccessId(String userPrincipal) {
-    return tenantId + TENANTID_USERNAME_DELIMITER + userPrincipal;
+    return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrincipal;
   }
 
   @Override

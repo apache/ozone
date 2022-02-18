@@ -63,24 +63,27 @@ public final class OMTenantRequestHelper {
    * throws OMException otherwise.
    * @throws OMException PERMISSION_DENIED
    */
-  static void checkTenantAdmin(OzoneManager ozoneManager, String tenantName)
+  static void checkTenantAdmin(OzoneManager ozoneManager, String tenantId)
       throws OMException {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isTenantAdmin(ugi, tenantName, true)) {
+        !ozoneManager.isTenantAdmin(ugi, tenantId, true)) {
       throw new OMException("User '" + ugi.getUserName() +
           "' is neither an Ozone admin nor a delegated admin of tenant '" +
-          tenantName + "'.", OMException.ResultCodes.PERMISSION_DENIED);
+          tenantId + "'.", OMException.ResultCodes.PERMISSION_DENIED);
     }
   }
 
+  /**
+   * Check if the tenantId exists in the table, throws TENANT_NOT_FOUND if not.
+   */
   static void checkTenantExistence(OMMetadataManager omMetadataManager,
-      String tenantName) throws OMException {
+      String tenantId) throws OMException {
 
     try {
-      if (!omMetadataManager.getTenantStateTable().isExist(tenantName)) {
-        throw new OMException("Tenant '" + tenantName + "' doesn't exist.",
+      if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
+        throw new OMException("Tenant '" + tenantId + "' doesn't exist.",
             OMException.ResultCodes.TENANT_NOT_FOUND);
       }
     } catch (IOException ex) {
@@ -90,9 +93,9 @@ public final class OMTenantRequestHelper {
           throw omEx;
         }
       }
-      throw new OMException("Unable to retrieve "
-          + "OmDBTenantInfo entry for tenant '" + tenantName + "': "
-          + ex.getMessage(), OMException.ResultCodes.METADATA_ERROR);
+      throw new OMException("Error while retrieving OmDBTenantInfo for tenant "
+          + "'" + tenantId + "': " + ex.getMessage(),
+          OMException.ResultCodes.METADATA_ERROR);
     }
   }
 
@@ -124,7 +127,7 @@ public final class OMTenantRequestHelper {
     return volumeName;
   }
 
-  public static String getTenantNameFromAccessId(
+  public static String getTenantIdFromAccessId(
       OMMetadataManager omMetadataManager, String accessId) throws IOException {
 
     final OmDBAccessIdInfo accessIdInfo = omMetadataManager
@@ -158,9 +161,9 @@ public final class OMTenantRequestHelper {
       return false;
     }
 
-    final String tenantName = accessIdInfo.getTenantId();
+    final String tenantId = accessIdInfo.getTenantId();
     // Sanity check
-    if (tenantName == null) {
+    if (tenantId == null) {
       throw new OMException("Unexpected error: OmDBAccessIdInfo " +
               "tenantId field should not have been null",
               OMException.ResultCodes.METADATA_ERROR);
@@ -180,7 +183,7 @@ public final class OMTenantRequestHelper {
     }
 
     // Check if ugi is an admin of this tenant
-    if (ozoneManager.isTenantAdmin(ugi, tenantName, true)) {
+    if (ozoneManager.isTenantAdmin(ugi, tenantId, true)) {
       return true;
     }
 
