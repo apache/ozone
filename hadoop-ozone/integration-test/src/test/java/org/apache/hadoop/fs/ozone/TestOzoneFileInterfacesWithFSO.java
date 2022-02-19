@@ -36,9 +36,16 @@ import java.io.IOException;
 public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
 
   public TestOzoneFileInterfacesWithFSO(boolean setDefaultFs,
-      boolean useAbsolutePath, boolean enabledFileSystemPaths)
+                                        boolean useAbsolutePath)
       throws Exception {
-    super(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
+    super(setDefaultFs, useAbsolutePath);
+  }
+
+  @Override
+  @Test
+  @Ignore("HDDS-2939")
+  public void testFileSystemWithObjectStoreLayout() throws IOException {
+    // ignore as this test is already ran in parent test class.
   }
 
   @Override

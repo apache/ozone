@@ -48,14 +48,14 @@ public class TestRootedOzoneFileSystemWithFSO
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true, false},
-        new Object[]{true, false, false}
+        new Object[]{true, false},
+        new Object[]{false, false}
     );
   }
 
-  public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis, boolean enableAcl) {
-    super(setDefaultFs, enableOMRatis, enableAcl);
+  public TestRootedOzoneFileSystemWithFSO(boolean enableOMRatis,
+                                          boolean enableAcl) {
+    super(enableOMRatis, enableAcl);
   }
 
   @BeforeClass

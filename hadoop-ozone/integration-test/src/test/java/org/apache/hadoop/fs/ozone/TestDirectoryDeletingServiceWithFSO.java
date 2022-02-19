@@ -73,8 +73,6 @@ public class TestDirectoryDeletingServiceWithFSO {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private static boolean isBucketFSOptimized = true;
-  private static boolean enabledFileSystemPaths = true;
   private static boolean omRatisEnabled = true;
 
   private static MiniOzoneCluster cluster;
@@ -91,20 +89,16 @@ public class TestDirectoryDeletingServiceWithFSO {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    if (isBucketFSOptimized) {
-      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
-    } else {
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-          enabledFileSystemPaths);
-    }
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 

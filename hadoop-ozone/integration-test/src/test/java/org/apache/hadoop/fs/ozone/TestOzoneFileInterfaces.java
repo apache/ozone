@@ -104,8 +104,8 @@ public class TestOzoneFileInterfaces {
    */
   @Parameters
   public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {{false, true, true},
-        {true, false, false}});
+    return Arrays.asList(new Object[][]{{false, true},
+        {true, false}});
   }
 
   private static boolean setDefaultFs;
@@ -126,19 +126,12 @@ public class TestOzoneFileInterfaces {
 
   private OMMetrics omMetrics;
 
-  private static boolean enableFileSystemPaths;
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  protected boolean enableFileSystemPathsInstance;
-
   public TestOzoneFileInterfaces(boolean setDefaultFs,
-      boolean useAbsolutePath, boolean enabledFileSystemPaths)
+                                 boolean useAbsolutePath)
       throws Exception {
-    enableFileSystemPathsInstance = enabledFileSystemPaths;
-    if (this.setDefaultFs != setDefaultFs
-        || this.useAbsolutePath != useAbsolutePath
-        || this.enableFileSystemPaths != enabledFileSystemPaths) {
-      setParameters(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
+    if (TestOzoneFileInterfaces.setDefaultFs != setDefaultFs
+        || TestOzoneFileInterfaces.useAbsolutePath != useAbsolutePath) {
+      setParameters(setDefaultFs, useAbsolutePath);
       teardown();
       init();
     }
@@ -146,11 +139,9 @@ public class TestOzoneFileInterfaces {
   }
 
   private static void setParameters(boolean defaultFs,
-                                    boolean absolutePath,
-                                    boolean fileSystemPaths) {
+                                    boolean absolutePath) {
     setDefaultFs = defaultFs;
     useAbsolutePath = absolutePath;
-    enableFileSystemPaths = fileSystemPaths;
   }
 
   private static void setCluster(MiniOzoneCluster newCluster) {
@@ -195,10 +186,7 @@ public class TestOzoneFileInterfaces {
   }
 
   protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        enableFileSystemPaths);
-    return conf;
+    return new OzoneConfiguration();
   }
 
   @After

@@ -45,7 +45,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -60,10 +60,8 @@ import static org.junit.Assert.fail;
 public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(
-            new Object[]{true, true},
-            new Object[]{true, false});
+  public static List<Boolean> data() {
+    return Arrays.asList(true, false);
   }
 
   @BeforeClass
@@ -71,9 +69,8 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
-  public TestOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis) {
-    super(setDefaultFs, enableOMRatis);
+  public TestOzoneFileSystemWithFSO(boolean enableOMRatis) {
+    super(enableOMRatis);
   }
 
   @After

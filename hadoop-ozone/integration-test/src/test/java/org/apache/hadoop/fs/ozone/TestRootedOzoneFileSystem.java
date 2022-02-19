@@ -114,26 +114,23 @@ public class TestRootedOzoneFileSystem {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true, true},
-        new Object[]{true, true, false},
-        new Object[]{true, false, false},
-        new Object[]{false, true, false},
-        new Object[]{false, false, false}
+        new Object[]{true, true},
+        new Object[]{true, false},
+        new Object[]{false, false},
+        new Object[]{false, false}
     );
   }
 
-  public TestRootedOzoneFileSystem(boolean setDefaultFs,
-      boolean enableOMRatis, boolean isAclEnabled) {
+  public TestRootedOzoneFileSystem(boolean enableOMRatis,
+                                   boolean isAclEnabled) {
     // Ignored. Actual init done in initParam().
     // This empty constructor is still required to avoid argument exception.
   }
 
   @Parameterized.BeforeParam
-  public static void initParam(boolean setDefaultFs,
-                               boolean enableOMRatis, boolean isAclEnabled)
+  public static void initParam(boolean enableOMRatis, boolean isAclEnabled)
       throws IOException, InterruptedException, TimeoutException {
     // Initialize the cluster before EACH set of parameters
-    enabledFileSystemPaths = setDefaultFs;
     omRatisEnabled = enableOMRatis;
     enableAcl = isAclEnabled;
     initClusterAndEnv();
@@ -159,7 +156,6 @@ public class TestRootedOzoneFileSystem {
   @Rule
   public Timeout globalTimeout = Timeout.seconds(300);
 
-  private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
   private static boolean isBucketFSOptimized = false;
   private static boolean enableAcl;
@@ -204,8 +200,6 @@ public class TestRootedOzoneFileSystem {
           BucketLayout.LEGACY.name());
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-          enabledFileSystemPaths);
     }
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, enableAcl);
     // Set ACL authorizer class to OzoneNativeAuthorizer. The default
@@ -300,7 +294,7 @@ public class TestRootedOzoneFileSystem {
     // TODO: Request for comment.
     //  If possible, improve this to test when FS Path is enabled.
     Assume.assumeTrue("FS Path is enabled. Skipping this test as it is not " +
-            "tuned for FS Path yet", !enabledFileSystemPaths);
+        "tuned for FS Path yet", !bucketLayout.isFileSystemOptimized());
 
     Path grandparent = new Path(bucketPath,
         "testDeleteCreatesFakeParentDir");
@@ -403,7 +397,7 @@ public class TestRootedOzoneFileSystem {
     // TODO: Request for comment.
     //  If possible, improve this to test when FS Path is enabled.
     Assume.assumeTrue("FS Path is enabled. Skipping this test as it is not " +
-            "tuned for FS Path yet", !enabledFileSystemPaths);
+        "tuned for FS Path yet", !bucketLayout.isFileSystemOptimized());
 
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
@@ -885,7 +879,7 @@ public class TestRootedOzoneFileSystem {
     // TODO: Request for comment.
     //  If possible, improve this to test when FS Path is enabled.
     Assume.assumeTrue("FS Path is enabled. Skipping this test as it is not " +
-            "tuned for FS Path yet", !enabledFileSystemPaths);
+        "tuned for FS Path yet", !bucketLayout.isFileSystemOptimized());
 
     Path[] paths = new Path[5];
     for (int i = 0; i < paths.length; i++) {
@@ -897,9 +891,23 @@ public class TestRootedOzoneFileSystem {
     // numEntries > 5
     FileStatus[] fileStatusesOver = customListStatus(new Path("/"),
         false, "", 8);
-    // There are only 5 volumes
+
+    // There are only 5 volumes created by current user.
     // Default volume "s3v" is created during startup.
-    Assert.assertEquals(5 + 1, fileStatusesOver.length);
+    //
+    // When ACL is enabled, listStatus root will see a 7th volume created by
+    // userXXXXX as the result of createVolumeAndBucket in initClusterAndEnv.
+    // This is due to the difference in behavior in listVolumesByUser depending
+    // on whether ACL is enabled or not:
+    //  1. when ACL is disabled, listVolumesByUser would only return volumes
+    //     OWNED by the current user (volume owner is the current user);
+    //  2. when ACL is enabled, it would return all the volumes that the current
+    //     user has LIST permission to, regardless of the volume owner field.
+    if (enableAcl) {
+      Assert.assertEquals(5 + 1 + 1, fileStatusesOver.length);
+    } else {
+      Assert.assertEquals(5 + 1, fileStatusesOver.length);
+    }
 
     // numEntries = 5
     FileStatus[] fileStatusesExact = customListStatus(new Path("/"),
@@ -918,10 +926,20 @@ public class TestRootedOzoneFileSystem {
         fileStatusesLimit1[fileStatusesLimit1.length - 1].getPath().toString();
     FileStatus[] fileStatusesLimit2 = customListStatus(new Path("/"),
         false, nextStartPath, 3);
+
     // Note: at the time of writing this test, OmMetadataManagerImpl#listVolumes
     //  excludes startVolume (startPath) from the result. Might change.
-    Assert.assertEquals(fileStatusesOver.length,
-        fileStatusesLimit1.length + fileStatusesLimit2.length);
+    if (enableAcl) {
+      // 1 is added to actual number of fileStatuses due to volume created by
+      // userXXXXX in initClusterAndEnv being included in the result when ACL
+      // is enabled.
+      Assert.assertEquals(fileStatusesOver.length,
+          fileStatusesLimit1.length + fileStatusesLimit2.length + 1);
+    } else {
+      Assert.assertEquals(fileStatusesOver.length,
+          fileStatusesLimit1.length + fileStatusesLimit2.length);
+    }
+
 
     // Cleanup
     for (Path path : paths) {

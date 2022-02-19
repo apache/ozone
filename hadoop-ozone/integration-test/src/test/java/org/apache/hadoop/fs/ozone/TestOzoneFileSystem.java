@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.List;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -102,22 +103,16 @@ public class TestOzoneFileSystem {
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
 
   @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{true, true},
-        new Object[]{true, false},
-        new Object[]{false, true},
-        new Object[]{false, false});
+  public static List<Boolean> data() {
+    return Arrays.asList(true, false);
   }
 
-  public TestOzoneFileSystem(boolean setDefaultFs, boolean enableOMRatis) {
-    // Checking whether 'defaultFS' and 'omRatis' flags represents next
-    // parameter index values. This is to ensure that initialize
-    // TestOzoneFileSystem#init() function will be invoked only at the
-    // beginning of every new set of Parameterized.Parameters.
-    if (enabledFileSystemPaths != setDefaultFs ||
-            omRatisEnabled != enableOMRatis) {
-      enabledFileSystemPaths = setDefaultFs;
+  public TestOzoneFileSystem(boolean enableOMRatis) {
+    // 'omRatis' flags represents next parameter index values.
+    // This is to ensure that initialize TestOzoneFileSystem#init() function
+    // will be invoked only at the beginning of every new set of
+    // Parameterized.Parameters.
+    if (omRatisEnabled != enableOMRatis) {
       omRatisEnabled = enableOMRatis;
       try {
         teardown();
@@ -139,7 +134,6 @@ public class TestOzoneFileSystem {
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
   private static BucketLayout bucketLayout = BucketLayout.LEGACY;
-  private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
 
   private static MiniOzoneCluster cluster;
@@ -159,10 +153,6 @@ public class TestOzoneFileSystem {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    if (!bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-          enabledFileSystemPaths);
-    }
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         bucketLayout.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -590,17 +580,15 @@ public class TestOzoneFileSystem {
     Path parent = new Path("/");
 
     // Wait until the filestatus is updated
-    if (!enabledFileSystemPaths) {
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return fs.listStatus(parent).length != 0;
-        } catch (IOException e) {
-          LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
-          return false;
-        }
-      }, 1000, 120000);
-    }
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return fs.listStatus(parent).length != 0;
+      } catch (IOException e) {
+        LOG.error("listStatus() Failed", e);
+        Assert.fail("listStatus() Failed");
+        return false;
+      }
+    }, 1000, 120000);
 
     FileStatus[] fileStatuses = fs.listStatus(parent);
 
