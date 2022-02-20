@@ -81,7 +81,7 @@ By default, the buckets will default to `OBJECT_STORE` behaviour.
 </property>
 ```
 
-## Configuring Older Versions (1.2.0)
+## Configuring Older Versions (1.2.1)
 
 Older clients which do not support bucket layout features can enable cluster-wide prefix-based file system optimization
 using the following configuration.
