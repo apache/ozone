@@ -558,13 +558,15 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   private void addPadding(int parityCellSize) {
     ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
-
-    for (int i = 1; i < numDataBlks; i++) {
-      final int position = buffers[i].position();
-      assert position <= parityCellSize : "If an internal block is smaller"
-          + " than parity block, then its last cell should be small than last"
-          + " parity cell";
-      padBufferToLimit(buffers[i], parityCellSize);
+    int maxSize = 0;
+    for (int i = 0; i < numDataBlks; i++) {
+      if (parityCellSize > buffers[i].position())
+        maxSize = Math.max(maxSize, parityCellSize);
+      else
+        maxSize = Math.max(maxSize, buffers[i].position());
+    }
+    for (int i = 0; i < numDataBlks; i++) {
+      padBufferToLimit(buffers[i], maxSize);
     }
   }
 
