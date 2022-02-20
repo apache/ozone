@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -255,7 +254,8 @@ public class TestRecursiveAclWithFSO {
     // Note: OM doesn't support live config reloading
     conf.setBoolean(OZONE_ACL_ENABLED, true);
 
-    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
 
     cluster =
         MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)

@@ -79,9 +79,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
   private AuditLogger auditLogger;
   // Just setting ozoneManagerDoubleBuffer which does nothing.
   private OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-          ((response, transactionIndex) -> {
-            return null;
-          });
+          ((response, transactionIndex) -> null);
 
   @Before
   public void setup() throws Exception {
@@ -90,7 +88,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
             folder.newFolder().getAbsolutePath());
-    OMRequestTestUtils.configureFSOptimizedPaths(ozoneConfiguration, true);
+    ozoneConfiguration.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);

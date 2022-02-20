@@ -25,8 +25,8 @@ import org.apache.hadoop.ozone.TestStandardOutputUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -54,7 +54,8 @@ public class TestNSSummaryAdmin extends TestStandardOutputUtil {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes().includeRecon(true).build();

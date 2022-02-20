@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -1060,21 +1059,6 @@ public final class OMRequestTestUtils {
       parentId = omDirInfo.getObjectID();
     }
     return parentId;
-  }
-
-  public static void configureFSOptimizedPaths(Configuration conf,
-                                               boolean enableFileSystemPaths) {
-    configureFSOptimizedPaths(conf, enableFileSystemPaths,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
-  }
-
-  public static void configureFSOptimizedPaths(Configuration conf,
-                                               boolean enableFileSystemPaths,
-                                               BucketLayout bucketLayout) {
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            enableFileSystemPaths);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-            bucketLayout.name());
   }
 
   private static BucketLayout getDefaultBucketLayout() {
