@@ -32,11 +32,11 @@ Setup Multipart Tests
 
 Create Random file
     [arguments]             ${size_in_megabytes}
-    Execute                 dd if=/dev/urandom of=/tmp/part1 bs=1048576 count=${size_in_megabytes}
+    Execute                 dd if=/dev/urandom of=/tmp/part1 bs=1048576 count=${size_in_megabytes} status=none
 
 Create Random File KB
     [arguments]             ${file}    ${size_in_kilobytes}
-    Execute                 dd if=/dev/urandom of=${file} bs=1024 count=${size_in_kilobytes}
+    Execute                 dd if=/dev/urandom of=${file} bs=1024 count=${size_in_kilobytes} status=none
 
 Wait Til Date Past
     [arguments]         ${date}
