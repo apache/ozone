@@ -107,7 +107,7 @@ public class TestRefreshVolumeUsageHandler {
     //so scm does not get the latest usage info of this datanode for now.
     Assert.assertTrue(cluster.getStorageContainerManager()
             .getScmNodeManager().getUsageInfo(datanodeDetails)
-            .getScmNodeStat().getScmUsed().get().equals(currentScmUsed));
+            .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
 
     try {
       GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
@@ -119,6 +119,12 @@ public class TestRefreshVolumeUsageHandler {
     } catch (InterruptedException ie) {
       //no op
     }
+
+    //after waiting for several node report , this usage info in scm
+    //is still not updated
+    Assert.assertTrue(cluster.getStorageContainerManager()
+        .getScmNodeManager().getUsageInfo(datanodeDetails)
+        .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
 
     //send refresh volume usage command to datanode
     cluster.getStorageContainerManager()
@@ -134,6 +140,6 @@ public class TestRefreshVolumeUsageHandler {
                                               long currentScmUsed) {
     return cluster.getStorageContainerManager().getScmNodeManager()
       .getUsageInfo(datanodeDetails).getScmNodeStat()
-      .getScmUsed().get().equals(currentScmUsed);
+      .getScmUsed().isGreater(currentScmUsed);
   }
 }
