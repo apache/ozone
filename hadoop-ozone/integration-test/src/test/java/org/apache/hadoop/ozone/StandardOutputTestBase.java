@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * Utility class to check standard output.
  */
-public class StandardOutputTestUtil {
+public class StandardOutputTestBase {
   private final ByteArrayOutputStream outContent =
       new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent =

@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.shell;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.StandardOutputTestUtil;
+import org.apache.hadoop.ozone.StandardOutputTestBase;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -40,7 +40,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_K
 /**
  * Test for Namespace CLI.
  */
-public class TestNSSummaryAdmin extends StandardOutputTestUtil {
+public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static ObjectStore store;
 
   private static OzoneAdmin ozoneAdmin;
