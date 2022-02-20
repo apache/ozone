@@ -27,8 +27,12 @@ Test Setup          Generate random prefix
 *** Keywords ***
 Setup Multipart Tests
     Setup s3 tests
-    Create Random File KB    /tmp/part1    5121 # 5MB + a bit
-    Create Random File KB    /tmp/part2    1023 # 1MB - a bit
+
+    # 5MB + a bit
+    Create Random File KB    /tmp/part1    5121
+
+    # 1MB - a bit
+    Create Random File KB    /tmp/part2    1023
 
 Create Random file
     [arguments]             ${size_in_megabytes}
