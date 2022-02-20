@@ -1029,7 +1029,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public static boolean scmInit(OzoneConfiguration conf,
       String clusterId) throws IOException {
-    ExitUtils.disableSystemExit();
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     StorageState state = scmStorageConfig.getState();
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
