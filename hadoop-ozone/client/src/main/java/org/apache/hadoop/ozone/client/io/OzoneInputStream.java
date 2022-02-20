@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
+import org.apache.hadoop.fs.Seekable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,7 +30,7 @@ import java.nio.ByteBuffer;
  * It uses {@link KeyInputStream} for reading the data.
  */
 public class OzoneInputStream extends InputStream implements CanUnbuffer,
-    ByteBufferReadable {
+    ByteBufferReadable, Seekable {
 
   private final InputStream inputStream;
 
@@ -88,6 +89,36 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer,
   public void unbuffer() {
     if (inputStream instanceof CanUnbuffer) {
       ((CanUnbuffer) inputStream).unbuffer();
+    }
+  }
+
+  @Override
+  public void seek(long pos) throws IOException {
+    if (inputStream instanceof Seekable) {
+      ((Seekable) inputStream).seek(pos);
+    } else {
+      throw new UnsupportedOperationException("Seek is not supported on the " +
+          "underlying inputStream");
+    }
+  }
+
+  @Override
+  public long getPos() throws IOException {
+    if (inputStream instanceof Seekable) {
+      return ((Seekable) inputStream).getPos();
+    } else {
+      throw new UnsupportedOperationException("Seek is not supported on the " +
+          "underlying inputStream");
+    }
+  }
+
+  @Override
+  public boolean seekToNewSource(long targetPos) throws IOException {
+    if (inputStream instanceof Seekable) {
+      return ((Seekable) inputStream).seekToNewSource(targetPos);
+    } else {
+      throw new UnsupportedOperationException("Seek is not supported on the " +
+          "underlying inputStream");
     }
   }
 }

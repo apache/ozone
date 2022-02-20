@@ -19,10 +19,11 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,7 +32,7 @@ import org.junit.Test;
  */
 public class TestChunkInputStream extends TestInputStreamBase {
 
-  public TestChunkInputStream(ChunkLayOutVersion layout) {
+  public TestChunkInputStream(ContainerLayoutVersion layout) {
     super(layout);
   }
 
@@ -57,7 +58,8 @@ public class TestChunkInputStream extends TestInputStreamBase {
 
     KeyInputStream keyInputStream = getKeyInputStream(keyName);
 
-    BlockInputStream block0Stream = keyInputStream.getBlockStreams().get(0);
+    BlockInputStream block0Stream =
+        (BlockInputStream)keyInputStream.getBlockStreams().get(0);
     block0Stream.initialize();
 
     ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
@@ -121,7 +123,8 @@ public class TestChunkInputStream extends TestInputStreamBase {
 
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
-      BlockInputStream block0Stream = keyInputStream.getBlockStreams().get(0);
+      BlockInputStream block0Stream =
+          (BlockInputStream)keyInputStream.getBlockStreams().get(0);
       block0Stream.initialize();
 
       ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);

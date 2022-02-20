@@ -19,14 +19,17 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -53,14 +56,16 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 
 /**
  * Handles CreateKey request layout version1.
  */
 public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
-  public OMKeyCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCreateRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -119,9 +124,6 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
                 pathInfoFSO.getLeafNodeName());
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataManager, dbFileKey, keyName);
-        if (dbFileInfo != null) {
-          ozoneManager.getKeyManager().refresh(dbFileInfo);
-        }
       }
 
       // Check if a file or directory exists with same key name.
@@ -146,13 +148,18 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
               omMetadataManager.getBucketKey(volumeName, bucketName));
+      final ReplicationConfig repConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo.getDefaultReplicationConfig(),
+              ozoneManager.getDefaultReplicationConfig());
 
       OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
               dbFileInfo, keyArgs.getDataSize(), locations,
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              ozoneManager.isRatisEnabled());
+              ozoneManager.isRatisEnabled(), repConfig);
 
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
@@ -168,9 +175,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
-      long preAllocatedSpace = newLocationList.size()
-              * ozoneManager.getScmBlockSize()
-              * omFileInfo.getReplicationConfig().getRequiredNodes();
+      long preAllocatedSpace =
+          newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
+              .getRequiredNodes();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
@@ -211,7 +218,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(
-              createErrorOMResponse(omResponse, exception));
+              createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
@@ -232,8 +239,28 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     return omClientResponse;
   }
 
+  /**
+   * Returns the DB key name of a multipart open key in OM metadata store.
+   *
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @param uploadID          - Multi part upload ID for this key.
+   * @param omMetadataManager
+   * @return
+   * @throws IOException
+   */
   @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
+                                         String keyName, String uploadID,
+                                         OMMetadataManager omMetadataManager)
+      throws IOException {
+
+    long parentId =
+        getParentId(omMetadataManager, volumeName, bucketName, keyName);
+
+    String fileName = OzoneFSUtils.getFileName(keyName);
+
+    return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
   }
 }

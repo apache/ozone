@@ -18,8 +18,15 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -29,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -51,12 +59,28 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
-  enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
+  @Option(names = {"--user", "-u"},
+          description = "Owner of the bucket. Defaults to current" +
+              " user if not specified")
+  private String ownerName;
 
-  @Option(names = { "--type", "-t" },
-      description = "Allowed Bucket Types: ${COMPLETION-CANDIDATES}",
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
+
+  @Option(names = { "--layout", "-l" },
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
       defaultValue = "OBJECT_STORE")
   private AllowedBucketLayouts allowedBucketLayout;
+
+  @Option(names = {"--replication", "-r"},
+      description = "Replication value. Example: 3 (for Ratis type) or 1 ( for"
+          + " standalone type). In the case of EC, pass DATA-PARITY, eg 3-2," +
+          " 6-3, 10-4")
+  private String replication;
+
+  @Option(names = {"--type", "-t"},
+      description = "Replication type. Supported types are RATIS, STANDALONE,"
+          + " EC")
+  private String replicationType;
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
@@ -68,12 +92,16 @@ public class CreateBucketHandler extends BucketHandler {
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
+    if (ownerName == null) {
+      ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
+    }
+
     BucketArgs.Builder bb;
     BucketLayout bucketLayout =
         BucketLayout.valueOf(allowedBucketLayout.toString());
     bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-        .setVersioning(false).setBucketLayout(bucketLayout);
-
+        .setVersioning(false).setBucketLayout(bucketLayout)
+        .setOwner(ownerName);
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {
@@ -90,6 +118,26 @@ public class CreateBucketHandler extends BucketHandler {
       if (isVerbose()) {
         out().printf("Bucket Encryption enabled with Key Name: %s%n",
             bekName);
+      }
+    }
+
+    if (replicationType != null) {
+      if (replication != null) {
+        ReplicationConfig replicationConfig = ReplicationConfig
+            .parse(ReplicationType.valueOf(replicationType),
+                replication, new OzoneConfiguration());
+        boolean isEC = replicationConfig
+            .getReplicationType() == HddsProtos.ReplicationType.EC;
+        bb.setDefaultReplicationConfig(new DefaultReplicationConfig(
+            ReplicationType.fromProto(replicationConfig.getReplicationType()),
+            isEC ?
+                null :
+                ReplicationFactor.valueOf(replicationConfig.getRequiredNodes()),
+            isEC ? (ECReplicationConfig) replicationConfig : null));
+      } else {
+        throw new IOException(
+            "Replication can't be null. Replication type passed was : "
+                + replicationType);
       }
     }
 

@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
 
 /**
  * ContainerReplicator wrapper with additional metrics.
@@ -38,19 +39,25 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   private final ContainerReplicator delegate;
 
-  @Metric
+  @Metric(about = "Number of successful replication tasks")
   private MutableCounterLong success;
 
-  @Metric
+  @Metric(about = "Time spent on successful replication tasks")
   private MutableGaugeLong successTime;
 
-  @Metric
+  @Metric(about = "Number of failed replication attempts")
   private MutableCounterLong failure;
 
-  @Metric
+  @Metric(about = "Time spent waiting in the queue before starting the task")
   private MutableGaugeLong queueTime;
 
-  @Metric
+  @Metric(about = "Time spent on failed replication attempts")
+  private MutableGaugeLong failureTime;
+
+  @Metric(about = "Bytes transferred for failed replication attempts")
+  private MutableGaugeLong failureBytes;
+
+  @Metric(about = "Bytes transferred for successful replication tasks")
   private MutableGaugeLong transferredBytes;
 
   public MeasuredReplicator(ContainerReplicator delegate) {
@@ -61,18 +68,21 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   @Override
   public void replicate(ReplicationTask task) {
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
 
     long msInQueue =
         (Instant.now().getNano() - task.getQueued().getNano()) / 1_000_000;
     queueTime.incr(msInQueue);
     delegate.replicate(task);
+    long elapsed = Time.monotonicNow() - start;
     if (task.getStatus() == Status.FAILED) {
       failure.incr();
+      failureBytes.incr(task.getTransferredBytes());
+      failureTime.incr(elapsed);
     } else if (task.getStatus() == Status.DONE) {
       transferredBytes.incr(task.getTransferredBytes());
       success.incr();
-      successTime.incr(System.currentTimeMillis() - start);
+      successTime.incr(elapsed);
     }
   }
 
@@ -92,6 +102,11 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   }
 
   @VisibleForTesting
+  public MutableGaugeLong getFailureTime() {
+    return failureTime;
+  }
+
+  @VisibleForTesting
   public MutableCounterLong getFailure() {
     return failure;
   }
@@ -104,6 +119,11 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   @VisibleForTesting
   public MutableGaugeLong getTransferredBytes() {
     return transferredBytes;
+  }
+
+  @VisibleForTesting
+  public MutableGaugeLong getFailureBytes() {
+    return failureBytes;
   }
 
 }

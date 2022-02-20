@@ -23,15 +23,13 @@ import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import static org.apache.hadoop.ozone.om.OzoneManager.LOG;
 
 import javax.annotation.Nonnull;
 
@@ -50,7 +48,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
     MULTIPARTINFO_TABLE})
-public class S3MultipartUploadCompleteResponse extends OMClientResponse {
+public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private String multipartKey;
   private String multipartOpenKey;
   private OmKeyInfo omKeyInfo;
@@ -61,8 +59,9 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
       @Nonnull String multipartKey,
       @Nonnull String multipartOpenKey,
       @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull List<OmKeyInfo> unUsedParts) {
-    super(omResponse);
+      @Nonnull List<OmKeyInfo> unUsedParts,
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.partsUnusedList = unUsedParts;
     this.multipartKey = multipartKey;
     this.multipartOpenKey = multipartOpenKey;
@@ -73,8 +72,9 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public S3MultipartUploadCompleteResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public S3MultipartUploadCompleteResponse(@Nonnull OMResponse omResponse,
+                                           @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 
@@ -114,9 +114,7 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
 
     String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable(
-        getBucketLayout(omMetadataManager, omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName()))
+    omMetadataManager.getKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, ozoneKey, omKeyInfo);
     return ozoneKey;
   }
@@ -131,26 +129,6 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
 
   protected List<OmKeyInfo> getPartsUnusedList() {
     return partsUnusedList;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
-
-  public BucketLayout getBucketLayout(OMMetadataManager omMetadataManager,
-      String volName, String buckName) {
-    if (omMetadataManager == null) {
-      return BucketLayout.DEFAULT;
-    }
-    String buckKey = omMetadataManager.getBucketKey(volName, buckName);
-    try {
-      OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
-      return buckInfo.getBucketLayout();
-    } catch (IOException e) {
-      LOG.error("Cannot find the key: " + buckKey);
-    }
-    return BucketLayout.DEFAULT;
   }
 
 }

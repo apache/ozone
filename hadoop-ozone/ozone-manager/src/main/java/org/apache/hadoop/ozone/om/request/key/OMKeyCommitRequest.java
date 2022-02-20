@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -46,6 +48,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
@@ -70,8 +73,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
-  public OMKeyCommitRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -85,15 +88,18 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if(checkKeyNameEnabled){
+    if (checkKeyNameEnabled) {
       OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
     }
 
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(validateAndNormalizeKey(
-                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+            .setKeyName(keyPath);
 
     return getOmRequest().toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
@@ -254,12 +260,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
 
-      if(bucketLockAcquired) {
+      if (bucketLockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
@@ -350,4 +356,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
   }
 
+  public static OMKeyCommitRequest getInstance(KeyArgs keyArgs,
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMKeyCommitRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMKeyCommitRequest(omRequest, bucketLayout);
+  }
 }

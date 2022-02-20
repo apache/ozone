@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.yaml.snakeyaml.nodes.Tag;
@@ -83,6 +83,8 @@ public class KeyValueContainerData extends ContainerData {
 
   private long blockCommitSequenceId;
 
+  private int replicaIndex;
+
   static {
     // Initialize YAML fields
     KV_YAML_FIELDS = Lists.newArrayList();
@@ -96,12 +98,12 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Constructs KeyValueContainerData object.
    * @param id - ContainerId
-   * @param layOutVersion chunk layout
+   * @param layoutVersion container layout
    * @param size - maximum size of the container in bytes
    */
-  public KeyValueContainerData(long id, ChunkLayOutVersion layOutVersion,
+  public KeyValueContainerData(long id, ContainerLayoutVersion layoutVersion,
       long size, String originPipelineId, String originNodeId) {
-    super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
+    super(ContainerProtos.ContainerType.KeyValueContainer, id, layoutVersion,
         size, originPipelineId, originNodeId);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
@@ -270,7 +272,7 @@ public class KeyValueContainerData extends ContainerData {
       builder.setBytesUsed(this.getBytesUsed());
     }
 
-    if(this.getContainerType() != null) {
+    if (this.getContainerType() != null) {
       builder.setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
     }
 
@@ -302,5 +304,13 @@ public class KeyValueContainerData extends ContainerData {
             (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
   }
 }

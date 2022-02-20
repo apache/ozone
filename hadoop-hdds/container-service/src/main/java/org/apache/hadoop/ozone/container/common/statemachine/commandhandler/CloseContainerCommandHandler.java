@@ -62,14 +62,13 @@ public class CloseContainerCommandHandler implements CommandHandler {
    * Handles a given SCM command.
    *
    * @param command           - SCM Command
-   * @param ozoneContainer         - Ozone Container.
+   * @param ozoneContainer    - Ozone Container.
    * @param context           - Current Context.
    * @param connectionManager - The SCMs that we are talking to.
    */
   @Override
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    LOG.debug("Processing Close Container command.");
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
     final DatanodeDetails datanodeDetails = context.getParent()
@@ -78,6 +77,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         ((CloseContainerCommand)command).getProto();
     final ContainerController controller = ozoneContainer.getController();
     final long containerId = closeCommand.getContainerID();
+    LOG.debug("Processing Close Container command container #{}",
+        containerId);
     try {
       final Container container = controller.getContainer(containerId);
 
@@ -103,10 +104,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
           ozoneContainer.getWriteChannel()
               .submitRequest(request, closeCommand.getPipelineID());
         } else {
-          // Container should not exist in CLOSING state without a pipeline
-          controller.markContainerUnhealthy(containerId);
-          LOG.info("Marking UNHEALTHY as Container should not be in " +
-              "CLOSING state without pipeline, ContainerID: {}", containerId);
+          controller.quasiCloseContainer(containerId);
+          LOG.info("Marking Container {} quasi closed", containerId);
         }
         break;
       case QUASI_CLOSED:
@@ -118,10 +117,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         break;
       case UNHEALTHY:
       case INVALID:
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Cannot close the container #{}, the container is"
-              + " in {} state.", containerId, container.getContainerState());
-        }
+        LOG.debug("Cannot close the container #{}, the container is"
+            + " in {} state.", containerId, container.getContainerState());
         break;
       default:
         break;

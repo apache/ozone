@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -119,9 +121,12 @@ public final class TestHelper {
   public static OzoneOutputStream createKey(String keyName,
       ReplicationType type, long size, ObjectStore objectStore,
       String volumeName, String bucketName) throws Exception {
+    if (type == ReplicationType.STAND_ALONE) {
+      throw new IllegalArgumentException(ReplicationType.STAND_ALONE +
+          " replication type should not be used in tests to write keys anymore."
+      );
+    }
     org.apache.hadoop.hdds.client.ReplicationFactor factor =
-        type == ReplicationType.STAND_ALONE ?
-            org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
             org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey(keyName, size, type, factor, new HashMap<>());
@@ -134,6 +139,13 @@ public final class TestHelper {
       throws Exception {
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey(keyName, size, type, factor, new HashMap<>());
+  }
+
+  public static OzoneOutputStream createKey(String keyName,
+      ReplicationConfig replicationConfig, long size, ObjectStore objectStore,
+      String volumeName, String bucketName) throws Exception {
+    return objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createKey(keyName, size, replicationConfig, new HashMap<>());
   }
 
   public static void validateData(String keyName, byte[] data,

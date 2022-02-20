@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.IOException;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 

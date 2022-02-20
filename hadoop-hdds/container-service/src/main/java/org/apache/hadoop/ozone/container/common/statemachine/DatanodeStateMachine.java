@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
@@ -111,7 +112,7 @@ public class DatanodeStateMachine implements Closeable {
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
 
   /**
-   * Constructs a a datanode state machine.
+   * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
    * @param conf - Configuration.
    * @param certClient - Datanode Certificate client, required if security is
@@ -166,9 +167,11 @@ public class DatanodeStateMachine implements Closeable {
 
     replicatorMetrics = new MeasuredReplicator(replicator);
 
+    ReplicationConfig replicationConfig =
+        conf.getObject(ReplicationConfig.class);
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, dnConf.getReplicationMaxStreams());
+            replicatorMetrics, replicationConfig);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -290,7 +293,7 @@ public class DatanodeStateMachine implements Closeable {
 
       now = Time.monotonicNow();
       if (now < nextHB.get()) {
-        if(!Thread.interrupted()) {
+        if (!Thread.interrupted()) {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
@@ -376,7 +379,7 @@ public class DatanodeStateMachine implements Closeable {
       connectionManager.close();
     }
 
-    if(container != null) {
+    if (container != null) {
       container.stop();
     }
 
@@ -634,12 +637,12 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   public StatusAndMessages finalizeUpgrade()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
   }
 
   public StatusAndMessages queryUpgradeStatus()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         true);
   }

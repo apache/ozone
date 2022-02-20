@@ -29,7 +29,7 @@ import java.nio.ByteBuffer;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
-import static org.apache.hadoop.ozone.container.common.helpers.ContainerUtils.processForDebug;
+import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
 import static org.junit.Assert.assertEquals;
 

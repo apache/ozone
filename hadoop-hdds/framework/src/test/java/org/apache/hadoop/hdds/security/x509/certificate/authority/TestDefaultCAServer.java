@@ -384,9 +384,11 @@ public class TestDefaultCAServer {
 
 
     Assert.assertNotNull(certificateHolder);
-    Assert.assertEquals(10, certificateHolder.getNotAfter().toInstant()
+    LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
         .atZone(ZoneId.systemDefault())
-        .toLocalDate().compareTo(LocalDate.now()));
+        .toLocalDate();
+    LocalDate now = LocalDate.now();
+    assertEquals(0, invalidAfterDate.compareTo(now.plusDays(3650)));
 
     X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 

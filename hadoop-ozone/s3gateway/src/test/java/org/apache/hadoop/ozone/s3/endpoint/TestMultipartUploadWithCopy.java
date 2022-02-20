@@ -34,6 +34,7 @@ import java.util.Scanner;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -120,6 +121,7 @@ public class TestMultipartUploadWithCopy {
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
+    REST.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   @Test

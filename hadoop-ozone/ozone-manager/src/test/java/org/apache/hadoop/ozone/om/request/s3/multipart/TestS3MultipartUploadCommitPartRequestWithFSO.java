@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
@@ -43,14 +43,16 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
 
   @Override
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
-          OMRequest omRequest) {
-    return new S3MultipartUploadCommitPartRequestWithFSO(omRequest);
+      OMRequest omRequest) {
+    return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-          OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest);
+      OMRequest initiateMPURequest) {
+    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
@@ -62,12 +64,12 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
     long txnLogId = 10000;
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, parentID + 1, parentID,
             txnLogId, Time.now());
     String fileName = OzoneFSUtils.getFileName(keyName);
-    TestOMRequestUtils.addFileToKeyTable(true, false,
+    OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfo, clientID, txnLogId, omMetadataManager);
   }
 
@@ -90,11 +92,12 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   protected OMRequest doPreExecuteInitiateMPU(String volumeName,
       String bucketName, String keyName) throws Exception {
     OMRequest omRequest =
-            TestOMRequestUtils.createInitiateMPURequest(volumeName, bucketName,
+            OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
                     keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-            new S3InitiateMultipartUploadRequestWithFSO(omRequest);
+        new S3InitiateMultipartUploadRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMRequest modifiedRequest =
             s3InitiateMultipartUploadRequest.preExecute(ozoneManager);
@@ -113,7 +116,7 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   protected void createParentPath(String volumeName, String bucketName)
       throws Exception {
     // Create parent dirs for the path
-    parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
+    parentID = OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName,
             dirName, omMetadataManager);
   }
 

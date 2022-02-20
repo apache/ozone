@@ -68,6 +68,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -299,6 +300,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
+    LOG.warn("Moving container {} to state UNHEALTHY from state:{} Trace:{}",
+            containerData.getContainerPath(), containerData.getState(),
+            StringUtils.getStackTrace(Thread.currentThread()));
   }
 
   @Override
@@ -378,7 +382,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private void compactDB() throws StorageContainerException {
     try {
-      try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+      try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
         db.getStore().compactDB();
       }
     } catch (StorageContainerException ex) {
@@ -431,7 +435,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     // holding lock and writing data to disk. We can have async implementation
     // to flush the update container data to disk.
     long containerId = containerData.getContainerID();
-    if(!containerData.isValid()) {
+    if (!containerData.isValid()) {
       LOG.debug("Invalid container data. ContainerID: {}", containerId);
       throw new StorageContainerException("Invalid container data. " +
           "ContainerID: " + containerId, INVALID_CONTAINER_STATE);
@@ -680,6 +684,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setKeyCount(containerData.getKeyCount())
         .setUsed(containerData.getBytesUsed())
         .setState(getHddsState())
+        .setReplicaIndex(containerData.getReplicaIndex())
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
         .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
         .setOriginNodeId(containerData.getOriginNodeId());
@@ -770,7 +775,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * @return
    * @throws IOException
    */
-  private File createTempFile(File file) throws IOException{
+  private File createTempFile(File file) throws IOException {
     return File.createTempFile("tmp_" + System.currentTimeMillis() + "_",
         file.getName(), file.getParentFile());
   }

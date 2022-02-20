@@ -24,8 +24,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -51,7 +54,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 
@@ -61,8 +63,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 public class S3InitiateMultipartUploadRequestWithFSO
         extends S3InitiateMultipartUploadRequest {
 
-  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -111,17 +114,6 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      // If KMS is configured and TDE is enabled on bucket, throw MPU not
-      // supported.
-      if (ozoneManager.getKmsProvider() != null) {
-        if (omMetadataManager.getBucketTable().get(
-            omMetadataManager.getBucketKey(volumeName, bucketName))
-            .getEncryptionKeyInfo() != null) {
-          throw new OMException("MultipartUpload is not yet supported on " +
-              "encrypted buckets", NOT_SUPPORTED_OPERATION);
-        }
-      }
-
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
           .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
               keyName, Paths.get(keyName));
@@ -161,9 +153,14 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // care of in the final complete multipart upload. AWS S3 behavior is
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
-      final ReplicationConfig replicationConfig =
-              ReplicationConfig.fromTypeAndFactor(
-                      keyArgs.getType(), keyArgs.getFactor());
+      final OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+          .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+      final ReplicationConfig replicationConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo != null ?
+                  bucketInfo.getDefaultReplicationConfig() :
+                  null, ozoneManager.getDefaultReplicationConfig());
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
@@ -186,6 +183,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
+          .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
+              OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .setParentObjectID(pathInfoFSO.getLastKnownParentId())
           .build();
 
@@ -213,14 +212,14 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo, multipartKey,
-              missingParentInfos);
+              missingParentInfos, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponseWithFSO(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
@@ -248,10 +247,5 @@ public class S3InitiateMultipartUploadRequestWithFSO
       throw new OMException("Can not write to directory: " + keyName,
               OMException.ResultCodes.NOT_A_FILE);
     }
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

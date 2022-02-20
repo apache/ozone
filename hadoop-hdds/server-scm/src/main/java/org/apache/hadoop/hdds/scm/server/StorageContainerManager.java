@@ -380,8 +380,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     initializeEventHandlers();
 
-    containerBalancer = new ContainerBalancer(scmNodeManager,
-        containerManager, replicationManager, configuration, scmContext,
+    containerBalancer = new ContainerBalancer(scmNodeManager, containerManager,
+        replicationManager, configuration, scmContext, clusterMap,
         ContainerPlacementPolicyFactory
             .getPolicy(conf, scmNodeManager, clusterMap, true,
                 placementMetrics));
@@ -557,7 +557,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .build();
     }
 
-    if(configurator.getScmNodeManager() != null) {
+    if (configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
     } else {
       scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
@@ -616,7 +616,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmHAManager,
           getScmMetadataStore().getMoveTable());
     }
-    if(configurator.getScmSafeModeManager() != null) {
+    if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
@@ -642,7 +642,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // TODO: Support Certificate Server loading via Class Name loader.
     // So it is easy to use different Certificate Servers if needed.
-    if(this.scmMetadataStore == null) {
+    if (this.scmMetadataStore == null) {
       LOG.error("Cannot initialize Certificate Server without a valid meta " +
           "data layer.");
       throw new SCMException("Cannot initialize CA without a valid metadata " +
@@ -796,7 +796,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private void initalizeMetadataStore(OzoneConfiguration conf,
                                       SCMConfigurator configurator)
       throws IOException {
-    if(configurator.getMetadataStore() != null) {
+    if (configurator.getMetadataStore() != null) {
       scmMetadataStore = configurator.getMetadataStore();
     } else {
       scmMetadataStore = new SCMMetadataStoreImpl(conf);
@@ -977,7 +977,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         // will be persisted into the version file once this node gets added
         // to existing SCM ring post node regular start up.
 
-        if(OzoneSecurityUtil.isSecurityEnabled(conf)) {
+        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
           HASecurityUtils.initializeSecurity(scmStorageConfig, config,
               getScmAddress(scmhaNodeDetails, conf), false);
         }
@@ -1319,11 +1319,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "server", getBlockProtocolServer().getBlockRpcAddress()));
     }
     getBlockProtocolServer().start();
-
-    if (LOG.isInfoEnabled()) {
-      LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
-          "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
-    }
 
     // If HA is enabled, start datanode protocol server once leader is ready.
     if (!scmStorageConfig.isSCMHAEnabled()) {
@@ -1835,7 +1830,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public StatusAndMessages finalizeUpgrade(String upgradeClientID)
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.finalize(upgradeClientID, this);
   }
 

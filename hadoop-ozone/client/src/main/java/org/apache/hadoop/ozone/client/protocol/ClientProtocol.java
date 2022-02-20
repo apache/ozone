@@ -27,6 +27,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -42,12 +43,14 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -635,6 +638,7 @@ public interface ClientProtocol {
    *                     invalid arguments
    */
   @SuppressWarnings("checkstyle:parameternumber")
+  @Deprecated
   OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationType type, ReplicationFactor factor,
       boolean overWrite, boolean recursive) throws IOException;
@@ -738,6 +742,17 @@ public interface ClientProtocol {
       long quotaInNamespace, long quotaInBytes) throws IOException;
 
   /**
+   * Set Bucket replication configuration.
+   *
+   * @param volumeName        Name of the Volume.
+   * @param bucketName        Name of the Bucket.
+   * @param replicationConfig The replication config to set on bucket.
+   * @throws IOException
+   */
+  void setReplicationConfig(String volumeName, String bucketName,
+      ReplicationConfig replicationConfig) throws IOException;
+
+  /**
    * Returns OzoneKey that contains the application generated/visible
    * metadata for an Ozone Object.
    *
@@ -752,4 +767,47 @@ public interface ClientProtocol {
    */
   OzoneKey headObject(String volumeName, String bucketName,
       String keyName) throws IOException;
+
+  /**
+   * Sets the S3 Authentication information for the requests executed on behalf
+   * of the S3 API implementation within Ozone.
+   * @param s3Auth authentication information for each S3 API call.
+   */
+  void setTheadLocalS3Auth(S3Auth s3Auth);
+
+  /**
+   * Gets the S3 Authentication information that is attached to the thread.
+   * @return S3 Authentication information.
+   */
+  S3Auth getThreadLocalS3Auth();
+
+  /**
+   * Clears the S3 Authentication information attached to the thread.
+   */
+  void clearTheadLocalS3Auth();
+
+  /**
+   * Sets the owner of bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param owner to be set for the bucket
+   * @throws IOException
+   */
+  boolean setBucketOwner(String volumeName, String bucketName,
+      String owner) throws IOException;
+
+  /**
+   * Reads every replica for all the blocks associated with a given key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @return For every OmKeyLocationInfo (represents a block) it is mapped
+   * every replica, which is constructed by the DatanodeDetails and an
+   * inputstream made from the block.
+   * @throws IOException
+   */
+  Map<OmKeyLocationInfo,
+      Map<DatanodeDetails, OzoneInputStream>> getKeysEveryReplicas(
+          String volumeName, String bucketName, String keyName)
+      throws IOException;
 }

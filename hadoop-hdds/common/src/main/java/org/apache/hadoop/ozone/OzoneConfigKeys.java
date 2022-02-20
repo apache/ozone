@@ -115,6 +115,11 @@ public final class OzoneConfigKeys {
       "ozone.scm.block.size";
   public static final String OZONE_SCM_BLOCK_SIZE_DEFAULT = "256MB";
 
+  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
+      "ozone.client.max.ec.stripe.write.retries";
+  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
+      "10";
+
   /**
    * Ozone administrator users delimited by comma.
    * If not set, only the user who launches an ozone service will be the
@@ -454,6 +459,25 @@ public final class OzoneConfigKeys {
       "ozone.client.key.latest.version.location";
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
+
+  public static final String OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT =
+      "ozone.client.test.ofs.default.bucket.layout";
+
+  public static final String OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT =
+      "FILE_SYSTEM_OPTIMIZED";
+
+  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY =
+      "ozone.om.client.protocol.version";
+  // The version of the protocol for Client (S3G/OFS) to OM Communication.
+  // The protocol starts at 2.0.0 and a null or empty value for older versions.
+  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION = "2.0.0";
+
+  public static final String
+      OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS =
+      "ozone.client.bucket.replication.config.refresh.time.ms";
+  public static final long
+      OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
+      300 * 1000;
 
   /**
    * There is no need to instantiate this class.

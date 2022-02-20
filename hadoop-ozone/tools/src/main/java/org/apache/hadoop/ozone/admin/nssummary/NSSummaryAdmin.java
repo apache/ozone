@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
+import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
@@ -24,8 +25,17 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
+
+import java.io.IOException;
+import java.util.HashSet;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
@@ -74,10 +84,28 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     return OzoneAdmin.class;
   }
 
-  public boolean isFSOEnabled() {
-    OzoneConfiguration conf = parent.getOzoneConf();
-    return conf.getBoolean("ozone.om.enable.filesystem.paths", false)
-        && conf.get("ozone.om.metadata.layout").equalsIgnoreCase("PREFIX");
+  public boolean isFileSystemOptimizedBucket(String path) throws IOException {
+    OFSPath ofsPath = new OFSPath(path);
+
+    OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
+    ObjectStore objectStore = ozoneClient.getObjectStore();
+
+    try {
+      OzoneBucket bucket = objectStore.getVolume(ofsPath.getVolumeName())
+          .getBucket(ofsPath.getBucketName());
+
+      // Resolve the bucket layout in case this is a Link Bucket.
+      BucketLayout resolvedBucketLayout =
+          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+              new HashSet<>());
+
+      return resolvedBucketLayout.isFileSystemOptimized();
+    } catch (IOException e) {
+      System.out.println(
+          "Bucket layout couldn't be verified for path: " + ofsPath +
+              ". Exception: " + e);
+      return false;
+    }
   }
 
   /**

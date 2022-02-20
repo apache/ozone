@@ -79,7 +79,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
  * This class is NOT thread safe. All the calls are idempotent.
  */
 public final class ContainerStateManagerImpl
-    implements ContainerStateManagerV2 {
+    implements ContainerStateManager {
 
   /**
    * Logger instance of ContainerStateManagerImpl.
@@ -415,6 +415,11 @@ public final class ContainerStateManagerImpl
           deleteTransactionMap.entrySet()) {
         final ContainerInfo info = containers.getContainerInfo(
             transaction.getKey());
+        if (info == null) {
+          LOG.warn("Cannot find container {}, transaction id is {}",
+              transaction.getKey(), transaction.getValue());
+          continue;
+        }
         info.updateDeleteTransactionId(transaction.getValue());
         transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
       }
@@ -561,21 +566,21 @@ public final class ContainerStateManagerImpl
       return this;
     }
 
-    public ContainerStateManagerV2 build() throws IOException {
+    public ContainerStateManager build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(pipelineMgr);
       Preconditions.checkNotNull(table);
 
-      final ContainerStateManagerV2 csm = new ContainerStateManagerImpl(
+      final ContainerStateManager csm = new ContainerStateManagerImpl(
           conf, pipelineMgr, table, transactionBuffer);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(RequestType.CONTAINER, csm,
               scmRatisServer);
 
-      return (ContainerStateManagerV2) Proxy.newProxyInstance(
+      return (ContainerStateManager) Proxy.newProxyInstance(
           SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{ContainerStateManagerV2.class}, invocationHandler);
+          new Class<?>[]{ContainerStateManager.class}, invocationHandler);
     }
 
   }

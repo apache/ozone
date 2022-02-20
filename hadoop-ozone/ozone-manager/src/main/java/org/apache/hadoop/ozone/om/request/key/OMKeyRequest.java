@@ -59,7 +59,6 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
     .EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -94,13 +93,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
+  public OMKeyRequest(OMRequest omRequest, BucketLayout bucketLayoutArg) {
+    super(omRequest);
+    this.bucketLayout = bucketLayoutArg;
+  }
+
   public BucketLayout getBucketLayout() {
-    // Returning Bucket.default since this is a non fso code path.
-    return BucketLayout.DEFAULT;
+    return bucketLayout;
   }
 
   protected KeyArgs resolveBucketLink(
@@ -120,12 +125,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
   @SuppressWarnings("parameternumber")
   protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
       OzoneBlockTokenSecretManager secretManager,
-      HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor replicationFactor,
-      ExcludeList excludeList, long requestedSize, long scmBlockSize,
-      int preallocateBlocksMax, boolean grpcBlockTokenEnabled, String omID)
-      throws IOException {
-
+      ReplicationConfig replicationConfig, ExcludeList excludeList,
+      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
+      boolean grpcBlockTokenEnabled, String omID) throws IOException {
     int numBlocks = Math.min((int) ((requestedSize - 1) / scmBlockSize + 1),
         preallocateBlocksMax);
 
@@ -133,10 +135,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = scmClient.getBlockClient().allocateBlock(scmBlockSize,
-          numBlocks, ReplicationConfig.fromTypeAndFactor(replicationType,
-              replicationFactor),
-          omID, excludeList);
+      allocatedBlocks = scmClient.getBlockClient()
+          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
+              excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
@@ -253,22 +254,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OmBucketInfo bucketInfo, PrefixManager prefixManager) {
     List<OzoneAcl> acls = new ArrayList<>();
 
-    if(keyArgs.getAclsList() != null) {
+    if (keyArgs.getAclsList() != null) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
 
     // Inherit DEFAULT acls from prefix.
-    if(prefixManager != null) {
+    if (prefixManager != null) {
       List< OmPrefixInfo > prefixList = prefixManager.getLongestPrefixPath(
           OZONE_URI_DELIMITER +
               keyArgs.getVolumeName() + OZONE_URI_DELIMITER +
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if(prefixList.size() > 0) {
+      if (prefixList.size() > 0) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
-        if(prefixInfo  != null) {
+        if (prefixInfo  != null) {
           if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls())) {
             return acls;
           }
@@ -341,8 +342,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneObj.ResourceType resourceType, String volumeOwner)
       throws IOException {
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
-          volume, bucket, key, volumeOwner);
+      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE,
+          aclType, volume, bucket, key, volumeOwner,
+          ozoneManager.getBucketOwner(volume, bucket, aclType, resourceType));
     }
   }
 
@@ -460,11 +462,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+
+        // Get the DB key name for looking up keyInfo in OpenKeyTable with
+        // resolved volume/bucket.
+        String dbMultipartOpenKey =
+            getDBMultipartOpenKey(resolvedBucket.realVolume(),
+                resolvedBucket.realBucket(), keyArgs.getKeyName(),
+                keyArgs.getMultipartUploadID(), omMetadataManager);
+
         OmKeyInfo omKeyInfo =
-            omMetadataManager.getOpenKeyTable(getBucketLayout()).get(
-                omMetadataManager.getMultipartKey(resolvedBucket.realVolume(),
-                    resolvedBucket.realBucket(), keyArgs.getKeyName(),
-                    keyArgs.getMultipartUploadID()));
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
+                .get(dbMultipartOpenKey);
+
         if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
           newKeyArgs.setFileEncryptionInfo(
               OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
@@ -589,12 +598,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          long transactionLogIndex, long objectID, boolean isRatisEnabled)
+          long transactionLogIndex, long objectID, boolean isRatisEnabled,
+          ReplicationConfig replicationConfig)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
             locations, encInfo, prefixManager, omBucketInfo, null,
-            transactionLogIndex, objectID, isRatisEnabled);
+            transactionLogIndex, objectID, isRatisEnabled, replicationConfig);
   }
 
   /**
@@ -612,7 +622,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfoWithFSO omPathInfo,
           long transactionLogIndex, long objectID,
-          boolean isRatisEnabled)
+          boolean isRatisEnabled, ReplicationConfig replicationConfig)
           throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
@@ -640,9 +650,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
-    return createFileInfo(keyArgs, locations,
-            ReplicationConfig.fromTypeAndFactor(
-                    keyArgs.getType(), keyArgs.getFactor()),
+    return createFileInfo(keyArgs, locations, replicationConfig,
             keyArgs.getDataSize(), encInfo, prefixManager,
             omBucketInfo, omPathInfo, transactionLogIndex, objectID);
   }
@@ -661,7 +669,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfoWithFSO omPathInfo,
       long transactionLogIndex, long objectID) {
-
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -735,5 +742,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID);
+  }
+
+  /**
+   * Returns the DB key name of a multipart open key in OM metadata store.
+   *
+   * @param volumeName        - volume name.
+   * @param bucketName        - bucket name.
+   * @param keyName           - key name.
+   * @param uploadID          - Multi part upload ID for this key.
+   * @param omMetadataManager
+   * @return
+   * @throws IOException
+   */
+  protected String getDBMultipartOpenKey(String volumeName, String bucketName,
+                                         String keyName, String uploadID,
+                                         OMMetadataManager omMetadataManager)
+      throws IOException {
+
+    return omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, uploadID);
   }
 }

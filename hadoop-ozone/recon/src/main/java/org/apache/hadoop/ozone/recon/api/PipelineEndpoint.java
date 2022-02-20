@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
@@ -105,9 +104,7 @@ public class PipelineEndpoint {
               .setDatanodes(datanodes)
               .setDuration(duration)
               .setStatus(pipeline.getPipelineState())
-              .setReplicationFactor(ReplicationConfig
-                  .getLegacyFactor(pipeline.getReplicationConfig()).getNumber())
-          .setReplicationType(pipeline.getType().toString());
+              .setReplicationConfig(pipeline.getReplicationConfig());
       // If any metrics service providers like Prometheus
       // is configured, then query it for metrics and populate
       // leader election count and last leader election time
@@ -116,7 +113,7 @@ public class PipelineEndpoint {
         // ex. group id of 48981bf7-8bea-4fbd-9857-79df51ee872d
         // is group-79DF51EE872D
         String[] splits = pipelineId.toString().split("-");
-        String groupId = "group-" + splits[splits.length-1].toUpperCase();
+        String groupId = "group-" + splits[splits.length - 1].toUpperCase();
         Optional<Long> leaderElectionCount = getMetricValue(
             "ratis_leader_election_electionCount", groupId);
         leaderElectionCount.ifPresent(pipelineBuilder::setLeaderElections);

@@ -21,6 +21,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -134,6 +136,8 @@ public class TestCleanupTableInfo {
         );
     when(om.getAclsEnabled()).thenReturn(false);
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
+    when(om.getDefaultReplicationConfig()).thenReturn(ReplicationConfig
+        .getDefault(new OzoneConfiguration()));
     addVolumeToMetaTable(aVolumeArgs());
     addBucketToMetaTable(aBucketInfo());
   }
@@ -144,8 +148,10 @@ public class TestCleanupTableInfo {
 
     Set<String> tables = omMetadataManager.listTableNames();
     Set<Class<? extends OMClientResponse>> subTypes = responseClasses();
+    // OmKeyResponse is an abstract class that does not need CleanupTable.
+    subTypes.remove(OmKeyResponse.class);
     subTypes.forEach(aClass -> {
-      Assert.assertTrue(aClass + "does not have annotation of" +
+      Assert.assertTrue(aClass + " does not have annotation of" +
               " CleanupTableInfo",
           aClass.isAnnotationPresent(CleanupTableInfo.class));
       CleanupTableInfo annotation =
@@ -214,7 +220,7 @@ public class TestCleanupTableInfo {
     for (String tableName : om.getMetadataManager().listTableNames()) {
       if (!cleanup.contains(tableName)) {
         assertEquals(
-            "Cache item count of table " +tableName,
+            "Cache item count of table " + tableName,
             cacheItemCount.get(tableName).intValue(),
             Iterators.size(
                 om.getMetadataManager().getTable(tableName).cacheIterator()
@@ -286,7 +292,7 @@ public class TestCleanupTableInfo {
     return new OMFileCreateRequest(protoRequest);
   }
 
-  private OMKeyCreateRequest anOMKeyCreateRequest(){
+  private OMKeyCreateRequest anOMKeyCreateRequest() {
     OMRequest protoRequest = mock(OMRequest.class);
     when(protoRequest.getCreateKeyRequest()).thenReturn(aKeyCreateRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateKey);

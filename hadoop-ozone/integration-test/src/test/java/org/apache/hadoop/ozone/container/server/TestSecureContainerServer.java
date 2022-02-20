@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -97,6 +96,8 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.ratis.rpc.RpcType;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.After;
 
@@ -125,6 +126,7 @@ public class TestSecureContainerServer {
   @BeforeClass
   public static void setup() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);
+    ExitUtils.disableSystemExit();
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
     CONF.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
@@ -167,7 +169,7 @@ public class TestSecureContainerServer {
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(dd, conf,
-            hddsDispatcher, caClient), (dn, p) -> {}, (p) -> {});
+            hddsDispatcher, caClient), (dn, p) -> {  }, (p) -> { });
   }
 
   private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
@@ -192,7 +194,7 @@ public class TestSecureContainerServer {
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
               containerSet, volumeSet, metrics,
-              TestHddsDispatcher.NO_OP_ICR_SENDER));
+              c -> { }));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
@@ -232,7 +234,7 @@ public class TestSecureContainerServer {
         XceiverClientRatis::newXceiverClientRatis,
         TestSecureContainerServer::newXceiverServerRatis,
         (dn, p) -> RatisTestHelper.initXceiverServerRatis(rpc, dn, p),
-        (p) -> {});
+        (p) -> { });
   }
 
   private static void runTestClientServer(

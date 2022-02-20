@@ -189,7 +189,7 @@ public class TestOzoneAuditLogger {
       lines = FileUtils.readLines(file, (String)null);
       try {
         Thread.sleep(500 * (i + 1));
-      } catch(InterruptedException ie) {
+      } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
         break;
       }
@@ -212,7 +212,7 @@ public class TestOzoneAuditLogger {
     assertEquals(0, lines.size());
   }
 
-  private static class TestException extends Exception{
+  private static class TestException extends Exception {
     TestException(String message) {
       super(message);
     }

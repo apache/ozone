@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -46,6 +48,67 @@ public class TestPipeline {
         VERSION_HANDLES_UNKNOWN_DN_PORTS);
     for (HddsProtos.DatanodeDetailsProto dn : protoV1.getMembersList()) {
       assertPorts(dn, ALL_PORTS);
+    }
+  }
+
+  @Test
+  public void getProtobufMessageEC() throws IOException {
+    Pipeline subject = MockPipeline.createPipeline(3);
+
+    //when EC config is empty/null
+    HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(1);
+    Assert.assertEquals(0, protobufMessage.getEcReplicationConfig().getData());
+
+
+    //when EC config is NOT empty
+    subject = MockPipeline.createEcPipeline();
+
+    protobufMessage = subject.getProtobufMessage(1);
+    Assert.assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
+    Assert
+        .assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
+
+  }
+
+  @Test
+  public void testReplicaIndexesSerialisedCorrectly() throws IOException {
+    Pipeline pipeline = MockPipeline.createEcPipeline();
+    HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(1);
+    Pipeline reloadedPipeline = Pipeline.getFromProtobuf(protobufMessage);
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      Assert.assertEquals(pipeline.getReplicaIndex(dn),
+          reloadedPipeline.getReplicaIndex(dn));
+    }
+  }
+
+  @Test
+  public void testECPipelineIsAlwaysHealthy() throws IOException {
+    Pipeline pipeline = MockPipeline.createEcPipeline();
+    Assert.assertTrue(pipeline.isHealthy());
+  }
+
+  @Test
+  public void testBuilderCopiesAllFieldsFromOtherPipeline() {
+    Pipeline original = MockPipeline.createEcPipeline();
+    Pipeline copied = Pipeline.newBuilder(original).build();
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getReplicationConfig(),
+        copied.getReplicationConfig());
+    Assert.assertEquals(original.getPipelineState(), copied.getPipelineState());
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getId(), copied.getId());
+    Assert.assertEquals(original.getNodeSet(), copied.getNodeSet());
+    Assert.assertEquals(original.getNodesInOrder(), copied.getNodesInOrder());
+    Assert.assertEquals(original.getLeaderId(), copied.getLeaderId());
+    Assert.assertEquals(original.getCreationTimestamp(),
+        copied.getCreationTimestamp());
+    Assert.assertEquals(original.getSuggestedLeaderId(),
+        copied.getSuggestedLeaderId());
+    for (DatanodeDetails dn : original.getNodes()) {
+      Assert.assertEquals(original.getReplicaIndex(dn),
+          copied.getReplicaIndex(dn));
     }
   }
 }
