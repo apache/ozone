@@ -27,7 +27,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -46,6 +49,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -56,6 +60,7 @@ import static org.apache.commons.collections.CollectionUtils.intersection;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -215,13 +220,17 @@ public class TestRatisPipelineProvider {
     List<DatanodeDetails> healthyNodes = nodeManager
         .getNodes(NodeStatus.inServiceHealthy()).stream()
         .limit(3).collect(Collectors.toList());
+    Set<ContainerReplica> replicas = createContainerReplicas(healthyNodes);
 
     Pipeline pipeline1 = provider.create(
         new RatisReplicationConfig(ReplicationFactor.THREE), healthyNodes);
     Pipeline pipeline2 = provider.create(
         new RatisReplicationConfig(ReplicationFactor.THREE), healthyNodes);
+    Pipeline pipeline3 = provider.createForRead(
+        new RatisReplicationConfig(ReplicationFactor.THREE), replicas);
 
     Assert.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
+    Assert.assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
     cleanup();
   }
 
@@ -275,6 +284,31 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
+  // Test excluded nodes work correctly. Note that for Ratis, the
+  // PipelinePlacementPolicy, which Ratis is hardcoded to use, does not consider
+  // favored nodes.
+  public void testCreateFactorTHREEPipelineWithExcludedDatanodes()
+      throws Exception {
+    init(1);
+    int healthyCount = nodeManager.getNodes(NodeStatus.inServiceHealthy())
+        .size();
+    // Add all but 3 nodes to the exclude list and ensure that the 3 picked
+    // nodes are not in the excluded list.
+    List<DatanodeDetails> excludedNodes = nodeManager
+        .getNodes(NodeStatus.inServiceHealthy()).stream()
+        .limit(healthyCount - 3).collect(Collectors.toList());
+
+    Pipeline pipeline1 = provider.create(
+        new RatisReplicationConfig(ReplicationFactor.THREE), excludedNodes,
+        Collections.EMPTY_LIST);
+
+    for (DatanodeDetails dn : pipeline1.getNodes()) {
+      assertFalse(excludedNodes.contains(dn));
+    }
+  }
+
+
+  @Test
   public void testCreatePipelinesWhenNotEnoughSpace() throws Exception {
     String expectedErrorSubstring = "Unable to find enough" +
         " nodes that meet the space requirement";
@@ -285,11 +319,14 @@ public class TestRatisPipelineProvider {
     largeContainerConf.set(OZONE_SCM_CONTAINER_SIZE, "100TB");
     init(1, largeContainerConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
+      if (factor == ReplicationFactor.ZERO) {
+        continue;
+      }
       try {
         provider.create(new RatisReplicationConfig(factor));
         Assert.fail("Expected SCMException for large container size with " +
             "replication factor " + factor.toString());
-      } catch(SCMException ex) {
+      } catch (SCMException ex) {
         Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
@@ -298,11 +335,14 @@ public class TestRatisPipelineProvider {
     largeMetadataConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "100TB");
     init(1, largeMetadataConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
+      if (factor == ReplicationFactor.ZERO) {
+        continue;
+      }
       try {
         provider.create(new RatisReplicationConfig(factor));
         Assert.fail("Expected SCMException for large metadata size with " +
             "replication factor " + factor.toString());
-      } catch(SCMException ex) {
+      } catch (SCMException ex) {
         Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
@@ -324,5 +364,25 @@ public class TestRatisPipelineProvider {
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);
+  }
+
+  private Set<ContainerReplica> createContainerReplicas(
+      List<DatanodeDetails> dns) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (DatanodeDetails dn : dns) {
+      ContainerReplica r = ContainerReplica.newBuilder()
+          .setBytesUsed(1)
+          .setContainerID(ContainerID.valueOf(1))
+          .setContainerState(StorageContainerDatanodeProtocolProtos
+              .ContainerReplicaProto.State.CLOSED)
+          .setKeyCount(1)
+          .setOriginNodeId(UUID.randomUUID())
+          .setSequenceId(1)
+          .setReplicaIndex(0)
+          .setDatanodeDetails(dn)
+          .build();
+      replicas.add(r);
+    }
+    return replicas;
   }
 }

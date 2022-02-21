@@ -27,8 +27,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -41,10 +41,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -68,7 +65,7 @@ public class PutKeyHandler extends KeyHandler {
 
   @Option(names = {"-t", "--type"},
       description = "Replication type of the new key. (use RATIS or " +
-          "STAND_ALONE) Default is specified in the cluster-wide config.")
+          "STAND_ALONE or EC) Default is specified in the cluster-wide config.")
   private ReplicationType replicationType;
 
   @Override
@@ -88,19 +85,9 @@ public class PutKeyHandler extends KeyHandler {
       }
     }
 
-    if (replicationType == null) {
-      replicationType = ReplicationType.valueOf(
-          getConf()
-              .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
-    }
-
-    if (replication == null) {
-      replication = getConf().get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
-    }
-
-    ReplicationConfig replicationConfig =
-        getConf().getObject(ReplicationConfigValidator.class).validate(
-            ReplicationConfig.fromTypeAndString(replicationType, replication));
+    ReplicationConfig replicationConfig = OzoneClientUtils
+        .validateAndGetClientReplicationConfig(replicationType, replication,
+            getConf());
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);

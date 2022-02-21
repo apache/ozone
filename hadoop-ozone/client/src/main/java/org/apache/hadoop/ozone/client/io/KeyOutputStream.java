@@ -150,7 +150,6 @@ public class KeyOutputStream extends OutputStream {
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId());
-
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -432,7 +431,7 @@ public class KeyOutputStream extends OutputStream {
 
   // Every container specific exception from datatnode will be seen as
   // StorageContainerException
-  private boolean checkIfContainerToExclude(Throwable t) {
+  boolean checkIfContainerToExclude(Throwable t) {
     return t instanceof StorageContainerException;
   }
 

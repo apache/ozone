@@ -122,8 +122,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",
             protocolMetrics,
             LOG,
-            ContainerUtils::processForDebug,
-            ContainerUtils::processForDebug);
+            HddsUtils::processForDebug,
+            HddsUtils::processForDebug);
   }
 
   @Override
@@ -409,6 +409,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         ContainerProtos.ContainerType.KeyValueContainer;
     createRequest.setContainerType(containerType);
 
+    if (containerRequest.hasWriteChunk()) {
+      createRequest.setReplicaIndex(
+          containerRequest.getWriteChunk().getBlockID().getReplicaIndex());
+    }
+
     ContainerCommandRequestProto.Builder requestBuilder =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.CreateContainer)
@@ -581,16 +586,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   private void audit(AuditAction action, EventType eventType,
-      Map<String, String> params, AuditEventStatus result, Throwable exception){
+      Map<String, String> params, AuditEventStatus result,
+      Throwable exception) {
     AuditMessage amsg;
     switch (result) {
     case SUCCESS:
-      if(isAllowed(action.getAction())) {
-        if(eventType == EventType.READ &&
+      if (isAllowed(action.getAction())) {
+        if (eventType == EventType.READ &&
             AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
           amsg = buildAuditMessageForSuccess(action, params);
           AUDIT.logReadSuccess(amsg);
-        } else if(eventType == EventType.WRITE &&
+        } else if (eventType == EventType.WRITE &&
             AUDIT.getLogger().isInfoEnabled(AuditMarker.WRITE.getMarker())) {
           amsg = buildAuditMessageForSuccess(action, params);
           AUDIT.logWriteSuccess(amsg);
@@ -599,11 +605,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       break;
 
     case FAILURE:
-      if(eventType == EventType.READ &&
+      if (eventType == EventType.READ &&
           AUDIT.getLogger().isErrorEnabled(AuditMarker.READ.getMarker())) {
         amsg = buildAuditMessageForFailure(action, params, exception);
         AUDIT.logReadFailure(amsg);
-      } else if(eventType == EventType.WRITE &&
+      } else if (eventType == EventType.WRITE &&
           AUDIT.getLogger().isErrorEnabled(AuditMarker.WRITE.getMarker())) {
         amsg = buildAuditMessageForFailure(action, params, exception);
         AUDIT.logWriteFailure(amsg);
@@ -656,7 +662,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    * @return true or false accordingly.
    */
   private boolean isAllowed(String action) {
-    switch(action) {
+    switch (action) {
     case "CLOSE_CONTAINER":
     case "CREATE_CONTAINER":
     case "LIST_CONTAINER":

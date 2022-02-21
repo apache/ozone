@@ -18,12 +18,10 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
@@ -38,17 +36,6 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
   @NotNull
   @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
-  }
-
-  @NotNull
-  @Override
   protected String getOpenKeyName() {
     Assert.assertNotNull(omBucketInfo);
     return omMetadataManager.getOpenFileName(
@@ -59,7 +46,7 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     Assert.assertNotNull(omBucketInfo);
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName,
             omBucketInfo.getBucketName(), keyName, replicationType,
             replicationFactor,
             omBucketInfo.getObjectID() + 1,

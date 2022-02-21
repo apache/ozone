@@ -139,7 +139,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    String omLayout = ozoneManager.getOMMetadataLayout();
     OmBucketInfo omBucketInfo = null;
     if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
         .equals(BucketLayoutProto.LEGACY)) {
@@ -337,13 +336,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
-    for(OmBucketInfo bucketInfo : bucketList) {
+    for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
       }
     }
-    if(volumeQuotaInBytes < totalBucketQuota
+    if (volumeQuotaInBytes < totalBucketQuota
         && volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
       throw new IllegalArgumentException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +

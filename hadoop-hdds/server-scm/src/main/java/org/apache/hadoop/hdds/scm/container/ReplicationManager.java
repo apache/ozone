@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 
 import com.google.protobuf.GeneratedMessage;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
@@ -255,6 +256,11 @@ public class ReplicationManager implements SCMService {
   private final MoveScheduler moveScheduler;
 
   /**
+   * Report object that is refreshed each time replication Manager runs.
+   */
+  private ReplicationManagerReport containerReport;
+
+  /**
    * Constructs ReplicationManager instance with the given configuration.
    *
    * @param conf OzoneConfiguration
@@ -286,6 +292,7 @@ public class ReplicationManager implements SCMService {
     this.inflightMoveFuture = new ConcurrentHashMap<>();
     this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
     this.clock = clock;
+    this.containerReport = new ReplicationManagerReport();
 
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -363,14 +370,27 @@ public class ReplicationManager implements SCMService {
    * This in intended to be used in tests.
    */
   public synchronized void processAll() {
+    if (!shouldRun()) {
+      LOG.info("Replication Manager is not ready to run until {}ms after " +
+          "safemode exit", waitTimeInMillis);
+      return;
+    }
     final long start = clock.millis();
     final List<ContainerInfo> containers =
         containerManager.getContainers();
-    containers.forEach(this::processContainer);
-
+    ReplicationManagerReport report = new ReplicationManagerReport();
+    for (ContainerInfo c : containers) {
+      processContainer(c, report);
+    }
+    report.setComplete();
+    containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
+  }
+
+  public ReplicationManagerReport getContainerReport() {
+    return containerReport;
   }
 
   /**
@@ -398,7 +418,9 @@ public class ReplicationManager implements SCMService {
    *
    * @param container ContainerInfo
    */
-  private void processContainer(ContainerInfo container) {
+  @SuppressWarnings("checkstyle:methodlength")
+  private void processContainer(ContainerInfo container,
+      ReplicationManagerReport report) {
     if (!shouldRun()) {
       return;
     }
@@ -410,6 +432,7 @@ public class ReplicationManager implements SCMService {
         final Set<ContainerReplica> replicas = containerManager
             .getContainerReplicas(id);
         final LifeCycleState state = container.getState();
+        report.increment(state);
 
         /*
          * We don't take any action if the container is in OPEN state and
@@ -418,6 +441,8 @@ public class ReplicationManager implements SCMService {
          */
         if (state == LifeCycleState.OPEN) {
           if (!isOpenContainerHealthy(container, replicas)) {
+            report.incrementAndSample(
+                HealthState.OPEN_UNHEALTHY, container.containerID());
             eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
           }
           return;
@@ -442,9 +467,20 @@ public class ReplicationManager implements SCMService {
          * If the container is in QUASI_CLOSED state, check and close the
          * container if possible.
          */
-        if (state == LifeCycleState.QUASI_CLOSED &&
-            canForceCloseContainer(container, replicas)) {
-          forceCloseContainer(container, replicas);
+        if (state == LifeCycleState.QUASI_CLOSED) {
+          if (canForceCloseContainer(container, replicas)) {
+            forceCloseContainer(container, replicas);
+            return;
+          } else {
+            report.incrementAndSample(HealthState.QUASI_CLOSED_STUCK,
+                container.containerID());
+          }
+        }
+
+        if (container.getReplicationType() == HddsProtos.ReplicationType.EC) {
+          // TODO We do not support replicating EC containers as yet, so at this
+          //      point, after handing the closing etc states, we just return.
+          //      EC Support will be added later.
           return;
         }
 
@@ -458,19 +494,14 @@ public class ReplicationManager implements SCMService {
         updateInflightAction(container, inflightReplication,
             action -> replicas.stream()
                 .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
-            ()-> metrics.incrNumReplicationCmdsTimeout(),
-            () -> {
-              metrics.incrNumReplicationCmdsCompleted();
-              metrics.incrNumReplicationBytesCompleted(
-                  container.getUsedBytes());
-            });
+            () -> metrics.incrNumReplicationCmdsTimeout(),
+            action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
             action -> replicas.stream()
-                .noneMatch(r ->
-                    r.getDatanodeDetails().equals(action.datanode)),
+                .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
             () -> metrics.incrNumDeletionCmdsTimeout(),
-            () -> metrics.incrNumDeletionCmdsCompleted());
+            action -> updateCompletedDeletionMetrics(container, action));
 
         /*
          * If container is under deleting and all it's replicas are deleted,
@@ -503,6 +534,8 @@ public class ReplicationManager implements SCMService {
          * exact number of replicas in the same state.
          */
         if (isContainerEmpty(container, replicas)) {
+          report.incrementAndSample(
+              HealthState.EMPTY, container.containerID());
           /*
            *  If container is empty, schedule task to delete the container.
            */
@@ -514,8 +547,22 @@ public class ReplicationManager implements SCMService {
          * Check if the container is under replicated and take appropriate
          * action.
          */
-        if (!replicaSet.isSufficientlyReplicated()
-            || !placementStatus.isPolicySatisfied()) {
+        boolean sufficientlyReplicated = replicaSet.isSufficientlyReplicated();
+        boolean placementSatisfied = placementStatus.isPolicySatisfied();
+        if (!sufficientlyReplicated || !placementSatisfied) {
+          if (!sufficientlyReplicated) {
+            report.incrementAndSample(
+                HealthState.UNDER_REPLICATED, container.containerID());
+            if (replicaSet.isMissing()) {
+              report.incrementAndSample(HealthState.MISSING,
+                  container.containerID());
+            }
+          }
+          if (!placementSatisfied) {
+            report.incrementAndSample(HealthState.MIS_REPLICATED,
+                container.containerID());
+
+          }
           handleUnderReplicatedContainer(container,
               replicaSet, placementStatus);
           return;
@@ -526,6 +573,8 @@ public class ReplicationManager implements SCMService {
          * action.
          */
         if (replicaSet.isOverReplicated()) {
+          report.incrementAndSample(HealthState.OVER_REPLICATED,
+              container.containerID());
           handleOverReplicatedContainer(container, replicaSet);
           return;
         }
@@ -536,6 +585,8 @@ public class ReplicationManager implements SCMService {
        are not in the same state as the container itself.
        */
         if (!replicaSet.isHealthy()) {
+          report.incrementAndSample(HealthState.UNHEALTHY,
+              container.containerID());
           handleUnstableContainer(container, replicas);
         }
       }
@@ -544,6 +595,20 @@ public class ReplicationManager implements SCMService {
     } catch (Exception ex) {
       LOG.warn("Process container {} error: ", id, ex);
     }
+  }
+
+  private void updateCompletedReplicationMetrics(ContainerInfo container,
+      InflightAction action) {
+    metrics.incrNumReplicationCmdsCompleted();
+    metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
+    metrics.addReplicationTime(clock.millis() - action.time);
+  }
+
+  private void updateCompletedDeletionMetrics(ContainerInfo container,
+      InflightAction action) {
+    metrics.incrNumDeletionCmdsCompleted();
+    metrics.incrNumDeletionBytesCompleted(container.getUsedBytes());
+    metrics.addDeletionTime(clock.millis() - action.time);
   }
 
   /**
@@ -559,14 +624,14 @@ public class ReplicationManager implements SCMService {
       final Map<ContainerID, List<InflightAction>> inflightActions,
       final Predicate<InflightAction> filter,
       final Runnable timeoutCounter,
-      final Runnable completedCounter) {
+      final Consumer<InflightAction> completedCounter) {
     final ContainerID id = container.containerID();
     final long deadline = clock.millis() - rmConf.getEventTimeout();
     if (inflightActions.containsKey(id)) {
       final List<InflightAction> actions = inflightActions.get(id);
 
       Iterator<InflightAction> iter = actions.iterator();
-      while(iter.hasNext()) {
+      while (iter.hasNext()) {
         try {
           InflightAction a = iter.next();
           NodeStatus status = nodeManager.getNodeStatus(a.datanode);
@@ -581,7 +646,7 @@ public class ReplicationManager implements SCMService {
             if (isTimeout) {
               timeoutCounter.run();
             } else if (isCompleted) {
-              completedCounter.run();
+              completedCounter.accept(a);
             }
 
             updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
@@ -861,7 +926,7 @@ public class ReplicationManager implements SCMService {
    */
   private boolean isPolicySatisfiedAfterMove(ContainerInfo cif,
                     DatanodeDetails srcDn, DatanodeDetails targetDn,
-                    final List<ContainerReplica> replicas){
+                    final List<ContainerReplica> replicas) {
     Set<ContainerReplica> movedReplicas =
         replicas.stream().collect(Collectors.toSet());
     movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
@@ -1099,7 +1164,7 @@ public class ReplicationManager implements SCMService {
 
       if (replicaSet.isSufficientlyReplicated()
           && placementStatus.isPolicySatisfied()) {
-        LOG.info("The container {} with replicas {} is sufficiently "+
+        LOG.info("The container {} with replicas {} is sufficiently " +
             "replicated and is not mis-replicated",
             container.getContainerID(), replicaSet);
         return;
@@ -1290,8 +1355,8 @@ public class ReplicationManager implements SCMService {
     ContainerReplicaCount replicaCount =
         getContainerReplicaCount(cif, replicaSet);
 
-    if(!replicaSet.stream()
-        .anyMatch(r -> r.getDatanodeDetails().equals(srcDn))){
+    if (!replicaSet.stream()
+        .anyMatch(r -> r.getDatanodeDetails().equals(srcDn))) {
       // if the target is present but source disappears somehow,
       // we can consider move is successful.
       compleleteMoveFutureWithResult(cid, MoveResult.COMPLETED);
@@ -1497,10 +1562,12 @@ public class ReplicationManager implements SCMService {
   }
 
   private String getContainerToken(ContainerID containerID) {
-    StorageContainerManager scm = scmContext.getScm();
-    return scm != null
-        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
-        : ""; // unit test
+    if (scmContext.getScm() instanceof StorageContainerManager) {
+      StorageContainerManager scm =
+              (StorageContainerManager) scmContext.getScm();
+      return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
+    }
+    return ""; // unit test
   }
 
   /**
@@ -1553,6 +1620,7 @@ public class ReplicationManager implements SCMService {
         action -> inflightDeletion.get(id).add(action));
 
     metrics.incrNumDeletionCmdsSent();
+    metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
   }
 
   /**
@@ -1593,7 +1661,7 @@ public class ReplicationManager implements SCMService {
     try {
       return nodeManager.getNodeStatus(dn);
     } catch (NodeNotFoundException e) {
-      throw new IllegalStateException("Unable to find NodeStatus for "+dn, e);
+      throw new IllegalStateException("Unable to find NodeStatus for " + dn, e);
     }
   }
 
@@ -1883,7 +1951,7 @@ public class ReplicationManager implements SCMService {
       try {
         cid = ContainerID.getFromProtobuf(contianerIDProto);
         mp = MoveDataNodePair.getFromProtobuf(mdnpp);
-        if(!inflightMove.containsKey(cid)) {
+        if (!inflightMove.containsKey(cid)) {
           transactionBuffer.addToBuffer(moveTable, cid, mp);
           inflightMove.putIfAbsent(cid, mp);
         }
@@ -1994,8 +2062,8 @@ public class ReplicationManager implements SCMService {
       boolean isTgtExist = replicas.stream()
           .anyMatch(r -> r.getDatanodeDetails().equals(v.getTgt()));
 
-      if(isSrcExist) {
-        if(isTgtExist) {
+      if (isSrcExist) {
+        if (isTgtExist) {
           //the former scm leader may or may not send the deletion command
           //before reelection.here, we just try to send the command again.
           deleteSrcDnForMove(cif, replicas);
@@ -2020,8 +2088,8 @@ public class ReplicationManager implements SCMService {
    * complete the CompletableFuture of the container in the given Map with
    * a given MoveResult.
    */
-  private void compleleteMoveFutureWithResult(ContainerID cid, MoveResult mr){
-    if(inflightMoveFuture.containsKey(cid)) {
+  private void compleleteMoveFutureWithResult(ContainerID cid, MoveResult mr) {
+    if (inflightMoveFuture.containsKey(cid)) {
       inflightMoveFuture.get(cid).complete(mr);
       inflightMoveFuture.remove(cid);
     }

@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -79,7 +80,7 @@ public class TestContainerManagerImpl {
 
   @After
   public void cleanup() throws Exception {
-    if(containerManager != null) {
+    if (containerManager != null) {
       containerManager.close();
     }
 
@@ -125,12 +126,12 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testGetContainers() throws Exception{
+  public void testGetContainers() throws Exception {
     Assert.assertTrue(
         containerManager.getContainers().isEmpty());
 
     ContainerID[] cidArray = new ContainerID[10];
-    for(int i = 0; i < 10; i++){
+    for (int i = 0; i < 10; i++) {
       ContainerInfo container = containerManager.allocateContainer(
           new RatisReplicationConfig(
               ReplicationFactor.THREE), "admin");
@@ -155,4 +156,13 @@ public class TestContainerManagerImpl {
     Assert.assertEquals(2, containerManager
         .getContainers(HddsProtos.LifeCycleState.CLOSING).size());
   }
+
+  @Test
+  public void testAllocateContainersWithECReplicationConfig() throws Exception {
+    final ContainerInfo admin = containerManager
+        .allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    Assert.assertEquals(1, containerManager.getContainers().size());
+    Assert.assertNotNull(containerManager.getContainer(admin.containerID()));
+  }
+
 }

@@ -23,7 +23,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -37,8 +38,8 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -48,6 +49,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -67,7 +69,7 @@ public abstract class TestInputStreamBase {
   private String bucketName;
   private String keyString;
 
-  private ChunkLayOutVersion chunkLayout;
+  private ContainerLayoutVersion containerLayout;
   private static final Random RAND = new Random();
 
   protected static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
@@ -81,11 +83,11 @@ public abstract class TestInputStreamBase {
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  public TestInputStreamBase(ChunkLayOutVersion layout) {
-    this.chunkLayout = layout;
+  public TestInputStreamBase(ContainerLayoutVersion layout) {
+    this.containerLayout = layout;
   }
 
   /**
@@ -105,7 +107,8 @@ public abstract class TestInputStreamBase {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 64,
         StorageUnit.MB);
-    conf.set(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY, chunkLayout.toString());
+    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
+        containerLayout.toString());
 
     ReplicationManagerConfiguration repConf =
         conf.getObject(ReplicationManagerConfiguration.class);
@@ -113,7 +116,7 @@ public abstract class TestInputStreamBase {
     conf.setFromObject(repConf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(4)
+        .setNumDatanodes(5)
         .setTotalPipelineNumLimit(5)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
@@ -168,8 +171,14 @@ public abstract class TestInputStreamBase {
   }
 
   byte[] writeKey(String keyName, int dataLength) throws Exception {
+    ReplicationConfig repConfig = new RatisReplicationConfig(THREE);
+    return writeKey(keyName, repConfig, dataLength);
+  }
+
+  byte[] writeKey(String keyName, ReplicationConfig repConfig, int dataLength)
+      throws Exception {
     OzoneOutputStream key = TestHelper.createKey(keyName,
-        ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
+        repConfig, 0, objectStore, volumeName, bucketName);
 
     byte[] inputData = ContainerTestHelper.getFixedLengthString(
         keyString, dataLength).getBytes(UTF_8);
@@ -181,8 +190,15 @@ public abstract class TestInputStreamBase {
 
   byte[] writeRandomBytes(String keyName, int dataLength)
       throws Exception {
+    ReplicationConfig repConfig = new RatisReplicationConfig(THREE);
+    return writeRandomBytes(keyName, repConfig, dataLength);
+  }
+
+  byte[] writeRandomBytes(String keyName, ReplicationConfig repConfig,
+      int dataLength)
+      throws Exception {
     OzoneOutputStream key = TestHelper.createKey(keyName,
-        ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
+        repConfig, 0, objectStore, volumeName, bucketName);
 
     byte[] inputData = new byte[dataLength];
     RAND.nextBytes(inputData);
@@ -197,7 +213,7 @@ public abstract class TestInputStreamBase {
     byte[] expectedData = new byte[readDataLen];
     System.arraycopy(inputData, (int) offset, expectedData, 0, readDataLen);
 
-    for (int i=0; i < readDataLen; i++) {
+    for (int i = 0; i < readDataLen; i++) {
       Assert.assertEquals("Read data at does not match the input data at " +
               "position " + (offset + i), expectedData[i], readData[i]);
     }

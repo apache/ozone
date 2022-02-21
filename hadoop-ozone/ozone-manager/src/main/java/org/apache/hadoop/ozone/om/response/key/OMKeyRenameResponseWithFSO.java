@@ -42,8 +42,8 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
 
   public OMKeyRenameResponseWithFSO(@Nonnull OMResponse omResponse,
       String fromKeyName, String toKeyName, @Nonnull OmKeyInfo renameKeyInfo,
-      boolean isRenameDirectory) {
-    super(omResponse, fromKeyName, toKeyName, renameKeyInfo);
+      boolean isRenameDirectory, BucketLayout bucketLayout) {
+    super(omResponse, fromKeyName, toKeyName, renameKeyInfo, bucketLayout);
     this.isRenameDirectory = isRenameDirectory;
   }
 
@@ -51,8 +51,9 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyRenameResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyRenameResponseWithFSO(@Nonnull OMResponse omResponse,
+                                    @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override

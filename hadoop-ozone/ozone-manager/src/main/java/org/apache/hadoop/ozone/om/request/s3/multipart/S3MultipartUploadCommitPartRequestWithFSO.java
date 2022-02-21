@@ -42,8 +42,9 @@ import java.util.Iterator;
 public class S3MultipartUploadCommitPartRequestWithFSO
         extends S3MultipartUploadCommitPartRequest {
 
-  public S3MultipartUploadCommitPartRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCommitPartRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -82,11 +83,6 @@ public class S3MultipartUploadCommitPartRequestWithFSO
 
     return new S3MultipartUploadCommitPartResponseWithFSO(build, multipartKey,
         openKey, multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-        ozoneManager.isRatisEnabled(), omBucketInfo);
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+        ozoneManager.isRatisEnabled(), omBucketInfo, getBucketLayout());
   }
 }

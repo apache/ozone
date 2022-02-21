@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hdds</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.3.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Project</description>
   <name>Apache Ozone HDDS</name>
   <packaging>pom</packaging>
@@ -45,6 +45,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>docs</module>
     <module>config</module>
     <module>test-utils</module>
+    <module>erasurecode</module>
   </modules>
 
   <repositories>

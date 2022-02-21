@@ -16,21 +16,26 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 /**
  * Data generator tool test om performance.
@@ -43,6 +48,8 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
+
+  @Spec private CommandSpec spec;
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -67,22 +74,35 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private int bufferSize;
 
   @Option(names = { "-F", "--factor" },
-      description = "Replication factor (ONE, THREE)",
+      description = "[Deprecated] Replication factor (ONE, THREE)",
       defaultValue = "THREE"
   )
   private ReplicationFactor factor = ReplicationFactor.THREE;
 
-  @Option(
-      names = "--om-service-id",
+  @Option(names = "--om-service-id",
       description = "OM Service ID"
   )
-  private String omServiceID = null;
+  private String omServiceID;
+
+  @Option(names = {"--replication"},
+      description =
+          "Replication configuration of the new key."
+              + "(ONE, THREE) for RATIS or STAND_ALONE, "
+              + "(rs-3-2-1024k, rs-6-3-1024k or rs-10-4-1024k) for EC."
+  )
+  private String replication;
+
+  @Option(names = {"--type"},
+      description = "Replication type of the new key. (RATIS, STAND_ALONE, EC)"
+  )
+  private ReplicationType replicationType;
 
   private Timer timer;
 
   private OzoneBucket bucket;
   private ContentGenerator contentGenerator;
   private Map<String, String> metadata;
+  private ReplicationConfig replicationConfig;
 
   @Override
   public Void call() throws Exception {
@@ -93,6 +113,15 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
+
+    if (spec.commandLine().getParseResult().hasMatchedOption("--factor")) {
+      replicationConfig = ReplicationConfig
+          .fromTypeAndFactor(ReplicationType.RATIS, factor);
+    } else {
+      replicationConfig = OzoneClientUtils
+          .validateAndGetClientReplicationConfig(replicationType, replication,
+              ozoneConfiguration);
+    }
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
@@ -111,10 +140,13 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OutputStream stream = bucket.createKey(key, keySize,
-              ReplicationType.RATIS, factor, metadata)) {
+      try (OzoneOutputStream stream = bucket.createKey(key, keySize,
+          replicationConfig, metadata)) {
         contentGenerator.write(stream);
-        stream.flush();
+        if (!(stream.getOutputStream() instanceof ECKeyOutputStream)) {
+          // ECKeyOutputStream#flush() is not implemented yet.
+          stream.flush();
+        }
       }
       return null;
     });

@@ -19,9 +19,11 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -60,13 +62,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileCreateRequestWithFSO.class);
-  public OMFileCreateRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
-  }
 
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  public OMFileCreateRequestWithFSO(OMRequest omRequest,
+                                    BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -144,9 +143,6 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
                 pathInfoFSO.getLeafNodeName());
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataManager, dbFileKey, keyName);
-        if (dbFileInfo != null) {
-          ozoneManager.getKeyManager().refresh(dbFileInfo);
-        }
       }
 
       // check if the file or directory already existed in OM
@@ -168,13 +164,18 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
+      final ReplicationConfig repConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo.getDefaultReplicationConfig(),
+              ozoneManager.getDefaultReplicationConfig());
 
       OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
               dbFileInfo, keyArgs.getDataSize(), locations,
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              ozoneManager.isRatisEnabled());
+              ozoneManager.isRatisEnabled(), repConfig);
 
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
       long clientID = createFileRequest.getClientID();
@@ -190,9 +191,9 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
-      long preAllocatedSpace = newLocationList.size()
-              * ozoneManager.getScmBlockSize()
-              * omFileInfo.getReplicationConfig().getRequiredNodes();
+      long preAllocatedSpace =
+          newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
+              .getRequiredNodes();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
@@ -233,7 +234,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseWithFSO(createErrorOMResponse(
-            omResponse, exception));
+            omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

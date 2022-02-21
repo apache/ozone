@@ -90,7 +90,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       defaultValue = "")
   private String datanodes;
 
-  private XceiverClientManager xceiverClientManager;
   private List<XceiverClientSpi> xceiverClients;
 
   private Timer timer;
@@ -104,8 +103,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
 
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
-    xceiverClientManager =
-        new XceiverClientManager(ozoneConf);
     if (OzoneSecurityUtil.isSecurityEnabled(ozoneConf)) {
       throw new IllegalArgumentException(
           "Datanode chunk generator is not supported in secure environment");
@@ -118,7 +115,9 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     Set<Pipeline> pipelines;
 
     try (StorageContainerLocationProtocol scmLocationClient =
-               createStorageContainerLocationClient(ozoneConf)) {
+               createStorageContainerLocationClient(ozoneConf);
+         XceiverClientManager xceiverClientManager =
+             new XceiverClientManager(ozoneConf)) {
       List<Pipeline> pipelinesFromSCM = scmLocationClient.listPipelines();
       Pipeline firstPipeline;
       init();
@@ -137,7 +136,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       } else {
         xceiverClients = new ArrayList<>();
         pipelines = new HashSet<>();
-        for(String pipelineId:pipelinesFromCmd){
+        for (String pipelineId:pipelinesFromCmd) {
           List<Pipeline> selectedPipelines =  pipelinesFromSCM.stream()
               .filter((p -> p.getId().toString()
                   .equals("PipelineID=" + pipelineId)
@@ -145,11 +144,11 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
                .collect(Collectors.toList());
           pipelines.addAll(selectedPipelines);
         }
-        for (Pipeline p:pipelines){
+        for (Pipeline p:pipelines) {
           LOG.info("Writing to pipeline: " + p.getId());
           xceiverClients.add(xceiverClientManager.acquireClient(p));
         }
-        if (pipelines.isEmpty()){
+        if (pipelines.isEmpty()) {
           throw new IllegalArgumentException(
               "Couldn't find the any/the selected pipeline");
         }
@@ -167,8 +166,8 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
   private boolean pipelineContainsDatanode(Pipeline p,
       List<String> datanodeHosts) {
-    for (DatanodeDetails dn:p.getNodes()){
-      if (datanodeHosts.contains(dn.getHostName())){
+    for (DatanodeDetails dn:p.getNodes()) {
+      if (datanodeHosts.contains(dn.getHostName())) {
         return true;
       }
     }
@@ -203,7 +202,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     DatanodeBlockID blockId = DatanodeBlockID.newBuilder()
         .setContainerID(1L)
         .setLocalID(stepNo % 20)
-        .setBlockCommitSequenceId(stepNo)
         .build();
 
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
@@ -221,7 +219,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
             .setData(dataToWrite);
 
     XceiverClientSpi clientSpi = xceiverClients.get(
-        (int) (stepNo%(xceiverClients.size())));
+        (int) (stepNo % (xceiverClients.size())));
     sendWriteChunkRequest(blockId, writeChunkRequest,
         clientSpi);
 

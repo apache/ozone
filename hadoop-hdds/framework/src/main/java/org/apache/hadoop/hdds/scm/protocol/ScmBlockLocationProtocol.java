@@ -65,7 +65,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
       ReplicationType type, ReplicationFactor factor, String owner,
       ExcludeList excludeList) throws IOException {
     return allocateBlock(size, numBlocks, ReplicationConfig
-        .fromTypeAndFactor(type, factor), owner, excludeList);
+        .fromProtoTypeAndFactor(type, factor), owner, excludeList);
   }
 
   /**

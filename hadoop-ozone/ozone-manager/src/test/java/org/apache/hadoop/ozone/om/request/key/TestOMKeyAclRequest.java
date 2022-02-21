@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
@@ -46,7 +46,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   @Test
   public void testKeyAddAclRequest() throws Exception {
     // Manually add volume, bucket and key to DB
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
@@ -60,7 +60,8 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
     // Create KeyAddAcl request
     OMRequest originalRequest = createAddAclkeyRequest(acl);
-    OMKeyAclRequest omKeyAddAclRequest = getOmKeyAddAclRequest(originalRequest);
+    OMKeyAclRequest omKeyAddAclRequest =
+        getOmKeyAddAclRequest(originalRequest);
     OMRequest preExecuteRequest = omKeyAddAclRequest.preExecute(ozoneManager);
 
     // When preExecute() of adding acl,
@@ -82,7 +83,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testKeyRemoveAclRequest() throws Exception {
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
@@ -146,7 +147,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testKeySetAclRequest() throws Exception {
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
@@ -247,7 +248,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   }
 
   protected String addKeyToTable() throws Exception {
-    TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
         keyName, clientID, replicationType, replicationFactor, 1L,
         omMetadataManager);
 
@@ -256,16 +257,15 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   }
 
   protected OMKeyAclRequest getOmKeyAddAclRequest(OMRequest originalRequest) {
-    return new OMKeyAddAclRequest(
-        originalRequest);
+    return new OMKeyAddAclRequest(originalRequest, ozoneManager);
   }
 
   protected OMKeyAclRequest getOmKeyRemoveAclRequest(
       OMRequest removeAclRequest) {
-    return new OMKeyRemoveAclRequest(removeAclRequest);
+    return new OMKeyRemoveAclRequest(removeAclRequest, ozoneManager);
   }
 
   protected OMKeyAclRequest getOmKeySetAclRequest(OMRequest setAclRequest) {
-    return new OMKeySetAclRequest(setAclRequest);
+    return new OMKeySetAclRequest(setAclRequest, ozoneManager);
   }
 }

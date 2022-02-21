@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
@@ -111,12 +110,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
+      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
-  public HddsDatanodeService(){}
+  public HddsDatanodeService() { }
 
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
@@ -244,12 +243,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
               DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
-              conf.get(DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY));
+              conf.get(
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
           UserGroupInformation.setConfiguration(conf);
 
           SecurityUtil
-              .login(conf, DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY,
+              .login(conf,
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
                   DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY,
                   hostname);
         } else {
@@ -374,7 +375,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));
       // Persist certificates.
-      if(response.hasX509CACertificate()) {
+      if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
@@ -451,16 +452,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DatanodeDetails initializeDatanodeDetails()
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     if (idFile.exists()) {
@@ -485,16 +476,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);

@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * Class defining Safe mode exit criteria for Containers.
  */
 public class ContainerSafeModeRule extends
-    SafeModeExitRule<NodeRegistrationContainerReport>{
+    SafeModeExitRule<NodeRegistrationContainerReport> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerSafeModeRule.class);
@@ -115,7 +115,7 @@ public class ContainerSafeModeRule extends
 
     reportsProto.getReport().getReportsList().forEach(c -> {
       if (containerMap.containsKey(c.getContainerID())) {
-        if(containerMap.remove(c.getContainerID()) != null) {
+        if (containerMap.remove(c.getContainerID()) != null) {
           containerWithMinReplicas.getAndAdd(1);
           getSafeModeMetrics()
               .incCurrentContainersWithOneReplicaReportedCount();

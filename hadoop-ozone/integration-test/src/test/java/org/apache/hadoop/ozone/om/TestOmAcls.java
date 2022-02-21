@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -132,7 +133,7 @@ public class TestOmAcls {
         () -> volume.createBucket(bucketName));
 
     assertTrue(logCapturer.getOutput()
-        .contains("doesn't have CREATE permission to access bucket"));
+        .contains("doesn't have READ permission to access volume"));
   }
 
   @Test
@@ -144,11 +145,10 @@ public class TestOmAcls {
     logCapturer.clearOutput();
 
     TestOmAcls.aclAllow = false;
-
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
-    assertTrue(logCapturer.getOutput().contains("doesn't have CREATE " +
-        "permission to access key"));
+    assertTrue(logCapturer.getOutput().contains("doesn't have READ " +
+        "permission to access volume"));
   }
 
   /**
@@ -158,6 +158,13 @@ public class TestOmAcls {
 
     @Override
     public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context) {
+      // Allow bucket read access. While creating key, we access bucket to
+      // inherit the replication config.
+      if (((OzoneObjInfo) ozoneObject).getResourceType().toString()
+          .equals("bucket") && "READ"
+          .equals(context.getAclRights().toString())) {
+        return true;
+      }
       return TestOmAcls.aclAllow;
     }
   }

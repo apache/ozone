@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -35,7 +34,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
  * Response for {@link OMKeyPurgeRequest} request.
  */
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE})
-public class OMKeyPurgeResponse extends OMClientResponse {
+public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,

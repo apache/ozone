@@ -211,6 +211,36 @@ class PipelineStateMap {
   }
 
   /**
+   * Get a count of pipelines with the given replicationConfig and state.
+   * This method is most efficient when getting a count for OPEN pipeline
+   * as the result can be obtained directly from the cached open list.
+   *
+   * @param replicationConfig - ReplicationConfig
+   * @param state             - Required PipelineState
+   * @return Count of pipelines with the specified replication config and state
+   */
+  int getPipelineCount(ReplicationConfig replicationConfig,
+      PipelineState state) {
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
+    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
+
+    if (state == PipelineState.OPEN) {
+      return query2OpenPipelines.getOrDefault(
+              replicationConfig, Collections.EMPTY_LIST).size();
+    }
+
+    int count = 0;
+    for (Pipeline pipeline : pipelineMap.values()) {
+      if (pipeline.getReplicationConfig().equals(replicationConfig)
+          && pipeline.getPipelineState() == state) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * Get list of pipeline corresponding to specified replication type,
    * replication factor and pipeline state.
    *

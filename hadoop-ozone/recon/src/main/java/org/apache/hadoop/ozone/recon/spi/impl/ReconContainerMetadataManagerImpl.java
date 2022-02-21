@@ -19,10 +19,10 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -119,7 +119,7 @@ public class ReconContainerMetadataManagerImpl
       this.containerKeyCountTable =
           CONTAINER_KEY_COUNT.getTable(containerDbStore);
       this.containerReplicaHistoryTable =
-          REPLICA_HISTORY.getTable(containerDbStore);
+          REPLICA_HISTORY_V2.getTable(containerDbStore);
     } catch (IOException e) {
       LOG.error("Unable to create Container Key tables.", e);
     }

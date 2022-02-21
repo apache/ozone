@@ -27,29 +27,13 @@ import java.util.Objects;
 /**
  * Replication configuration for EC replication.
  */
-public class RatisReplicationConfig
-    implements ReplicationConfig {
+public class RatisReplicationConfig implements ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
   private static final ReplicationType REPLICATION_TYPE = ReplicationType.RATIS;
 
   public RatisReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
-  }
-
-  public RatisReplicationConfig(String factorString) {
-    ReplicationFactor factor = null;
-    try {
-      factor = ReplicationFactor.valueOf(Integer.parseInt(factorString));
-    } catch (NumberFormatException ex) {
-      try {
-        factor = ReplicationFactor.valueOf(factorString);
-      } catch (IllegalArgumentException x) {
-        throw new IllegalArgumentException("Invalid RatisReplicationFactor '" +
-                factorString + "'. Please use ONE or THREE!");
-      }
-    }
-    this.replicationFactor = factor;
   }
 
   public static boolean hasFactor(ReplicationConfig replicationConfig,
@@ -72,8 +56,14 @@ public class RatisReplicationConfig
     return replicationFactor.getNumber();
   }
 
+  @Override
   public ReplicationFactor getReplicationFactor() {
     return replicationFactor;
+  }
+
+  @Override
+  public String getReplication() {
+    return String.valueOf(replicationFactor);
   }
 
   @Override
@@ -89,12 +79,12 @@ public class RatisReplicationConfig
   }
 
   @Override
-  public String toString() {
-    return REPLICATION_TYPE.name() + "/" + replicationFactor;
+  public int hashCode() {
+    return Objects.hash(replicationFactor);
   }
 
   @Override
-  public int hashCode() {
-    return Objects.hash(replicationFactor);
+  public String toString() {
+    return REPLICATION_TYPE.name() + "/" + replicationFactor;
   }
 }

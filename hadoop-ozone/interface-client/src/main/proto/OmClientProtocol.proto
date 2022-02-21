@@ -545,6 +545,8 @@ message BucketInfo {
     optional int64 quotaInNamespace = 16 [default = -2];
     optional uint64 usedNamespace = 17;
     optional BucketLayoutProto bucketLayout = 18;
+    optional string owner = 19;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
 }
 
 enum StorageTypeProto {
@@ -622,6 +624,8 @@ message BucketArgs {
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
     optional uint64 quotaInNamespace = 9;
+    optional string ownerName = 10;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
 }
 
 message PrefixInfo {
@@ -729,7 +733,7 @@ message SetBucketPropertyRequest {
 }
 
 message SetBucketPropertyResponse {
-
+    optional bool response = 1;
 }
 
 message DeleteBucketRequest {
@@ -758,8 +762,8 @@ message KeyArgs {
     required string bucketName = 2;
     required string keyName = 3;
     optional uint64 dataSize = 4;
-    optional hadoop.hdds.ReplicationType type = 5;
-    optional hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ReplicationType type = 5 [default = NONE];
+    optional hadoop.hdds.ReplicationFactor factor = 6 [default = ZERO];
     repeated KeyLocation keyLocations = 7;
     optional bool isMultipartKey = 8;
     optional string multipartUploadID = 9;
@@ -781,6 +785,7 @@ message KeyArgs {
 
     // When it is a head operation which is to check whether key exist
     optional bool headOp = 18;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
 }
 
 message KeyLocation {
@@ -814,7 +819,7 @@ message KeyInfo {
     required string keyName = 3;
     required uint64 dataSize = 4;
     required hadoop.hdds.ReplicationType type = 5;
-    required hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
     repeated KeyLocationList keyLocationList = 7;
     required uint64 creationTime = 8;
     required uint64 modificationTime = 9;
@@ -825,6 +830,7 @@ message KeyInfo {
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
     optional uint64 parentID = 16;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
 }
 
 message DirectoryInfo {
@@ -1097,6 +1103,7 @@ message ServiceListRequest {
 
 message DBUpdatesRequest {
     required uint64 sequenceNumber = 1;
+    optional uint64 limitCount = 2;
 }
 
 message ServiceListResponse {
@@ -1188,6 +1195,7 @@ message ServiceInfo {
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
+    optional string OMProtocolVersion = 5;
 }
 
 message MultipartInfoInitiateRequest {
@@ -1346,7 +1354,7 @@ message UpdateGetS3SecretRequest {
 }
 
 /**
-  This will be used by OM to authenicate S3 gateway requests on a per request basis.
+  This will be used by OM to authenticate S3 gateway requests on a per request basis.
 */
 message S3Authentication {
     optional string stringToSign = 1;

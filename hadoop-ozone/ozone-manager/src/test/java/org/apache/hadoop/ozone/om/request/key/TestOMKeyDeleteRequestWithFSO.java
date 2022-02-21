@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.apache.hadoop.util.Time;
@@ -43,7 +43,8 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
   @Override
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
       OMRequest modifiedOmRequest) {
-    return new OMKeyDeleteRequestWithFSO(modifiedOmRequest);
+    return new OMKeyDeleteRequestWithFSO(modifiedOmRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
@@ -59,17 +60,17 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     keyName = key; // updated key name
 
     // Create parent dirs for the path
-    long parentId = TestOMRequestUtils.addParentsToDirTable(volumeName,
+    long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName,
             bucketName, parentDir, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, key,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentId + 1,
                     parentId, 100, Time.now());
     omKeyInfo.setKeyName(fileName);
-    TestOMRequestUtils.addFileToKeyTable(false, false,
+    OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
     return omKeyInfo.getPath();
   }
@@ -77,7 +78,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
   @Test
   public void testOzonePrefixPathViewer() throws Exception {
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     String ozoneKey = addKeyToTable();
@@ -124,10 +125,10 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         pathName);
     Assert.assertTrue("Failed to list keyPaths", pathItr.hasNext());
     Assert.assertEquals(expectedPath, pathItr.next().getTrimmedName());
-    try{
+    try {
       pathItr.next();
       Assert.fail("Reached end of the list!");
-    } catch (NoSuchElementException nse){
+    } catch (NoSuchElementException nse) {
       // expected
     }
   }

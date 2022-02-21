@@ -44,7 +44,7 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
  *
  */
 @InterfaceAudience.Private
-@Metrics(about="Storage Container DataNode Metrics", context="dfs")
+@Metrics(about = "Storage Container DataNode Metrics", context = "dfs")
 public class ContainerMetrics {
   public static final String STORAGE_CONTAINER_METRICS =
       "StorageContainerMetrics";
@@ -106,7 +106,7 @@ public class ContainerMetrics {
     numOpsArray[type.ordinal()].incr();
   }
 
-  public long getContainerOpsMetrics(ContainerProtos.Type type){
+  public long getContainerOpsMetrics(ContainerProtos.Type type) {
     return numOpsArray[type.ordinal()].value();
   }
 
@@ -122,7 +122,7 @@ public class ContainerMetrics {
     opsBytesArray[type.ordinal()].incr(bytes);
   }
 
-  public long getContainerBytesMetrics(ContainerProtos.Type type){
+  public long getContainerBytesMetrics(ContainerProtos.Type type) {
     return opsBytesArray[type.ordinal()].value();
   }
 }

@@ -55,11 +55,20 @@ public class TestS3MultipartUploadAbortResponse
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponse =
-        createS3InitiateMPUResponse(volumeName, bucketName, keyName,
+        getS3InitiateMultipartUploadResponse(volumeName, bucketName, keyName,
             multipartUploadID);
 
     s3InitiateMultipartUploadResponse.addToDBBatch(omMetadataManager,
         batchOperation);
+
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    // Make sure key is present in OpenKeyTable and MPU table before Abort.
+    Assert.assertNotNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout())
+            .get(multipartOpenKey));
+    Assert.assertNotNull(
+        omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     S3MultipartUploadAbortResponse s3MultipartUploadAbortResponse =
         createS3AbortMPUResponse(multipartKey, multipartOpenKey,
@@ -71,6 +80,7 @@ public class TestS3MultipartUploadAbortResponse
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
+    // Key should be deleted from OpenKeyTable and MPU table after Abort.
     Assert.assertNull(
         omMetadataManager.getOpenKeyTable(getBucketLayout())
             .get(multipartOpenKey));
@@ -80,6 +90,14 @@ public class TestS3MultipartUploadAbortResponse
     // As no parts are created, so no entries should be there in delete table.
     Assert.assertTrue(omMetadataManager.countRowsInTable(
         omMetadataManager.getDeletedTable()) == 0);
+  }
+
+  protected S3InitiateMultipartUploadResponse
+        getS3InitiateMultipartUploadResponse(
+      String volumeName, String bucketName, String keyName,
+      String multipartUploadID) {
+    return createS3InitiateMPUResponse(volumeName, bucketName, keyName,
+        multipartUploadID);
   }
 
   @Test

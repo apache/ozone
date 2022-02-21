@@ -42,7 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
  *
  * The base implementation is handling Ratis-3 writes, with a single stream,
  * but there can be other implementations that are using a different way.
- * */
+ */
 public class BlockOutputStreamEntry extends OutputStream {
 
   private final OzoneClientConfig config;
@@ -248,7 +248,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   /**
    * Increases current position by one. Used in writes.
    */
-  void incCurrentPosition(){
+  void incCurrentPosition() {
     currentPosition++;
   }
 
@@ -276,11 +276,12 @@ public class BlockOutputStreamEntry extends OutputStream {
    * here.
    * @param id the last know ID of the block.
    */
-  void updateBlockID(BlockID id) {
+  @VisibleForTesting
+  protected void updateBlockID(BlockID id) {
     this.blockID = id;
   }
 
-  OzoneClientConfig getConf(){
+  OzoneClientConfig getConf() {
     return this.config;
   }
 
@@ -305,7 +306,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    * OMKeyLocationInfo.
    * @return
    */
-  Pipeline getPipelineForOMLocationReport(){
+  Pipeline getPipelineForOMLocationReport() {
     return getPipeline();
   }
 
@@ -352,12 +353,10 @@ public class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
-
     public Builder setLength(long len) {
       this.length = len;
       return this;
     }
-
 
     public Builder setBufferPool(BufferPool pool) {
       this.bufferPool = pool;

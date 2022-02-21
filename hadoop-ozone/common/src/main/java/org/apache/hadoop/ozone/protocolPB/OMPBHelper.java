@@ -21,6 +21,11 @@ import com.google.protobuf.ByteString;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -50,7 +55,7 @@ public final class OMPBHelper {
    * @return tokenProto
    */
   public static TokenProto convertToTokenProto(Token<?> tok) {
-    if(tok == null){
+    if (tok == null) {
       throw new IllegalArgumentException("Invalid argument: token is null");
     }
 
@@ -86,9 +91,9 @@ public final class OMPBHelper {
     }
 
     return new BucketEncryptionKeyInfo(
-        beInfo.hasCryptoProtocolVersion()?
+        beInfo.hasCryptoProtocolVersion() ?
             convert(beInfo.getCryptoProtocolVersion()) : null,
-        beInfo.hasSuite()? convert(beInfo.getSuite()) : null,
+        beInfo.hasSuite() ? convert(beInfo.getSuite()) : null,
         beInfo.getKeyName());
   }
 
@@ -106,7 +111,7 @@ public final class OMPBHelper {
     if (beInfo.getSuite() != null) {
       bb.setSuite(convert(beInfo.getSuite()));
     }
-    if (beInfo.getVersion()!= null) {
+    if (beInfo.getVersion() != null) {
       bb.setCryptoProtocolVersion(convert(beInfo.getVersion()));
     }
     return bb.build();
@@ -141,8 +146,57 @@ public final class OMPBHelper {
         ezKeyVersionName);
   }
 
+  public static DefaultReplicationConfig convert(
+      HddsProtos.DefaultReplicationConfig defaultReplicationConfig) {
+    if (defaultReplicationConfig == null) {
+      throw new IllegalArgumentException(
+          "Invalid argument: default replication config" + " is null");
+    }
+
+    final ReplicationType type =
+        ReplicationType.fromProto(defaultReplicationConfig.getType());
+    DefaultReplicationConfig defaultReplicationConfigObj = null;
+    switch (type) {
+    case EC:
+      defaultReplicationConfigObj = new DefaultReplicationConfig(type,
+          new ECReplicationConfig(
+              defaultReplicationConfig.getEcReplicationConfig()));
+      break;
+    default:
+      final ReplicationFactor factor =
+          ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
+      defaultReplicationConfigObj = new DefaultReplicationConfig(type, factor);
+    }
+    return defaultReplicationConfigObj;
+  }
+
+  public static HddsProtos.DefaultReplicationConfig convert(
+      DefaultReplicationConfig defaultReplicationConfig) {
+    if (defaultReplicationConfig == null) {
+      throw new IllegalArgumentException(
+          "Invalid argument: default replication config" + " is null");
+    }
+
+    final HddsProtos.DefaultReplicationConfig.Builder builder =
+        HddsProtos.DefaultReplicationConfig.newBuilder();
+    builder.setType(
+        ReplicationType.toProto(defaultReplicationConfig.getType()));
+
+    if (defaultReplicationConfig.getFactor() != null) {
+      builder.setFactor(ReplicationFactor
+          .toProto(defaultReplicationConfig.getFactor()));
+    }
+
+    if (defaultReplicationConfig.getEcReplicationConfig() != null) {
+      builder.setEcReplicationConfig(
+          defaultReplicationConfig.getEcReplicationConfig().toProto());
+    }
+
+    return builder.build();
+  }
+
   public static CipherSuite convert(CipherSuiteProto proto) {
-    switch(proto) {
+    switch (proto) {
     case AES_CTR_NOPADDING:
       return CipherSuite.AES_CTR_NOPADDING;
     default:
@@ -166,7 +220,7 @@ public final class OMPBHelper {
 
   public static CryptoProtocolVersionProto convert(
       CryptoProtocolVersion version) {
-    switch(version) {
+    switch (version) {
     case UNKNOWN:
       return OzoneManagerProtocolProtos.CryptoProtocolVersionProto
           .UNKNOWN_PROTOCOL_VERSION;
@@ -180,7 +234,7 @@ public final class OMPBHelper {
 
   public static CryptoProtocolVersion convert(
       CryptoProtocolVersionProto proto) {
-    switch(proto) {
+    switch (proto) {
     case ENCRYPTION_ZONES:
       return CryptoProtocolVersion.ENCRYPTION_ZONES;
     default:
