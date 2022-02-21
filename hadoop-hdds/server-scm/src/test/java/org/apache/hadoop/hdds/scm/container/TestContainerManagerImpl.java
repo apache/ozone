@@ -79,7 +79,7 @@ public class TestContainerManagerImpl {
 
   @After
   public void cleanup() throws Exception {
-    if(containerManager != null) {
+    if (containerManager != null) {
       containerManager.close();
     }
 
@@ -125,12 +125,12 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testGetContainers() throws Exception{
+  public void testGetContainers() throws Exception {
     Assert.assertTrue(
         containerManager.getContainers().isEmpty());
 
     ContainerID[] cidArray = new ContainerID[10];
-    for(int i = 0; i < 10; i++){
+    for (int i = 0; i < 10; i++) {
       ContainerInfo container = containerManager.allocateContainer(
           new RatisReplicationConfig(
               ReplicationFactor.THREE), "admin");
@@ -154,5 +154,19 @@ public class TestContainerManagerImpl {
         containerManager.getContainers(HddsProtos.LifeCycleState.OPEN).size());
     Assert.assertEquals(2, containerManager
         .getContainers(HddsProtos.LifeCycleState.CLOSING).size());
+    containerManager.updateContainerState(cidArray[1],
+        HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    containerManager.updateContainerState(cidArray[2],
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    containerManager.updateContainerState(cidArray[2],
+        HddsProtos.LifeCycleEvent.CLOSE);
+    Assert.assertEquals(7, containerManager.
+        getContainerStateCount(HddsProtos.LifeCycleState.OPEN));
+    Assert.assertEquals(1, containerManager
+        .getContainerStateCount(HddsProtos.LifeCycleState.CLOSING));
+    Assert.assertEquals(1, containerManager
+        .getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED));
+    Assert.assertEquals(1, containerManager
+        .getContainerStateCount(HddsProtos.LifeCycleState.CLOSED));
   }
 }

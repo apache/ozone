@@ -178,7 +178,7 @@ public class TestOzoneAtRestEncryption {
    */
   @AfterClass
   public static void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
@@ -251,7 +251,7 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try(OzoneInputStream is = bucket.readKey(keyName)) {
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
@@ -267,7 +267,7 @@ public class TestOzoneAtRestEncryption {
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
-      String bucketName) throws Exception{
+      String bucketName) throws Exception {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
@@ -333,7 +333,7 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try(OzoneInputStream is = bucket.readKey(keyName)) {
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
@@ -498,7 +498,7 @@ public class TestOzoneAtRestEncryption {
     // Read different data lengths and starting from different offsets and
     // verify the data matches.
     Random random = new Random();
-    int randomSize = random.nextInt(keySize/2);
+    int randomSize = random.nextInt(keySize / 2);
     int randomOffset = random.nextInt(keySize - randomSize);
 
     int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,

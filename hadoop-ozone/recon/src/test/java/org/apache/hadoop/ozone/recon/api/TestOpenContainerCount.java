@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -76,7 +78,9 @@ import javax.ws.rs.core.Response;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.util.*;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 /**
@@ -181,6 +185,8 @@ public class TestOpenContainerCount {
             .thenReturn(HttpServletResponse.SC_OK);
     when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
             anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+    when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
+        anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
 
     ReconTestInjector reconTestInjector =
             new ReconTestInjector.Builder(temporaryFolder)

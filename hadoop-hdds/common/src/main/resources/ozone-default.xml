@@ -399,6 +399,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.block.deleting.service.workers</name>
+    <value>10</value>
+    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <description>Number of workers executed of block deletion service. This
+      configuration should be set to greater than 0.
+    </description>
+  </property>
+  <property>
     <name>ozone.UnsafeByteOperations.enabled</name>
     <value>true</value>
     <tag>OZONE, PERFORMANCE, CLIENT</tag>
@@ -2567,6 +2575,24 @@
     <tag>OZONE, RECON, OM</tag>
     <description>
       Request to flush the OM DB before taking checkpoint snapshot.
+    </description>
+  </property>
+  <property>
+    <name>recon.om.delta.update.limit</name>
+    <value>2000</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Recon each time get a limited delta updates from OM.
+      The actual fetched data might be larger than this limit.
+    </description>
+  </property>
+  <property>
+    <name>recon.om.delta.update.loop.limit</name>
+    <value>10</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      The sync between Recon and OM consists of several small
+      fetch loops.
     </description>
   </property>
   <property>

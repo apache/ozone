@@ -92,7 +92,7 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
-  public void reinitialize(SCMMetadataStore metadataStore) {}
+  public void reinitialize(SCMMetadataStore metadataStore) { }
 
   @Override
   public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {

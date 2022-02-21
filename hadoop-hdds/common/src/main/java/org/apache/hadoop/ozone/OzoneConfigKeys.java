@@ -194,6 +194,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT
       = "300s"; // 300s for default
 
+  public static final String OZONE_BLOCK_DELETING_SERVICE_WORKERS =
+      "ozone.block.deleting.service.workers";
+  public static final int OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT
+      = 10;
+
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
   public static final int OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT

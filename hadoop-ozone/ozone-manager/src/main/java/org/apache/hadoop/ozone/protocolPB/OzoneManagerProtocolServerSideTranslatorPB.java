@@ -109,7 +109,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     }
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
-        metrics, LOG);
+        metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
   }
 
   /**

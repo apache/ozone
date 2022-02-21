@@ -97,10 +97,15 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getRandomPipelineReports;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.*;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -457,7 +462,7 @@ public class TestSCMNodeManager {
       // these pipelines use nodes outside of allowedDNs.
       if (success) {
         for (Pipeline pipeline: pipelines) {
-          for(DatanodeDetails pipelineDN: pipeline.getNodes()) {
+          for (DatanodeDetails pipelineDN: pipeline.getNodes()) {
             // Do not wait for this condition to be true. Disallowed DNs should
             // never be used once we have the expected number of pipelines.
             if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
@@ -1762,7 +1767,7 @@ public class TestSCMNodeManager {
     final int nodeCount = 6;
     SCMNodeManager nodeManager = createNodeManager(conf);
 
-    for (int i=0; i<nodeCount; i++) {
+    for (int i = 0; i < nodeCount; i++) {
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.randomDatanodeDetails();
       final long capacity = 2000;

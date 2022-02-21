@@ -40,7 +40,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.*;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,7 +158,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
       OzoneManager ozoneManager) {
     OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
-    if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()){
+    if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()) {
       OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =
           OzoneManagerProtocolProtos.UserInfo.newBuilder();
       UserGroupInformation user;
@@ -164,7 +167,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         user = UserGroupInformation.getCurrentUser();
         remoteAddress = ozoneManager.getOmRpcServerAddr()
             .getAddress();
-      } catch (Exception e){
+      } catch (Exception e) {
         LOG.debug("Couldn't get om Rpc server address", e);
         return getUserInfo();
       }
@@ -517,7 +520,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (path.length() == 0) {
       throw new OMException("Invalid KeyPath, empty keyName" + path,
           INVALID_KEY_NAME);
-    } else if(path.startsWith("/")) {
+    } else if (path.startsWith("/")) {
       isValid = false;
     } else {
       // Check for ".." "." ":" "/"

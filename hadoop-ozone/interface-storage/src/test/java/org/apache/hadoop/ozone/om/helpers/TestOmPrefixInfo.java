@@ -38,7 +38,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 public class TestOmPrefixInfo {
 
   private static OzoneManagerStorageProtos.OzoneAclInfo buildTestOzoneAclInfo(
-      String aclString){
+      String aclString) {
     OzoneAcl oacl = OzoneAcl.parseAcl(aclString);
     ByteString rights = ByteString.copyFrom(oacl.getAclBitSet().toByteArray());
     return OzoneManagerStorageProtos.OzoneAclInfo.newBuilder()
