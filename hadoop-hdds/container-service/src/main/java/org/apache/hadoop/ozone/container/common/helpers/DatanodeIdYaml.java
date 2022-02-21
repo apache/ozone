@@ -30,7 +30,6 @@ import java.util.UUID;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.hadoop.hdds.DatanodeVersions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.yaml.snakeyaml.DumperOptions;
@@ -106,12 +105,6 @@ public final class DatanodeIdYaml {
           .setCurrentVersion(datanodeDetailsYaml.getCurrentVersion());
 
       datanodeDetails = builder.build();
-    } catch (NullPointerException e) {
-      DatanodeDetails details = DatanodeDetails.newBuilder()
-          .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersions.CURRENT_VERSION);
-      details.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
-      return details;
     }
 
     return datanodeDetails;
