@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.junit.Assert.assertNotNull;
@@ -141,15 +142,27 @@ public final class OMMetadataManagerTestUtils {
 
   /**
    * Write a key to OM instance.
+   *
    * @throws IOException while writing.
    */
   public static void writeDataToOm(OMMetadataManager omMetadataManager,
-                               String key) throws IOException {
+                                   String key) throws IOException {
+    writeDataToOm(omMetadataManager, key, BucketLayout.DEFAULT);
+  }
+
+  /**
+   * Write a key to OM instance.
+   *
+   * @throws IOException while writing.
+   */
+  public static void writeDataToOm(OMMetadataManager omMetadataManager,
+                                   String key, BucketLayout bucketLayout)
+      throws IOException {
 
     String omKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", key);
 
-    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
@@ -160,20 +173,39 @@ public final class OMMetadataManagerTestUtils {
 
   /**
    * Write a key to OM instance.
+   *
    * @throws IOException while writing.
    */
-  public static  void writeDataToOm(OMMetadataManager omMetadataManager,
-                               String key,
-                               String bucket,
-                               String volume,
-                               List<OmKeyLocationInfoGroup>
-                                   omKeyLocationInfoGroupList)
+  public static void writeDataToOm(OMMetadataManager omMetadataManager,
+                                   String key,
+                                   String bucket,
+                                   String volume,
+                                   List<OmKeyLocationInfoGroup>
+                                       omKeyLocationInfoGroupList)
+      throws IOException {
+
+    writeDataToOm(omMetadataManager, key, bucket, volume,
+        omKeyLocationInfoGroupList, BucketLayout.DEFAULT);
+  }
+
+  /**
+   * Write a key to OM instance.
+   *
+   * @throws IOException while writing.
+   */
+  public static void writeDataToOm(OMMetadataManager omMetadataManager,
+                                   String key,
+                                   String bucket,
+                                   String volume,
+                                   List<OmKeyLocationInfoGroup>
+                                       omKeyLocationInfoGroupList,
+                                   BucketLayout bucketLayout)
       throws IOException {
 
     String omKey = omMetadataManager.getOzoneKey(volume,
         bucket, key);
 
-    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucket)
             .setVolumeName(volume)
@@ -250,15 +282,22 @@ public final class OMMetadataManagerTestUtils {
 
   public static OzoneManagerServiceProviderImpl
       getMockOzoneManagerServiceProvider() throws IOException {
+    return getMockOzoneManagerServiceProvider(BucketLayout.OBJECT_STORE);
+  }
+
+  public static OzoneManagerServiceProviderImpl
+      getMockOzoneManagerServiceProvider(BucketLayout bucketLayout)
+      throws IOException {
     OzoneManagerServiceProviderImpl omServiceProviderMock =
-            mock(OzoneManagerServiceProviderImpl.class);
+        mock(OzoneManagerServiceProviderImpl.class);
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table tableMock = mock(Table.class);
-    when(tableMock.getName()).thenReturn("keyTable");
-    when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
+    when(tableMock.getName()).thenReturn(
+        bucketLayout.isFileSystemOptimized() ? FILE_TABLE : KEY_TABLE);
+    when(omMetadataManagerMock.getKeyTable(bucketLayout))
         .thenReturn(tableMock);
     when(omServiceProviderMock.getOMMetadataManagerInstance())
-            .thenReturn(omMetadataManagerMock);
+        .thenReturn(omMetadataManagerMock);
     return omServiceProviderMock;
   }
 
@@ -318,9 +357,5 @@ public final class OMMetadataManagerTestUtils {
         .setBlockID(blockID)
         .setPipeline(pipeline)
         .build();
-  }
-
-  public static BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 }

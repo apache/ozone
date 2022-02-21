@@ -28,6 +28,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,10 +52,13 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Unit test for Container Key mapper task.
  */
+@RunWith(Parameterized.class)
 public class TestContainerKeyMapperTask {
 
   @Rule
@@ -64,12 +68,24 @@ public class TestContainerKeyMapperTask {
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
+  private final BucketLayout bucketLayout;
+
+  public TestContainerKeyMapperTask(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  @Parameterized.Parameters
+  public static List<BucketLayout> parameters() {
+    return Arrays.asList(BucketLayout.OBJECT_STORE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
 
   @Before
   public void setUp() throws Exception {
     omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.newFolder());
-    ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
+    ozoneManagerServiceProvider =
+        getMockOzoneManagerServiceProvider(getBucketLayout());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.newFolder());
 
@@ -116,7 +132,7 @@ public class TestContainerKeyMapperTask {
         "key_one",
         "bucketOne",
         "sampleVol",
-        Collections.singletonList(omKeyLocationInfoGroup));
+        Collections.singletonList(omKeyLocationInfoGroup), getBucketLayout());
 
     ContainerKeyMapperTask containerKeyMapperTask =
         new ContainerKeyMapperTask(reconContainerMetadataManager);
@@ -283,6 +299,6 @@ public class TestContainerKeyMapperTask {
   }
 
   private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+    return bucketLayout;
   }
 }

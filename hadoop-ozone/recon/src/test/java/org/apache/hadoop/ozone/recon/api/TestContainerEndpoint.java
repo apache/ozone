@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -194,7 +196,7 @@ public class TestContainerEndpoint {
     //key = key_one, Blocks = [ {CID = 1, LID = 101}, {CID = 2, LID = 102} ]
     writeDataToOm(reconOMMetadataManager,
         "key_one", "bucketOne", "sampleVol",
-        Collections.singletonList(omKeyLocationInfoGroup));
+        Collections.singletonList(omKeyLocationInfoGroup), bucketLayout);
 
     List<OmKeyLocationInfoGroup> infoGroups = new ArrayList<>();
     BlockID blockID3 = new BlockID(1, 103);
@@ -242,8 +244,8 @@ public class TestContainerEndpoint {
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table tableMock = mock(Table.class);
     String tableName =
-        this.bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED ? "fileTable" :
-            "keyTable";
+        this.bucketLayout.isFileSystemOptimized() ? FILE_TABLE :
+            KEY_TABLE;
     when(tableMock.getName()).thenReturn(tableName);
     when(omMetadataManagerMock.getKeyTable(this.bucketLayout))
         .thenReturn(tableMock);
