@@ -263,7 +263,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     boolean isRatisStreamingEnabled = getConf().getBoolean(
         OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLE,
         OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLE_DEFAULT);
-    if (isRatisStreamingEnabled){
+    if (isRatisStreamingEnabled) {
       return new FSDataOutputStream(adapter.createStreamFile(key,
           replication, overwrite, recursive), statistics);
     }
