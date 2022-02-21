@@ -283,7 +283,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private void writeChunkIfNeeded() throws IOException {
-    if (currentBuffer.length()==0) {
+    if (currentBuffer.length() == 0) {
       writeChunk(currentBuffer);
       currentBuffer = null;
     }
@@ -302,7 +302,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private void allocateNewBufferIfNeeded() {
-    if (currentBuffer==null) {
+    if (currentBuffer == null) {
       currentBuffer =
           StreamBuffer.allocate(config.getDataStreamMinPacketSize());
     }
@@ -323,7 +323,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       updateFlushLength();
       executePutBlock(false, false);
     }
-    if (bufferList.size()==streamWindow){
+    if (bufferList.size() == streamWindow) {
       try {
         checkOpen();
         if (!putBlockFutures.isEmpty()) {
@@ -514,7 +514,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
 
-      if (currentBuffer!=null) {
+      if (currentBuffer != null) {
         writeChunk(currentBuffer);
         currentBuffer = null;
       }
@@ -693,7 +693,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       boolean processExecutionException)
       throws IOException {
     LOG.error("Command execution was interrupted.");
-    if(processExecutionException) {
+    if (processExecutionException) {
       handleExecutionException(ex);
     } else {
       throw new IOException(EXCEPTION_MSG + ex.toString(), ex);
