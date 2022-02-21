@@ -107,7 +107,7 @@ public class TestBlockDataStreamOutput {
         .setDataStreamBufferFlushize(maxFlushSize)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setDataStreamMinPacketSize(chunkSize)
-        .setDataStreamStreamWindowSize(5*chunkSize)
+        .setDataStreamStreamWindowSize(5 * chunkSize)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -137,7 +137,7 @@ public class TestBlockDataStreamOutput {
   @Test
   public void testHalfChunkWrite() throws Exception {
     testWrite(chunkSize / 2);
-    testWriteWithFailure(chunkSize/2);
+    testWriteWithFailure(chunkSize / 2);
   }
 
   @Test
