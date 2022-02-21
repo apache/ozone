@@ -646,7 +646,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         dataStreamBufferFlushSize = Optional.of((long) 4 * chunkSize.get());
       }
       if (!dataStreamMinPacketSize.isPresent()) {
-        dataStreamMinPacketSize = OptionalInt.of(chunkSize.get()/4);
+        dataStreamMinPacketSize = OptionalInt.of(chunkSize.get() / 4);
       }
       if (!datastreamWindowSize.isPresent()) {
         datastreamWindowSize = Optional.of((long) 8 * chunkSize.get());
