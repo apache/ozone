@@ -28,8 +28,8 @@ import java.util.Objects;
  */
 public class EpochEntry<CACHEKEY> implements Comparable<CACHEKEY> {
 
-  private long epoch;
-  private CACHEKEY cachekey;
+  private final long epoch;
+  private final CACHEKEY cachekey;
 
   EpochEntry(long epoch, CACHEKEY cachekey) {
     this.epoch = epoch;
@@ -64,6 +64,9 @@ public class EpochEntry<CACHEKEY> implements Comparable<CACHEKEY> {
   @Override
   public int compareTo(Object o) {
     if (this.epoch == ((EpochEntry<?>)o).epoch) {
+      if (this.cachekey != ((EpochEntry<?>)o).cachekey) {
+        return -1;
+      }
       return 0;
     } else if (this.epoch < ((EpochEntry<?>)o).epoch) {
       return -1;
