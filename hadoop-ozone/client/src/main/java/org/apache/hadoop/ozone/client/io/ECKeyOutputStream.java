@@ -560,10 +560,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
     ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
     int maxSize = 0;
     for (int i = 0; i < numDataBlks; i++) {
-      if (parityCellSize > buffers[i].position())
+      if (parityCellSize > buffers[i].position()) {
         maxSize = Math.max(maxSize, parityCellSize);
-      else
+      }
+      else {
         maxSize = Math.max(maxSize, buffers[i].position());
+      }
     }
     for (int i = 0; i < numDataBlks; i++) {
       padBufferToLimit(buffers[i], maxSize);
