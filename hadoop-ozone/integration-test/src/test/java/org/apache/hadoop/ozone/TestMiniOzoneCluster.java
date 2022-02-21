@@ -182,15 +182,6 @@ public class TestMiniOzoneCluster {
     assertWriteRead(id1);
   }
 
-  @Test
-  public void testDatanodeEmptyIdFile() throws Exception {
-    // empty datanode id file
-    File file = new File(WRITE_TMP,"test.id");
-    file.createNewFile();
-    ContainerUtils.readDatanodeDetailsFrom(file);
-    file.delete();
-  }
-
   private static void assertWriteRead(DatanodeDetails details)
       throws IOException {
     // Write a single ID to the file and read it out
