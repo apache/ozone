@@ -184,7 +184,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       pos = handleDataWrite(currentStreamIdx, b, off, ecChunkSize, true);
       off += ecChunkSize;
       iters--;
-      checkAndWriteParityCells(pos, iters > 0 || remLen > 0);
+      checkAndWriteParityCells(pos, iters > 0 || lastCellSize > 0);
     }
 
     if (lastCellSize > 0) {
