@@ -1239,7 +1239,7 @@ public class RpcClient implements ClientProtocol {
         .setAcls(getAclList());
 
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
-      try{
+      try {
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
         builder.addAllMetadata(gKey.getKeyDetails());
       } catch (Exception e) {
