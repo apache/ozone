@@ -225,23 +225,25 @@ public final class ECStreamTestUtil {
 
     private Pipeline currentPipeline;
 
-    public List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
+    public synchronized
+        List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
       return blockStreams;
     }
 
-    public void setBlockStreamData(List<ByteBuffer> bufs) {
+    public synchronized void setBlockStreamData(List<ByteBuffer> bufs) {
       this.blockStreamData = bufs;
     }
 
-    public void setCurrentPipeline(Pipeline pipeline) {
+    public synchronized void setCurrentPipeline(Pipeline pipeline) {
       this.currentPipeline = pipeline;
     }
 
-    public void setFailIndexes(List<Integer> fail) {
+    public synchronized void setFailIndexes(List<Integer> fail) {
       failIndexes.addAll(fail);
     }
 
-    public BlockExtendedInputStream create(ReplicationConfig repConfig,
+    public synchronized BlockExtendedInputStream create(
+        ReplicationConfig repConfig,
         OmKeyLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
         XceiverClientFactory xceiverFactory,
