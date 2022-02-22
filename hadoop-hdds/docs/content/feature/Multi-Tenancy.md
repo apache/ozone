@@ -27,7 +27,7 @@ Before Ozone multi-tenancy, all S3 access to Ozone (via [S3 Gateway]({{< ref "in
 confined to a **single** designated S3 volume (that is volume `s3v`, by default).
 
 Ozone multi-tenancy allows **multiple** S3-accessible volumes to be created.
-Each volume can be managed separately by their own tenant admins via CLI for user operations, and via Ranger for access control.
+Each volume can be managed separately by their own tenant admins via CLI for user operations, and via Apache Ranger for access control.
 
 The concept **tenant** is introduced to Ozone by multi-tenancy.
 Each tenant has its own designated volume.
@@ -61,10 +61,14 @@ By default, a group of Ranger policies are created when a tenant is created on t
    - Note: For Ozone admins, there typically are independent Ranger policies that grants them full access to the cluster, so they should be able to access the buckets as well. But it is still possible to create new policies to explicitly deny them access to buckets. 
 
 
-## Quick Start / Usage
+## Setup
+
+See [Multi-Tenancy Setup]({{< ref "Multi-Tenancy-Setup.md" >}}) page.
+
+## Usage
 
 See [Tenant Subcommands]({{< ref "interface/Tenant.md" >}}) page.
 
 ## References
 
- * For developers, check out the upstream jira [HDDS-4944](https://issues.apache.org/jira/browse/HDDS-4944) and the attached design docs.
+ * For developers: check out the upstream jira [HDDS-4944](https://issues.apache.org/jira/browse/HDDS-4944) and the attached design docs.

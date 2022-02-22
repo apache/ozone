@@ -1,5 +1,5 @@
 ---
-title: "Tenant Subcommands"
+title: "Multi-Tenant commands"
 weight: 1
 menu:
    main:
@@ -23,59 +23,19 @@ summary: Ozone subcommands for tenant management
   limitations under the License.
 -->
 
-For a higher level understanding of multi-tenancy architecture,
-see [Multi-Tenancy feature]({{< ref "feature/Multi-Tenancy.md" >}}).
+For a higher level understanding of multi-tenancy architecture, see [Multi-Tenancy feature]({{< ref "feature/Multi-Tenancy.md" >}}).
 
 All Multi-Tenancy subcommands are located under CLI `ozone tenant`.
 
-The commands below assume a Kerberized Ozone cluster with Ranger install.
-Enabling HTTPS on S3 Gateway is optional but recommended.
+The commands below assume a Kerberized Ozone cluster with Ranger install. Enabling HTTPS on S3 Gateway is optional but recommended.
 
 ## Quick Start
 
-### Try it out in a Docker Compose cluster
+### Setup
 
-One is encouraged to try out the CLI commands inside the `./compose/ozonesecure/docker-compose.yaml` cluster environment that ships with Ozone.
+Follow the [Multi-Tenancy Setup]({{< ref "feature/Multi-Tenancy-Setup.md" >}}) guide if you haven't done so.
 
-The Docker Compose cluster has Kerberos and security pre-configured.
-But note it differs from an actual production cluster that Ranger has been replaced with a mock server. And OzoneManager does **not** use Ranger for ACL.
-
-Because the mock server does not mock all Ranger endpoints, some operations that works for a real Ranger deployment will not work by default. e.g. assigning users to a tenant other than `tenantone`.
-But one can add new custom endpoints in `./compose/ozonesecure/mockserverInitialization.json` as needed.
-
-To launch the Docker Compose cluster locally, from Ozone distribution root:
-
-```shell
-cd compose/ozonesecure
-docker-compose up -d --scale datanode=3
-docker-compose exec scm bash
-```
-
-It might be necessary to run the following command first before testing the tenant commands in the `compose/ozonesecure` Docker environment
-in order to workaround a Docker-specific DNS issue when first contacting Ranger.
-
-```shell
-bash-4.2$ curl -k https://ranger:6182/
-{}
-```
-
-Then all subsequent requests to Ranger (mock server) should work as expected.
-
-Otherwise you might see such DNS error:
-
-```shell
-bash-4.2$ ozone tenant create tenantone
-2022-02-16 00:00:00,000 [main] INFO rpc.RpcClient: Creating Tenant: 'tenantone', with new volume: 'tenantone'
-INTERNAL_ERROR No subject alternative DNS name matching ranger found.
-```
-
-
-Operations requiring Ozone cluster administrator privilege are run as `om/om` user:
-
-```shell
-kinit -kt /etc/security/keytabs/om.keytab om/om@EXAMPLE.COM
-```
-
+If the OzoneManagers are running in HA, append `--om-service-id=` accordingly to the commands.
 
 ### Create a tenant
 
@@ -83,8 +43,6 @@ Create a new tenant in the current Ozone cluster.
 This operation requires Ozone cluster administrator privilege.
 
 Creating a tenant creates a volume of the exact same name. Volume name restrictions apply.
-
-If the OzoneManagers are running in HA, append `--om-service-id=` accordingly to the commands.
 
 ```shell
 ozone tenant create <TENANT_NAME>
@@ -120,11 +78,9 @@ tenantone
 
 The first user in a tenant must be assigned by an Ozone cluster administrator.
 
-By default when user `testuser` is assigned to tenant `tenantone`, the generated
-Access ID for the user in this tenant is `tenantone$testuser`.
+By default when user `testuser` is assigned to tenant `tenantone`, the generated Access ID for the user in this tenant is `tenantone$testuser`.
 
-- Be sure to enclose the Access ID in single quotes in Bash when using it so it
-doesn't get auto-translated into environment variables.
+- Be sure to enclose the Access ID in single quotes in Bash when using it so it doesn't get auto-translated into environment variables.
 
 It is possible to assign a user to multiple tenants.
 
@@ -148,9 +104,8 @@ The first user in a tenant must be assigned by an Ozone cluster administrator.
 
 Both delegated and non-delegated tenant admin can assign and revoke **regular** tenant users.
 
-The only difference between delegated tenant admin and non-delegated tenant admin is that
-delegated tenant admin can assign and revoke tenant **admins** in the tenant, while
-non-delegated tenant admin can't.
+The only difference between delegated tenant admin and non-delegated tenant admin is that delegated tenant admin can assign and revoke tenant **admins** in the tenant,
+while non-delegated tenant admin can't.
 
 Unless specified, `ozone tenant assignadmin` assigns **delegated** tenant admins by default.
 
@@ -191,7 +146,9 @@ bash-4.2$ ozone tenant user list --tenant=tenantone
 ```
 
 
-### List tenants a user is assigned to
+### Get tenant user info
+
+This command lists all tenants a user is assigned to.
 
 ```shell
 ozone tenant user info <USER_NAME>
@@ -206,7 +163,9 @@ User 'testuser' is assigned to:
 ```
 
 
-### Example of accessing a bucket in a tenant volume via S3 Gateway
+### Bonus: Accessing a bucket in a tenant volume via S3 Gateway using S3 API
+
+- {{< detail-tag "Click here to expand/collapse" >}}
 
 #### Configure AWS CLI
 
@@ -240,7 +199,6 @@ bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-buckets
 }
 ```
 
-
 #### Put object (key) to a bucket, list objects
 
 ```shell
@@ -259,7 +217,6 @@ bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-objects --bucket bucket-
 }
 ```
 
-
 #### Get object (key) from a bucket
 
 ```shell
@@ -275,6 +232,8 @@ bash-4.2$ aws s3api --endpoint-url http://s3g:9878 get-object --bucket bucket-te
 }
 bash-4.2$ diff file1-get.txt README.md
 ```
+
+{{< /detail-tag >}}
 
 
 ### Revoke a tenant admin
@@ -310,8 +269,7 @@ Revoked accessId 'tenantone$testuser'.
 In order to be able to delete a tenant, the tenant has to be empty. i.e. All users need to be revoked before a tenant can be deleted.
 Otherwise OM will throw `TENANT_NOT_EMPTY` exception and refuse to delete the tenant.
 
-Note that it is intentional by design that the volume created and associated
-with the tenant during tenant creation is not removed.
+Note that it is intentional by design that the volume created and associated with the tenant during tenant creation is not removed.
 An admin has to remove the volume manually as prompt in the CLI, if deemed necessary.
 
 ```shell
@@ -327,3 +285,10 @@ But the associated volume 'tenantone' is not removed. To delete it, run
     ozone sh volume delete tenantone
 ```
 
+If an Ozone cluster admin (or whoever has the permission to delete the volume in Ranger) tries delete a volume before the tenant is deleted using the command above,
+the `ozone sh volume delete` command would fail because the volume reference count is not zero:
+
+```shell
+bash-4.2$ ozone sh volume delete tenantone
+VOLUME_IS_REFERENCED Volume reference count is not zero (1). Ozone features are enabled on this volume. Try `ozone tenant delete <tenantId>` first.
+```
