@@ -90,7 +90,7 @@ public class TarContainerPacker
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
           extractEntry(entry, archiveInput, size, chunksRoot,
-             destinationPath);
+              destinationPath);
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
