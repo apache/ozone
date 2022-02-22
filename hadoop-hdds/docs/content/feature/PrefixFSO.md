@@ -33,19 +33,19 @@ to `FILE_SYSTEM_OPTIMIZED` at the time of bucket creation.
 ozone sh bucket create /<volume-name>/<bucket-name> --layout FILE_SYSTEM_OPTIMIZED
 ```
 
-Note: File System Optimization favors Hadoop Compatible File System over S3 compatibility. Some irregular S3 key names
-may be rejected or normalized.
+Note: File System Optimization favors Hadoop Compatible File System instead of S3 compatibility. Some irregular S3 key
+names may be rejected or normalized.
 
 This feature is strongly recommended to be turned ON for Ozone buckets mainly used via Hadoop compatible interfaces,
 especially with high number of files in deep directory hierarchy.
 
 ## OzoneManager Metadata layout format
-OzoneManager supports two metadata bucket layout formats - Object Store and File System Optimized.
+OzoneManager supports two metadata bucket layout formats - Object Store (OBS) and File System Optimized (FSO).
 
-Object Store (also called LEGACY for older versions) is the existing OM metadata format, which stores key entry with
-full path name. In File System Optimized buckets, OM metadata format stores intermediate directories
-into `DirectoryTable` and files into `FileTable` as shown in the below picture. The key to the table is the name of a
-directory or a file prefixed by the unique identifier of its parent directory, `<parent unique-id>/<filename>`.
+Object Store (OBS) is the existing OM metadata format, which stores key entry with full path name. In File System
+Optimized (FSO) buckets, OM metadata format stores intermediate directories into `DirectoryTable` and files
+into `FileTable` as shown in the below picture. The key to the table is the name of a directory or a file prefixed by
+the unique identifier of its parent directory, `<parent unique-id>/<filename>`.
 
 {{< image src="PrefixFSO-Format.png">}}
 
