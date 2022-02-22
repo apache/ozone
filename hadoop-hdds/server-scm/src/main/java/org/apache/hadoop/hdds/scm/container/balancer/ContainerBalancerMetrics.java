@@ -45,14 +45,14 @@ public final class ContainerBalancerMetrics {
   private MutableCounterLong movedContainersNumInLatestIteration;
 
   @Metric(about = "Number of iterations that Container Balancer has run for.")
-  private MutableCounterLong countIterations;
+  private MutableCounterLong numIterations;
 
   @Metric(about = "Number of datanodes that were involved in balancing in the" +
       " latest iteration.")
   private MutableCounterLong datanodesNumInvolvedInLatestIteration;
 
   @Metric(about = "Amount of data in Gigabytes that is causing unbalance.")
-  private MutableCounterLong dataSizeCausingUnbalanceGB;
+  private MutableCounterLong dataSizeUnbalancedGB;
 
   @Metric(about = "Number of unbalanced datanodes.")
   private MutableCounterLong datanodesNumUnbalanced;
@@ -113,12 +113,12 @@ public final class ContainerBalancerMetrics {
    * Gets the number of iterations that Container Balancer has run for.
    * @return number of iterations
    */
-  public long getCountIterations() {
-    return countIterations.value();
+  public long getNumIterations() {
+    return numIterations.value();
   }
 
-  public void incrementCountIterations(long valueToAdd) {
-    countIterations.incr(valueToAdd);
+  public void incrementNumIterations(long valueToAdd) {
+    numIterations.incr(valueToAdd);
   }
 
   /**
@@ -143,16 +143,16 @@ public final class ContainerBalancerMetrics {
    * Gets the amount of data in Gigabytes that is causing unbalance.
    * @return size of data as a long value
    */
-  public long getDataSizeCausingUnbalanceGB() {
-    return dataSizeCausingUnbalanceGB.value();
+  public long getDataSizeUnbalancedGB() {
+    return dataSizeUnbalancedGB.value();
   }
 
-  public void incrementDataSizeCausingUnbalanceGB(long valueToAdd) {
-    dataSizeCausingUnbalanceGB.incr(valueToAdd);
+  public void incrementDataSizeUnbalancedGB(long valueToAdd) {
+    dataSizeUnbalancedGB.incr(valueToAdd);
   }
 
-  public void resetDataSizeCausingUnbalanceGB() {
-    dataSizeCausingUnbalanceGB.incr(-getDataSizeCausingUnbalanceGB());
+  public void resetDataSizeUnbalancedGB() {
+    dataSizeUnbalancedGB.incr(-getDataSizeUnbalancedGB());
   }
 
   /**

@@ -194,7 +194,7 @@ public class ContainerBalancer {
       //if no new move option is generated, it means the cluster can
       //not be balanced any more , so just stop
       IterationResult iR = doIteration();
-      metrics.incrementCountIterations(1);
+      metrics.incrementNumIterations(1);
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
         stop();
@@ -332,7 +332,7 @@ public class ContainerBalancer {
         withinThresholdUtilizedNodes.add(datanodeUsageInfo);
       }
     }
-    metrics.incrementDataSizeCausingUnbalanceGB(
+    metrics.incrementDataSizeUnbalancedGB(
         Math.max(totalOverUtilizedBytes, totalUnderUtilizedBytes) /
             OzoneConsts.GB);
     Collections.reverse(underUtilizedNodes);
@@ -750,7 +750,7 @@ public class ContainerBalancer {
     metrics.resetDataSizeMovedGBInLatestIteration();
     metrics.resetMovedContainersNumInLatestIteration();
     metrics.resetDatanodesNumInvolvedInLatestIteration();
-    metrics.resetDataSizeCausingUnbalanceGB();
+    metrics.resetDataSizeUnbalancedGB();
     metrics.resetDatanodesNumUnbalanced();
   }
 

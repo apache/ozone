@@ -307,9 +307,11 @@ public class TestContainerBalancer {
     // balancer should not have moved more size than the limit
     Assert.assertFalse(containerBalancer.getSizeMovedPerIteration() >
         10 * OzoneConsts.GB);
-    Assert.assertFalse(
-        containerBalancer.getMetrics().getDataSizeMovedGBInLatestIteration() >
-            10);
+
+    long size =
+        containerBalancer.getMetrics().getDataSizeMovedGBInLatestIteration();
+    Assert.assertTrue(size > 0);
+    Assert.assertFalse(size > 10);
     containerBalancer.stop();
   }
 
@@ -512,7 +514,7 @@ public class TestContainerBalancer {
             balancerConfiguration.getThreshold()).size(),
         metrics.getDatanodesNumUnbalanced());
     Assert.assertTrue(metrics.getDataSizeMovedGBInLatestIteration() <= 6);
-    Assert.assertEquals(1, metrics.getCountIterations());
+    Assert.assertEquals(1, metrics.getNumIterations());
     containerBalancer.stop();
   }
 
