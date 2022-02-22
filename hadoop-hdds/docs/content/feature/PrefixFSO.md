@@ -64,7 +64,7 @@ Following picture describes the OM metadata changes while performing a rename
 
 ## Configuration
 
-The following configuration can be used to define the default value for bucket layout during bucket creation
+The following configuration can be configured in `ozone-site.xml` to define the default value for bucket layout during bucket creation
 if the client has not specified the bucket layout argument.
 Supported values are `OBJECT_STORE` and `FILE_SYSTEM_OPTIMIZED`.
 
