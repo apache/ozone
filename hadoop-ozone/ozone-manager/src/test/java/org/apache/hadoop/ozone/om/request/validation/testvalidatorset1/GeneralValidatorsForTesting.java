@@ -52,7 +52,15 @@ public final class GeneralValidatorsForTesting {
    * processing, as for some of those tests this package is on the classpath
    * and therefore the annotated validations are loadede for them.
    */
-  public static boolean validatorTestsRunning = false;
+  private static boolean validatorTestsRunning = false;
+
+  public static void startValidatorTest() {
+    validatorTestsRunning = true;
+  }
+
+  public static void finishValidatorTest() {
+    validatorTestsRunning = false;
+  }
 
   private GeneralValidatorsForTesting() { }
 

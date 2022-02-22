@@ -32,8 +32,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
-import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.validatorTestsRunning;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.*;
+import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.startValidatorTest;
+import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.finishValidatorTest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
@@ -57,14 +58,14 @@ public class TestRequestValidations {
 
   @Before
   public void setup() {
-    validatorTestsRunning = true;
+    startValidatorTest();
     validationListener.attach();
   }
 
   @After
   public void tearDown() {
     validationListener.detach();
-    validatorTestsRunning = false;
+    finishValidatorTest();
   }
 
   @Test(expected = NullPointerException.class)

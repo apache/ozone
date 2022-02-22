@@ -37,7 +37,8 @@ import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.NEWER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.UNCONDITIONAL;
-import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.validatorTestsRunning;
+import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.startValidatorTest;
+import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.finishValidatorTest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
@@ -61,12 +62,12 @@ public class TestValidatorRegistry {
 
   @Before
   public void setup() {
-    validatorTestsRunning = true;
+    startValidatorTest();
   }
 
   @After
   public void tearDown() {
-    validatorTestsRunning = false;
+    finishValidatorTest();
   }
 
   @Test
