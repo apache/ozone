@@ -90,6 +90,7 @@ public abstract class OMClientResponse {
     case PARTIAL_RENAME:
     case OK:
       addToDBBatch(omMetadataManager, batchOperation);
+      break;
     default:
       // do nothing
       break;
