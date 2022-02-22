@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.reflections.util.ClasspathHelper;
 
@@ -35,6 +37,7 @@ import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.NEWER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.UNCONDITIONAL;
+import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.validatorTestsRunning;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
@@ -48,13 +51,23 @@ import static org.junit.Assert.assertTrue;
  */
 public class TestValidatorRegistry {
   private static final String PACKAGE =
-      "org.apache.hadoop.ozone.om.request.validation";
+      "org.apache.hadoop.ozone.om.request.validation.testvalidatorset1";
 
   private static final String PACKAGE2 =
-      "org.apache.hadoop.ozone.om.request.validation2";
+      "org.apache.hadoop.ozone.om.request.validation.testvalidatorset2";
 
   private static final String PACKAGE_WO_VALIDATORS =
       "org.apache.hadoop.hdds.annotation";
+
+  @Before
+  public void setup() {
+    validatorTestsRunning = true;
+  }
+
+  @After
+  public void tearDown() {
+    validatorTestsRunning = false;
+  }
 
   @Test
   public void testNoValidatorsReturnedForEmptyConditionList() {

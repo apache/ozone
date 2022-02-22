@@ -14,8 +14,11 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.om.request.validation;
+package org.apache.hadoop.ozone.om.request.validation.testvalidatorset1;
 
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.TestRequestValidations;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -38,6 +41,18 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
  * validations were properly called from tests where applicable.
  */
 public final class GeneralValidatorsForTesting {
+
+  /**
+   * As the validators written here does not override any request or response
+   * but throw exceptions for specific tests, a test that wants to directly
+   * use a validator here, has to turn on this boolean, and the method that
+   * the test relies on has to check for this value.
+   *
+   * This is necessary to do not affect other tests that are testing requests
+   * processing, as for some of those tests this package is on the classpath
+   * and therefore the annotated validations are loadede for them.
+   */
+  public static boolean validatorTestsRunning = false;
 
   private GeneralValidatorsForTesting() { }
 
@@ -186,7 +201,10 @@ public final class GeneralValidatorsForTesting {
   public static OMRequest throwingPreProcessValidator(
       OMRequest req, ValidationContext ctx) throws IOException {
     fireValidationEvent("throwingPreProcessValidator");
-    throw new IOException("IOException: fail for testing...");
+    if (validatorTestsRunning) {
+      throw new IOException("IOException: fail for testing...");
+    }
+    return req;
   }
 
   @RequestFeatureValidator(
@@ -198,6 +216,10 @@ public final class GeneralValidatorsForTesting {
       OMRequest req, OMResponse resp, ValidationContext ctx)
       throws IOException {
     fireValidationEvent("throwingPostProcessValidator");
-    throw new IOException("IOException: fail for testing...");
+    if (validatorTestsRunning) {
+      throw new IOException("IOException: fail for testing...");
+    }
+    return resp;
   }
+
 }

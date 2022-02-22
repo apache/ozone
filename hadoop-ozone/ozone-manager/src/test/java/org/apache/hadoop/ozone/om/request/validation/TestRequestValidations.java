@@ -18,7 +18,8 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.ClientVersions;
-import org.apache.hadoop.ozone.om.request.validation.GeneralValidatorsForTesting.ValidationListener;
+import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
+import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
+import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.validatorTestsRunning;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.*;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
@@ -45,7 +47,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestRequestValidations {
   private static final String PACKAGE =
-      "org.apache.hadoop.ozone.om.request.validation";
+      "org.apache.hadoop.ozone.om.request.validation.testvalidatorset1";
 
   private static final String PACKAGE_WO_VALIDATORS =
       "org.apache.hadoop.hdds.annotation";
@@ -55,12 +57,14 @@ public class TestRequestValidations {
 
   @Before
   public void setup() {
+    validatorTestsRunning = true;
     validationListener.attach();
   }
 
   @After
   public void tearDown() {
     validationListener.detach();
+    validatorTestsRunning = false;
   }
 
   @Test(expected = NullPointerException.class)
