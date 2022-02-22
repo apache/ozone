@@ -31,6 +31,9 @@ if git -C $(pwd) status >& /dev/null; then
   ENABLE_GIT_INFO="--enableGitInfo"
 fi
 
+# Replace all markdown images with a responsive hugo shortcode.
+python3 $DIR/make_images_responsive.py $DOCDIR
+
 DESTDIR="$DOCDIR/target/classes/docs"
 mkdir -p "$DESTDIR"
 cd "$DOCDIR"
