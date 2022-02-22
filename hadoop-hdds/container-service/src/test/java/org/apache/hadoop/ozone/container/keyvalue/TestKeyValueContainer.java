@@ -179,6 +179,35 @@ public class TestKeyValueContainer {
   }
 
   @Test
+  public void testEmptyContainerImportExport() throws Exception {
+    createContainer();
+    closeContainer();
+
+    KeyValueContainerData data = keyValueContainer.getContainerData();
+
+    // Check state of original container.
+    checkContainerFilesPresent(data, 0);
+
+    //destination path
+    File exportTar = folder.newFile("exported.tar.gz");
+    TarContainerPacker packer = new TarContainerPacker();
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
+      keyValueContainer.exportContainerData(fos, packer);
+    }
+
+    keyValueContainer.delete();
+
+    // import container.
+    try (FileInputStream fis = new FileInputStream(exportTar)) {
+      keyValueContainer.importContainerData(fis, packer);
+    }
+
+    // Make sure empty chunks dir was unpacked.
+    checkContainerFilesPresent(data, 0);
+  }
+
+  @Test
   public void testContainerImportExport() throws Exception {
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();
