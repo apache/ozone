@@ -76,14 +76,12 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  public void defaultTest() throws Exception {
+  public void testDefault() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+        new RandomKeyGenerator(cluster.getConf());
     randomKeyGenerator.setNumOfVolumes(2);
     randomKeyGenerator.setNumOfBuckets(5);
     randomKeyGenerator.setNumOfKeys(10);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
     randomKeyGenerator.call();
     Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
@@ -91,9 +89,24 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  public void multiThread() throws Exception {
+  public void testECKey() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+        new RandomKeyGenerator(cluster.getConf());
+    randomKeyGenerator.setNumOfVolumes(2);
+    randomKeyGenerator.setNumOfBuckets(5);
+    randomKeyGenerator.setNumOfKeys(10);
+    randomKeyGenerator.setReplication("rs-3-2-1024k");
+    randomKeyGenerator.setType(ReplicationType.EC);
+    randomKeyGenerator.call();
+    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+  }
+
+  @Test
+  public void testMultiThread() throws Exception {
+    RandomKeyGenerator randomKeyGenerator =
+        new RandomKeyGenerator(cluster.getConf());
     randomKeyGenerator.setNumOfVolumes(10);
     randomKeyGenerator.setNumOfBuckets(1);
     randomKeyGenerator.setNumOfKeys(10);
@@ -108,9 +121,9 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  public void ratisTest3() throws Exception {
+  public void testRatisKey() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+        new RandomKeyGenerator(cluster.getConf());
     randomKeyGenerator.setNumOfVolumes(10);
     randomKeyGenerator.setNumOfBuckets(1);
     randomKeyGenerator.setNumOfKeys(10);
@@ -125,9 +138,9 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  public void bigFileThan2GB() throws Exception {
+  public void testKeyLargerThan2GB() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+        new RandomKeyGenerator(cluster.getConf());
     randomKeyGenerator.setNumOfVolumes(1);
     randomKeyGenerator.setNumOfBuckets(1);
     randomKeyGenerator.setNumOfKeys(1);
@@ -144,9 +157,9 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  public void fileWithSizeZero() throws Exception {
+  public void testZeroSizeKey() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+        new RandomKeyGenerator(cluster.getConf());
     randomKeyGenerator.setNumOfVolumes(1);
     randomKeyGenerator.setNumOfBuckets(1);
     randomKeyGenerator.setNumOfKeys(1);
@@ -165,7 +178,7 @@ public class TestRandomKeyGenerator {
   @Test
   public void testThreadPoolSize() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+        new RandomKeyGenerator(cluster.getConf());
     randomKeyGenerator.setNumOfVolumes(1);
     randomKeyGenerator.setNumOfBuckets(1);
     randomKeyGenerator.setNumOfKeys(1);
@@ -179,9 +192,9 @@ public class TestRandomKeyGenerator {
 
   @Test
   @org.junit.Ignore("HDDS-5993")
-  public void cleanObjectsTest() throws Exception {
+  public void testCleanObjects() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+        new RandomKeyGenerator(cluster.getConf());
     randomKeyGenerator.setNumOfVolumes(2);
     randomKeyGenerator.setNumOfBuckets(5);
     randomKeyGenerator.setNumOfKeys(10);
