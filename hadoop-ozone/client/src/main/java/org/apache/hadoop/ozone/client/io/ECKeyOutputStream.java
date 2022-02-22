@@ -380,11 +380,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private int handleDataWrite(int currIdx, byte[] b, int off, long len,
-      boolean isFullCell) throws IOException {
+      boolean isFullCell) {
     int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, (int) len);
-    handleOutputStreamWrite(currIdx, len, isFullCell, false);
 
     if (pos == ecChunkSize) {
+      handleOutputStreamWrite(currIdx, pos, isFullCell, false);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
     return pos;
@@ -398,7 +398,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private void handleOutputStreamWrite(int currIdx, long len,
       boolean isFullCell, boolean isParity) {
 
-    BlockOutputStreamEntry current =
+    ECBlockOutputStreamEntry current =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
 
     if (isFullCell) {
@@ -406,16 +406,24 @@ public class ECKeyOutputStream extends KeyOutputStream {
           ecChunkBufferCache.getParityBuffers()[currIdx - numDataBlks] :
           ecChunkBufferCache.getDataBuffers()[currIdx];
       try {
-        // Since it's a fullcell, let's write all content from buffer.
-        writeToOutputStream(current, len, bytesToWrite.array(),
-            bytesToWrite.limit(), 0, isParity);
+        // Since it's a full cell, let's write all content from buffer.
+        // At a time we write max cell size in EC. So, it should safe to cast
+        // the len to int to use the super class defined write API.
+        // The len cannot be bigger than cell buffer size.
+        Preconditions.checkArgument(len <= ecChunkSize,
+            " The len: " + len + ". EC chunk size: " + ecChunkSize);
+        Preconditions.checkArgument(len <= bytesToWrite.limit(),
+            " The len: " + len + ". Chunk buffer limit: " + bytesToWrite
+                .limit());
+        writeToOutputStream(current, bytesToWrite.array(), (int) len, 0,
+            isParity);
       } catch (Exception e) {
         markStreamAsFailed(e);
       }
     }
   }
 
-  private int writeToOutputStream(BlockOutputStreamEntry current, long len,
+  private long writeToOutputStream(ECBlockOutputStreamEntry current,
       byte[] b, int writeLen, int off, boolean isParity)
       throws IOException {
     try {
@@ -426,8 +434,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
       }
       current.write(b, off, writeLen);
     } catch (IOException ioe) {
-      LOG.debug("Exception:: writeLen: " + writeLen + ", total len:" + len,
-          ioe);
+      LOG.debug(
+          "Exception while writing the cell buffers. The writeLen: " + writeLen
+              + ". The block internal index is: "
+              + current
+              .getCurrentStreamIdx(), ioe);
       handleException(current, ioe);
     }
     return writeLen;
@@ -504,11 +515,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
         // Finish writing the current partial cached chunk
         if (bytesToWrite.position() % ecChunkSize != 0) {
-          final BlockOutputStreamEntry current =
+          final ECBlockOutputStreamEntry current =
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           try {
             byte[] array = bytesToWrite.array();
-            writeToOutputStream(current, bytesToWrite.position(), array,
+            writeToOutputStream(current, array,
                 bytesToWrite.position(), 0, false);
           } catch (Exception e) {
             markStreamAsFailed(e);
@@ -531,7 +542,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
       }
 
       closeCurrentStreamEntry();
-      Preconditions.checkArgument(writeOffset == offset);
+      Preconditions.checkArgument(writeOffset == offset,
+          "Expected writeOffset= " + writeOffset
+              + " Expected offset=" + offset);
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
