@@ -32,11 +32,17 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 
 /**
  * Test KeyInputStream with underlying ECBlockInputStream.
@@ -102,23 +108,5 @@ public class TestKeyInputStreamEC {
         .setPartNumber(0)
         .build();
     return blockInfo;
-  }
-
-  private DatanodeDetails randomDatanodeDetails() {
-    String ipAddress = "127.0.0.1";
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, 0);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, 0);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, 0);
-    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(UUID.randomUUID())
-        .setHostName("localhost")
-        .setIpAddress(ipAddress)
-        .addPort(containerPort)
-        .addPort(ratisPort)
-        .addPort(restPort);
-    return builder.build();
   }
 }
