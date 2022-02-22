@@ -329,7 +329,6 @@ public final class ContainerStateManagerImpl
   public boolean contains(ContainerID id) {
     lock.readLock().lock();
     try {
-      // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
       return containers.contains(id);
     } finally {
       lock.readLock().unlock();
