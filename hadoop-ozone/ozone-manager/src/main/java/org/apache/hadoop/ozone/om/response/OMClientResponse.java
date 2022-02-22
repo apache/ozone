@@ -92,6 +92,7 @@ public abstract class OMClientResponse {
       addToDBBatch(omMetadataManager, batchOperation);
     default:
       // do nothing
+      break;
     }
   }
 
