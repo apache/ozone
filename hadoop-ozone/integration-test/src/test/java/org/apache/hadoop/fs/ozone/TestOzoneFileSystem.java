@@ -223,7 +223,7 @@ public class TestOzoneFileSystem {
   }
 
   public BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+    return bucketLayout;
   }
 
   @Test
