@@ -84,19 +84,13 @@ public class TarContainerPacker
         if (name.startsWith(DB_DIR_NAME + "/")) {
           Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
-          if (entry.isDirectory()) {
-            Files.createDirectories(destinationPath);
-          } else {
-            extractFileEntry(archiveInput, size, dbRoot, destinationPath);
-          }
+          extractEntry(entry, archiveInput, size, dbRoot,
+              destinationPath);
         } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
-          if (entry.isDirectory()) {
-            Files.createDirectories(destinationPath);
-          } else {
-            extractFileEntry(archiveInput, size, chunksRoot, destinationPath);
-          }
+          extractEntry(entry, archiveInput, size, chunksRoot,
+             destinationPath);
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
@@ -117,7 +111,7 @@ public class TarContainerPacker
     }
   }
 
-  private void extractFileEntry(InputStream input, long size,
+  private void extractEntry(ArchiveEntry entry, InputStream input, long size,
       Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);
     Path parent = path.getParent();
@@ -125,19 +119,23 @@ public class TarContainerPacker
       Files.createDirectories(parent);
     }
 
-    try (OutputStream fileOutput = new FileOutputStream(path.toFile());
-         OutputStream output = new BufferedOutputStream(fileOutput)) {
-      int bufferSize = 1024;
-      byte[] buffer = new byte[bufferSize + 1];
-      long remaining = size;
-      while (remaining > 0) {
-        int len = (int) Math.min(remaining, bufferSize);
-        int read = input.read(buffer, 0, len);
-        if (read >= 0) {
-          remaining -= read;
-          output.write(buffer, 0, read);
-        } else {
-          remaining = 0;
+    if (entry.isDirectory()) {
+      Files.createDirectories(path);
+    } else {
+      try (OutputStream fileOutput = new FileOutputStream(path.toFile());
+           OutputStream output = new BufferedOutputStream(fileOutput)) {
+        int bufferSize = 1024;
+        byte[] buffer = new byte[bufferSize + 1];
+        long remaining = size;
+        while (remaining > 0) {
+          int len = (int) Math.min(remaining, bufferSize);
+          int read = input.read(buffer, 0, len);
+          if (read >= 0) {
+            remaining -= read;
+            output.write(buffer, 0, read);
+          } else {
+            remaining = 0;
+          }
         }
       }
     }
