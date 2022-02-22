@@ -28,8 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 public final class UpdateServiceConfig {
 
   @Config(key = "port", defaultValue = "9893", description = "Port used for"
-      + " the SCM grpc update service for CRL.", tags = {
-      ConfigTag.SECURITY})
+      + " the SCM grpc update service for CRL.", tags = {ConfigTag.SECURITY})
   private int port;
 
   public int getPort() {
