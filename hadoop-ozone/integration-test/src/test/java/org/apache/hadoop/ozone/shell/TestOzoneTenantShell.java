@@ -521,7 +521,7 @@ public class TestOzoneTenantShell {
         "user", "revoke-admin", "dev$bob", "--tenant=dev"});
     checkOutput(out, "", true);
     checkOutput(err, "Revoked admin role of 'dev$bob' "
-        + "from tenant 'dev'\n", true);
+        + "from tenant 'dev'.\n", true);
 
     executeHA(tenantShell, new String[] {
         "user", "info", "bob"});
