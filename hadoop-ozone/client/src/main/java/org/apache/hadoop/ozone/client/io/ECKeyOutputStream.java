@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -85,6 +86,23 @@ public class ECKeyOutputStream extends KeyOutputStream {
   @VisibleForTesting
   public List<OmKeyLocationInfo> getLocationInfoList() {
     return blockOutputStreamEntryPool.getLocationInfoList();
+  }
+
+  @VisibleForTesting
+  public List<OmKeyLocationInfo> getAllLocationInfoList() {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (BlockOutputStreamEntry streamEntry : getStreamEntries()) {
+      OmKeyLocationInfo info =
+          new OmKeyLocationInfo.Builder()
+              .setBlockID(streamEntry.getBlockID())
+              .setLength(streamEntry.getCurrentPosition())
+              .setOffset(0)
+              .setToken(streamEntry.getToken())
+              .setPipeline(streamEntry.getPipeline())
+              .build();
+      locationInfoList.add(info);
+    }
+    return locationInfoList;
   }
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
@@ -190,14 +208,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
       failedParityStripeChunkLens[i] = parityBuffers[i].limit();
     }
 
-    blockOutputStreamEntryPool.getCurrentStreamEntry().resetToFirstEntry();
     // Rollback the length/offset updated as part of this failed stripe write.
     offset -= failedStripeDataSize;
-    blockOutputStreamEntryPool.getCurrentStreamEntry()
-        .resetToAckedPosition();
 
+    final ECBlockOutputStreamEntry failedStreamEntry =
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    failedStreamEntry.resetToFirstEntry();
+    failedStreamEntry.resetToAckedPosition();
+    // All pre-allocated blocks from the same pipeline
+    // should be dropped to eliminate worthless retries.
+    blockOutputStreamEntryPool.discardPreallocatedBlocks(-1,
+        failedStreamEntry.getPipeline().getId());
     // Let's close the current entry.
-    blockOutputStreamEntryPool.getCurrentStreamEntry().close();
+    failedStreamEntry.close();
 
     // Let's rewrite the last stripe, so that it will be written to new block
     // group.

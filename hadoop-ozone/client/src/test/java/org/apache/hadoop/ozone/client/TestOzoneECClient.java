@@ -28,11 +28,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
@@ -905,6 +908,107 @@ public class TestOzoneECClient {
       Assert.assertTrue(Arrays.equals(partialChunk, partialChunkToRead));
 
       Assert.assertEquals(-1, is.read(partialChunkToRead));
+    }
+  }
+
+  @Test
+  public void testDiscardPreAllocatedBlocksPreventRetryExceeds()
+      throws IOException {
+    close();
+    OzoneConfiguration con = new OzoneConfiguration();
+    int maxRetries = 3;
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        2, StorageUnit.KB);
+    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES,
+        maxRetries);
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
+            15);
+    createNewClient(con, blkAllocator);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    int numStripesBeforeFailure = 1;
+    int numStripesAfterFailure = 1;
+    int numSTripesTotal = numStripesBeforeFailure + numStripesAfterFailure;
+    int numChunksToWriteAfterFailure = dataBlocks;
+    int numExpectedBlockGrps = 2;
+    // fail the DNs for parity blocks
+    int[] nodesIndexesToMarkFailure = {3, 4};
+
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        1024 * dataBlocks * numStripesBeforeFailure
+            + numChunksToWriteAfterFailure,
+        new ECReplicationConfig(dataBlocks, parityBlocks,
+            ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      ECKeyOutputStream kos = (ECKeyOutputStream) out.getOutputStream();
+      List<OmKeyLocationInfo> blockInfos = kos.getAllLocationInfoList();
+      Assert.assertEquals(1, blockInfos.size());
+
+      // Mock some pre-allocated blocks to the key
+      // should be > maxRetries
+      int numPreAllocatedBlocks = maxRetries + 1;
+      BlockID blockID = blockInfos.get(0).getBlockID();
+      Pipeline pipeline = blockInfos.get(0).getPipeline();
+      List<OmKeyLocationInfo> omKeyLocationInfos = new ArrayList<>();
+      for (int i = 0; i < numPreAllocatedBlocks; i++) {
+        BlockID nextBlockID = new BlockID(blockID.getContainerID(),
+            blockID.getLocalID() + i + 1);
+        omKeyLocationInfos.add(new OmKeyLocationInfo.Builder()
+            .setBlockID(nextBlockID)
+            .setPipeline(pipeline)
+            .build());
+      }
+      OmKeyLocationInfoGroup omKeyLocationInfoGroup =
+          new OmKeyLocationInfoGroup(0, omKeyLocationInfos);
+      kos.addPreallocateBlocks(omKeyLocationInfoGroup, 0);
+
+      for (int j = 0; j < numStripesBeforeFailure; j++) {
+        for (int i = 0; i < dataBlocks; i++) {
+          out.write(inputChunks[i]);
+        }
+      }
+
+      // Make the parity write fail to trigger retry
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
+      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
+        failedDNs.add(DatanodeDetails
+            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      }
+
+      // First let's set storage as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      for (int j = 0; j < numStripesAfterFailure; j++) {
+        for (int i = 0; i < dataBlocks; i++) {
+          out.write(inputChunks[i]);
+        }
+      }
+
+      // if we don't discard pre-allocated blocks,
+      // we will get retries > maxRetries
+    }
+
+    final OzoneKeyDetails key = bucket.getKey(keyName);
+    Assert.assertEquals(numExpectedBlockGrps,
+        key.getOzoneKeyLocations().size());
+
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      for (int i = 0; i < dataBlocks * numSTripesTotal; i++) {
+        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+            is.read(fileContent));
+        Assert.assertArrayEquals(
+            "Expected: " + new String(inputChunks[i % dataBlocks], UTF_8)
+                + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            inputChunks[i % dataBlocks], fileContent);
+      }
     }
   }
 
