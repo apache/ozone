@@ -39,9 +39,6 @@ may be rejected or normalized.
 This feature is strongly recommended to be turned ON for Ozone buckets mainly used via Hadoop compatible interfaces,
 especially with high number of files in deep directory hierarchy.
 
-Previous versions of Ozone allowed cluster-wide prefix based
-file system optimization by enabling `ozone.om.enable.filesystem.paths` configuration.
-
 ## OzoneManager Metadata layout format
 OzoneManager supports two metadata bucket layout formats - Object Store and File System Optimized.
 
@@ -78,24 +75,5 @@ By default, the buckets will default to `OBJECT_STORE` behaviour.
 <property>
     <name>ozone.default.bucket.layout</name>
     <value>OBJECT_STORE</value>
-</property>
-```
-
-## Configuring Older Versions (1.2.1)
-
-Older clients which do not support bucket layout features can enable cluster-wide prefix-based file system optimization
-using the following configuration.
-
-By default, the feature is disabled. It can be enabled with the following settings in `ozone-site.xml`:
-
-```XML
-
-<property>
-    <name>ozone.om.enable.filesystem.paths</name>
-    <value>true</value>
-</property>
-<property>
-    <name>ozone.om.metadata.layout</name>
-    <value>PREFIX</value>
 </property>
 ```
