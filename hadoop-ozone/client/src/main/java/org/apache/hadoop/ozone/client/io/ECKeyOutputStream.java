@@ -198,10 +198,10 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private StripeWriteStatus rewriteStripeToNewBlockGroup(
-      int failedStripeDataSize, boolean allocateBlockIfFull, boolean close)
+      long failedStripeDataSize, boolean allocateBlockIfFull, boolean close)
       throws IOException {
-    long[] failedDataStripeChunkLens = new long[numDataBlks];
-    long[] failedParityStripeChunkLens = new long[numParityBlks];
+    int[] failedDataStripeChunkLens = new int[numDataBlks];
+    int[] failedParityStripeChunkLens = new int[numParityBlks];
     final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
     for (int i = 0; i < numDataBlks; i++) {
       failedDataStripeChunkLens[i] = dataBuffers[i].limit();
@@ -229,9 +229,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     long totalLenToWrite = failedStripeDataSize;
     for (int i = 0; i < numDataBlks; i++) {
-      long currentLen = totalLenToWrite < failedDataStripeChunkLens[i] ?
+      int currentLen = (int) (totalLenToWrite < failedDataStripeChunkLens[i] ?
           totalLenToWrite :
-          failedDataStripeChunkLens[i];
+          failedDataStripeChunkLens[i]);
       if (currentLen > 0) {
         handleOutputStreamWrite(i, currentLen, true, false);
       }
@@ -390,12 +390,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return pos;
   }
 
-  private void handleParityWrite(int currIdx, long len, boolean isFullCell) {
+  private void handleParityWrite(int currIdx, int len, boolean isFullCell) {
     handleOutputStreamWrite(currIdx, len, isFullCell, true);
     blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
   }
 
-  private void handleOutputStreamWrite(int currIdx, long len,
+  private void handleOutputStreamWrite(int currIdx, int len,
       boolean isFullCell, boolean isParity) {
 
     ECBlockOutputStreamEntry current =
@@ -410,13 +410,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
         // At a time we write max cell size in EC. So, it should safe to cast
         // the len to int to use the super class defined write API.
         // The len cannot be bigger than cell buffer size.
-        Preconditions.checkArgument(len <= ecChunkSize,
-            " The len: " + len + ". EC chunk size: " + ecChunkSize);
-        Preconditions.checkArgument(len <= bytesToWrite.limit(),
-            " The len: " + len + ". Chunk buffer limit: " + bytesToWrite
-                .limit());
-        writeToOutputStream(current, bytesToWrite.array(), (int) len, 0,
-            isParity);
+        assert len <= ecChunkSize : " The len: " + len + ". EC chunk size: "
+            + ecChunkSize;
+        assert len <= bytesToWrite
+            .limit() : " The len: " + len + ". Chunk buffer limit: "
+            + bytesToWrite.limit();
+        writeToOutputStream(current, bytesToWrite.array(), len, 0, isParity);
       } catch (Exception e) {
         markStreamAsFailed(e);
       }
@@ -507,7 +506,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      final int lastStripeSize = getCurrentDataStripeSize();
+      final long lastStripeSize = getCurrentDataStripeSize();
       if (isPartialStripe(lastStripeSize)) {
         ByteBuffer bytesToWrite =
             ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
@@ -527,7 +526,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         }
 
         final int parityCellSize =
-            lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize;
+            (int) (lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize);
         addPadding(parityCellSize);
         if (handleParityWrites(parityCellSize,
             false, true) == StripeWriteStatus.FAILED) {
@@ -552,7 +551,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     ecChunkBufferCache.release();
   }
 
-  private void handleStripeFailure(int lastStripeSize,
+  private void handleStripeFailure(long lastStripeSize,
       boolean allocateBlockIfFull, boolean isClose)
       throws IOException {
     StripeWriteStatus stripeWriteStatus;
@@ -590,13 +589,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
     buf.position(limit);
   }
 
-  private boolean isPartialStripe(int stripeSize) {
-    return stripeSize > 0 && stripeSize < numDataBlks * ecChunkSize;
+  private boolean isPartialStripe(long stripeSize) {
+    return stripeSize > 0 && stripeSize < (numDataBlks * ecChunkSize);
   }
 
-  private int getCurrentDataStripeSize() {
+  private long getCurrentDataStripeSize() {
     final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
-    int lastStripeSize = 0;
+    long lastStripeSize = 0;
     for (int i = 0; i < numDataBlks; i++) {
       lastStripeSize += dataBuffers[i].position();
     }
