@@ -72,14 +72,15 @@ public class CreateBucketHandler extends BucketHandler {
   private AllowedBucketLayouts allowedBucketLayout;
 
   @Option(names = {"--replication", "-r"},
-      description = "Replication value. Example: 3 (for Ratis type) or 1 ( for"
-          + " standalone type). In the case of EC, pass DATA-PARITY, eg 3-2," +
-          " 6-3, 10-4")
+      description = "Default replication level. Example: THREE"
+          + " (for RATIS) or ONE (for STAND_ALONE). In case of EC, pass"
+          + " CODEC-DATA-PARITY-CHUNKSIZE, eg rs-3-2-1024k, rs-6-3-1024k,"
+          + " rs-10-4-1024k")
   private String replication;
 
   @Option(names = {"--type", "-t"},
-      description = "Replication type. Supported types are RATIS, STANDALONE,"
-          + " EC")
+      description = "Default replication type. Supported types are"
+          + " RATIS, STANDALONE, EC")
   private String replicationType;
 
   @CommandLine.Mixin
