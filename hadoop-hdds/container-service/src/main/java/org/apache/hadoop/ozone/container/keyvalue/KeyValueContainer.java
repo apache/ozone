@@ -25,8 +25,9 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -99,7 +100,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   // container.
   // We do not need to explicitly synchronize this cache as the writes to
   // container are synchronous.
-  private ArrayList<Long> pendingPutBlockCache;
+  private Set<Long> pendingPutBlockCache;
 
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
@@ -112,7 +113,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     if (this.containerData.isOpen() || this.containerData.isClosing()) {
       // If container is not in OPEN or CLOSING state, there cannot be block
       // writes to the container. So pendingPutBlockCache is not needed.
-      this.pendingPutBlockCache = new ArrayList<>();
+      this.pendingPutBlockCache = new HashSet<>();
     }
   }
 
@@ -694,10 +695,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * pendingPutBlockCache or not.
    */
   public boolean isBlockInPendingPutBlockCache(long localID) {
+    // TODO: This function should not be called on a container which is not
+    //  in OPEN or CLOSING state (for which pendingPutBlockCache is
+    //  initialized). The null check is added here as a safety net. It can be
+    //  removed after making absolutely certain that this function will not
+    //  be called when pendingPutBlockCache is null.
     if (pendingPutBlockCache != null) {
       return pendingPutBlockCache.contains(localID);
     } else {
-      pendingPutBlockCache = new ArrayList<>();
+      pendingPutBlockCache = new HashSet<>();
       return false;
     }
   }
