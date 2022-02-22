@@ -13,3 +13,5 @@
 #
 org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory
 org.apache.ozone.erasurecode.rawcoder.XORRawErasureCoderFactory
+org.apache.ozone.erasurecode.rawcoder.NativeRSRawErasureCoderFactory
+org.apache.ozone.erasurecode.rawcoder.NativeXORRawErasureCoderFactory
