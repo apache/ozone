@@ -36,6 +36,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -282,10 +283,11 @@ public class ContainerManagerImpl implements ContainerManager {
   public void updateContainerState(final ContainerID cid,
                                    final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
+    HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.updateContainerState(cid.getProtobuf(), event);
+        containerStateManager.updateContainerState(protoId, event);
       } else {
         throwContainerNotFoundException(cid);
       }
@@ -410,10 +412,11 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public void deleteContainer(final ContainerID cid)
       throws IOException {
+    HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.removeContainer(cid.getProtobuf());
+        containerStateManager.removeContainer(protoId);
         scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
       } else {
         scmContainerManagerMetrics.incNumFailureDeleteContainers();
