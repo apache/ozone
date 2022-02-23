@@ -46,8 +46,8 @@ public interface OmTransportFactory {
       throws IOException {
     try {
       // if configured transport class is different than the default
-      // Hadoop3OmTransportFactory, then check service loader for
-      // transport class and instantiate it
+      // OmTransportFactory (Hadoop3OmTransportFactory), then
+      // check service loader for transport class and instantiate it
       if (conf
           .get(OZONE_OM_TRANSPORT_CLASS,
               OZONE_OM_TRANSPORT_CLASS_DEFAULT) !=
@@ -61,13 +61,9 @@ public interface OmTransportFactory {
         }
       }
       return OmTransportFactory.class.getClassLoader()
-          .loadClass(
-              "org.apache.hadoop.ozone.om.protocolPB"
-                  + ".Hadoop3OmTransportFactory")
-
+          .loadClass(OZONE_OM_TRANSPORT_CLASS_DEFAULT)
           .asSubclass(OmTransportFactory.class)
           .newInstance();
-
     } catch (Exception ex) {
       throw new IOException(
           "Can't create the default OmTransport implementation", ex);
