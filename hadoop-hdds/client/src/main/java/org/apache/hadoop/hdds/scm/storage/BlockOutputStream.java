@@ -686,25 +686,26 @@ public class BlockOutputStream extends OutputStream {
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
           blockID.get(), data, token, replicationIndex);
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-          asyncReply.getResponse();
-      future.thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          future.completeExceptionally(sce);
-        }
-        return e;
-      }, responseExecutor).exceptionally(e -> {
-        String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
-            "into block " + blockID;
-        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-        CompletionException ce = new CompletionException(msg, e);
-        setIoException(ce);
-        throw ce;
-      });
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          respFuture = asyncReply.getResponse();
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          validateFuture = respFuture.thenApplyAsync(e -> {
+            try {
+              validateResponse(e);
+            } catch (IOException sce) {
+              respFuture.completeExceptionally(sce);
+            }
+            return e;
+          }, responseExecutor).exceptionally(e -> {
+            String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
+                " into block " + blockID;
+            LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+            CompletionException ce = new CompletionException(msg, e);
+            setIoException(ce);
+            throw ce;
+          });
       containerBlockData.addChunks(chunkInfo);
-      return future;
+      return validateFuture;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
