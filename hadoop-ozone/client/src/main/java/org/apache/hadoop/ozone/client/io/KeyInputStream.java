@@ -210,6 +210,11 @@ public class KeyInputStream extends ExtendedInputStream {
     blockStreams.add(blockInputStream);
   }
 
+  @VisibleForTesting
+  public void addStream(BlockExtendedInputStream blockInputStream) {
+    blockStreams.add(blockInputStream);
+  }
+
   /**
    * {@inheritDoc}
    */
@@ -264,7 +269,7 @@ public class KeyInputStream extends ExtendedInputStream {
 
       // Get the current blockStream and read data from it
       BlockExtendedInputStream current = blockStreams.get(blockIndex);
-      int numBytesToRead = Math.min(buffLen, (int)current.getRemaining());
+      int numBytesToRead = (int)Math.min(buffLen, current.getRemaining());
       int numBytesRead = strategy.readFromBlock(current, numBytesToRead);
       if (numBytesRead != numBytesToRead) {
         // This implies that there is either data loss or corruption in the
