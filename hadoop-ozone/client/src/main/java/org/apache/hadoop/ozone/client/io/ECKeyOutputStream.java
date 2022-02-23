@@ -562,8 +562,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     for (int i = 0; i < numDataBlks; i++) {
       if (parityCellSize > buffers[i].position()) {
         maxSize = Math.max(maxSize, parityCellSize);
-      }
-      else {
+      } else {
         maxSize = Math.max(maxSize, buffers[i].position());
       }
     }
