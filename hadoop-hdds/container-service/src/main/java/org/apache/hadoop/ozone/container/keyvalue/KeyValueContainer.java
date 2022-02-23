@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -114,6 +115,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // If container is not in OPEN or CLOSING state, there cannot be block
       // writes to the container. So pendingPutBlockCache is not needed.
       this.pendingPutBlockCache = new HashSet<>();
+    } else {
+      this.pendingPutBlockCache = Collections.emptySet();
     }
   }
 
@@ -695,34 +698,34 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * pendingPutBlockCache or not.
    */
   public boolean isBlockInPendingPutBlockCache(long localID) {
-    // TODO: This function should not be called on a container which is not
-    //  in OPEN or CLOSING state (for which pendingPutBlockCache is
-    //  initialized). The null check is added here as a safety net. It can be
-    //  removed after making absolutely certain that this function will not
-    //  be called when pendingPutBlockCache is null.
-    if (pendingPutBlockCache != null) {
-      return pendingPutBlockCache.contains(localID);
-    } else {
-      pendingPutBlockCache = new HashSet<>();
-      return false;
-    }
+    return pendingPutBlockCache.contains(localID);
   }
 
   /**
    * Add the given localID of a block to the pendingPutBlockCache.
    */
-  public void addToPendingPutBlockCache(long localID) {
-    // Since this method is always called after isBlockInPendingPutBlockCache
-    // in BlockManagerImpl#persistPutBlock, we do not need a null check here
-    pendingPutBlockCache.add(localID);
+  public void addToPendingPutBlockCache(long localID)
+      throws StorageContainerException {
+    try {
+      pendingPutBlockCache.add(localID);
+    } catch (UnsupportedOperationException e) {
+      // Getting an UnsupportedOperationException here implies that the
+      // pendingPutBlockCache is an Empty Set. This should not happen if the
+      // container is in OPEN or CLOSING state. Log the exception here and
+      // throw a non-Runtime exception so that putBlock request fails.
+      String msg = "Failed to add block " + localID + " to " +
+          "pendingPutBlockCache of container " + containerData.getContainerID()
+          + " (state: " + containerData.getState() + ")";
+      LOG.error(msg, e);
+      throw new StorageContainerException(msg,
+          ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+    }
   }
 
   /**
    * Remove the given localID of a block from the pendingPutBlockCache.
    */
   public void removeFromPendingPutBlockCache(long localID) {
-    // Since this method is always called after isBlockInPendingPutBlockCache
-    // in BlockManagerImpl#persistPutBlock, we do not need a null check here
     pendingPutBlockCache.remove(localID);
   }
 
@@ -731,10 +734,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * pendingPutBlockCache as there won't be any more writes to the container.
    */
   private void clearPendingPutBlockCache() {
-    if (pendingPutBlockCache != null) {
-      pendingPutBlockCache.clear();
-      pendingPutBlockCache = null;
-    }
+    pendingPutBlockCache.clear();
+    pendingPutBlockCache = Collections.emptySet();
   }
 
   /**
