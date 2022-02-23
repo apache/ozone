@@ -35,7 +35,7 @@ fi
 # for pre-processing the markdown files.
 TMPDIR="$DOCDIR/target/tmp"
 mkdir -p "$TMPDIR"
-rsync -av --exclude="$DOCDIR/target" --exclude="$DOCDIR/public" "$DOCDIR/" "$TMPDIR"
+rsync -a --exclude="$DOCDIR/target" --exclude="$DOCDIR/public" "$DOCDIR/" "$TMPDIR"
 
 # Replace all markdown images with a hugo shortcode to make them responsive.
 python3 $DIR/make_images_responsive.py $TMPDIR
