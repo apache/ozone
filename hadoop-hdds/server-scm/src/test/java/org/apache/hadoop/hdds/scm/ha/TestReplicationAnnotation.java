@@ -107,8 +107,9 @@ public class TestReplicationAnnotation {
 
     ContainerStateManager proxy =
         (ContainerStateManager) Proxy.newProxyInstance(
-        SCMHAInvocationHandler.class.getClassLoader(),
-        new Class<?>[]{ContainerStateManager.class}, scmhaInvocationHandler);
+            SCMHAInvocationHandler.class.getClassLoader(),
+            new Class<?>[]{ContainerStateManager.class},
+            scmhaInvocationHandler);
 
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
@@ -124,8 +125,9 @@ public class TestReplicationAnnotation {
 
     CertificateStore certificateStore =
         (CertificateStore) Proxy.newProxyInstance(
-        SCMHAInvocationHandler.class.getClassLoader(),
-        new Class<?>[]{CertificateStore.class}, scmhaInvocationHandler);
+            SCMHAInvocationHandler.class.getClassLoader(),
+            new Class<?>[]{CertificateStore.class},
+            scmhaInvocationHandler);
 
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     try {
