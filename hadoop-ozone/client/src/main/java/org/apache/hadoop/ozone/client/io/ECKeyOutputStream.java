@@ -152,37 +152,30 @@ public class ECKeyOutputStream extends KeyOutputStream {
         || ((off + len) < 0)) {
       throw new IndexOutOfBoundsException();
     }
-    if (len == 0) {
-      return;
-    }
-    handleWrite(b, off, len);
-    writeOffset += len;
-  }
-
-  private void handleWrite(byte[] b, int off, int len)
-      throws IOException {
-    while (len > 0) {
+    int rem = len;
+    while (rem > 0) {
       try {
         blockOutputStreamEntryPool.allocateBlockIfNeeded();
         int currentStreamIdx = blockOutputStreamEntryPool
             .getCurrentStreamEntry().getCurrentStreamIdx();
-        int currentRem =
+        int bufferRem =
             ecChunkBufferCache.dataBuffers[currentStreamIdx].remaining();
-        int expectedWriteLen = Math.min(len, Math.min(currentRem, ecChunkSize));
-        long currentPos =
+        int expectedWriteLen = Math.min(rem, Math.min(bufferRem, ecChunkSize));
+        int oldPos =
             ecChunkBufferCache.dataBuffers[currentStreamIdx].position();
         int pos =
             handleDataWrite(currentStreamIdx, b, off, expectedWriteLen,
-                currentPos + expectedWriteLen == ecChunkSize);
+                oldPos + expectedWriteLen == ecChunkSize);
         checkAndWriteParityCells(pos);
-        long writtenLength = pos - currentPos;
-        len -= writtenLength;
+        long writtenLength = pos - oldPos;
+        rem -= writtenLength;
         off += writtenLength;
       } catch (Exception e) {
         markStreamClosed();
         throw new IOException(e.getMessage());
       }
     }
+    writeOffset += len;
   }
 
   private StripeWriteStatus rewriteStripeToNewBlockGroup(
