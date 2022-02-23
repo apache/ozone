@@ -149,6 +149,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | tenantPolicyTable         | policyGroup -> [policyId1, policyId2]    |
    * |----------------------------------------------------------------------|
+   * | RangerStateTable         | String""RangerOzoneServiceVersion" -> service version in Ranger]    |
+   * |----------------------------------------------------------------------|
+   *
    *
    * Simple Tables:
    * |----------------------------------------------------------------------|
@@ -201,6 +204,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String TENANT_GROUP_TABLE = "tenantGroupTable";
   public static final String TENANT_ROLE_TABLE = "tenantRoleTable";
   public static final String TENANT_POLICY_TABLE = "tenantPolicyTable";
+  public static final String RANGER_STATE_TABLE = "RangerStateTable";
+  public static final String RangerOzoneServiceVersionKey = "RangerOzoneServiceVersion";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -224,7 +229,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       TENANT_STATE_TABLE,
       TENANT_GROUP_TABLE,
       TENANT_ROLE_TABLE,
-      TENANT_POLICY_TABLE
+      TENANT_POLICY_TABLE,
+      RANGER_STATE_TABLE
   };
 
   private DBStore store;
@@ -255,6 +261,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table tenantGroupTable;
   private Table tenantRoleTable;
   private Table tenantPolicyTable;
+  private Table rangerStateTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -466,6 +473,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(TENANT_GROUP_TABLE)
         .addTable(TENANT_ROLE_TABLE)
         .addTable(TENANT_POLICY_TABLE)
+        .addTable(RANGER_STATE_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -573,6 +581,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
         String.class, OmDBTenantInfo.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
+
+    // String("RangerOzoneServiceVersion")> Long (current service version
+    // in Ranger)
+    rangerStateTable = this.store.getTable(RANGER_STATE_TABLE,
+        String.class, Long.class);
+    checkTableStatus(rangerStateTable, RANGER_STATE_TABLE);
 
     // accessId -> list of tenant groups the user belongs to
     tenantGroupTable = this.store.getTable(TENANT_GROUP_TABLE,
@@ -1340,6 +1354,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmDBTenantInfo> getTenantStateTable() {
     return tenantStateTable;
+  }
+
+  @Override
+  public Table<String, Long> getOmRangerStateTable() {
+    return rangerStateTable;
   }
 
   @Override

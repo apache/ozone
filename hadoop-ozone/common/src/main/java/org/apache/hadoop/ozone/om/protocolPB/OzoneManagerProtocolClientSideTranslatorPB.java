@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmRangerSyncArgs;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -968,6 +969,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setRevokeS3SecretRequest(request)
             .build();
     handleError(submitRequest(omRequest));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void rangerServiceVersionSync(OmRangerSyncArgs omArgs) throws IOException {
+    final RangerServiceVersionSyncRequest request = RangerServiceVersionSyncRequest.newBuilder()
+        .setRangerServiceVersion(omArgs.getNewSyncServiceVersion())
+        .build();
+    final OMRequest omRequest = createOMRequest(Type.RangerServiceVersionSync)
+        .setRangerServiceVersionSyncRequest(request)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
   }
 
   /**

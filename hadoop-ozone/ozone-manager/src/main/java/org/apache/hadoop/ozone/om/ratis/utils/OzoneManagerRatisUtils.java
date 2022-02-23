@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMRangerServiceVersionSyncRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignAdminRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantDeleteRequest;
@@ -180,6 +181,8 @@ public final class OzoneManagerRatisUtils {
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
+    case RangerServiceVersionSync:
+        return new OMRangerServiceVersionSyncRequest(omRequest);
     case CreateTenant:
       return new OMTenantCreateRequest(omRequest);
     case DeleteTenant:

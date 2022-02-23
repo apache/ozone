@@ -103,6 +103,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmRangerSyncArgs;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -736,6 +737,21 @@ public class RpcClient implements ClientProtocol {
             "kerberosID cannot be null or empty.");
 
     ozoneManagerClient.revokeS3Secret(kerberosID);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void rangerServiceVersionSync(long version)
+      throws IOException {
+
+    OmRangerSyncArgs.Builder builder = OmRangerSyncArgs.newBuilder();
+    builder.setNewSyncServiceVersion(version);
+
+    LOG.info("Setting Ranger Ozone Service Version in OMDB to {}", version);
+
+    ozoneManagerClient.rangerServiceVersionSync(builder.build());
   }
 
   /**

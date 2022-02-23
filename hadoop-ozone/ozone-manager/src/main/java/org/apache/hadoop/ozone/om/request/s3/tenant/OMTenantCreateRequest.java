@@ -58,6 +58,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RESOURCE_BUSY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
@@ -165,6 +166,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             .setCreationTime(initialTime)
             .setModificationTime(initialTime)
             .build();
+
+    if (!ozoneManager.getMultiTenantManager()
+        .tryAcquireInProgressMtOp(WAIT_MILISECONDS)) {
+      throw new OMException("Only One MultiTenant operation allowed at a " +
+          "time", RESOURCE_BUSY);
+    }
 
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
@@ -307,11 +314,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           new CacheKey<>(userPolicyGroupName),
           new CacheValue<>(Optional.of(tenantDefaultPolicies),
               transactionLogIndex));
-      final String bucketPolicyId =
-          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(bucketPolicyGroupName),
-          new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex));
 
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder().setSuccess(true).build()
@@ -319,7 +321,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantCreateResponse(
           omResponse.build(),
           omVolumeArgs, volumeList,
-          omDBTenantInfo, tenantDefaultPolicies, bucketPolicyId);
+          omDBTenantInfo, tenantDefaultPolicies);
 
     } catch (IOException ex) {
       // Error handling. Clean up Ranger policies when necessary.
@@ -355,6 +357,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      ozoneManager.getMultiTenantManager().resetInProgressMtOpState();
     }
 
     // Perform audit logging

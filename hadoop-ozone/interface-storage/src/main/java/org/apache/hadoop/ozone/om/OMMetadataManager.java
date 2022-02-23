@@ -365,6 +365,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmDBTenantInfo> getTenantStateTable();
 
+  Table<String, Long> getOmRangerStateTable();
+
   Table<String, String> getTenantGroupTable();
 
   Table<String, String> getTenantRoleTable();

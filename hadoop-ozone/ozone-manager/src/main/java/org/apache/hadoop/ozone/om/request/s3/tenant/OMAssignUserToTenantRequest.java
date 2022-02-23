@@ -314,6 +314,7 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
 
       // Add to tenantGroupTable
       // TODO: DOUBLE CHECK GROUP NAME USAGE
+      // TODO : Group is not needed anymore, remove it.
       final String defaultGroupName =
           tenantId + OzoneConsts.DEFAULT_TENANT_USER_GROUP_SUFFIX;
       omMetadataManager.getTenantGroupTable().addCacheEntry(

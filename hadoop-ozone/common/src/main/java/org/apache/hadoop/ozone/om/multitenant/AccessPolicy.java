@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -90,12 +91,28 @@ public interface AccessPolicy {
    */
   void setPolicyID(String id);
 
+  /**
+   * Sets the last update time to mtime.
+   * @param mtime
+   */
+  void setLastUpdateTime(long mtime);
+
+  /**
+   * Returns the last update time.
+   */
+  long getLastUpdateTime();
+
   String getPolicyID();
 
   /**
    * @return unique policy-name for this policy.
    */
   String getPolicyName();
+
+  /**
+   * @return list of roles associated with this policy
+   */
+  HashSet<String> getRoleList();
 
   /**
    *

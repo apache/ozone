@@ -19,11 +19,14 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -39,17 +42,24 @@ public class RangerAccessPolicy implements AccessPolicy {
   // For now RangerAccessPolicy supports only one object per policy
   private OzoneObj accessObject;
   private Map<String, List<AccessPolicyElem>> policyMap;
+  private HashSet<String> roleList;
   private String policyID;
   private String policyJsonString;
   private String policyName;
+  private long lastUpdateTime;
 
   public RangerAccessPolicy(String name) {
     policyMap = new ConcurrentHashMap<>();
     policyName = name;
+    roleList = new HashSet<>();
   }
 
   public void setPolicyID(String id) {
     policyID = id;
+  }
+
+  public void setLastUpdateTime(long mtime) {
+    lastUpdateTime = mtime;
   }
 
   public String getPolicyID() {
@@ -58,6 +68,10 @@ public class RangerAccessPolicy implements AccessPolicy {
 
   public String getPolicyName() {
     return policyName;
+  }
+
+  public HashSet<String> getRoleList() {
+    return roleList;
   }
 
   @Override
@@ -70,7 +84,28 @@ public class RangerAccessPolicy implements AccessPolicy {
   public String deserializePolicyFromJsonString(JsonObject jsonObject)
       throws Exception {
     setPolicyID(jsonObject.get("id").getAsString());
+    try {
+      JsonArray policyItems = jsonObject
+          .getAsJsonArray("policyItems");
+      for (int j = 0; j < policyItems.size(); ++j) {
+        JsonObject policy = policyItems.get(j).getAsJsonObject();
+        JsonArray roles = policy.getAsJsonArray("roles");
+        for (int k = 0; k < roles.size(); ++k) {
+          if (!roleList.contains(roles.get(k).getAsString())) {
+            // We only get the role name here. We need to query and populate it.
+            roleList.add(roles.get(k).getAsString());
+          }
+        }
+      }
+    } catch (Exception e) {
+      // Ignore Exception here.
+    }
     // TODO : retrieve other policy fields as well.
+    try {
+      setLastUpdateTime(jsonObject.get("updateTime").getAsLong());
+    } catch (Exception e){
+      // lets ignore the exception in case the field is not set.
+    }
     return null;
   }
 
@@ -116,6 +151,11 @@ public class RangerAccessPolicy implements AccessPolicy {
       list.addAll(entry.getValue());
     }
     return list;
+  }
+
+  @Override
+  public long getLastUpdateTime() {
+    return lastUpdateTime;
   }
 
   @Override
@@ -254,7 +294,8 @@ public class RangerAccessPolicy implements AccessPolicy {
     policyJsonString =
         "{\"policyType\":\"0\"," + "\"name\":\"" + policyName + "\","
             + "\"isEnabled\":true," + "\"policyPriority\":0,"
-            + "\"policyLabels\":[]," + "\"description\":\"\","
+            + "\"description\":\"Policy created by Ozone for Multi-Tenancy\","
+            + "\"policyLabels\":[\"OzoneMultiTenant\"]," + "\"description\":\"\","
             + "\"isAuditEnabled\":true," + createRangerResourceItems()
             + "\"isDenyAllElse\":false," + createRangerPolicyItems()
             + "\"allowExceptions\":[]," + "\"denyPolicyItems\":[],"

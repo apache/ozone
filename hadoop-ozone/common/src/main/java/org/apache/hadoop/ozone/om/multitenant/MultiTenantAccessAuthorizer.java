@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -28,7 +29,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.http.auth.BasicUserPrincipal;
-
 
 /**
  * Public API for Ozone MultiTenant Gatekeeper. Security providers providing
@@ -66,6 +66,25 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
       boolean isAdmin) throws IOException;
 
   /**
+   * Update the exising role details and push the changes to Ranger.
+   *
+   * @param principal contains user name, must be an existing user in Ranger.
+   * @param existingRole An existing role's JSON response String from Ranger.
+   * @return roleId (not useful for now)
+   * @throws IOException
+   */
+  String revokeUserFromRole(BasicUserPrincipal principal,
+                                   String existingRole) throws IOException;
+
+  /**
+   * Assign all the users to an existing role
+   * @param users list of user principals
+   * @param existingRole roleName
+   */
+  public String assignAllUsers(HashSet<String> users,
+                               String existingRole) throws IOException;
+
+  /**
    * @param principal
    * @return Unique userID maintained by the authorizer plugin.
    * @throws IOException
@@ -78,6 +97,15 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @throws IOException
    */
   String getRole(OzoneTenantRolePrincipal principal)
+      throws IOException;
+
+  /**
+   * Returs the details of a role, given the rolename.
+   * @param roleName
+   * @return
+   * @throws IOException
+   */
+  String getRole(String roleName)
       throws IOException;
 
   /**
@@ -97,9 +125,19 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * MultiTenantGateKeeper plugin Implementation e.g. corresponding ID on the
    * Ranger end for a ranger based implementation .
    */
-  String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+  String createRole(String role, String adminRoleName)
       throws IOException;
 
+  /**
+   * Creates a new user.
+   * @param userName
+   * @param password
+   * @return
+   * @throws IOException
+   */
+  public String createUser(String userName,
+                           String password)
+      throws IOException;
   /**
    * Delete the group groupID in MultiTenantGateKeeper plugin.
    * @param groupID : unique opaque ID that was returned by
@@ -122,6 +160,14 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @throws Exception
    */
   AccessPolicy getAccessPolicyByName(String policyName) throws Exception;
+
+  /**
+   * given a policy Id, returs the policy.
+   * @param policyId
+   * @return
+   * @throws Exception
+   */
+  AccessPolicy getAccessPolicyById(String policyId) throws Exception;
 
   /**
    *

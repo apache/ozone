@@ -309,6 +309,7 @@ public final class OmUtils {
     case TenantRevokeUserAccessId:
     case TenantAssignAdmin:
     case TenantRevokeAdmin:
+    case RangerServiceVersionSync:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

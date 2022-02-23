@@ -49,21 +49,19 @@ public class OMTenantCreateResponse extends OMClientResponse {
   private OmVolumeArgs omVolumeArgs;
 
   private OmDBTenantInfo omTenantInfo;
-  private String userPolicyId, bucketPolicyId;
+  private String userPolicyId;
 
   public OMTenantCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmVolumeArgs omVolumeArgs,
       @Nonnull OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo,
       @Nonnull OmDBTenantInfo omTenantInfo,
-      @Nonnull String userPolicyId,
-      @Nonnull String bucketPolicyId
+      @Nonnull String userPolicyId
   ) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;
     this.omTenantInfo = omTenantInfo;
     this.userPolicyId = userPolicyId;
-    this.bucketPolicyId = bucketPolicyId;
   }
 
   /**
@@ -87,11 +85,6 @@ public class OMTenantCreateResponse extends OMClientResponse {
         omTenantInfo.getUserPolicyGroupName();
     omMetadataManager.getTenantPolicyTable().putWithBatch(
         batchOperation, userPolicyGroupName, userPolicyId);
-
-    final String bucketPolicyGroupName =
-        omTenantInfo.getBucketPolicyGroupName();
-    omMetadataManager.getTenantPolicyTable().putWithBatch(
-        batchOperation, bucketPolicyGroupName, bucketPolicyId);
 
     // From OMVolumeCreateResponse
     String dbVolumeKey =

@@ -344,7 +344,6 @@ public final class OzoneConsts {
   public static final String TENANT_NAME_ROLE_DELIMITER = "-";
   public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
-  public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
   public static final String DEFAULT_TENANT_USER_GROUP_SUFFIX = "-users";
 
   // For OM metrics saving to a file
@@ -484,9 +483,11 @@ public final class OzoneConsts {
   public static final String OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT =
       "/service/roles/roles/name/";
 
-  // TODO: Change to delete role endpoint
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT =
       "/service/xusers/secure/groups/id/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT =
+      "/service/roles/roles/";
 
   public static final String OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT =
       "/service/public/v2/api/policy";
@@ -494,6 +495,20 @@ public final class OzoneConsts {
   public static final String OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT =
       "/service/public/v2/api/policy/?policyName=";
 
+  public static final String OZONE_OM_RANGER_ADMIN_GET_POLICY_ID_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy/?policyId=";
+
   public static final String OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT =
       "/service/plugins/policies/";
+
+  public static final String OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT =
+      "/service/plugins/services/";
+
+  public static final String OZONE_OM_RANGER_DOWNLOAD_ENDPOINT =
+      "/service/plugins/secure/policies/download/cm_ozone" +
+          "?supportsPolicyDeltas=true&lastKnownVersion=";
+
+  public static final String OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT =
+      "/service/plugins/policies/service/";
+
 }

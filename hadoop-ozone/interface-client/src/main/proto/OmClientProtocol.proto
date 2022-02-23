@@ -118,6 +118,8 @@ enum Type {
   TenantListUser = 105;
 
   SetS3Secret = 106;
+
+  RangerServiceVersionSync = 107;
 }
 
 message OMRequest {
@@ -218,6 +220,9 @@ message OMRequest {
   optional TenantListUserRequest            tenantListUserRequest          = 105;
 
   optional SetS3SecretRequest               SetS3SecretRequest             = 106;
+
+  optional RangerServiceVersionSyncRequest  RangerServiceVersionSyncRequest =
+      107;
 }
 
 message OMResponse {
@@ -311,6 +316,9 @@ message OMResponse {
   optional TenantListUserResponse            tenantListUserResponse        = 105;
 
   optional SetS3SecretResponse               SetS3SecretResponse           = 106;
+
+  optional RangerServiceVersionSyncResponse  RangerServiceVersionSyncResponse =
+      107;
 }
 
 enum Status {
@@ -1473,9 +1481,13 @@ message RevokeS3SecretRequest {
 }
 
 message CreateTenantRequest {
-    optional string tenantName = 1;
-    optional string tenantDefaultPolicyName = 2;
-    optional string volumeName = 3;
+  optional string tenantName = 1;
+  optional string tenantDefaultPolicyName = 2;
+  optional string volumeName = 3;
+}
+
+message RangerServiceVersionSyncRequest {
+    required uint64 rangerServiceVersion = 1;
 }
 
 message DeleteTenantRequest {
@@ -1510,6 +1522,9 @@ message GetS3VolumeContextRequest {
 
 message CreateTenantResponse {
     optional bool success = 1;  // TODO: Remove this field
+}
+
+message RangerServiceVersionSyncResponse {
 }
 
 message DeleteTenantResponse {

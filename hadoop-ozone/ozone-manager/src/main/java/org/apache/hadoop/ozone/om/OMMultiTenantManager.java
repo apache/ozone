@@ -297,4 +297,14 @@ public interface OMMultiTenantManager {
   void updateTenantPolicy(Tenant tenant, String policyID,
                           AccessPolicy policy) throws IOException;
 
+  /**
+   * Currently we allow only one in-progress multi-tenant operation.
+   * tryAcquireInProgressMtOp/resetInProgressMtOpState help with this.
+   * @param milli milliseconds to wait before giving up on the lock.
+   * @return
+   */
+  boolean tryAcquireInProgressMtOp(long milli);
+
+  void resetInProgressMtOpState();
+
 }

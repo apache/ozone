@@ -46,6 +46,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RESOURCE_BUSY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
@@ -111,6 +112,13 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     } else {
       delegated = true;
     }
+
+    if (!ozoneManager.getMultiTenantManager()
+        .tryAcquireInProgressMtOp(WAIT_MILISECONDS)) {
+      throw new OMException("Only One MultiTenant operation allowed at a " +
+          "time", RESOURCE_BUSY);
+    }
+
     // Call OMMTM to add user to tenant admin role
     ozoneManager.getMultiTenantManager().assignTenantAdmin(
         request.getAccessId(), delegated);
@@ -229,6 +237,8 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+
+      ozoneManager.getMultiTenantManager().resetInProgressMtOpState();
     }
 
     // Audit

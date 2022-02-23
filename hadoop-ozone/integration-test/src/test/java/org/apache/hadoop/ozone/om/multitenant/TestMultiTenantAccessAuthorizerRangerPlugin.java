@@ -157,9 +157,9 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
           OzoneTenantRolePrincipal.getAdminRole("tenant1");
       OzoneTenantRolePrincipal group2Principal =
           OzoneTenantRolePrincipal.getUserRole("tenant1");
-      omm.createRole(group1Principal, null);
+      omm.createRole(group1Principal.getName(), null);
       groupIdsCreated.add(omm.getRole(group1Principal));
-      omm.createRole(group2Principal, group1Principal.getName());
+      omm.createRole(group2Principal.getName(), group1Principal.getName());
       groupIdsCreated.add(omm.getRole(group2Principal));
 
       userPrincipal = new BasicUserPrincipal("user1Test");

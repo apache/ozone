@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.http.auth.BasicUserPrincipal;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -51,6 +52,16 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
+  public String revokeUserFromRole(BasicUserPrincipal principal, String existingRole) throws IOException {
+    return null;
+  }
+
+  @Override
+  public String assignAllUsers(HashSet<String> users, String existingRole) throws IOException {
+    return null;
+  }
+
+  @Override
   public String getUserId(BasicUserPrincipal principal) throws IOException {
     return null;
   }
@@ -61,13 +72,23 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
+  public String getRole(String roleName) throws IOException {
+    return null;
+  }
+
+  @Override
   public void deleteUser(String opaqueUserID) throws IOException {
 
   }
 
   @Override
-  public String createRole(OzoneTenantRolePrincipal role, String adminRoleName)
+  public String createRole(String role, String adminRoleName)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public String createUser(String userName, String password) throws IOException {
     return null;
   }
 
@@ -84,6 +105,11 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   @Override
   public AccessPolicy getAccessPolicyByName(String policyName)
       throws Exception {
+    return null;
+  }
+
+  @Override
+  public AccessPolicy getAccessPolicyById(String policyName) throws Exception {
     return null;
   }
 

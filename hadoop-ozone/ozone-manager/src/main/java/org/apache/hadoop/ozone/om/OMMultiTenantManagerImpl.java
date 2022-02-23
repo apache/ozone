@@ -38,6 +38,8 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.lang3.StringUtils;
@@ -92,8 +94,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final OzoneConfiguration conf;
   private final ReentrantReadWriteLock controlPathLock;
   private final Map<String, CachedTenantInfo> tenantCache;
+  private final Semaphore inProgressMtOp = new Semaphore(1, true);
 
-  OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
+  public OMMultiTenantManagerImpl(OMMetadataManager mgr,
+                                  OzoneConfiguration conf)
       throws IOException {
     this.conf = conf;
     controlPathLock = new ReentrantReadWriteLock();
@@ -170,13 +174,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // Create admin role first
       final OzoneTenantRolePrincipal adminRole =
           OzoneTenantRolePrincipal.getAdminRole(tenantID);
-      String adminRoleId = authorizer.createRole(adminRole, null);
+      String adminRoleId = authorizer.createRole(adminRole.getName(), null);
       tenant.addTenantAccessRole(adminRoleId);
 
       // Then create user role, and add admin role as its delegated admin
       final OzoneTenantRolePrincipal userRole =
           OzoneTenantRolePrincipal.getUserRole(tenantID);
-      String userRoleId = authorizer.createRole(userRole, adminRole.getName());
+      String userRoleId = authorizer.createRole(userRole.getName(), adminRole.getName());
       tenant.addTenantAccessRole(userRoleId);
 
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();
@@ -636,5 +640,19 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   @VisibleForTesting
   Map<String, CachedTenantInfo> getTenantCache() {
     return tenantCache;
+  }
+
+  @Override
+  public boolean tryAcquireInProgressMtOp(long milli) {
+    try {
+      return inProgressMtOp.tryAcquire(milli, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      return false;
+    }
+  }
+
+  @Override
+  public void resetInProgressMtOpState() {
+    inProgressMtOp.drainPermits();
   }
 }

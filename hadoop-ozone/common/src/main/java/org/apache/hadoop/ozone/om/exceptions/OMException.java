@@ -255,6 +255,8 @@ public class OMException extends IOException {
     TENANT_AUTHORIZER_ERROR,
 
     VOLUME_IS_REFERENCED,
-    TENANT_NOT_EMPTY
+    TENANT_NOT_EMPTY,
+
+    RESOURCE_BUSY
   }
 }

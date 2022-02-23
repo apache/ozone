@@ -211,6 +211,15 @@ public class ObjectStore {
   }
 
   /**
+   * Sync Ozone Service version in Ranger to OMDB.
+   * @param version
+   * @throws IOException
+   */
+  public void rangerServiceVersionSync(long version) throws IOException {
+    proxy.rangerServiceVersionSync(version);
+  }
+
+  /**
    * Create a tenant.
    * @param tenantId tenant name.
    * @throws IOException
