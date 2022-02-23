@@ -327,7 +327,7 @@ public final class ECStreamTestUtil {
 
     @Override
     public long getRemaining() {
-      return data.remaining();
+      return getLength() - getPos();
     }
 
     @Override
@@ -344,7 +344,7 @@ public final class ECStreamTestUtil {
       if (getRemaining() == 0) {
         return EOF;
       }
-      int toRead = Math.min(buf.remaining(), (int)getRemaining());
+      int toRead = (int)Math.min(buf.remaining(), getRemaining());
       for (int i = 0; i < toRead; i++) {
         if (shouldError && data.position() >= shouldErrorPosition) {
           throwError();
