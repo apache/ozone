@@ -192,7 +192,7 @@ IntelliJ may not pick up protoc generated classes as they can be very huge. If t
 2. Add `idea.max.intellisense.filesize=10000` entry
 3. Restart your IDE
 
-## Connecting to Ozone on Kubernetes
+## Connecting IDE to Ozone on Kubernetes
 
 ### Setup Ozone and Kubernetes
 
@@ -202,9 +202,8 @@ To start Ozone in Kubernetes, you need Kubernetes and kubectl installed. You als
 2. `cd <ozone-root>/hadoop-ozone/dist/target/ozone-X.X../kubernetes/examples/ozone`
 3. `source ../testlib.sh`
 4. `regenerate_resources`
-5. `start_k8s_env`
 
-### Attach the debugger in IntelliJ
+### Configure IntelliJ
 
 Select some preferred ports for attaching the debugger.
 Below there is an example configuration for connecting OM to port 5005, SCM to port 6006 and S3G to port 7007.
@@ -239,7 +238,12 @@ In the file `<ozone-root>/hadoop-ozone/dist/target/ozone-X.X../bin/ozone`
 
 1. Go over the code and set breakpoints for the parts you want to debug
 2. Start in Debug mode the Remote JVM Debug configurations that we created earlier in IntelliJ
-3. An example use would be to read and write objects in the bash and check the output in the Debugger in IntelliJ
+3. An example use would be to read and write objects in bash and check the output in the Debugger in IntelliJ.  For example, set a breakpoint in the OMVolumeCreateRequest, then create a volume like so to hit it:
+```
+      kubectl exec -it scm-0 bash
+      ozone sh volume create testVolume
+```
+
 
 ## CI
 The Ozone project uses Github Actions for its CI system.  The configuration is described in detail [here](.github/ci.md).
