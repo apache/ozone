@@ -114,14 +114,15 @@ public class TarContainerPacker
   private void extractEntry(ArchiveEntry entry, InputStream input, long size,
       Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);
-    Path parent = path.getParent();
-    if (parent != null) {
-      Files.createDirectories(parent);
-    }
 
     if (entry.isDirectory()) {
       Files.createDirectories(path);
     } else {
+      Path parent = path.getParent();
+      if (parent != null) {
+        Files.createDirectories(parent);
+      }
+
       try (OutputStream fileOutput = new FileOutputStream(path.toFile());
            OutputStream output = new BufferedOutputStream(fileOutput)) {
         int bufferSize = 1024;
