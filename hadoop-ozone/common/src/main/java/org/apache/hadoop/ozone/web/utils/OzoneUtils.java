@@ -54,15 +54,15 @@ public final class OzoneUtils {
    */
   private static final ThreadLocal<SimpleDateFormat> DATE_FORMAT =
       new ThreadLocal<SimpleDateFormat>() {
-    @Override
-    protected SimpleDateFormat initialValue() {
-      SimpleDateFormat format = new SimpleDateFormat(
-          OzoneConsts.OZONE_DATE_FORMAT, Locale.US);
-      format.setTimeZone(TimeZone.getTimeZone(OzoneConsts.OZONE_TIME_ZONE));
+        @Override
+        protected SimpleDateFormat initialValue() {
+          SimpleDateFormat format = new SimpleDateFormat(
+              OzoneConsts.OZONE_DATE_FORMAT, Locale.US);
+          format.setTimeZone(TimeZone.getTimeZone(OzoneConsts.OZONE_TIME_ZONE));
 
-      return format;
-    }
-  };
+          return format;
+        }
+      };
 
   /**
    * Verifies that max key length is a valid value.
