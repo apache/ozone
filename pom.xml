@@ -1622,6 +1622,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <version>${proto-backwards-compatibility.version}</version>
           <configuration>
             <protoSourceRoot>${basedir}/target/classes</protoSourceRoot>
+            <options>--strict false</options>
           </configuration>
           <executions>
             <execution>
