@@ -155,49 +155,38 @@ public class ECKeyOutputStream extends KeyOutputStream {
     if (len == 0) {
       return;
     }
-    blockOutputStreamEntryPool.allocateBlockIfNeeded();
-
-    int currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
-        .getCurrentStreamIdx();
-    int currentChunkBufferRemainingLength =
-        ecChunkBufferCache.dataBuffers[currentStreamIdx].remaining();
-    int currentChunkBufferLen =
-        ecChunkBufferCache.dataBuffers[currentStreamIdx]
-            .position();
-    int maxLenToCurrChunkBuffer = Math.min(len, ecChunkSize);
-    int currentWriterChunkLenToWrite =
-        Math.min(currentChunkBufferRemainingLength, maxLenToCurrChunkBuffer);
-    int pos = handleDataWrite(currentStreamIdx, b, off,
-        currentWriterChunkLenToWrite,
-        currentChunkBufferLen + currentWriterChunkLenToWrite == ecChunkSize);
-    checkAndWriteParityCells(pos, false);
-    int remLen = len - currentWriterChunkLenToWrite;
-    int iters = remLen / ecChunkSize;
-    int lastCellSize = remLen % ecChunkSize;
-    off += currentWriterChunkLenToWrite;
-
-    while (iters > 0) {
-      currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
-          .getCurrentStreamIdx();
-      pos = handleDataWrite(currentStreamIdx, b, off, ecChunkSize, true);
-      off += ecChunkSize;
-      iters--;
-      checkAndWriteParityCells(pos, iters > 0 || remLen > 0);
-    }
-
-    if (lastCellSize > 0) {
-      currentStreamIdx = blockOutputStreamEntryPool.getCurrentStreamEntry()
-          .getCurrentStreamIdx();
-      pos = handleDataWrite(currentStreamIdx, b, off,
-          lastCellSize, false);
-      checkAndWriteParityCells(pos, false);
-    }
+    handleWrite(b, off, len);
     writeOffset += len;
   }
 
-  private StripeWriteStatus rewriteStripeToNewBlockGroup(
-      long failedStripeDataSize, boolean allocateBlockIfFull, boolean close)
+  private void handleWrite(byte[] b, int off, int len)
       throws IOException {
+    while (len > 0) {
+      try {
+        blockOutputStreamEntryPool.allocateBlockIfNeeded();
+        int currentStreamIdx = blockOutputStreamEntryPool
+            .getCurrentStreamEntry().getCurrentStreamIdx();
+        int currentRem =
+            ecChunkBufferCache.dataBuffers[currentStreamIdx].remaining();
+        int expectedWriteLen = Math.min(len, Math.min(currentRem, ecChunkSize));
+        long currentPos =
+            ecChunkBufferCache.dataBuffers[currentStreamIdx].position();
+        int pos =
+            handleDataWrite(currentStreamIdx, b, off, expectedWriteLen,
+                currentPos + expectedWriteLen == ecChunkSize);
+        checkAndWriteParityCells(pos);
+        long writtenLength = pos - currentPos;
+        len -= writtenLength;
+        off += writtenLength;
+      } catch (Exception e) {
+        markStreamClosed();
+        throw new IOException(e.getMessage());
+      }
+    }
+  }
+
+  private StripeWriteStatus rewriteStripeToNewBlockGroup(
+      long failedStripeDataSize, boolean close) throws IOException {
     int[] failedDataStripeChunkLens = new int[numDataBlks];
     int[] failedParityStripeChunkLens = new int[numParityBlks];
     final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
@@ -260,9 +249,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       // In most cases this should not happen except in the case stripe size and
       // block size same.
       newBlockGroupStreamEntry.close();
-      if (allocateBlockIfFull) {
-        blockOutputStreamEntryPool.allocateBlockIfNeeded();
-      }
     } else {
       newBlockGroupStreamEntry.resetToFirstEntry();
     }
@@ -270,20 +256,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return StripeWriteStatus.SUCCESS;
   }
 
-  private void checkAndWriteParityCells(int lastDataBuffPos,
-      boolean allocateBlockIfFull) throws IOException {
-    //check data blocks finished
-    //If index is > datanum blks
+  private void checkAndWriteParityCells(int lastDataBuffPos)
+      throws IOException {
+    // Check data blocks finished
+    // If index > numDataBlks
     ECBlockOutputStreamEntry currentStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     int currentStreamIdx = currentStreamEntry.getCurrentStreamIdx();
     if (currentStreamIdx == numDataBlks && lastDataBuffPos == ecChunkSize) {
       //Lets encode and write
       boolean shouldClose = currentStreamEntry.getRemaining() <= 0;
-      if (handleParityWrites(ecChunkSize, allocateBlockIfFull,
-          shouldClose) == StripeWriteStatus.FAILED) {
-        handleStripeFailure(numDataBlks * ecChunkSize, allocateBlockIfFull,
-            shouldClose);
+      if (handleParityWrites(ecChunkSize, shouldClose)
+          == StripeWriteStatus.FAILED) {
+        handleStripeFailure(numDataBlks * ecChunkSize, shouldClose);
       } else {
         // At this stage stripe write is successful.
         currentStreamEntry.updateBlockGroupToAckedPosition(
@@ -294,8 +279,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private StripeWriteStatus handleParityWrites(int parityCellSize,
-      boolean allocateBlockIfFull, boolean isLastStripe)
-      throws IOException {
+      boolean isLastStripe) throws IOException {
     writeParityCells(parityCellSize);
     if (hasWriteFailure()) {
       return StripeWriteStatus.FAILED;
@@ -316,9 +300,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
     if (streamEntry.getRemaining() <= 0) {
       streamEntry.close();
-      if (allocateBlockIfFull) {
-        blockOutputStreamEntryPool.allocateBlockIfNeeded();
-      }
     } else {
       streamEntry.resetToFirstEntry();
     }
@@ -523,9 +504,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
         final int parityCellSize =
             (int) (lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize);
         addPadding(parityCellSize);
-        if (handleParityWrites(parityCellSize,
-            false, true) == StripeWriteStatus.FAILED) {
-          handleStripeFailure(lastStripeSize, false, true);
+        if (handleParityWrites(parityCellSize, true)
+            == StripeWriteStatus.FAILED) {
+          handleStripeFailure(lastStripeSize, true);
         } else {
           blockOutputStreamEntryPool.getCurrentStreamEntry()
               .updateBlockGroupToAckedPosition(
@@ -546,14 +527,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
     ecChunkBufferCache.release();
   }
 
-  private void handleStripeFailure(long lastStripeSize,
-      boolean allocateBlockIfFull, boolean isClose)
+  private void handleStripeFailure(long lastStripeSize, boolean isClose)
       throws IOException {
     StripeWriteStatus stripeWriteStatus;
     for (int i = 0; i < this.config.getMaxECStripeWriteRetries(); i++) {
-      stripeWriteStatus =
-          rewriteStripeToNewBlockGroup(lastStripeSize,
-              allocateBlockIfFull, isClose);
+      stripeWriteStatus = rewriteStripeToNewBlockGroup(lastStripeSize, isClose);
       if (stripeWriteStatus == StripeWriteStatus.SUCCESS) {
         return;
       }
