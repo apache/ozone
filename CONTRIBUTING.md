@@ -203,7 +203,7 @@ To start Ozone in Kubernetes, you need Kubernetes and kubectl installed. You als
 3. `source ../testlib.sh`
 4. `regenerate_resources`
 
-### Attach the debugger in IntelliJ
+### Configure IntelliJ
 
 Select some preferred ports for attaching the debugger.
 Below there is an example configuration for connecting OM to port 5005, SCM to port 6006 and S3G to port 7007.
