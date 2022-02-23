@@ -16,6 +16,10 @@
 import sys
 import os
 import re
+import logging
+
+LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
+logging.basicConfig(level=LOGLEVEL)
 
 # The first argument to the script is the directory where the documentation is
 # stored.
@@ -34,14 +38,14 @@ for root, subdirs, files in os.walk(docs_directory):
                 for line in f:
                     # If the line contains the image tag, we need to replace it
                     if re.search(re.compile("^!\[(.*?)\]\((.*?)\)"), line):
-                        print('file %s (full path: %s)' %
-                              (filename, file_path))
-                        print(f"found markdown image: {line}", end="")
+                        logging.debug(
+                            f'file {filename} (full path: {file_path})')
+                        logging.debug(f"found markdown image: {line}")
 
                         line_replacement = line.replace(
                             '![', '{{< image alt="').replace('](', '" src="').replace(')', '">}}')
 
-                        print(
+                        logging.debug(
                             f"replaced with shortcode: {line_replacement}")
 
                         new_file_content.append(line_replacement)
