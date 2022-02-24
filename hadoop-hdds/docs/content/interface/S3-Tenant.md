@@ -1,9 +1,8 @@
 ---
-title: "S3 Tenant commands"
-weight: 3
+title: "Tenant commands"
 menu:
    main:
-      parent: "Client Interfaces"
+      parent: "Command Line Interface"
 summary: Ozone subcommands for S3 tenant management
 ---
 <!---
@@ -42,7 +41,10 @@ If the OzoneManagers are running in HA, append `--om-service-id=` accordingly to
 Create a new tenant in the current Ozone cluster.
 This operation requires Ozone cluster administrator privilege.
 
-Creating a tenant creates a volume of the exact same name. Volume name restrictions apply.
+Apart from adding new OM DB entries, creating a tenant also does the following in the background:
+1. Creates a volume of the exact same name. Therefore, volume name restrictions apply to the tenant name as well. Specifying a custom volume name during tenant creation is not supported yet. Tenant volume cannot be changed once the tenant is created.
+2. Creates two new Ranger roles, `tenantName-UserRole` and `tenantName-AdminRole`.
+3. Creates new Ranger policies that allows all tenant users to list and create buckets by default under the tenant volume, but only bucket owners and tenant admins are allowed to access the bucket contents.
 
 ```shell
 ozone tenant create <TENANT_NAME>
@@ -107,12 +109,12 @@ Both delegated and non-delegated tenant admin can assign and revoke **regular** 
 The only difference between delegated tenant admin and non-delegated tenant admin is that delegated tenant admin can assign and revoke tenant **admins** in the tenant,
 while non-delegated tenant admin can't.
 
-Unless specified, `ozone tenant assignadmin` assigns **delegated** tenant admins by default.
+Unless `--delegated=false` is specified, `ozone tenant assignadmin` assigns **delegated** tenant admins by default.
 
 It is possible to assign a user to be tenant admins in multiple tenants.
 
 ```shell
-ozone tenant user assignadmin <ACCESS_ID> --tenant=<TENANT_NAME>
+ozone tenant user assignadmin <ACCESS_ID> --delegated=true --tenant=<TENANT_NAME>
 ```
 
 Example:
@@ -161,79 +163,6 @@ bash-4.2$ ozone tenant user info testuser
 User 'testuser' is assigned to:
 - Tenant 'tenantone' delegated admin with accessId 'tenantone$testuser'
 ```
-
-
-### Bonus: Accessing a bucket in a tenant volume via S3 Gateway using S3 API
-
-- {{< detail-tag "Click here to expand/collapse" >}}
-
-#### Configure AWS CLI
-
-```shell
-bash-4.2$ aws configure
-AWS Access Key ID [****************fslf]: tenantone$testuser
-AWS Secret Access Key [****************fslf]: <GENERATED_SECRET>
-Default region name [us-west-1]:
-Default output format [None]:
-```
-
-#### List buckets, create a bucket
-
-```shell
-bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-buckets
-{
-    "Buckets": []
-}
-bash-4.2$ aws s3api --endpoint-url http://s3g:9878 create-bucket --bucket bucket-test1
-{
-    "Location": "http://s3g:9878/bucket-test1"
-}
-bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-buckets
-{
-    "Buckets": [
-        {
-            "Name": "bucket-test1",
-            "CreationDate": "2022-02-16T00:05:00.000Z"
-        }
-    ]
-}
-```
-
-#### Put object (key) to a bucket, list objects
-
-```shell
-bash-4.2$ aws s3api --endpoint-url http://s3g:9878 put-object --bucket bucket-test1 --key file1 --body README.md
-bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-objects --bucket bucket-test1
-{
-    "Contents": [
-        {
-            "Key": "file1",
-            "LastModified": "2022-02-16T00:10:00.000Z",
-            "ETag": "2022-02-16T00:10:00.000Z",
-            "Size": 3811,
-            "StorageClass": "STANDARD"
-        }
-    ]
-}
-```
-
-#### Get object (key) from a bucket
-
-```shell
-bash-4.2$ aws s3api --endpoint-url http://s3g:9878 get-object --bucket bucket-test1 --key file1 file1-get.txt
-{
-    "AcceptRanges": "bytes",
-    "LastModified": "Wed, 16 Feb 2022 00:10:00 GMT",
-    "ContentLength": 3811,
-    "CacheControl": "no-cache",
-    "ContentType": "application/octet-stream",
-    "Expires": "Wed, 16 Feb 2022 00:15:00 GMT",
-    "Metadata": {}
-}
-bash-4.2$ diff file1-get.txt README.md
-```
-
-{{< /detail-tag >}}
 
 
 ### Revoke a tenant admin
@@ -292,3 +221,102 @@ the `ozone sh volume delete` command would fail because the volume reference cou
 bash-4.2$ ozone sh volume delete tenantone
 VOLUME_IS_REFERENCED Volume reference count is not zero (1). Ozone features are enabled on this volume. Try `ozone tenant delete <tenantId>` first.
 ```
+
+
+## Bonus: Accessing a bucket in a tenant volume via S3 Gateway using S3 API
+
+### Configure AWS CLI
+
+```shell
+bash-4.2$ aws configure
+AWS Access Key ID [****************fslf]: tenantone$testuser
+AWS Secret Access Key [****************fslf]: <GENERATED_SECRET>
+Default region name [us-west-1]:
+Default output format [None]:
+```
+
+### List buckets, create a bucket
+
+```shell
+bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-buckets
+{
+    "Buckets": []
+}
+bash-4.2$ aws s3api --endpoint-url http://s3g:9878 create-bucket --bucket bucket-test1
+{
+    "Location": "http://s3g:9878/bucket-test1"
+}
+bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-buckets
+{
+    "Buckets": [
+        {
+            "Name": "bucket-test1",
+            "CreationDate": "2022-02-16T00:05:00.000Z"
+        }
+    ]
+}
+```
+
+If aws cli reports `AccessDenied`, check if the user associated with the Access ID has the permission to access the volume.
+In the Docker Compose dev cluster, one workaround is to set the volume owner to `testuser` to gain full access (because `OzoneNativeAuthorizer` grants the volume owner all permission):
+
+```shell
+ozone sh volume update tenantone --user=testuser
+```
+
+The bucket created with `aws s3api` is also visible under Ozone CLI:
+
+```shell
+bash-4.2$ ozone sh bucket list /tenantone
+[ {
+  "metadata" : { },
+  "volumeName" : "tenantone",
+  "name" : "bucket-test1",
+  "storageType" : "DISK",
+  "versioning" : false,
+  "usedBytes" : 0,
+  "usedNamespace" : 0,
+  "creationTime" : "2022-02-16T00:05:00.000Z",
+  "modificationTime" : "2022-02-16T00:05:00.000Z",
+  "quotaInBytes" : -1,
+  "quotaInNamespace" : -1,
+  "bucketLayout" : "OBJECT_STORE",
+  "owner" : "root",
+  "link" : false
+} ]
+```
+
+### Put object (key) to a bucket, list objects
+
+```shell
+bash-4.2$ aws s3api --endpoint-url http://s3g:9878 put-object --bucket bucket-test1 --key file1 --body README.md
+bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-objects --bucket bucket-test1
+{
+    "Contents": [
+        {
+            "Key": "file1",
+            "LastModified": "2022-02-16T00:10:00.000Z",
+            "ETag": "2022-02-16T00:10:00.000Z",
+            "Size": 3811,
+            "StorageClass": "STANDARD"
+        }
+    ]
+}
+```
+
+### Get object (key) from a bucket
+
+```shell
+bash-4.2$ aws s3api --endpoint-url http://s3g:9878 get-object --bucket bucket-test1 --key file1 file1-get.txt
+{
+    "AcceptRanges": "bytes",
+    "LastModified": "Wed, 16 Feb 2022 00:10:00 GMT",
+    "ContentLength": 3811,
+    "CacheControl": "no-cache",
+    "ContentType": "application/octet-stream",
+    "Expires": "Wed, 16 Feb 2022 00:15:00 GMT",
+    "Metadata": {}
+}
+bash-4.2$ diff file1-get.txt README.md
+```
+

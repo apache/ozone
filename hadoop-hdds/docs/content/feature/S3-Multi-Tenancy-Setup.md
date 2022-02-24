@@ -23,10 +23,20 @@ summary: Preparing Ozone clusters to enable Multi-Tenancy feature
   limitations under the License.
 -->
 
-Steps to enable Multi-Tenancy feature in Ozone clusters. 
+Steps to enable S3 Multi-Tenancy feature in Ozone clusters.
 
 
-### Setting up Multi-Tenancy with Apache Ranger (For production)
+## Setting up S3 Multi-Tenancy for production
+
+### Secure the cluster
+
+Follow [this guide](< ref "security/SecureOzone.md" >) to Kerberize (secure) the cluster if the cluster is not Kerberized yet.
+
+### Set up S3 Gateway
+
+Follow [this guide](< ref "interface/S3.md" >) the cluster to set up at least one S3 Gateway if the cluster doesn't have a S3 Gateway yet.
+
+### Set up Apache Ranger
 
 First make sure ACL is enabled, and `RangerOzoneAuthorizer` is the effective ACL authorizer implementation in-use for Ozone.
 If that is not the case, [follow this]({{< ref "security/SecurityWithRanger.md" >}}). 
@@ -53,7 +63,7 @@ Finally restart all OzoneManagers to apply the new configs.
 Now you can follow the [Multi-Tenancy CLI command guide]({{< ref "interface/S3-Tenant.md" >}}) to try the commands. 
 
 
-### Try in a Docker Compose cluster (For developers)
+## Try in a Docker Compose cluster (For developers)
 
 Developers are encouraged to try out the CLI commands inside the `./compose/ozonesecure/docker-compose.yaml` cluster environment that ships with Ozone.
 
