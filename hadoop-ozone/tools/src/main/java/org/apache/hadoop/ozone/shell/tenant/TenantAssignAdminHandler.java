@@ -47,7 +47,7 @@ public class TenantAssignAdminHandler extends TenantHandler {
   private String tenantId;
 
   @CommandLine.Option(names = {"-d", "--delegated"}, defaultValue = "true",
-      description = "Make delegated admin")
+      description = "Set to true (default) to assign delegated admin")
   private boolean delegated;
 
   @Override
