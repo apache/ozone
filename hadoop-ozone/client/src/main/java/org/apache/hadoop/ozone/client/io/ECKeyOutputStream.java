@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -462,7 +461,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
 
   @Override
   public void flush() {
-    throw new NotImplementedException("The flush API is not implemented yet.");
+    LOG.debug("ECKeyOutputStream does not support flush.");
   }
 
   private void closeCurrentStreamEntry()
