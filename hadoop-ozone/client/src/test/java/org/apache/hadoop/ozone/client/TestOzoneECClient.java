@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.client;
 
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -908,22 +907,6 @@ public class TestOzoneECClient {
       Assert.assertEquals(-1, is.read(partialChunkToRead));
     }
   }
-
-  @Test(expected = NotImplementedException.class)
-  public void testFlushShouldThrowNotImplementedException() throws IOException {
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-
-    try (OzoneOutputStream out = bucket.createKey(keyName, 1024 * 3,
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-            chunkSize), new HashMap<>())) {
-      out.write(inputChunks[0]); // Just write some content.
-      out.flush();
-    }
-  }
-
 
   private OzoneBucket writeIntoECKey(byte[] data, String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
