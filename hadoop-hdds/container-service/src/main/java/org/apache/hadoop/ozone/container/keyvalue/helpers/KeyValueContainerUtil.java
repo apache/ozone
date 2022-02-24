@@ -252,7 +252,7 @@ public final class KeyValueContainerUtil {
       Long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
       if (blockCount != null) {
         isBlockMetadataSet = true;
-        kvContainerData.setKeyCount(blockCount);
+        kvContainerData.setBlockCount(blockCount);
       }
       if (!isBlockMetadataSet) {
         initializeUsedBytesAndBlockCount(store, kvContainerData);
@@ -323,10 +323,10 @@ public final class KeyValueContainerUtil {
       }
     }
     kvData.setBytesUsed(usedBytes);
-    kvData.setKeyCount(blockCount);
+    kvData.setBlockCount(blockCount);
   }
 
-  private static long getBlockLength(BlockData block) throws IOException {
+  public static long getBlockLength(BlockData block) throws IOException {
     long blockLen = 0;
     List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
 
