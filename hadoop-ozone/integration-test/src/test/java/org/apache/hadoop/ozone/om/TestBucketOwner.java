@@ -59,16 +59,15 @@ public class TestBucketOwner {
 
   private static MiniOzoneCluster cluster;
   private static final Logger LOG =
-          LoggerFactory.getLogger(TestBucketOwner.class);
+      LoggerFactory.getLogger(TestBucketOwner.class);
   private static  UserGroupInformation adminUser =
-          UserGroupInformation.createUserForTesting("om",
-          new String[] {"ozone"});
+      UserGroupInformation.createUserForTesting("om", new String[]{"ozone"});
   private static  UserGroupInformation user1 = UserGroupInformation
-          .createUserForTesting("user1", new String[] {"test1"});
+      .createUserForTesting("user1", new String[] {"test1"});
   private static UserGroupInformation user2 = UserGroupInformation
-          .createUserForTesting("user2", new String[] {"test2"});
+      .createUserForTesting("user2", new String[] {"test2"});
   private static UserGroupInformation user3 = UserGroupInformation
-          .createUserForTesting("user3", new String[] {"test3"});
+      .createUserForTesting("user3", new String[] {"test3"});
   private static OzoneClient client;
   private static ObjectStore objectStore;
 

@@ -199,7 +199,7 @@ public class TestKeyValueContainer {
     assertEquals(keyValueContainerData.getState(),
         containerData.getState());
     assertEquals(numberOfKeysToWrite,
-        containerData.getKeyCount());
+        containerData.getBlockCount());
     assertEquals(keyValueContainerData.getLayoutVersion(),
         containerData.getLayoutVersion());
     assertEquals(keyValueContainerData.getMaxSize(),
