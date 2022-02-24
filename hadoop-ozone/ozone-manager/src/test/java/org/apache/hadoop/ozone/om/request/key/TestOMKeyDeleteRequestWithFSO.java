@@ -39,10 +39,10 @@ import java.util.NoSuchElementException;
  * Tests OmKeyDelete request with prefix layout.
  */
 public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
-  private final String partialParentDir = "c/d/";
-  private final String parentDir = "c/d/e";
-  private final String fileName = "file1";
-  private final String fileKey = parentDir + "/" + fileName;
+  private final static String partialParentDir = "c/d/";
+  private final static String parentDir = "c/d/e";
+  private final static String fileName = "file1";
+  private final static String fileKey = parentDir + "/" + fileName;
 
   @Override
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
