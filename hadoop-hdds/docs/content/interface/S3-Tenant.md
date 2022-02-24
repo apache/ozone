@@ -90,6 +90,8 @@ It is possible to assign a user to multiple tenants.
 ozone tenant user assign <USER_NAME> --tenant=<TENANT_NAME>
 ```
 
+`<USER_NAME>` should be a short user name for a Kerberos principal, e.g. `testuser` when the Kerberos principal is `testuser/scm@EXAMPLE.COM`
+
 Example:
 
 ```shell
