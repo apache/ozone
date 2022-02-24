@@ -71,7 +71,7 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
 
     // Check if this key is a directory.
     // NOTE: checkRecursiveAccess is always false for a file keyPrefix.
-    if (pathStatus.isDirectory()) {
+    if (pathStatus != null && pathStatus.isDirectory()) {
       // set recursive access check to true if this directory contains
       // sub-directories or sub-files.
       checkRecursiveAccess = OMFileRequest.hasChildren(
