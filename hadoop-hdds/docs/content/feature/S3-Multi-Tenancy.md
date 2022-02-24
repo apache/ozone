@@ -40,13 +40,19 @@ generated when an Ozone cluster admin or tenant admin assigns the user to the te
 ## Basics
 
 1. Initial tenant creation has to be done by an Ozone cluster admin under the CLI.
-2. The Ozone cluster admin will have to assign the first user of a tenant. Once assigned, an _Access ID & Secret Key_ pair will be generated for that user for access via S3 Gateway. 
+2. The Ozone cluster admin will have to assign the first user of a tenant. Once assigned, an _Access ID & Secret Key pair_ (key pair) will be generated for that user for access via S3 Gateway. 
+   - The key pair serves to authenticate the end user to the Ozone Manager (via client requests from S3 Gateway). Tenant volume is selected based on the Access ID.
+   - After successful authentication, Ozone Manager uses the underlying user name (not the Access ID) to identify the user. The user name is used to perform authorization checks in Apache Ranger.
+   - A key pair is tied to the user name it is assigned to. If a user is assigned key pairs in multiple tenants, all key pairs point to the same user name internally in Ozone Manager.
+   - A user can be only assigned one key pair in a same tenant. Ozone Manager rejects the tenant user assign request if a user is already assigned to the same tenant (i.e. when the user has already been assigned an Access ID in this tenant).
+   - Key pairs assigned to a user for different tenants are used to access buckets under different tenants. For instance, `testuser` uses `tenantone$testuser` to access `tenantone` buckets, and uses `tenanttwo$testuser` to access `tenanttwo` buckets via S3 Gateway.
+     - A bucket link can be set up if cross-tenant (cross-volume) access is desired.
 3. The Ozone cluster admin can then assign tenant admin roles to that user.
-4. Tenant admin are able to assign new users to the tenant. 
+4. Tenant admin are able to assign new users to the tenant.
    - They can even assign new tenant admins in their tenant, if they are delegated tenant admins, which is the default. See the usage below for more details.
    - Note that tenant admins still need to use Ozone tenant CLI to assign new users to the tenant.
-     - On a Kerberized cluster, once tenant admins get the Kerberos TGT (via `kinit`), they can run `user assign` command to assign new users. OzoneManager will recognize that they are the tenant admins and allow the user to do so in their tenants.  
-5. After that, users can use handy S3-compatible tools (awscli, Python boto3 library, etc.) to access the buckets in the tenant volume via S3 Gateway using the generated _Access ID & Secret Key_ pairs.
+     - On a Kerberized cluster, once tenant admins get the Kerberos TGT (via `kinit`), they can run `user assign` command to assign new users. OzoneManager will recognize that they are the tenant admins and allow the user to do so in their tenants.
+5. After that, users can use any S3-compatible client (awscli, Python boto3 library, etc.) to access the buckets in the tenant volume via S3 Gateway using the generated key pairs.
 
 
 ## Access Control
