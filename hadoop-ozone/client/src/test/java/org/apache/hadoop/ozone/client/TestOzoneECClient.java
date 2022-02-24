@@ -843,6 +843,72 @@ public class TestOzoneECClient {
     }
   }
 
+  @Test
+  public void testPartialStripeWithPartialChunkRetry()
+      throws IOException {
+    close();
+    OzoneConfiguration con = new OzoneConfiguration();
+    // block size of 3KB could hold 3 full stripes
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 3, StorageUnit.KB);
+    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks, 15);
+    createNewClient(con, blkAllocator);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    int numFullChunks = 7;
+    //Prepare additional partial chunk.
+    int partialChunkSize = 1020;
+    byte[] partialChunk = new byte[partialChunkSize];
+    Arrays.fill(partialChunk, 0, partialChunk.length, "1".getBytes(UTF_8)[0]);
+
+    // A partial chunk to trigger partialStripe check
+    // in ECKeyOutputStream.close()
+    int inSize = chunkSize;
+    try (OzoneOutputStream out = bucket.createKey(keyName, inSize,
+        new ECReplicationConfig(dataBlocks, parityBlocks,
+            ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
+      for (int i = 0; i < numFullChunks; i++) {
+        out.write(inputChunks[i % dataBlocks]);
+      }
+
+      out.write(partialChunk);
+
+      int[] nodesIndexesToMarkFailure = new int[] {0, 4};
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
+      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
+        failedDNs.add(DatanodeDetails
+            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      }
+
+      // First let's set storage as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+    }
+
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      for (int i = 0; i < numFullChunks; i++) {
+        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+            is.read(fileContent));
+        Assert.assertTrue("Expected: " + new String(inputChunks[i % dataBlocks],
+                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
+      }
+
+      byte[] partialChunkToRead = new byte[partialChunkSize];
+      Assert
+          .assertEquals(partialChunkToRead.length, is.read(partialChunkToRead));
+      Assert.assertTrue(Arrays.equals(partialChunk, partialChunkToRead));
+
+      Assert.assertEquals(-1, is.read(partialChunkToRead));
+    }
+  }
+
   @Test(expected = NotImplementedException.class)
   public void testFlushShouldThrowNotImplementedException() throws IOException {
     store.createVolume(volumeName);
