@@ -170,7 +170,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     // should not be enabled for this case.
     Assert.assertFalse(pathViewer.isCheckRecursiveAccess());
 
-    // Instantiate PrefixPath for partial key.
+    // Instantiate PrefixPath for parent key.
     pathViewer = new OzonePrefixPathImpl(volumeName,
         bucketName, parentKey, ozoneManager.getKeyManager());
 
@@ -189,7 +189,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);
 
-    // Instantiate PrefixPath for partial key 'c/d/'.
+    // Instantiate PrefixPath for parent key 'c/d/'.
     pathViewer = new OzonePrefixPathImpl(volumeName,
         bucketName, INTERMEDIATE_DIR, ozoneManager.getKeyManager());
 
