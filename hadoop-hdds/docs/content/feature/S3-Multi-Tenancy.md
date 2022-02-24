@@ -1,6 +1,5 @@
 ---
-title: "Multi-Tenancy"
-weight: 1
+title: "S3 Multi-Tenancy"
 menu:
    main:
       parent: Features
@@ -63,11 +62,11 @@ By default, a group of Ranger policies are created when a tenant is created on t
 
 ## Setup
 
-See [Multi-Tenancy Setup]({{< ref "Multi-Tenancy-Setup.md" >}}) page.
+See [Multi-Tenancy Setup]({{< ref "S3-Multi-Tenancy-Setup.md" >}}) page.
 
 ## Usage
 
-See [Tenant Subcommands]({{< ref "interface/Tenant.md" >}}) page.
+See [Tenant Subcommands]({{< ref "interface/S3-Tenant.md" >}}) page.
 
 ## References
 

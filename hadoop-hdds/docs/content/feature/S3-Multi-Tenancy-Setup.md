@@ -3,7 +3,7 @@ title: "Setup"
 weight: 1
 menu:
    main:
-      parent: "Multi-Tenancy"
+      parent: "S3 Multi-Tenancy"
 summary: Preparing Ozone clusters to enable Multi-Tenancy feature
 ---
 <!---
@@ -50,7 +50,7 @@ Then simply add the following configs to `ozone-site.xml`:
 
 Finally restart all OzoneManagers to apply the new configs.
 
-Now you can follow the [Multi-Tenancy CLI command guide]({{< ref "interface/Tenant.md" >}}) to try the commands. 
+Now you can follow the [Multi-Tenancy CLI command guide]({{< ref "interface/S3-Tenant.md" >}}) to try the commands. 
 
 
 ### Try in a Docker Compose cluster (For developers)

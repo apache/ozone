@@ -1,10 +1,10 @@
 ---
-title: "Multi-Tenant commands"
-weight: 1
+title: "S3 Tenant commands"
+weight: 3
 menu:
    main:
       parent: "Client Interfaces"
-summary: Ozone subcommands for tenant management
+summary: Ozone subcommands for S3 tenant management
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -23,7 +23,7 @@ summary: Ozone subcommands for tenant management
   limitations under the License.
 -->
 
-For a higher level understanding of multi-tenancy architecture, see [Multi-Tenancy feature]({{< ref "feature/Multi-Tenancy.md" >}}).
+For a higher level understanding of multi-tenancy architecture, see [Multi-Tenancy feature]({{< ref "feature/S3-Multi-Tenancy.md" >}}).
 
 All Multi-Tenancy subcommands are located under CLI `ozone tenant`.
 
@@ -33,7 +33,7 @@ The commands below assume a Kerberized Ozone cluster with Ranger install. Enabli
 
 ### Setup
 
-Follow the [Multi-Tenancy Setup]({{< ref "feature/Multi-Tenancy-Setup.md" >}}) guide if you haven't done so.
+Follow the [Multi-Tenancy Setup]({{< ref "feature/S3-Multi-Tenancy-Setup.md" >}}) guide if you haven't done so.
 
 If the OzoneManagers are running in HA, append `--om-service-id=` accordingly to the commands.
 
