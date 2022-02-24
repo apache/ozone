@@ -43,12 +43,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -61,7 +61,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -72,6 +72,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTRO
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -212,7 +213,8 @@ public class TestDeleteWithSlowFollower {
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    Assume.assumeTrue("Expected exactly a single location, but got: " +
+        locationInfoList.size(), 1 == locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     long containerID = omKeyLocationInfo.getContainerID();
     // A container is created on the datanode. Now figure out a follower node to
@@ -224,19 +226,18 @@ public class TestDeleteWithSlowFollower {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(new RatisReplicationConfig(
                 HddsProtos.ReplicationFactor.THREE));
-    Assert.assertTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
+    Assume.assumeTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
-      if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
+      if (RatisTestHelper.isRatisFollower(dn, pipeline)) {
         follower = dn;
-      } else if (ContainerTestHelper.isRatisLeader(dn, pipeline)) {
+      } else if (RatisTestHelper.isRatisLeader(dn, pipeline)) {
         leader = dn;
       }
     }
-    Assert.assertNotNull(follower);
-    Assert.assertNotNull(leader);
+    Assume.assumeNotNull(follower, leader);
     //ensure that the chosen follower is still a follower
-    Assert.assertTrue(ContainerTestHelper.isRatisFollower(follower, pipeline));
+    Assume.assumeTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
     // shutdown the  follower node
     cluster.shutdownHddsDatanode(follower.getDatanodeDetails());
     key.write(testData);
@@ -255,11 +256,13 @@ public class TestDeleteWithSlowFollower {
     xceiverClient.sendCommand(request.build());
 
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper
+        (ContainerStateMachine) RatisTestHelper
             .getStateMachine(leader, pipeline);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
-        setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        setBucketName(bucketName)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID =
@@ -309,7 +312,6 @@ public class TestDeleteWithSlowFollower {
       }
     } catch (IOException ioe) {
       Assert.fail("Exception should not be thrown.");
-
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();
@@ -346,6 +348,5 @@ public class TestDeleteWithSlowFollower {
             == ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
       }
     }
-
   }
 }

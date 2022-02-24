@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
@@ -36,12 +36,15 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +77,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.Assert.fail;
@@ -92,20 +96,23 @@ public class TestDecommissionAndMaintenance {
   private OzoneBucket bucket;
   private MiniOzoneCluster cluster;
   private NodeManager nm;
-  private ContainerManagerV2 cm;
+  private ContainerManager cm;
   private PipelineManager pm;
   private StorageContainerManager scm;
 
   private ContainerOperationClient scmClient;
 
-  @Before
-  public void setUp() throws Exception {
+  private static MiniOzoneClusterProvider clusterProvider;
+
+  @BeforeClass
+  public static void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int interval = 100;
 
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         interval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 1, SECONDS);
@@ -121,28 +128,40 @@ public class TestDecommissionAndMaintenance {
     replicationConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(replicationConf);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    setManagers();
+    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(numOfDatanodes);
 
+    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 8);
+  }
+
+  @AfterClass
+  public static void shutdown() throws InterruptedException {
+    if (clusterProvider != null) {
+      clusterProvider.shutdown();
+    }
+  }
+
+  @Before
+  public void setUp() throws Exception {
+    cluster = clusterProvider.provide();
+    setManagers();
     bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
-    scmClient = new ContainerOperationClient(conf);
+    scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws InterruptedException, IOException {
     if (cluster != null) {
-      cluster.shutdown();
+      clusterProvider.destroy(cluster);
     }
   }
 
   @Test
   // Decommissioning a node with open pipelines should close the pipelines
   // and hence the open containers and then the containers should be replicated
-  // by the replication manager.
-  public void testNodeWithOpenPipelineCanBeDecommissioned()
+  // by the replication manager. After the node completes decommission, it can
+  // be recommissioned.
+  public void testNodeWithOpenPipelineCanBeDecommissionedAndRecommissioned()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
@@ -169,43 +188,26 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(container, 4);
 
     // Stop the decommissioned DN
+    int dnIndex = cluster.getHddsDatanodeIndex(toDecommission);
     cluster.shutdownHddsDatanode(toDecommission);
     waitForDnToReachHealthState(toDecommission, DEAD);
 
     // Now the decommissioned node is dead, we should have
     // 3 replicas for the tracked container.
     waitForContainerReplicas(container, 3);
-  }
 
-  @Test
-  // After a SCM restart, it will have forgotten all the Operational states.
-  // However the state will have been persisted on the DNs. Therefore on initial
-  // registration, the DN operationalState is the source of truth and SCM should
-  // be updated to reflect that.
-  public void testDecommissionedStateReinstatedAfterSCMRestart()
-      throws Exception {
-    // Decommission any node and wait for it to be DECOMMISSIONED
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
-    DatanodeDetails dn = nm.getAllNodes().get(0);
-    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
-    waitForDnToReachOpState(dn, DECOMMISSIONED);
-
-    cluster.restartStorageContainerManager(true);
-    setManagers();
-    DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
-
-    // On initial registration, the DN should report its operational state
-    // and if it is decommissioned, that should be updated in the NodeStatus
-    waitForDnToReachOpState(newDn, DECOMMISSIONED);
-    // Also confirm the datanodeDetails correctly reflect the operational
-    // state.
-    waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
+    cluster.restartHddsDatanode(dnIndex, true);
+    scmClient.recommissionNodes(Arrays.asList(
+        getDNHostAndPort(toDecommission)));
+    waitForDnToReachOpState(toDecommission, IN_SERVICE);
+    waitForDnToReachPersistedOpState(toDecommission, IN_SERVICE);
   }
 
   @Test
   // If a node has not yet completed decommission and SCM is restarted, then
   // when it re-registers it should re-enter the decommission workflow and
-  // complete decommissioning.
+  // complete decommissioning. If SCM is restarted after decommssion is complete
+  // then SCM should learn of the decommissioned DN when it registers.
   public void testDecommissioningNodesCompleteDecommissionOnSCMRestart()
       throws Exception {
     // First stop the replicationManager so nodes marked for decommission cannot
@@ -230,6 +232,18 @@ public class TestDecommissionAndMaintenance {
     // it should re-enter the decommission workflow and move to DECOMMISSIONED
     DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
     waitForDnToReachOpState(newDn, DECOMMISSIONED);
+    waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
+
+    // Now the node is decommissioned, so restart SCM again
+    cluster.restartStorageContainerManager(true);
+    setManagers();
+    newDn = nm.getNodeByUuid(dn.getUuid().toString());
+
+    // On initial registration, the DN should report its operational state
+    // and if it is decommissioned, that should be updated in the NodeStatus
+    waitForDnToReachOpState(newDn, DECOMMISSIONED);
+    // Also confirm the datanodeDetails correctly reflect the operational
+    // state.
     waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
   }
 
@@ -268,27 +282,12 @@ public class TestDecommissionAndMaintenance {
   }
 
   @Test
-  // A node which is decommissioning or decommissioned can be move back to
-  // IN_SERVICE.
-  public void testDecommissionedNodeCanBeRecommissioned() throws Exception {
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
-    DatanodeDetails dn = nm.getAllNodes().get(0);
-    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
-
-    GenericTestUtils.waitFor(
-        () -> !dn.getPersistedOpState()
-            .equals(IN_SERVICE),
-        200, 30000);
-
-    scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
-    waitForDnToReachOpState(dn, IN_SERVICE);
-    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
-  }
-
-  @Test
   // When putting a single node into maintenance, its pipelines should be closed
   // but no new replicas should be create and the node should transition into
-  // maintenance
+  // maintenance.
+  // After a restart, the DN should keep the maintenance state.
+  // If the DN is recommissioned while stopped, it should get the recommissioned
+  // state when it re-registers.
   public void testSingleNodeWithOpenPipelineCanGotoMaintenance()
       throws Exception {
     // Generate some data on the empty cluster to create some containers
@@ -327,21 +326,8 @@ public class TestDecommissionAndMaintenance {
     DatanodeDetails newDN = nm.getNodeByUuid(dn.getUuid().toString());
     waitForDnToReachHealthState(newDN, HEALTHY);
     waitForDnToReachPersistedOpState(newDN, IN_MAINTENANCE);
-  }
 
-  @Test
-  // After a node enters maintenance and is stopped, it can be recommissioned in
-  // SCM. Then when it is restarted, it should go back to IN_SERVICE and have
-  // that persisted on the DN.
-  public void testStoppedMaintenanceNodeTakesScmStateOnRestart()
-      throws Exception {
-    // Put a node into maintenance and wait for it to complete
-    generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
-    DatanodeDetails dn = nm.getAllNodes().get(0);
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0);
-    waitForDnToReachOpState(dn, IN_MAINTENANCE);
-    waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
-
+    // Stop the DN and wait for it to go dead.
     int dnIndex = cluster.getHddsDatanodeIndex(dn);
     cluster.shutdownHddsDatanode(dnIndex);
     waitForDnToReachHealthState(dn, DEAD);
@@ -376,14 +362,14 @@ public class TestDecommissionAndMaintenance {
     Set<ContainerReplica> replicas = getContainerReplicas(container);
 
     List<DatanodeDetails> forMaintenance = new ArrayList<>();
-    replicas.forEach(r ->forMaintenance.add(r.getDatanodeDetails()));
+    replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
 
@@ -397,7 +383,7 @@ public class TestDecommissionAndMaintenance {
         .collect(Collectors.toList()));
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachOpState(dn, IN_SERVICE);
     }
 
@@ -418,26 +404,26 @@ public class TestDecommissionAndMaintenance {
     Set<ContainerReplica> replicas = getContainerReplicas(container);
 
     List<DatanodeDetails> forMaintenance = new ArrayList<>();
-    replicas.forEach(r ->forMaintenance.add(r.getDatanodeDetails()));
+    replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to entering_maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       waitForDnToReachPersistedOpState(dn, ENTERING_MAINTENANCE);
     }
     cluster.restartStorageContainerManager(true);
     setManagers();
 
     List<DatanodeDetails> newDns = new ArrayList<>();
-    for(DatanodeDetails dn : forMaintenance) {
+    for (DatanodeDetails dn : forMaintenance) {
       newDns.add(nm.getNodeByUuid(dn.getUuid().toString()));
     }
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : newDns) {
+    for (DatanodeDetails dn : newDns) {
       waitForDnToReachOpState(dn, IN_MAINTENANCE);
     }
 
@@ -514,7 +500,8 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(newContainer, 3);
 
     ContainerReplicaCount counts =
-        scm.getReplicationManager().getContainerReplicaCount(newContainer);
+        scm.getReplicationManager()
+          .getContainerReplicaCount(newContainer.containerID());
     assertEquals(1, counts.getMaintenanceCount());
     assertTrue(counts.isSufficientlyReplicated());
 
@@ -541,7 +528,8 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(nextContainer, 3);
     // There should be no IN_MAINTENANCE node:
     assertEquals(0, nm.getNodeCount(IN_MAINTENANCE, null));
-    counts = scm.getReplicationManager().getContainerReplicaCount(newContainer);
+    counts = scm.getReplicationManager()
+      .getContainerReplicaCount(newContainer.containerID());
     assertEquals(0, counts.getMaintenanceCount());
     assertTrue(counts.isSufficientlyReplicated());
   }
@@ -566,7 +554,7 @@ public class TestDecommissionAndMaintenance {
    */
   private void generateData(int keyCount, String keyPrefix,
       ReplicationFactor repFactor, ReplicationType repType) throws IOException {
-    for (int i=0; i<keyCount; i++) {
+    for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, repFactor, repType,
           "this is the content");
     }
@@ -626,7 +614,7 @@ public class TestDecommissionAndMaintenance {
    * @return host:port for the given DN.
    */
   private String getDNHostAndPort(DatanodeDetails dn) {
-    return dn.getHostName()+":"+dn.getPorts().get(0).getValue();
+    return dn.getHostName() + ":" + dn.getPorts().get(0).getValue();
   }
 
   /**

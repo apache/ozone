@@ -25,10 +25,12 @@ OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
+OZONE-SITE.XML_ozone.default.bucket.layout=FILE_SYSTEM_OPTIMIZED
 
 no_proxy=om,recon,scm,s3g,kdc,localhost,127.0.0.1

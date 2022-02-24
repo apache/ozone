@@ -26,10 +26,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -42,11 +42,12 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -76,7 +77,7 @@ public class TestPipelineClose {
   private OzoneConfiguration conf;
   private StorageContainerManager scm;
   private ContainerWithPipeline ratisContainer;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private PipelineManager pipelineManager;
 
   private long pipelineDestroyTimeoutInMillis;
@@ -173,7 +174,7 @@ public class TestPipelineClose {
   public void testPipelineCloseWithPipelineAction() throws Exception {
     List<DatanodeDetails> dns = ratisContainer.getPipeline().getNodes();
     PipelineActionsFromDatanode
-        pipelineActionsFromDatanode = TestUtils
+        pipelineActionsFromDatanode = HddsTestUtils
         .getPipelineActionFromDatanode(dns.get(0),
             ratisContainer.getPipeline().getId());
     // send closing action for pipeline
@@ -204,6 +205,7 @@ public class TestPipelineClose {
   }
 
   @Test
+  @Ignore("HDDS-5604")
   public void testPipelineCloseWithLogFailure() throws IOException {
 
     EventQueue eventQ = (EventQueue) scm.getEventQueue();

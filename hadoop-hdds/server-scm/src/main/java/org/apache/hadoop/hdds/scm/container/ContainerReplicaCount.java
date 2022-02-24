@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -99,15 +100,15 @@ public class ContainerReplicaCount {
 
   @Override
   public String toString() {
-    return "Container State: " +container.getState()+
-        " Replica Count: "+replica.size()+
-        " Healthy Count: "+healthyCount+
-        " Decommission Count: "+decommissionCount+
-        " Maintenance Count: "+maintenanceCount+
-        " inFlightAdd Count: "+inFlightAdd+
-        " inFightDel Count: "+inFlightDel+
-        " ReplicationFactor: "+repFactor+
-        " minMaintenance Count: "+minHealthyForMaintenance;
+    return "Container State: " + container.getState() +
+        " Replica Count: " + replica.size() +
+        " Healthy Count: " + healthyCount +
+        " Decommission Count: " + decommissionCount +
+        " Maintenance Count: " + maintenanceCount +
+        " inFlightAdd Count: " + inFlightAdd +
+        " inFightDel Count: " + inFlightDel +
+        " ReplicationFactor: " + repFactor +
+        " minMaintenance Count: " + minHealthyForMaintenance;
   }
 
   /**
@@ -267,5 +268,15 @@ public class ContainerReplicaCount {
         .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
         .allMatch(r -> ReplicationManager.compareState(
             container.getState(), r.getState()));
+  }
+
+  /**
+   * Returns true is there are no replicas of a container available, ie the
+   * set of container replica passed in the constructor has zero entries.
+   *
+   * @return true if there are no replicas, false otherwise.
+   */
+  public boolean isMissing() {
+    return replica.size() == 0;
   }
 }

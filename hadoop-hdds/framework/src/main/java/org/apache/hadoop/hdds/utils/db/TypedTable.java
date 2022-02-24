@@ -98,7 +98,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>();
       //fill cache
-      try(TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
+      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
               iterator()) {
 
         while (tableIterator.hasNext()) {
@@ -447,24 +447,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         return null;
       }
       return new TypedKeyValue(result);
-    }
-
-    @Override
-    public KEY key() throws IOException {
-      byte[] result = rawIterator.key();
-      if (result == null) {
-        return null;
-      }
-      return codecRegistry.asObject(result, keyClass);
-    }
-
-    @Override
-    public TypedKeyValue value() {
-      KeyValue keyValue = rawIterator.value();
-      if(keyValue != null) {
-        return new TypedKeyValue(keyValue, keyClass, valueClass);
-      }
-      return null;
     }
 
     @Override

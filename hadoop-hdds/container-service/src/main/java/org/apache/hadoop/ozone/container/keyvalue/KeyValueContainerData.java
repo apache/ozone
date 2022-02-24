@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -29,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.yaml.snakeyaml.nodes.Tag;
@@ -95,12 +96,12 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Constructs KeyValueContainerData object.
    * @param id - ContainerId
-   * @param layOutVersion chunk layout
+   * @param layoutVersion container layout
    * @param size - maximum size of the container in bytes
    */
-  public KeyValueContainerData(long id, ChunkLayOutVersion layOutVersion,
+  public KeyValueContainerData(long id, ContainerLayoutVersion layoutVersion,
       long size, String originPipelineId, String originNodeId) {
-    super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
+    super(ContainerProtos.ContainerType.KeyValueContainer, id, layoutVersion,
         size, originPipelineId, originNodeId);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
@@ -251,6 +252,7 @@ public class KeyValueContainerData extends ContainerData {
    * @return Protocol Buffer Message
    */
   @Override
+  @JsonIgnore
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());
@@ -268,7 +270,7 @@ public class KeyValueContainerData extends ContainerData {
       builder.setBytesUsed(this.getBytesUsed());
     }
 
-    if(this.getContainerType() != null) {
+    if (this.getContainerType() != null) {
       builder.setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
     }
 
@@ -286,16 +288,16 @@ public class KeyValueContainerData extends ContainerData {
    * @param deletedBlockCount - Number of blocks deleted.
    * @throws IOException
    */
-  public void updateAndCommitDBCounters(
-      ReferenceCountedDB db, BatchOperation batchOperation,
-      int deletedBlockCount) throws IOException {
+  public void updateAndCommitDBCounters(ReferenceCountedDB db,
+      BatchOperation batchOperation, int deletedBlockCount,
+      long releasedBytes) throws IOException {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
     metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED,
-            getBytesUsed());
+            getBytesUsed() - releasedBytes);
     metadataTable.putWithBatch(batchOperation, BLOCK_COUNT,
-            getKeyCount() - deletedBlockCount);
+            getBlockCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, PENDING_DELETE_BLOCK_COUNT,
             (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
 

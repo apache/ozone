@@ -25,18 +25,23 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 
 /**
  * Test for HadoopDirTreeGenerator.
@@ -47,11 +52,13 @@ public class TestHadoopDirTreeGenerator {
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
+  private static final Logger LOG =
+          LoggerFactory.getLogger(TestHadoopDirTreeGenerator.class);
 
   @Before
   public void setup() {
     path = GenericTestUtils
-            .getTempPath(TestOzoneClientKeyGenerator.class.getSimpleName());
+            .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
     File baseDir = new File(path);
@@ -74,13 +81,18 @@ public class TestHadoopDirTreeGenerator {
    * @throws IOException
    */
   private void startCluster() throws Exception {
-    conf = new OzoneConfiguration();
-
+    conf = getOzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
 
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+  }
+
+  protected OzoneConfiguration getOzoneConfiguration() {
+    return new OzoneConfiguration();
   }
 
   @Test
@@ -103,6 +115,9 @@ public class TestHadoopDirTreeGenerator {
               2, 4, 2);
       verifyDirTree("vol5", "bucket1", 5,
               4, 1, 0);
+      // default page size is Constants.LISTING_PAGE_SIZE = 1024
+      verifyDirTree("vol6", "bucket1", 2,
+              1, 1100, 0);
     } finally {
       shutdown();
     }
@@ -122,6 +137,7 @@ public class TestHadoopDirTreeGenerator {
             fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath,
                      "-g", perFileSizeInBytes + ""});
     // verify the directory structure
+    LOG.info("Started verifying the directory structure...");
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
             conf);
     Path rootDir = new Path(rootPath.concat("/"));
@@ -149,6 +165,7 @@ public class TestHadoopDirTreeGenerator {
       verifyActualSpan(expectedSpanCnt, fileStatuses);
     }
     int actualNumFiles = 0;
+    ArrayList <String> files = new ArrayList<>();
     for (FileStatus fileStatus : fileStatuses) {
       if (fileStatus.isDirectory()) {
         ++depth;
@@ -157,6 +174,12 @@ public class TestHadoopDirTreeGenerator {
       } else {
         Assert.assertEquals("Mismatches file len",
                 perFileSizeInBytes, fileStatus.getLen());
+        String fName = fileStatus.getPath().getName();
+        Assert.assertFalse("actualNumFiles:" + actualNumFiles +
+                        ", fName:" + fName + ", expectedFileCnt:" +
+                        expectedFileCnt + ", depth:" + depth,
+                files.contains(fName));
+        files.add(fName);
         actualNumFiles++;
       }
     }

@@ -34,9 +34,9 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.util.LifeCycle;
@@ -81,7 +81,6 @@ public class TestOzoneManagerConfiguration {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
-
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
     // writes the version file properties
@@ -100,6 +99,7 @@ public class TestOzoneManagerConfiguration {
       .setClusterId(clusterId)
       .setScmId(scmId)
       .setOmId(omId)
+      .withoutDatanodes()
       .build();
     cluster.waitForClusterToBeReady();
   }
@@ -240,7 +240,7 @@ public class TestOzoneManagerConfiguration {
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
-        expectedPeerAddress = "0.0.0.0:"+
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode3Id :
@@ -323,7 +323,7 @@ public class TestOzoneManagerConfiguration {
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
-        expectedPeerAddress = "0.0.0.0:"+
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode3Id :

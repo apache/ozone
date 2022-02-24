@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CRLInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
@@ -38,9 +39,12 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto.Reason;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
@@ -171,6 +175,21 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   /**
+   * Get SCM signed certificate.
+   *
+   * @param nodeDetails - Node Details.
+   * @param certSignReq  - Certificate signing request.
+   * @return String      - pem encoded SCM signed
+   *                         certificate.
+   */
+  @Override
+  public String getCertificate(NodeDetailsProto nodeDetails,
+      String certSignReq) throws IOException {
+    return getCertificateChain(nodeDetails, certSignReq)
+        .getX509Certificate();
+  }
+
+  /**
    * Get signed certificate for SCM node.
    *
    * @param scmNodeDetails  - SCM Node Details.
@@ -266,6 +285,26 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   /**
+   * Get SCM signed certificate.
+   *
+   * @param nodeDetails   - Node Details.
+   * @param certSignReq - Certificate signing request.
+   * @return byte[]         - SCM signed certificate.
+   */
+  public SCMGetCertResponseProto getCertificateChain(
+      NodeDetailsProto nodeDetails, String certSignReq)
+      throws IOException {
+
+    SCMGetCertRequestProto request =
+        SCMGetCertRequestProto.newBuilder()
+            .setCSR(certSignReq)
+            .setNodeDetails(nodeDetails)
+            .build();
+    return submitRequest(Type.GetCert,
+        builder -> builder.setGetCertRequest(request))
+        .getGetCertResponseProto();
+  }
+  /**
    * Get CA certificate.
    *
    * @return serial   - Root certificate.
@@ -354,6 +393,18 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
     return submitRequest(Type.GetLatestCrlId,
         builder -> builder.setGetLatestCrlIdRequest(protoIns))
         .getGetLatestCrlIdResponseProto().getCrlId();
+  }
+
+  @Override
+  public long revokeCertificates(List<String> certIds, int reason,
+      long revocationTime) throws IOException {
+    SCMRevokeCertificatesRequestProto req = SCMRevokeCertificatesRequestProto
+        .newBuilder().addAllCertIds(certIds)
+        .setReason(Reason.valueOf(reason))
+        .setRevokeTime(revocationTime).build();
+    return submitRequest(Type.RevokeCertificates,
+        builder -> builder.setRevokeCertificatesRequest(req))
+        .getRevokeCertificatesResponseProto().getCrlId();
   }
 
   /**

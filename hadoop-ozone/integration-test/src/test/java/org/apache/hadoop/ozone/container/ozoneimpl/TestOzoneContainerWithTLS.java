@@ -18,13 +18,11 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -39,8 +37,12 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.*;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -53,7 +55,6 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -156,12 +157,8 @@ public class TestOzoneContainerWithTLS {
 
       if (blockTokenEnabled) {
         secretManager.start(caClient);
-        Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(
-            "123", EnumSet.allOf(
-                HddsProtos.BlockTokenSecretProto.AccessModeProto.class),
-            RandomUtils.nextLong());
-        client.connect(token.encodeToUrlString());
-        createSecureContainerForTesting(client, containerID, token);
+        client.connect();
+        createSecureContainerForTesting(client, containerID, null);
       } else {
         createContainerForTesting(client, containerID);
         client.connect();

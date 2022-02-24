@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 
 import java.nio.ByteBuffer;
 
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
+
 /**
  * Implementation of ChunkManager built for running performance tests.
  * Chunks are not written to disk, Reads are returned with zero-filled buffers
@@ -72,8 +74,10 @@ public class ChunkManagerDummyImpl implements ChunkManager {
    */
   @Override
   public ChunkBuffer readChunk(Container container, BlockID blockID,
-      ChunkInfo info, DispatcherContext dispatcherContext) {
+      ChunkInfo info, DispatcherContext dispatcherContext)
+      throws StorageContainerException {
 
+    limitReadSize(info.getLen());
     // stats are handled in ChunkManagerImpl
     return ChunkBuffer.wrap(ByteBuffer.allocate((int) info.getLen()));
   }

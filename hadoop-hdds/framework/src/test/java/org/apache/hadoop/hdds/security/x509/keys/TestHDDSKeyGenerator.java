@@ -28,7 +28,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -79,7 +79,7 @@ public class TestHDDSKeyGenerator {
     HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config.getConfiguration());
     KeyPair keyPair = keyGen.generateKey(4096);
     PublicKey publicKey = keyPair.getPublic();
-    if(publicKey instanceof RSAPublicKey) {
+    if (publicKey instanceof RSAPublicKey) {
       Assert.assertEquals(4096,
           ((RSAPublicKey)(publicKey)).getModulus().bitLength());
     }

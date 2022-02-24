@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -54,7 +55,9 @@ import org.junit.Rule;
 import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
@@ -173,8 +176,10 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
@@ -223,8 +228,10 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);

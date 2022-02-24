@@ -19,18 +19,29 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.ratis.protocol.exceptions.*;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.ReconfigurationInProgressException;
+import org.apache.ratis.protocol.exceptions.ReconfigurationTimeoutException;
+import org.apache.ratis.protocol.exceptions.ResourceUnavailableException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +73,15 @@ public final class SCMHAUtils {
           .add(ResourceUnavailableException.class)
           .build();
 
+  private static final List<Class<? extends Exception>>
+      NON_RETRIABLE_EXCEPTION_LIST =
+      ImmutableList.<Class<? extends Exception>>builder()
+          .add(SCMException.class)
+          .add(NonRetriableException.class)
+          .add(PipelineNotFoundException.class)
+          .add(ContainerNotFoundException.class)
+          .build();
+
   private SCMHAUtils() {
     // not used
   }
@@ -78,8 +98,10 @@ public final class SCMHAUtils {
 
   public static boolean isPrimordialSCM(ConfigurationSource conf,
       String selfNodeId, String hostName) {
+    // This should only be called if SCM HA is enabled.
+    Preconditions.checkArgument(isSCMHAEnabled(conf));
     String primordialNode = getPrimordialSCM(conf);
-    return isSCMHAEnabled(conf) && primordialNode != null && (primordialNode
+    return primordialNode != null && (primordialNode
         .equals(selfNodeId) || primordialNode.equals(hostName));
   }
   /**
@@ -112,7 +134,7 @@ public final class SCMHAUtils {
    */
   public static String getSCMRatisDirectory(ConfigurationSource conf) {
     String scmRatisDirectory =
-        conf.getObject(SCMHAConfiguration.class).getRatisStorageDir();
+            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(scmRatisDirectory)) {
       scmRatisDirectory = ServerUtils.getDefaultRatisDirectory(conf);
@@ -122,7 +144,7 @@ public final class SCMHAUtils {
 
   public static String getSCMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir =
-        conf.getObject(SCMHAConfiguration.class).getRatisStorageDir();
+            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
 
     // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
     if (Strings.isNullOrEmpty(snapshotDir)) {
@@ -201,13 +223,14 @@ public final class SCMHAUtils {
     return getSCMNodeIds(configuration, scmServiceId);
   }
 
-  private static Throwable unwrapException(Exception e) {
-    IOException ioException = null;
+  public static Throwable unwrapException(Exception e) {
     Throwable cause = e.getCause();
-    if (cause instanceof RemoteException) {
-      ioException = ((RemoteException) cause).unwrapRemoteException();
+    if (e instanceof RemoteException) {
+      return ((RemoteException) e).unwrapRemoteException();
+    } else if (cause instanceof RemoteException) {
+      return ((RemoteException) cause).unwrapRemoteException();
     }
-    return ioException == null ? e : ioException;
+    return e;
   }
 
   /**
@@ -217,7 +240,7 @@ public final class SCMHAUtils {
   public static boolean isNonRetriableException(Exception e) {
     Throwable t =
         getExceptionForClass(e, StateMachineException.class);
-    return t == null ? false : true;
+    return t != null;
   }
 
   /**
@@ -226,7 +249,12 @@ public final class SCMHAUtils {
    */
   public static boolean checkNonRetriableException(Exception e) {
     Throwable t = unwrapException(e);
-    return NonRetriableException.class.isInstance(t);
+    for (Class<? extends Exception> clazz : NON_RETRIABLE_EXCEPTION_LIST) {
+      if (clazz.isInstance(t)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // This will return the underlying exception after unwrapping
@@ -288,7 +316,15 @@ public final class SCMHAUtils {
 
   public static RetryPolicy.RetryAction getRetryAction(int failovers, int retry,
       Exception e, int maxRetryCount, long retryInterval) {
-    if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
+    Throwable unwrappedException = HddsUtils.getUnwrappedException(e);
+    if (unwrappedException instanceof AccessControlException) {
+      // For AccessControl Exception where Client is not authenticated.
+      return RetryPolicy.RetryAction.FAIL;
+    } else if (HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
+      // For some types of Rpc Exceptions, retrying on different server would
+      // not help.
+      return RetryPolicy.RetryAction.FAIL;
+    } else if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
       if (retry < maxRetryCount) {
         return new RetryPolicy.RetryAction(
             RetryPolicy.RetryAction.RetryDecision.RETRY, retryInterval);
@@ -298,6 +334,8 @@ public final class SCMHAUtils {
     } else if (SCMHAUtils.checkNonRetriableException(e)) {
       return RetryPolicy.RetryAction.FAIL;
     } else {
+      // For any other exception like RetriableWithFailOverException or any
+      // other we perform fail-over and retry.
       if (failovers < maxRetryCount) {
         return new RetryPolicy.RetryAction(
             RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,

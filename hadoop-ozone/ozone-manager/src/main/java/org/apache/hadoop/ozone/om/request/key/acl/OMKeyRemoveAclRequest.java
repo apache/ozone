@@ -69,7 +69,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
   private List<OzoneAcl> ozoneAcls;
   private OzoneObj obj;
 
-  public OMKeyRemoveAclRequest(OMRequest omRequest) {
+  public OMKeyRemoveAclRequest(OMRequest omRequest, OzoneManager ozoneManager) {
     super(omRequest);
     OzoneManagerProtocolProtos.RemoveAclRequest removeAclRequest =
         getOmRequest().getRemoveAclRequest();
@@ -77,6 +77,8 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
     path = obj.getPath();
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
+
+    initializeBucketLayout(ozoneManager);
   }
 
   @Override
@@ -146,5 +148,6 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
     return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
         omDoubleBufferHelper);
   }
+
 }
 

@@ -72,6 +72,11 @@ enum Type {
 
   ServiceList = 51;
   DBUpdates = 53;
+  FinalizeUpgrade = 54;
+  FinalizeUpgradeProgress = 55;
+  Prepare = 56;
+  PrepareStatus = 57;
+  CancelPrepare = 58;
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -93,6 +98,10 @@ enum Type {
 
   ListTrash = 91;
   RecoverTrash = 92;
+
+  RevokeS3Secret = 93;
+
+  PurgePaths = 94;
 }
 
 message OMRequest {
@@ -107,6 +116,7 @@ message OMRequest {
   optional UserInfo userInfo = 4;
   optional uint32 version = 5;
 
+  optional LayoutVersion layoutVersion = 6;
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
@@ -141,6 +151,11 @@ message OMRequest {
 
   optional ServiceListRequest               serviceListRequest             = 51;
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
+  optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
+  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
+  optional PrepareRequest                   prepareRequest                 = 56;
+  optional PrepareStatusRequest             prepareStatusRequest           = 57;
+  optional CancelPrepareRequest             cancelPrepareRequest           = 58;
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -165,6 +180,12 @@ message OMRequest {
 
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+
+  optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
+
+  optional PurgePathsRequest                purgePathsRequest              = 94;
+
+  optional S3Authentication                 s3Authentication               = 95;
 }
 
 message OMResponse {
@@ -214,6 +235,11 @@ message OMResponse {
 
   optional ServiceListResponse               ServiceListResponse           = 51;
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
+  optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
+  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
+  optional PrepareResponse                 prepareResponse                 = 56;
+  optional PrepareStatusResponse           prepareStatusResponse           = 57;
+  optional CancelPrepareResponse           cancelPrepareResponse           = 58;
 
   optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
   optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
@@ -235,6 +261,7 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  optional PurgePathsResponse                 purgePathsResponse           = 93;
 }
 
 enum Status {
@@ -321,6 +348,14 @@ enum Status {
 
     QUOTA_ERROR = 67;
 
+    DIRECTORY_NOT_EMPTY = 68;
+
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70;
+    UPDATE_LAYOUT_VERSION_FAILED = 71;
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
+    PREPARE_FAILED = 73;
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
 }
 
 /**
@@ -509,6 +544,8 @@ message BucketInfo {
     optional int64 quotaInBytes = 15 [default = -2];
     optional int64 quotaInNamespace = 16 [default = -2];
     optional uint64 usedNamespace = 17;
+    optional BucketLayoutProto bucketLayout = 18;
+    optional string owner = 19;
 }
 
 enum StorageTypeProto {
@@ -516,6 +553,12 @@ enum StorageTypeProto {
     SSD = 2;
     ARCHIVE = 3;
     RAM_DISK = 4;
+}
+
+enum BucketLayoutProto {
+    LEGACY = 1;
+    FILE_SYSTEM_OPTIMIZED = 2;
+    OBJECT_STORE = 3;
 }
 
 /**
@@ -580,6 +623,7 @@ message BucketArgs {
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
     optional uint64 quotaInNamespace = 9;
+    optional string ownerName = 10;
 }
 
 message PrefixInfo {
@@ -683,10 +727,11 @@ message InfoBucketResponse {
 
 message SetBucketPropertyRequest {
     optional BucketArgs bucketArgs = 1;
+    optional uint64 modificationTime = 2;
 }
 
 message SetBucketPropertyResponse {
-
+    optional bool response = 1;
 }
 
 message DeleteBucketRequest {
@@ -731,6 +776,13 @@ message KeyArgs {
 
     // This will be set by leader OM in HA and update the original request.
     optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+    optional bool latestVersionLocation = 16;
+
+    // This will be set when user performs delete directory recursively.
+    optional bool recursive = 17;
+
+    // When it is a head operation which is to check whether key exist
+    optional bool headOp = 18;
 }
 
 message KeyLocation {
@@ -774,6 +826,18 @@ message KeyInfo {
     repeated OzoneAclInfo acls = 13;
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
+    optional uint64 parentID = 16;
+}
+
+message DirectoryInfo {
+    required string name = 1;
+    required uint64 creationTime = 2;
+    required uint64 modificationTime = 3;
+    repeated hadoop.hdds.KeyValue metadata = 4;
+    repeated OzoneAclInfo acls = 5;
+    required uint64 objectID = 6;
+    required uint64 updateID = 7;
+    required uint64 parentID = 8;
 }
 
 message RepeatedKeyInfo {
@@ -940,6 +1004,16 @@ message PurgeKeysResponse {
 
 }
 
+message PurgePathsRequest {
+    repeated string deletedDirs = 1;
+    repeated KeyInfo deletedSubFiles = 2;
+    repeated KeyInfo markDeletedSubDirs = 3;
+}
+
+message PurgePathsResponse {
+
+}
+
 message DeleteOpenKeysRequest {
   repeated OpenKeyBucket openKeysPerBucket = 1;
 }
@@ -1025,6 +1099,7 @@ message ServiceListRequest {
 
 message DBUpdatesRequest {
     required uint64 sequenceNumber = 1;
+    optional uint64 limitCount = 2;
 }
 
 message ServiceListResponse {
@@ -1040,6 +1115,59 @@ message ServiceListResponse {
 message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
+}
+
+message FinalizeUpgradeRequest {
+  required string upgradeClientId = 1;
+}
+
+message FinalizeUpgradeResponse {
+    required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+message FinalizeUpgradeProgressRequest {
+    required string upgradeClientId = 1;
+    optional bool takeover = 2;
+    optional bool readonly = 3;
+}
+
+message FinalizeUpgradeProgressResponse {
+    required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+message PrepareRequest {
+    required PrepareRequestArgs args = 1;
+}
+
+message PrepareRequestArgs {
+    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300];
+    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5];
+}
+
+message PrepareResponse {
+    required uint64 txnID = 1;
+}
+
+message PrepareStatusRequest {
+    required uint64 txnID = 1;
+}
+
+message PrepareStatusResponse {
+    enum PrepareStatus {
+        NOT_PREPARED = 1;
+        PREPARE_GATE_ENABLED = 2;
+        PREPARE_COMPLETED = 3;
+    }
+    required PrepareStatus status = 1;
+    optional uint64 currentTxnIndex = 2;
+}
+
+message CancelPrepareRequest {
+
+}
+
+message CancelPrepareResponse {
+
 }
 
 message ServicePort {
@@ -1063,6 +1191,7 @@ message ServiceInfo {
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
+    optional string OMProtocolVersion = 5;
 }
 
 message MultipartInfoInitiateRequest {
@@ -1085,6 +1214,7 @@ message MultipartKeyInfo {
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
+    optional uint64 parentID = 8;
 }
 
 message PartKeyInfo {
@@ -1202,6 +1332,14 @@ message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
 }
 
+message LayoutVersion {
+  required uint64 version = 1;
+}
+
+message RevokeS3SecretRequest {
+    required string kerberosID = 1;
+}
+
 /**
   This will be used internally by OM to replicate S3 Secret across quorum of
   OM's.
@@ -1209,6 +1347,15 @@ message GetS3SecretResponse {
 message UpdateGetS3SecretRequest {
     required string kerberosID = 1;
     required string awsSecret = 2;
+}
+
+/**
+  This will be used by OM to authenticate S3 gateway requests on a per request basis.
+*/
+message S3Authentication {
+    optional string stringToSign = 1;
+    optional string signature = 2;
+    optional string accessId = 3;
 }
 
 /**

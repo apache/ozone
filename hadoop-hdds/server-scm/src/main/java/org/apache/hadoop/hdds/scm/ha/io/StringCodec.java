@@ -21,6 +21,9 @@ import com.google.protobuf.ByteString;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+/**
+ * {@link Codec} for {@code String} objects.
+ */
 public class StringCodec implements Codec {
   @Override
   public ByteString serialize(Object object) {

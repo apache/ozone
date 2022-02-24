@@ -29,12 +29,14 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto.
@@ -289,7 +291,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @return KeyTable.
    */
-  Table<String, OmKeyInfo> getKeyTable();
+
+  Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout);
+
+  /**
+   * Returns the FileTable.
+   *
+   * @return FileTable.
+   */
+  Table<String, OmKeyInfo> getFileTable();
 
   /**
    * Get Deleted Table.
@@ -303,7 +313,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @return Table.
    */
-  Table<String, OmKeyInfo> getOpenKeyTable();
+  Table<String, OmKeyInfo> getOpenKeyTable(BucketLayout buckLayout);
 
   /**
    * Gets the DelegationTokenTable.
@@ -347,6 +357,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, TransactionInfo> getTransactionInfoTable();
 
   /**
+   * Gets the OM Meta table.
+   * @return meta table reference.
+   */
+  Table<String, String> getMetaTable();
+
+  /**
    * Returns number of rows in a table.  This should not be used for very
    * large tables.
    * @param table
@@ -375,6 +391,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String bucketName, String prefix) throws IOException;
 
   /**
+   * Gets the DirectoryTable.
+   * @return Table.
+   */
+  Table<String, OmDirectoryInfo> getDirectoryTable();
+
+  /**
    * Return table mapped to the specified table name.
    * @param tableName
    * @return Table
@@ -398,4 +420,43 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
       getKeyIterator();
+
+  /**
+   * Given parent object id and path component name, return the corresponding
+   * DB 'prefixKey' key.
+   *
+   * @param parentObjectId - parent object Id
+   * @param pathComponentName   - path component name
+   * @return DB directory key as String.
+   */
+  String getOzonePathKey(long parentObjectId, String pathComponentName);
+
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param id             - client id for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long parentObjectId, String fileName, long id);
+
+  /**
+   * Returns the DB key name of a multipart upload key in OM metadata store.
+   *
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param uploadId       - the upload id for this key
+   * @return bytes of DB key.
+   */
+  String getMultipartKey(long parentObjectId, String fileName, String uploadId);
+
+  /**
+   * Get Deleted Directory Table.
+   *
+   * @return Deleted Directory Table.
+   */
+  Table<String, OmKeyInfo> getDeletedDirTable();
+
 }

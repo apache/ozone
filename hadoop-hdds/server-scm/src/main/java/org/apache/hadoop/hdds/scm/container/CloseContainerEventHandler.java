@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -52,11 +53,11 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       LoggerFactory.getLogger(CloseContainerEventHandler.class);
 
   private final PipelineManager pipelineManager;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final SCMContext scmContext;
 
   public CloseContainerEventHandler(final PipelineManager pipelineManager,
-                                    final ContainerManagerV2 containerManager,
+                                    final ContainerManager containerManager,
                                     final SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
@@ -82,12 +83,13 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
         SCMCommand<?> command = new CloseContainerCommand(
             containerID.getId(), container.getPipelineID());
         command.setTerm(scmContext.getTermOfLeader());
+        command.setEncodedToken(getContainerToken(containerID));
 
         getNodes(container).forEach(node ->
             publisher.fireEvent(DATANODE_COMMAND,
                 new CommandForDatanode<>(node.getUuid(), command)));
       } else {
-        LOG.warn("Cannot close container {}, which is in {} state.",
+        LOG.debug("Cannot close container {}, which is in {} state.",
             containerID, container.getState());
       }
 
@@ -97,6 +99,15 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
     } catch (IOException | InvalidStateTransitionException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }
+  }
+
+  private String getContainerToken(ContainerID containerID) {
+    if (scmContext.getScm() instanceof StorageContainerManager) {
+      StorageContainerManager scm =
+          (StorageContainerManager) scmContext.getScm();
+      return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
+    }
+    return ""; //Recon and unit test
   }
 
   /**

@@ -31,10 +31,10 @@ import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -55,7 +55,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 
 /**
  * This class is for performing chunk related operations.
@@ -68,17 +69,20 @@ public class FilePerChunkStrategy implements ChunkManager {
   private final boolean doSyncWrite;
   private final BlockManager blockManager;
   private final long defaultReadBufferCapacity;
+  private final VolumeSet volumeSet;
 
-  public FilePerChunkStrategy(boolean sync, BlockManager manager) {
+  public FilePerChunkStrategy(boolean sync, BlockManager manager,
+                              VolumeSet volSet) {
     doSyncWrite = sync;
     blockManager = manager;
     this.defaultReadBufferCapacity = manager == null ? 0 :
         manager.getDefaultReadBufferCapacity();
+    this.volumeSet = volSet;
   }
 
   private static void checkLayoutVersion(Container container) {
     Preconditions.checkArgument(
-        container.getContainerData().getLayOutVersion() == FILE_PER_CHUNK);
+        container.getContainerData().getLayoutVersion() == FILE_PER_CHUNK);
   }
 
   /**
@@ -104,7 +108,6 @@ public class FilePerChunkStrategy implements ChunkManager {
       KeyValueContainer kvContainer = (KeyValueContainer) container;
       KeyValueContainerData containerData = kvContainer.getContainerData();
       HddsVolume volume = containerData.getVolume();
-      VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
       File chunkFile = getChunkFile(kvContainer, blockID, info);
 
@@ -148,7 +151,7 @@ public class FilePerChunkStrategy implements ChunkManager {
                   tmpChunkFile);
         }
         // Initially writes to temporary chunk file.
-        ChunkUtils.writeData(tmpChunkFile, data, offset, len, volumeIOStats,
+        ChunkUtils.writeData(tmpChunkFile, data, offset, len, volume,
             doSyncWrite);
         // No need to increment container stats here, as still data is not
         // committed here.
@@ -173,7 +176,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         break;
       case COMBINED:
         // directly write to the chunk file
-        ChunkUtils.writeData(chunkFile, data, offset, len, volumeIOStats,
+        ChunkUtils.writeData(chunkFile, data, offset, len, volume,
             doSyncWrite);
         containerData.updateWriteStats(len, isOverwrite);
         break;
@@ -206,12 +209,12 @@ public class FilePerChunkStrategy implements ChunkManager {
       throws StorageContainerException {
 
     checkLayoutVersion(container);
+    limitReadSize(info.getLen());
 
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = kvContainer.getContainerData();
 
     HddsVolume volume = containerData.getVolume();
-    VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
     // In version1, we verify checksum if it is available and return data
     // of the chunk file.
@@ -264,7 +267,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         if (file.exists()) {
           long offset = info.getOffset() - chunkFileOffset;
           Preconditions.checkState(offset >= 0);
-          ChunkUtils.readData(file, dataBuffers, offset, len, volumeIOStats);
+          ChunkUtils.readData(file, dataBuffers, offset, len, volume);
           return ChunkBuffer.wrap(Lists.newArrayList(dataBuffers));
         }
       } catch (StorageContainerException ex) {

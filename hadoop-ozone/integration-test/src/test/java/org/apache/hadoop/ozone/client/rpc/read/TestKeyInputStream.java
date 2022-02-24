@@ -19,10 +19,13 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -30,20 +33,24 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
 import static org.junit.Assert.fail;
 
@@ -55,7 +62,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyInputStream.class);
 
-  public TestKeyInputStream(ChunkLayOutVersion layout) {
+  public TestKeyInputStream(ContainerLayoutVersion layout) {
     super(layout);
   }
 
@@ -70,18 +77,18 @@ public class TestKeyInputStream extends TestInputStreamBase {
   private void randomSeek(int dataLength, KeyInputStream keyInputStream,
       byte[] inputData) throws Exception {
     // Do random seek.
-    for (int i=0; i<dataLength - 300; i+=20) {
+    for (int i = 0; i < dataLength - 300; i += 20) {
       validate(keyInputStream, inputData, i, 200);
     }
 
     // Seek to end and read in reverse order. And also this is partial chunks
     // as readLength is 20, chunk length is 100.
-    for (int i=dataLength - 100; i>=100; i-=20) {
+    for (int i = dataLength - 100; i >= 100; i -= 20) {
       validate(keyInputStream, inputData, i, 20);
     }
 
     // Start from begin and seek such that we read partially chunks.
-    for (int i=0; i<dataLength - 300; i+=20) {
+    for (int i = 0; i < dataLength - 300; i += 20) {
       validate(keyInputStream, inputData, i, 90);
     }
 
@@ -106,7 +113,58 @@ public class TestKeyInputStream extends TestInputStreamBase {
     validateData(inputData, (int) seek, readData);
   }
 
+  /**
+   * This test runs the others as a single test, so to avoid creating a new
+   * mini-cluster for each test.
+   */
   @Test
+  public void testNonReplicationReads() throws Exception {
+    testInputStreams();
+    testSeekRandomly();
+    testSeek();
+    testReadChunkWithByteArray();
+    testReadChunkWithByteBuffer();
+    testSkip();
+  }
+
+  public void testInputStreams() throws Exception {
+    String keyName = getNewKeyName();
+    int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE) + 1;
+    writeRandomBytes(keyName, dataLength);
+
+    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+
+    // Verify BlockStreams and ChunkStreams
+    int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
+        dataLength, BLOCK_SIZE);
+    List<BlockInputStream> blockStreams = keyInputStream.getBlockStreams();
+    Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
+
+    int readBlockLength = 0;
+    for (BlockInputStream blockStream : blockStreams) {
+      int blockStreamLength = Math.min(BLOCK_SIZE,
+          dataLength - readBlockLength);
+      Assert.assertEquals(blockStreamLength, blockStream.getLength());
+
+      int expectedNumChunkStreams =
+          BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
+      blockStream.initialize();
+      List<ChunkInputStream> chunkStreams = blockStream.getChunkStreams();
+      Assert.assertEquals(expectedNumChunkStreams, chunkStreams.size());
+
+      int readChunkLength = 0;
+      for (ChunkInputStream chunkStream : chunkStreams) {
+        int chunkStreamLength = Math.min(CHUNK_SIZE,
+            blockStreamLength - readChunkLength);
+        Assert.assertEquals(chunkStreamLength, chunkStream.getRemaining());
+
+        readChunkLength += chunkStreamLength;
+      }
+
+      readBlockLength += blockStreamLength;
+    }
+  }
+
   public void testSeekRandomly() throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
@@ -115,7 +173,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     KeyInputStream keyInputStream = getKeyInputStream(keyName);
 
     // Seek to some where end.
-    validate(keyInputStream, inputData, dataLength-200, 100);
+    validate(keyInputStream, inputData, dataLength - 200, 100);
 
     // Now seek to start.
     validate(keyInputStream, inputData, 0, 140);
@@ -137,7 +195,6 @@ public class TestKeyInputStream extends TestInputStreamBase {
     keyInputStream.close();
   }
 
-  @Test
   public void testSeek() throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
@@ -183,15 +240,14 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  @Test
-  public void testReadChunk() throws Exception {
+  public void testReadChunkWithByteArray() throws Exception {
     String keyName = getNewKeyName();
 
     // write data spanning multiple blocks/chunks
     int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
     byte[] data = writeRandomBytes(keyName, dataLength);
 
-    // read chunk data
+    // read chunk data using Byte Array
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
       int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
@@ -204,7 +260,26 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  @Test
+  public void testReadChunkWithByteBuffer() throws Exception {
+    String keyName = getNewKeyName();
+
+    // write data spanning multiple blocks/chunks
+    int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
+    byte[] data = writeRandomBytes(keyName, dataLength);
+
+    // read chunk data using ByteBuffer
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+
+      int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
+          CHUNK_SIZE / 2, CHUNK_SIZE - 1, CHUNK_SIZE, CHUNK_SIZE + 1,
+          BLOCK_SIZE - 1, BLOCK_SIZE, BLOCK_SIZE + 1, BLOCK_SIZE * 2};
+      for (int bufferSize : bufferSizeList) {
+        assertReadFullyUsingByteBuffer(data, keyInputStream, bufferSize, 0);
+        keyInputStream.seek(0);
+      }
+    }
+  }
+
   public void testSkip() throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
@@ -278,8 +353,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(getVolumeName())
         .setBucketName(getBucketName())
         .setKeyName(keyName)
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
         .build();
     OmKeyInfo keyInfo = getCluster().getOzoneManager().lookupKey(keyArgs);
 
@@ -297,18 +371,26 @@ public class TestKeyInputStream extends TestInputStreamBase {
 
     // read chunk data
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
-
       int b = keyInputStream.read();
       Assert.assertNotEquals(-1, b);
-
       if (doUnbuffer) {
         keyInputStream.unbuffer();
       }
-
       getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
-
       // check that we can still read it
       assertReadFully(data, keyInputStream, dataLength - 1, 1);
+    }
+
+    // read chunk data with ByteBuffer
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+      int b = keyInputStream.read();
+      Assert.assertNotEquals(-1, b);
+      if (doUnbuffer) {
+        keyInputStream.unbuffer();
+      }
+      getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
+      // check that we can still read it
+      assertReadFullyUsingByteBuffer(data, keyInputStream, dataLength - 1, 1);
     }
   }
 
@@ -348,6 +430,27 @@ public class TestKeyInputStream extends TestInputStreamBase {
           Arrays.copyOfRange(buffer, 0, numBytesRead);
       Assert.assertArrayEquals(tmp1, tmp2);
       totalRead += numBytesRead;
+    }
+    Assert.assertEquals(data.length, totalRead);
+  }
+
+  private void assertReadFullyUsingByteBuffer(byte[] data, KeyInputStream in,
+      int bufferSize, int totalRead) throws IOException {
+
+    ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize);
+    while (totalRead < data.length) {
+      int numBytesRead = in.read(buffer);
+      if (numBytesRead == -1 || numBytesRead == 0) {
+        break;
+      }
+      byte[] tmp1 =
+          Arrays.copyOfRange(data, totalRead, totalRead + numBytesRead);
+      byte[] tmp2 = new byte[numBytesRead];
+      buffer.flip();
+      buffer.get(tmp2, 0, numBytesRead);
+      Assert.assertArrayEquals(tmp1, tmp2);
+      totalRead += numBytesRead;
+      buffer.clear();
     }
     Assert.assertEquals(data.length, totalRead);
   }

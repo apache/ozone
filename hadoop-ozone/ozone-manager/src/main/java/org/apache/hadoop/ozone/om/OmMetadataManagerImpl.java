@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.om.codec.UserVolumeInfoCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -69,6 +71,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto
@@ -103,6 +106,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * OM DB stores metadata as KV pairs in different column families.
    * <p>
    * OM DB Schema:
+   *
+   *
+   * Common Tables:
    * |----------------------------------------------------------------------|
    * |  Column Family     |        VALUE                                    |
    * |----------------------------------------------------------------------|
@@ -112,23 +118,41 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | bucketTable        |     /volume/bucket-> BucketInfo                 |
    * |----------------------------------------------------------------------|
-   * | keyTable           | /volumeName/bucketName/keyName->KeyInfo         |
-   * |----------------------------------------------------------------------|
-   * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
-   * |----------------------------------------------------------------------|
-   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
-   * |----------------------------------------------------------------------|
    * | s3SecretTable      | s3g_access_key_id -> s3Secret                   |
    * |----------------------------------------------------------------------|
    * | dTokenTable        | OzoneTokenID -> renew_time                      |
    * |----------------------------------------------------------------------|
    * | prefixInfoTable    | prefix -> PrefixInfo                            |
    * |----------------------------------------------------------------------|
-   * |  multipartInfoTable| /volumeName/bucketName/keyName/uploadId ->...   |
+   * | multipartInfoTable | /volumeName/bucketName/keyName/uploadId ->...   |
    * |----------------------------------------------------------------------|
+   * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
    * |----------------------------------------------------------------------|
-   * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
+   *
+   * Simple Tables:
    * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
+   * |----------------------------------------------------------------------|
+   * | keyTable           | /volumeName/bucketName/keyName->KeyInfo         |
+   * |----------------------------------------------------------------------|
+   * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
+   * |----------------------------------------------------------------------|
+   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
+   * |----------------------------------------------------------------------|
+   *
+   * Prefix Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
+   * |----------------------------------------------------------------------|
+   * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
+   * |----------------------------------------------------------------------|
+   * |  fileTable         | parentId/fileName -> KeyInfo                    |
+   * |----------------------------------------------------------------------|
+   * |  openFileTable     | parentId/fileName/id -> KeyInfo                 |
+   * |----------------------------------------------------------------------|
+   * |  deletedDirTable   | parentId/directoryName -> KeyInfo               |
+   * |----------------------------------------------------------------------|
+   *
    */
 
   public static final String USER_TABLE = "userTable";
@@ -141,8 +165,32 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String S3_SECRET_TABLE = "s3SecretTable";
   public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
   public static final String PREFIX_TABLE = "prefixTable";
+  public static final String DIRECTORY_TABLE = "directoryTable";
+  public static final String FILE_TABLE = "fileTable";
+  public static final String OPEN_FILE_TABLE = "openFileTable";
+  public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
+  public static final String META_TABLE = "metaTable";
+
+  static final String[] ALL_TABLES = new String[] {
+      USER_TABLE,
+      VOLUME_TABLE,
+      BUCKET_TABLE,
+      KEY_TABLE,
+      DELETED_TABLE,
+      OPEN_KEY_TABLE,
+      MULTIPARTINFO_TABLE,
+      S3_SECRET_TABLE,
+      DELEGATION_TOKEN_TABLE,
+      PREFIX_TABLE,
+      TRANSACTION_INFO_TABLE,
+      DIRECTORY_TABLE,
+      FILE_TABLE,
+      DELETED_DIR_TABLE,
+      OPEN_FILE_TABLE,
+      META_TABLE
+  };
 
   private DBStore store;
 
@@ -159,9 +207,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table s3SecretTable;
   private Table dTokenTable;
   private Table prefixTable;
+  private Table dirTable;
+  private Table fileTable;
+  private Table openFileTable;
   private Table transactionInfoTable;
+  private Table metaTable;
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
+  private Table deletedDirTable;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
   // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
@@ -197,7 +250,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * For subclass overriding.
    */
   protected OmMetadataManagerImpl() {
-    this.lock = new OzoneManagerLock(new OzoneConfiguration());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    this.lock = new OzoneManagerLock(conf);
     this.openKeyExpireThresholdMS =
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
     this.omEpoch = 0;
@@ -224,8 +278,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmKeyInfo> getKeyTable() {
+  public Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout) {
+    if (bucketLayout.isFileSystemOptimized()) {
+      return fileTable;
+    }
     return keyTable;
+  }
+
+  @Override
+  public Table<String, OmKeyInfo> getFileTable() {
+    return fileTable;
   }
 
   @Override
@@ -234,13 +296,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmKeyInfo> getOpenKeyTable() {
+  public Table<String, OmKeyInfo> getDeletedDirTable() {
+    return deletedDirTable;
+  }
+
+  @Override
+  public Table getOpenKeyTable(BucketLayout bucketLayout) {
+    if (bucketLayout.isFileSystemOptimized()) {
+      return openFileTable;
+    }
     return openKeyTable;
   }
 
   @Override
   public Table<String, OmPrefixInfo> getPrefixTable() {
     return prefixTable;
+  }
+
+  @Override
+  public Table<String, OmDirectoryInfo> getDirectoryTable() {
+    return dirTable;
   }
 
   @Override
@@ -335,7 +410,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DELEGATION_TOKEN_TABLE)
         .addTable(S3_SECRET_TABLE)
         .addTable(PREFIX_TABLE)
+        .addTable(DIRECTORY_TABLE)
+        .addTable(FILE_TABLE)
+        .addTable(OPEN_FILE_TABLE)
+        .addTable(DELETED_DIR_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
+        .addTable(META_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -346,7 +426,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmMultipartKeyInfo.class, new OmMultipartKeyInfoCodec())
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
-        .addCodec(TransactionInfo.class, new TransactionInfoCodec());
+        .addCodec(TransactionInfo.class, new TransactionInfoCodec())
+        .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec());
   }
 
   /**
@@ -400,9 +481,28 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         OmPrefixInfo.class);
     checkTableStatus(prefixTable, PREFIX_TABLE);
 
+    dirTable = this.store.getTable(DIRECTORY_TABLE, String.class,
+            OmDirectoryInfo.class);
+    checkTableStatus(dirTable, DIRECTORY_TABLE);
+
+    fileTable = this.store.getTable(FILE_TABLE, String.class,
+            OmKeyInfo.class);
+    checkTableStatus(fileTable, FILE_TABLE);
+
+    openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
+            OmKeyInfo.class);
+    checkTableStatus(openFileTable, OPEN_FILE_TABLE);
+
+    deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
+        OmKeyInfo.class);
+    checkTableStatus(deletedDirTable, DELETED_DIR_TABLE);
+
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
     checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE);
+
+    metaTable = this.store.getTable(META_TABLE, String.class, String.class);
+    checkTableStatus(metaTable, META_TABLE);
   }
 
   /**
@@ -734,13 +834,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
-      getBucketIterator(){
+      getBucketIterator() {
     return bucketTable.cacheIterator();
   }
 
   @Override
   public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-      getKeyIterator(){
+      getKeyIterator() {
     return keyTable.iterator();
   }
 
@@ -791,7 +891,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
 
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
-    Set<String> deletedKeySet = new TreeSet<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
         keyTable.cacheIterator();
 
@@ -811,19 +910,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
       // Making sure that entry in cache is not for delete key request.
 
-      if (omKeyInfo != null) {
-        if (key.startsWith(seekPrefix) && key.compareTo(seekKey) >= 0) {
-          cacheKeyMap.put(key, omKeyInfo);
-        }
-      } else {
-        deletedKeySet.add(key);
+      if (omKeyInfo != null
+          && key.startsWith(seekPrefix)
+          && key.compareTo(seekKey) >= 0) {
+        cacheKeyMap.put(key, omKeyInfo);
       }
     }
 
     // Get maxKeys from DB if it has.
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyIter = getKeyTable().iterator()) {
+             keyIter = getKeyTable(getBucketLayout()).iterator()) {
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
       // we need to iterate maxKeys + 1 here because if skipStartKey is true,
@@ -834,7 +931,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
           // Entry should not be marked for delete, consider only those
           // entries.
-          if(!deletedKeySet.contains(kv.getKey())) {
+          CacheValue<OmKeyInfo> cacheValue =
+              keyTable.getCacheValue(new CacheKey<>(kv.getKey()));
+          if (cacheValue == null || cacheValue.getCacheValue() != null) {
             cacheKeyMap.put(kv.getKey(), kv.getValue());
             currentCount++;
           }
@@ -865,7 +964,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     // Clear map and set.
     cacheKeyMap.clear();
-    deletedKeySet.clear();
 
     return result;
   }
@@ -1007,7 +1105,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         if (kv != null) {
           RepeatedOmKeyInfo infoList = kv.getValue();
           // Get block keys as a list.
-          for(OmKeyInfo info : infoList.getOmKeyInfoList()){
+          for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
             OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
             List<BlockID> item = latest.getLocationList().stream()
                 .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
@@ -1034,18 +1132,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
     List<String> expiredKeys = Lists.newArrayList();
 
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+    try (
+        TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+            keyValueTableIterator = getOpenKeyTable(
+            getBucketLayout()).iterator()) {
 
       while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String openKey = openKeyValue.getKey();
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
-        Duration openKeyAge =
-                Duration.between(
-                        Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
-                        Instant.now());
+        Duration openKeyAge = Duration
+            .between(Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
+                Instant.now());
 
         if (openKeyAge.compareTo(expirationDuration) >= 0) {
           expiredKeys.add(openKey);
@@ -1137,6 +1236,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return transactionInfoTable;
   }
 
+  @Override
+  public Table<String, String> getMetaTable() {
+    return metaTable;
+  }
+
   /**
    * Update store used by subclass.
    *
@@ -1165,4 +1269,35 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return tableMap.keySet();
   }
 
+  @Override
+  public String getOzonePathKey(long parentObjectId, String pathComponentName) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(parentObjectId);
+    builder.append(OM_KEY_PREFIX).append(pathComponentName);
+    return builder.toString();
+  }
+
+  @Override
+  public String getOpenFileName(long parentID, String fileName,
+                                long id) {
+    StringBuilder openKey = new StringBuilder();
+    openKey.append(parentID);
+    openKey.append(OM_KEY_PREFIX).append(fileName);
+    openKey.append(OM_KEY_PREFIX).append(id);
+    return openKey.toString();
+  }
+
+  @Override
+  public String getMultipartKey(long parentID, String fileName,
+                                String uploadId) {
+    StringBuilder openKey = new StringBuilder();
+    openKey.append(parentID);
+    openKey.append(OM_KEY_PREFIX).append(fileName);
+    openKey.append(OM_KEY_PREFIX).append(uploadId);
+    return openKey.toString();
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
 }

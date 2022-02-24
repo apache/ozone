@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.metrics;
 
 import java.io.File;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,15 +40,16 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -91,8 +93,10 @@ public class TestContainerMetrics {
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, path);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, path);
       VolumeSet volumeSet = new MutableVolumeSet(
-          datanodeDetails.getUuidString(), conf);
+          datanodeDetails.getUuidString(), conf,
+          null, StorageVolume.VolumeType.DATA_VOLUME, null);
       ContainerSet containerSet = new ContainerSet();
       DatanodeStateMachine stateMachine = Mockito.mock(
           DatanodeStateMachine.class);
@@ -108,7 +112,7 @@ public class TestContainerMetrics {
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
                 containerSet, volumeSet, metrics,
-                TestHddsDispatcher.NO_OP_ICR_SENDER));
+                c -> { }));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
           volumeSet, handlers, context, metrics, null);
@@ -159,7 +163,9 @@ public class TestContainerMetrics {
       assertQuantileGauges("WriteChunkNanos" + sec, containerMetrics);
 
       // Check VolumeIOStats metrics
-      HddsVolume hddsVolume = volumeSet.getVolumesList().get(0);
+      List<HddsVolume> volumes =
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+      HddsVolume hddsVolume = volumes.get(0);
       MetricsRecordBuilder volumeIOMetrics =
           getMetrics(hddsVolume.getVolumeIOStats().getMetricsSourceName());
       assertCounter("ReadBytes", 1024L, volumeIOMetrics);
@@ -176,7 +182,7 @@ public class TestContainerMetrics {
       }
       // clean up volume dir
       File file = new File(path);
-      if(file.exists()) {
+      if (file.exists()) {
         FileUtil.fullyDelete(file);
       }
     }

@@ -30,8 +30,10 @@ public class VolumeUsage implements SpaceUsageSource {
 
   private final CachingSpaceUsageSource source;
   private boolean shutdownComplete;
+  private final long reservedInBytes;
 
-  VolumeUsage(SpaceUsageCheckParams checkParams) {
+  VolumeUsage(SpaceUsageCheckParams checkParams, long reservedInBytes) {
+    this.reservedInBytes = reservedInBytes;
     source = new CachingSpaceUsageSource(checkParams);
     start(); // TODO should start only on demand
   }
@@ -41,15 +43,37 @@ public class VolumeUsage implements SpaceUsageSource {
     return Math.max(source.getCapacity(), 0);
   }
 
+  /**
+   * Calculate available space use method B.
+   * |----used----|   (avail)   |++++++++reserved++++++++|
+   *              |     fsAvail      |-------other-------|
+   *                          ->|~~~~|<-
+   *                      remainingReserved
+   * B) avail = fsAvail - Max(reserved - other, 0);
+   */
   @Override
   public long getAvailable() {
-    long l = source.getCapacity() - source.getUsedSpace();
-    return Math.max(Math.min(l, source.getAvailable()), 0);
+    return source.getAvailable() - getRemainingReserved();
   }
 
   @Override
   public long getUsedSpace() {
     return source.getUsedSpace();
+  }
+
+  /**
+   * Get the space used by others except hdds.
+   * DU is refreshed periodically and could be not exact,
+   * so there could be that DU value > totalUsed when there are deletes.
+   * @return other used space
+   */
+  private long getOtherUsed() {
+    long totalUsed = source.getCapacity() - source.getAvailable();
+    return Math.max(totalUsed - source.getUsedSpace(), 0L);
+  }
+
+  private long getRemainingReserved() {
+    return Math.max(reservedInBytes - getOtherUsed(), 0L);
   }
 
   public synchronized void start() {
@@ -63,4 +87,7 @@ public class VolumeUsage implements SpaceUsageSource {
     }
   }
 
+  public void refreshNow() {
+    source.refreshNow();
+  }
 }

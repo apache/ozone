@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
@@ -70,7 +70,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     // Check all keys are deleted.
     for (String deleteKey : deleteKeyList) {
-      Assert.assertNull(omMetadataManager.getKeyTable()
+      Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
           .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
               deleteKey)));
     }
@@ -106,7 +106,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     // Check keys are deleted and in response check unDeletedKey.
     for (String deleteKey : deleteKeyList) {
-      Assert.assertNull(omMetadataManager.getKeyTable()
+      Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
           .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
               deleteKey)));
     }
@@ -123,7 +123,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     deleteKeyList = new ArrayList<>();
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     int count = 10;
@@ -138,7 +138,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     for (int i = 0; i < count; i++) {
       key = parentDir.concat("/key" + i);
-      TestOMRequestUtils.addKeyToTableCache(volumeName, bucketName,
+      OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName,
           parentDir.concat("/key" + i), HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE, omMetadataManager);
       deleteKeyArgs.addKeys(key);

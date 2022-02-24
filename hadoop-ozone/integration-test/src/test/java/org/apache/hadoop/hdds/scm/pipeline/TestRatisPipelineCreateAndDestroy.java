@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -61,7 +61,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
-            .setTotalPipelineNumLimit(numDatanodes + numDatanodes/3)
+            .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
             .setHbInterval(2000)
             .setHbProcessorInterval(1000)
             .build();

@@ -42,8 +42,7 @@ rm -rf target/coverage-classes || true
 mkdir -p target/coverage-classes
 
 #Unzip all the classes from the last build
-find hadoop-ozone/dist/target/*/share/ozone/lib -name "hadoop-*.jar" | \
-    grep -E 'hadoop-ozone-|hadoop-hdds-' | \
+find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'ozone-*.jar' | \
     grep -v -E 'shaded|hadoop2|hadoop3|tests' | \
     xargs -n1 unzip -o -q -d target/coverage-classes
 
@@ -52,7 +51,6 @@ find target/coverage-classes -name proto -type d | xargs rm -rf
 find target/coverage-classes -name generated -type d | xargs rm -rf
 find target/coverage-classes -name v1 -type d | xargs rm -rf
 find target/coverage-classes -name freon -type d | xargs rm -rf
-find target/coverage-classes -name genesis -type d | xargs rm -rf
 
 #generate the reports
 jacoco report "$REPORT_DIR/jacoco-all.exec" --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"

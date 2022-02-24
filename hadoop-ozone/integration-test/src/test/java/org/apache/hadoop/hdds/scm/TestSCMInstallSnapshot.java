@@ -21,11 +21,10 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
-import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotProvider;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -37,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -62,12 +61,10 @@ public class TestSCMInstallSnapshot {
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    SCMHAConfiguration scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    scmhaConfiguration.setRatisSnapshotThreshold(1L);
-    scmhaConfiguration.setRatisSnapshotDir(
-        GenericTestUtils.getRandomizedTempPath() + "/snapshot");
-    conf.setFromObject(scmhaConfiguration);
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD, 1L);
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR,
+            GenericTestUtils.getRandomizedTempPath() + "/snapshot");
     cluster = MiniOzoneCluster
         .newBuilder(conf)
         .setNumDatanodes(3)
@@ -89,7 +86,7 @@ public class TestSCMInstallSnapshot {
 
   private DBCheckpoint downloadSnapshot() throws Exception {
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    ContainerManagerV2 containerManager = scm.getContainerManager();
+    ContainerManager containerManager = scm.getContainerManager();
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
@@ -121,7 +118,6 @@ public class TestSCMInstallSnapshot {
   public void testInstallCheckPoint() throws Exception {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    SCMHAManagerImpl scmhaManager = (SCMHAManagerImpl)scm.getScmHAManager();
     DBStore db = HAUtils
         .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
             checkpoint.getCheckpointLocation().getFileName().toString(),
@@ -132,7 +128,7 @@ public class TestSCMInstallSnapshot {
     Assert.assertNotNull(db);
     HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
         .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
-            .setCurrentTerm(1).setTransactionIndex(100).build());
+            .setCurrentTerm(10).setTransactionIndex(100).build());
     db.close();
     ContainerID cid =
         scm.getContainerManager().getContainers().get(0).containerID();
@@ -143,7 +139,12 @@ public class TestSCMInstallSnapshot {
     Assert.assertNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
     Assert.assertFalse(scm.getContainerManager().containerExist(cid));
-    scmhaManager.installCheckpoint("scm1", checkpoint);
+
+    SCMStateMachine sm =
+        scm.getScmHAManager().getRatisServer().getSCMStateMachine();
+    sm.pause();
+    sm.setInstallingDBCheckpoint(checkpoint);
+    sm.reinitialize();
 
     Assert.assertNotNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));

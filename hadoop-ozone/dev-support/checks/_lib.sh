@@ -43,8 +43,12 @@ _install_tool() {
   if [[ ! -d "${dir}" ]]; then
     mkdir -pv "${dir}"
     pushd "${dir}"
-    eval "${func}"
-    echo "Installed ${tool} in ${dir}"
+    if eval "${func}"; then
+      echo "Installed ${tool} in ${dir}"
+    else
+      echo "Failed to install ${tool}"
+      exit 1
+    fi
     popd
   fi
 
@@ -73,7 +77,7 @@ install_k3s() {
 }
 
 _install_k3s() {
-  curl -sfL https://get.k3s.io | sh -
+  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.21.2+k3s1" sh -
   sudo chmod a+r $KUBECONFIG
 }
 
@@ -83,7 +87,12 @@ install_flekszible() {
 
 _install_flekszible() {
   mkdir bin
-  curl -LSs https://github.com/elek/flekszible/releases/download/v2.3.0/flekszible_2.3.0_Linux_x86_64.tar.gz | tar -xz -f - -C bin
+
+  local os=$(uname -s)
+  local arch=$(uname -m)
+
+  curl -LSs https://github.com/elek/flekszible/releases/download/v2.3.0/flekszible_2.3.0_${os}_${arch}.tar.gz | tar -xz -f - -C bin
+
   chmod +x bin/flekszible
 }
 
@@ -92,7 +101,7 @@ install_hugo() {
 }
 
 _install_hugo() {
-  : ${HUGO_VERSION:=0.81.0}
+  : ${HUGO_VERSION:=0.83.1}
 
   local os=$(uname -s)
   local arch=$(uname -m)

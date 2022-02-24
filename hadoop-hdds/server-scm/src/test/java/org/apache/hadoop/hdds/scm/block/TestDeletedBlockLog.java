@@ -19,15 +19,15 @@ package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -68,9 +68,11 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.mockito.Matchers.anyObject;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 /**
@@ -78,14 +80,18 @@ import static org.mockito.Mockito.when;
  */
 public class TestDeletedBlockLog {
 
-  private  DeletedBlockLogImplV2 deletedBlockLog;
+  private  DeletedBlockLogImpl deletedBlockLog;
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
+  private Table<ContainerID, ContainerInfo> containerTable;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
   private SCMHADBTransactionBuffer scmHADBTransactionBuffer;
+  private Map<Long, ContainerInfo> containers = new HashMap<>();
+  private Map<Long, Set<ContainerReplica>> replicas = new HashMap<>();
+  private ScmBlockDeletingServiceMetrics metrics;
 
   @Before
   public void setup() throws Exception {
@@ -95,17 +101,20 @@ public class TestDeletedBlockLog {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    scm = TestUtils.getScm(conf);
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    scm = HddsTestUtils.getScm(conf);
+    containerManager = Mockito.mock(ContainerManager.class);
+    containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
         new MockSCMHADBTransactionBuffer(scm.getScmMetadataStore().getStore());
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    metrics = Mockito.mock(ScmBlockDeletingServiceMetrics.class);
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     dnList = new ArrayList<>(3);
     setupContainerManager();
   }
@@ -121,10 +130,44 @@ public class TestDeletedBlockLog {
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
+    when(containerManager.getContainerReplicas(anyObject()))
+        .thenAnswer(invocationOnMock -> {
+          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
+          return replicas.get(cid.getId());
+        });
+    when(containerManager.getContainer(anyObject()))
+        .thenAnswer(invocationOnMock -> {
+          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
+          return containerTable.get(cid);
+        });
+    when(containerManager.getContainers())
+        .thenReturn(new ArrayList<>(containers.values()));
+    doAnswer(invocationOnMock -> {
+      Map<ContainerID, Long> map =
+          (Map<ContainerID, Long>) invocationOnMock.getArguments()[0];
+      for (Map.Entry<ContainerID, Long> e : map.entrySet()) {
+        ContainerInfo info = containers.get(e.getKey().getId());
+        try {
+          Assert.assertTrue(e.getValue() > info.getDeleteTransactionId());
+        } catch (AssertionError err) {
+          throw new Exception("New TxnId " + e.getValue() + " < " + info
+              .getDeleteTransactionId());
+        }
+        info.updateDeleteTransactionId(e.getValue());
+        scmHADBTransactionBuffer.addToBuffer(containerTable, e.getKey(), info);
+      }
+      return null;
+    }).when(containerManager).updateDeleteTransactionId(anyObject());
+  }
+
+  private void updateContainerMetadata(long cid) throws IOException {
     final ContainerInfo container =
-        new ContainerInfo.Builder().setContainerID(1)
-            .setReplicationFactor(ReplicationFactor.THREE)
+        new ContainerInfo.Builder()
+            .setContainerID(cid)
+            .setReplicationConfig(new RatisReplicationConfig(THREE))
             .setState(HddsProtos.LifeCycleState.CLOSED)
+            .setOwner("TestDeletedBlockLog")
+            .setPipelineID(PipelineID.randomId())
             .build();
     final Set<ContainerReplica> replicaSet = dnList.stream()
         .map(datanodeDetails -> ContainerReplica.newBuilder()
@@ -133,11 +176,9 @@ public class TestDeletedBlockLog {
             .setDatanodeDetails(datanodeDetails)
             .build())
         .collect(Collectors.toSet());
-
-    when(containerManager.getContainerReplicas(anyObject()))
-        .thenReturn(replicaSet);
-    when(containerManager.getContainer(anyObject()))
-        .thenReturn(container);
+    containers.put(cid, container);
+    containerTable.put(ContainerID.valueOf(cid), container);
+    replicas.put(cid, replicaSet);
   }
 
   @After
@@ -148,13 +189,14 @@ public class TestDeletedBlockLog {
     FileUtils.deleteDirectory(testDir);
   }
 
-  private Map<Long, List<Long>> generateData(int dataSize) {
+  private Map<Long, List<Long>> generateData(int dataSize) throws IOException {
     Map<Long, List<Long>> blockMap = new HashMap<>();
     Random random = new Random(1);
     int continerIDBase = random.nextInt(100);
     int localIDBase = random.nextInt(1000);
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
+      updateContainerMetadata(containerID);
       List<Long> blocks = new ArrayList<>();
       for (int j = 0; j < BLOCKS_PER_TXN; j++)  {
         long localID = localIDBase + j;
@@ -165,10 +207,13 @@ public class TestDeletedBlockLog {
     return blockMap;
   }
 
-  private void addTransactions(Map<Long, List<Long>> containerBlocksMap)
+  private void addTransactions(Map<Long, List<Long>> containerBlocksMap,
+      boolean shouldFlush)
       throws IOException {
     deletedBlockLog.addTransactions(containerBlocksMap);
-    scmHADBTransactionBuffer.flush();
+    if (shouldFlush) {
+      scmHADBTransactionBuffer.flush();
+    }
   }
 
   private void incrementCount(List<Long> txIDs) throws IOException {
@@ -230,11 +275,36 @@ public class TestDeletedBlockLog {
   }
 
   @Test
+  public void testContainerManagerTransactionId() throws Exception {
+    // Initially all containers should have deleteTransactionId as 0
+    for (ContainerInfo containerInfo : containerManager.getContainers()) {
+      Assert.assertEquals(0, containerInfo.getDeleteTransactionId());
+    }
+
+    // Create 30 TXs
+    addTransactions(generateData(30), false);
+    // Since transactions are not yet flushed deleteTransactionId should be
+    // 0 for all containers
+    Assert.assertEquals(0, getTransactions(1000).size());
+    for (ContainerInfo containerInfo : containerManager.getContainers()) {
+      Assert.assertEquals(0, containerInfo.getDeleteTransactionId());
+    }
+
+    scmHADBTransactionBuffer.flush();
+    // After flush there should be 30 transactions in deleteTable
+    // All containers should have positive deleteTransactionId
+    Assert.assertEquals(30, getTransactions(1000).size());
+    for (ContainerInfo containerInfo : containerManager.getContainers()) {
+      Assert.assertTrue(containerInfo.getDeleteTransactionId() > 0);
+    }
+  }
+
+  @Test
   public void testIncrementCount() throws Exception {
     int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
     // Create 30 TXs in the log.
-    addTransactions(generateData(30));
+    addTransactions(generateData(30), true);
 
     // This will return all TXs, total num 30.
     List<DeletedBlocksTransaction> blocks =
@@ -261,7 +331,7 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testCommitTransactions() throws Exception {
-    addTransactions(generateData(50));
+    addTransactions(generateData(50), true);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(20 * BLOCKS_PER_TXN);
     // Add an invalid txn.
@@ -295,7 +365,7 @@ public class TestDeletedBlockLog {
     for (int i = 0; i < 100; i++) {
       int state = random.nextInt(4);
       if (state == 0) {
-        addTransactions(generateData(10));
+        addTransactions(generateData(10), true);
         added += 10;
       } else if (state == 1) {
         blocks = getTransactions(20);
@@ -325,17 +395,18 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testPersistence() throws Exception {
-    addTransactions(generateData(50));
+    addTransactions(generateData(50), true);
     // close db and reopen it again to make sure
     // transactions are stored persistently.
     deletedBlockLog.close();
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(BLOCKS_PER_TXN * 10);
     Assert.assertEquals(10, blocks.size());
@@ -347,13 +418,14 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // currentTxnID = 50
     deletedBlockLog.close();
-    new DeletedBlockLogImplV2(conf,
+    new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assert.assertEquals(0, blocks.size());
     //Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
@@ -370,7 +442,7 @@ public class TestDeletedBlockLog {
 
     // Creates {TXNum} TX in the log.
     Map<Long, List<Long>> deletedBlocks = generateData(txNum);
-    addTransactions(deletedBlocks);
+    addTransactions(deletedBlocks, true);
     for (Map.Entry<Long, List<Long>> entry :deletedBlocks.entrySet()) {
       count++;
       containerID = entry.getKey();
@@ -398,7 +470,7 @@ public class TestDeletedBlockLog {
     builder.setCount(0);
     Map<Long, List<Long>> deletedBlocksMap = new HashMap<>();
     deletedBlocksMap.put(containerID, new LinkedList<>());
-    addTransactions(deletedBlocksMap);
+    addTransactions(deletedBlocksMap, true);
 
     // get should return two transactions for the same container
     blocks = getTransactions(txNum);
@@ -419,9 +491,7 @@ public class TestDeletedBlockLog {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
     builder.setContainerID(containerID)
         .setPipelineID(pipeline.getId())
-        .setReplicationType(pipeline.getType())
-        .setReplicationFactor(
-            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+        .setReplicationConfig(pipeline.getReplicationConfig());
 
     ContainerInfo containerInfo = builder.build();
     Mockito.doReturn(containerInfo).when(containerManager)

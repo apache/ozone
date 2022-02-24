@@ -21,6 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for a *unstable* .proto interface.
  */
+syntax = "proto2";
 
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 
@@ -74,6 +75,15 @@ enum Status {
 }
 
 /**
+ * DataNode will advertise its current layout version through
+ * heartbeat as well as registration mechanism.
+ */
+message LayoutVersionProto {
+   required uint32 metadataLayoutVersion = 1;
+   required uint32 softwareLayoutVersion = 2;
+}
+
+/**
  * Request for version info of the software stack on the server.
  */
 message SCMVersionRequestProto {}
@@ -92,6 +102,7 @@ message SCMRegisterRequestProto {
   required NodeReportProto nodeReport = 2;
   required ContainerReportsProto containerReport = 3;
   required PipelineReportsProto pipelineReports = 4;
+  optional LayoutVersionProto dataNodeLayoutVersion = 5;
 }
 
 /**
@@ -126,6 +137,7 @@ message SCMHeartbeatRequestProto {
   optional ContainerActionsProto containerActions = 6;
   optional PipelineActionsProto pipelineActions = 7;
   optional PipelineReportsProto pipelineReports = 8;
+  optional LayoutVersionProto dataNodeLayoutVersion = 9;
 }
 
 /*
@@ -162,6 +174,10 @@ message StorageReportProto {
 message MetadataStorageReportProto {
   required string storageLocation = 1;
   optional StorageTypeProto storageType = 2 [default = DISK];
+  optional uint64 capacity = 3 [default = 0];
+  optional uint64 scmUsed = 4 [default = 0];
+  optional uint64 remaining = 5 [default = 0];
+  optional bool failed = 6 [default = false];
 }
 
 /**
@@ -197,7 +213,7 @@ message ContainerReplicaProto {
   required State state = 2;
   optional int64 size = 3;
   optional int64 used = 4;
-  optional int64 keyCount = 5;
+  optional int64 keyCount = 5; // keyCount here refers to BlockCount
   optional int64 readCount = 6;
   optional int64 writeCount = 7;
   optional int64 readBytes = 8;
@@ -294,6 +310,8 @@ message SCMCommandProto {
     createPipelineCommand = 6;
     closePipelineCommand = 7;
     setNodeOperationalStateCommand = 8;
+    finalizeNewLayoutVersionCommand = 9;
+    refreshVolumeUsageInfo = 10;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -305,10 +323,13 @@ message SCMCommandProto {
   optional CreatePipelineCommandProto createPipelineCommandProto = 7;
   optional ClosePipelineCommandProto closePipelineCommandProto = 8;
   optional SetNodeOperationalStateCommandProto setNodeOperationalStateCommandProto = 9;
+  optional FinalizeNewLayoutVersionCommandProto
+  finalizeNewLayoutVersionCommandProto = 10;
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
   optional int64 term = 15;
+  optional string encodedToken = 16;
 }
 
 /**
@@ -401,6 +422,27 @@ message SetNodeOperationalStateCommandProto {
   required  int64 cmdId = 1;
   required  NodeOperationalState nodeOperationalState = 2;
   required  int64 stateExpiryEpochSeconds = 3;
+}
+
+message CRLStatusReport {
+  required int64 receivedCrlId=1;
+  repeated int64 pendingCrlIds=2;
+}
+
+/**
+ * This command asks the datanode to process a new CRL.
+ */
+message ProcessCRLCommandProto {
+  required CRLInfoProto crlInfo = 1;
+}
+
+/**
+ * This command asks the DataNode to finalize a new layout version.
+ */
+message FinalizeNewLayoutVersionCommandProto {
+  required bool finalizeNewLayoutVersion = 1 [default = false];
+  required LayoutVersionProto dataNodeLayoutVersion = 2;
+  required int64 cmdId = 3;
 }
 
 /**

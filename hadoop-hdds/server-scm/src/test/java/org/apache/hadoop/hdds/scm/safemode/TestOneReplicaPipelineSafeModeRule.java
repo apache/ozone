@@ -44,10 +44,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -63,7 +63,7 @@ public class TestOneReplicaPipelineSafeModeRule {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
   private OneReplicaPipelineSafeModeRule rule;
-  private PipelineManagerV2Impl pipelineManager;
+  private PipelineManagerImpl pipelineManager;
   private EventQueue eventQueue;
   private SCMServiceManager serviceManager;
   private SCMContext scmContext;
@@ -90,7 +90,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     SCMMetadataStore scmMetadataStore =
             new SCMMetadataStoreImpl(ozoneConfiguration);
 
-    pipelineManager = PipelineManagerV2Impl.newPipelineManager(
+    pipelineManager = PipelineManagerImpl.newPipelineManager(
         ozoneConfiguration,
         MockSCMHAManager.getInstance(true),
         mockNodeManager,
@@ -111,7 +111,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         HddsProtos.ReplicationFactor.ONE);
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containers,
+        new SCMSafeModeManager(ozoneConfiguration, containers, null,
             pipelineManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();
@@ -133,7 +133,7 @@ public class TestOneReplicaPipelineSafeModeRule {
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
-    firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount -1));
+    firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount - 1));
 
     // As 90% of 7 with ceil is 7, if we send 6 pipeline reports, rule
     // validate should be still false.
@@ -144,7 +144,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     Assert.assertFalse(rule.validate());
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.subList(pipelineFactorThreeCount -1,
+    firePipelineEvent(pipelines.subList(pipelineFactorThreeCount - 1,
             pipelineFactorThreeCount));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
@@ -181,13 +181,13 @@ public class TestOneReplicaPipelineSafeModeRule {
         pipelineManager.getPipelines(
             new RatisReplicationConfig(ReplicationFactor.THREE));
 
-    firePipelineEvent(pipelines.subList(0, pipelineCountThree -1));
+    firePipelineEvent(pipelines.subList(0, pipelineCountThree - 1));
 
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 6"), 1000, 5000);
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.subList(pipelineCountThree -1,
+    firePipelineEvent(pipelines.subList(pipelineCountThree - 1,
             pipelineCountThree));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);

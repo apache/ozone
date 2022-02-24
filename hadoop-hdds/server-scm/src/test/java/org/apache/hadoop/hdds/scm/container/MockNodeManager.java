@@ -16,43 +16,51 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.Node2ContainerMap;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.assertj.core.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -61,16 +69,21 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState
-    .HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto
+    .HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
 /**
  * Test Helper for testing container Mapping.
  */
 public class MockNodeManager implements NodeManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MockNodeManager.class);
+
   public static final int NUM_PIPELINE_PER_METADATA_DISK = 2;
   private static final NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
@@ -100,9 +113,7 @@ public class MockNodeManager implements NodeManager {
   private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
 
-  public MockNodeManager(NetworkTopologyImpl clusterMap,
-                         List<DatanodeDetails> nodes,
-                         boolean initializeFakeNodes, int nodeCount) {
+  {
     this.healthyNodes = new LinkedList<>();
     this.staleNodes = new LinkedList<>();
     this.deadNodes = new LinkedList<>();
@@ -111,6 +122,12 @@ public class MockNodeManager implements NodeManager {
     this.node2ContainerMap = new Node2ContainerMap();
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
+    this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
+  }
+
+  public MockNodeManager(NetworkTopologyImpl clusterMap,
+                         List<DatanodeDetails> nodes,
+                         boolean initializeFakeNodes, int nodeCount) {
     this.clusterMap = clusterMap;
     if (!nodes.isEmpty()) {
       for (int x = 0; x < nodes.size(); x++) {
@@ -137,6 +154,64 @@ public class MockNodeManager implements NodeManager {
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
     this(new NetworkTopologyImpl(new OzoneConfiguration()), new ArrayList<>(),
         initializeFakeNodes, nodeCount);
+  }
+
+  public MockNodeManager(List<DatanodeUsageInfo> nodes)
+      throws IllegalArgumentException {
+    if (!nodes.isEmpty()) {
+      for (DatanodeUsageInfo node : nodes) {
+        register(node.getDatanodeDetails(), null, null);
+        nodeMetricMap.put(node.getDatanodeDetails(), node.getScmNodeStat());
+        aggregateStat.add(node.getScmNodeStat());
+        healthyNodes.add(node.getDatanodeDetails());
+      }
+    } else {
+      throw new IllegalArgumentException("The argument nodes list must not " +
+          "be empty");
+    }
+
+    safemode = false;
+    this.commandMap = new HashMap<>();
+    numHealthyDisksPerDatanode = 1;
+    numRaftLogDisksPerDatanode = 1;
+    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+        NUM_PIPELINE_PER_METADATA_DISK;
+  }
+
+  public MockNodeManager(
+      Map<DatanodeUsageInfo, Set<ContainerID>> usageInfoToCidsMap)
+      throws IllegalArgumentException {
+    if (!usageInfoToCidsMap.isEmpty()) {
+      // for each usageInfo, register it, add containers, and update metrics
+      for (Map.Entry<DatanodeUsageInfo, Set<ContainerID>> entry:
+          usageInfoToCidsMap.entrySet()) {
+        DatanodeUsageInfo usageInfo = entry.getKey();
+        register(usageInfo.getDatanodeDetails(), null, null);
+        try {
+          setContainers(usageInfo.getDatanodeDetails(), entry.getValue());
+        } catch (NodeNotFoundException e) {
+          LOG.warn("Could not find Datanode {} for adding containers to it. " +
+                  "Skipping this node.", usageInfo
+              .getDatanodeDetails().getUuidString());
+          continue;
+        }
+
+        nodeMetricMap
+            .put(usageInfo.getDatanodeDetails(), usageInfo.getScmNodeStat());
+        aggregateStat.add(usageInfo.getScmNodeStat());
+        healthyNodes.add(usageInfo.getDatanodeDetails());
+      }
+    } else {
+      throw new IllegalArgumentException("The provided argument should not be" +
+          " empty");
+    }
+
+    safemode = false;
+    this.commandMap = new HashMap<>();
+    numHealthyDisksPerDatanode = 1;
+    numRaftLogDisksPerDatanode = 1;
+    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+        NUM_PIPELINE_PER_METADATA_DISK;
   }
 
   /**
@@ -199,7 +274,29 @@ public class MockNodeManager implements NodeManager {
   public List<DatanodeDetails> getNodes(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
     if (nodestate == HEALTHY) {
-      return healthyNodes;
+      // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
+      List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
+      for (DatanodeDetails dd : healthyNodes) {
+        DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
+            UpgradeUtils.defaultLayoutVersionProto());
+
+        long capacity = nodeMetricMap.get(dd).getCapacity().get();
+        long used = nodeMetricMap.get(dd).getScmUsed().get();
+        long remaining = nodeMetricMap.get(dd).getRemaining().get();
+        StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+            di.getUuid(), "/data1-" + di.getUuidString(),
+            capacity, used, remaining, null);
+        MetadataStorageReportProto metaStorage1 =
+            HddsTestUtils.createMetadataStorageReport(
+                "/metadata1-" + di.getUuidString(), capacity, used,
+                remaining, null);
+        di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
+        di.updateMetaDataStorageReports(
+            new ArrayList<>(Arrays.asList(metaStorage1)));
+
+        healthyNodesWithInfo.add(di);
+      }
+      return healthyNodesWithInfo;
     }
 
     if (nodestate == STALE) {
@@ -280,7 +377,34 @@ public class MockNodeManager implements NodeManager {
   @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
-    return null;
+    List<DatanodeDetails> datanodeDetailsList =
+        getNodes(NodeOperationalState.IN_SERVICE, HEALTHY);
+    if (datanodeDetailsList == null) {
+      return new ArrayList<>();
+    }
+    Comparator<DatanodeUsageInfo> comparator;
+    if (mostUsed) {
+      comparator = DatanodeUsageInfo.getMostUtilized().reversed();
+    } else {
+      comparator = DatanodeUsageInfo.getMostUtilized();
+    }
+
+    return datanodeDetailsList.stream()
+        .map(node -> new DatanodeUsageInfo(node, nodeMetricMap.get(node)))
+        .sorted(comparator)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param datanodeDetails the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
+    SCMNodeStat stat = nodeMetricMap.get(datanodeDetails);
+    return new DatanodeUsageInfo(datanodeDetails, stat);
   }
 
   /**
@@ -307,7 +431,15 @@ public class MockNodeManager implements NodeManager {
   @Override
   public NodeStatus getNodeStatus(DatanodeDetails dd)
       throws NodeNotFoundException {
-    return null;
+    if (healthyNodes.contains(dd)) {
+      return NodeStatus.inServiceHealthy();
+    } else if (staleNodes.contains(dd)) {
+      return NodeStatus.inServiceStale();
+    } else if (deadNodes.contains(dd)) {
+      return NodeStatus.inServiceDead();
+    } else {
+      throw new NodeNotFoundException();
+    }
   }
 
   /**
@@ -400,7 +532,7 @@ public class MockNodeManager implements NodeManager {
 
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
-    if(commandMap.containsKey(dnId)) {
+    if (commandMap.containsKey(dnId)) {
       List<SCMCommand> commandList = commandMap.get(dnId);
       Preconditions.checkNotNull(commandList);
       commandList.add(command);
@@ -420,6 +552,18 @@ public class MockNodeManager implements NodeManager {
   @Override
   public void processNodeReport(DatanodeDetails dnUuid,
       NodeReportProto nodeReport) {
+    // do nothing
+  }
+
+  /**
+   * Empty implementation for processLayoutVersionReport.
+   *
+   * @param dnUuid
+   * @param layoutReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails dnUuid,
+                                         LayoutVersionProto layoutReport) {
     // do nothing
   }
 
@@ -457,7 +601,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   public void clearCommandQueue(UUID dnId) {
-    if(commandMap.containsKey(dnId)) {
+    if (commandMap.containsKey(dnId)) {
       commandMap.put(dnId, new LinkedList<>());
     }
   }
@@ -513,7 +657,9 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
-      NodeReportProto nodeReport, PipelineReportsProto pipelineReportsProto) {
+                                    NodeReportProto nodeReport,
+                                    PipelineReportsProto pipelineReportsProto,
+                                    LayoutVersionProto layoutInfo) {
     try {
       node2ContainerMap.insertNewDatanode(datanodeDetails.getUuid(),
           Collections.emptySet());
@@ -550,10 +696,12 @@ public class MockNodeManager implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - Datanode ID.
+   * @param layoutInfo - DataNode Layout info
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                           LayoutVersionProto layoutInfo) {
     return null;
   }
 
@@ -602,7 +750,8 @@ public class MockNodeManager implements NodeManager {
     SCMNodeStat stat = this.nodeMetricMap.get(datanodeDetails);
     if (stat != null) {
       aggregateStat.subtract(stat);
-      stat.getCapacity().add(size);
+      stat.getScmUsed().add(size);
+      stat.getRemaining().subtract(size);
       aggregateStat.add(stat);
       nodeMetricMap.put(datanodeDetails, stat);
     }
@@ -618,7 +767,8 @@ public class MockNodeManager implements NodeManager {
     SCMNodeStat stat = this.nodeMetricMap.get(datanodeDetails);
     if (stat != null) {
       aggregateStat.subtract(stat);
-      stat.getCapacity().subtract(size);
+      stat.getScmUsed().subtract(size);
+      stat.getRemaining().add(size);
       aggregateStat.add(stat);
       nodeMetricMap.put(datanodeDetails, stat);
     }
@@ -649,7 +799,7 @@ public class MockNodeManager implements NodeManager {
     if (uuids == null) {
       return results;
     }
-    for(String uuid : uuids) {
+    for (String uuid : uuids) {
       DatanodeDetails dn = getNodeByUuid(uuid);
       if (dn != null) {
         results.add(dn);

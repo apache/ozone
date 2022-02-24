@@ -19,8 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
-import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -37,6 +36,9 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 
+/**
+ * Tests snapshots in SCM HA.
+ */
 public class TestSCMSnapshot {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -45,10 +47,8 @@ public class TestSCMSnapshot {
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    SCMHAConfiguration scmhaConfiguration = conf.getObject(
-        SCMHAConfiguration.class);
-    scmhaConfiguration.setRatisSnapshotThreshold(1L);
-    conf.setFromObject(scmhaConfiguration);
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD, 1L);
     cluster = MiniOzoneCluster
         .newBuilder(conf)
         .setNumDatanodes(3)
@@ -62,7 +62,7 @@ public class TestSCMSnapshot {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     long snapshotInfo1 = scm.getScmHAManager().asSCMHADBTransactionBuffer()
         .getLatestTrxInfo().getTransactionIndex();
-    ContainerManagerV2 containerManager = scm.getContainerManager();
+    ContainerManager containerManager = scm.getContainerManager();
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(

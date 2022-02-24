@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -70,6 +71,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -143,18 +145,26 @@ public class TestCleanupTableInfo {
 
     Set<String> tables = omMetadataManager.listTableNames();
     Set<Class<? extends OMClientResponse>> subTypes = responseClasses();
+    // OmKeyResponse is an abstract class that does not need CleanupTable.
+    subTypes.remove(OmKeyResponse.class);
     subTypes.forEach(aClass -> {
-      Assert.assertTrue(aClass + "does not have annotation of" +
+      Assert.assertTrue(aClass + " does not have annotation of" +
               " CleanupTableInfo",
           aClass.isAnnotationPresent(CleanupTableInfo.class));
-      String[] cleanupTables =
-          aClass.getAnnotation(CleanupTableInfo.class).cleanupTables();
-      Assert.assertTrue(cleanupTables.length >=1);
-      for (String tableName : cleanupTables) {
-        Assert.assertTrue(tables.contains(tableName));
+      CleanupTableInfo annotation =
+          aClass.getAnnotation(CleanupTableInfo.class);
+      String[] cleanupTables = annotation.cleanupTables();
+      boolean cleanupAll = annotation.cleanupAll();
+      if (cleanupTables.length >= 1) {
+        Assert.assertTrue(
+            Arrays.stream(cleanupTables).allMatch(tables::contains)
+        );
+      } else {
+        assertTrue(cleanupAll);
       }
     });
   }
+
 
   private Set<Class<? extends OMClientResponse>> responseClasses() {
     Reflections reflections = new Reflections(OM_RESPONSE_PACKAGE);
@@ -185,8 +195,6 @@ public class TestCleanupTableInfo {
     verify(omMetrics, times(1)).incNumKeyAllocates();
   }
 
-
-
   private Map<String, Integer> recordCacheItemCounts() {
     Map<String, Integer> cacheItemCount = new HashMap<>();
     for (String tableName : om.getMetadataManager().listTableNames()) {
@@ -200,7 +208,8 @@ public class TestCleanupTableInfo {
     return cacheItemCount;
   }
 
-  private void assertCacheItemCounts(Map<String, Integer> cacheItemCount,
+  private void assertCacheItemCounts(
+      Map<String, Integer> cacheItemCount,
       Class<? extends OMClientResponse> responseClass
   ) {
     CleanupTableInfo ann = responseClass.getAnnotation(CleanupTableInfo.class);
@@ -208,7 +217,7 @@ public class TestCleanupTableInfo {
     for (String tableName : om.getMetadataManager().listTableNames()) {
       if (!cleanup.contains(tableName)) {
         assertEquals(
-            "Cache item count of table " +tableName,
+            "Cache item count of table " + tableName,
             cacheItemCount.get(tableName).intValue(),
             Iterators.size(
                 om.getMetadataManager().getTable(tableName).cacheIterator()
@@ -280,7 +289,7 @@ public class TestCleanupTableInfo {
     return new OMFileCreateRequest(protoRequest);
   }
 
-  private OMKeyCreateRequest anOMKeyCreateRequest(){
+  private OMKeyCreateRequest anOMKeyCreateRequest() {
     OMRequest protoRequest = mock(OMRequest.class);
     when(protoRequest.getCreateKeyRequest()).thenReturn(aKeyCreateRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateKey);
@@ -355,7 +364,7 @@ public class TestCleanupTableInfo {
   }
 
   private DatanodeDetailsProto aDatanodeDetailsProto(String s,
-      String host1) {
+                                                     String host1) {
     return DatanodeDetailsProto.newBuilder()
         .setUuid(UUID.randomUUID().toString())
         .setIpAddress(s)

@@ -220,10 +220,11 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         long callId = callIdRandom.nextLong();
         inFlightMessages.put(callId);
         sender.onNext(createAppendLogEntry(sequence, callId));
-      } catch (Exception e) {
+      } catch (InterruptedException e) {
         LOG.error(
             "Error while sending new append entry request (HB) to the "
                 + "follower", e);
+        Thread.currentThread().interrupt();
       }
     });
   }
@@ -241,6 +242,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         rateLimiter.acquire();
       } catch (InterruptedException e) {
         LOG.error("Rate limiter acquire has been interrupted", e);
+        Thread.currentThread().interrupt();
       }
     }
     long previousLog = nextIndex - 1;

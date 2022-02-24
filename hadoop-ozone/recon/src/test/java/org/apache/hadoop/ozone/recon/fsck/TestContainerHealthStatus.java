@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.fsck;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -50,8 +51,9 @@ public class TestContainerHealthStatus {
   public void setup() {
     placementPolicy = mock(PlacementPolicy.class);
     container = mock(ContainerInfo.class);
-    when(container.getReplicationFactor())
-        .thenReturn(HddsProtos.ReplicationFactor.THREE);
+    when(container.getReplicationConfig())
+        .thenReturn(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
     when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(

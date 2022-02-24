@@ -17,24 +17,29 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.junit.Assert.assertFalse;
-import static org.mockito.Matchers.anyObject;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
 
@@ -46,21 +51,43 @@ public class TestSCMContainerPlacementRandom {
   @Test
   public void chooseDatanodes() throws SCMException {
     //given
-    ConfigurationSource conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // We are using small units here
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        1, StorageUnit.BYTES);
 
-    List<DatanodeDetails> datanodes = new ArrayList<>();
+    List<DatanodeInfo> datanodes = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
-      datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          MockDatanodeDetails.randomDatanodeDetails(),
+          NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
+
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          100L, 0, 100L, null);
+      MetadataStorageReportProto metaStorage1 =
+          HddsTestUtils.createMetadataStorageReport(
+              "/metadata1-" + datanodeInfo.getUuidString(),
+              100L, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+      datanodeInfo.updateMetaDataStorageReports(
+          new ArrayList<>(Arrays.asList(metaStorage1)));
+
+      datanodes.add(datanodeInfo);
     }
+
+    StorageReportProto storage2 = HddsTestUtils.createStorageReport(
+        datanodes.get(2).getUuid(),
+        "/data1-" + datanodes.get(2).getUuidString(),
+        100L, 90L, 10L, null);
+    datanodes.get(2).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage2)));
 
     NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
-
-    when(mockNodeManager.getNodeStat(anyObject()))
-        .thenReturn(new SCMNodeMetric(100L, 0L, 100L));
-    when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 90L, 10L));
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
@@ -73,7 +100,7 @@ public class TestSCMContainerPlacementRandom {
     for (int i = 0; i < 100; i++) {
       //when
       List<DatanodeDetails> datanodeDetails = scmContainerPlacementRandom
-          .chooseDatanodes(existingNodes, null, 1, 15);
+          .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
       Assert.assertEquals(1, datanodeDetails.size());
@@ -95,7 +122,9 @@ public class TestSCMContainerPlacementRandom {
   @Test
   public void testPlacementPolicySatisified() {
     //given
-    ConfigurationSource conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        10, StorageUnit.MB);
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
@@ -127,4 +156,72 @@ public class TestSCMContainerPlacementRandom {
     // Only expect 1 more replica to give us one rack on this policy.
     assertEquals(0, status.misReplicationCount(), 3);
   }
+
+  @Test
+  public void testIsValidNode() throws SCMException {
+    //given
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // We are using small units here
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        1, StorageUnit.BYTES);
+
+    List<DatanodeInfo> datanodes = new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          MockDatanodeDetails.randomDatanodeDetails(),
+          NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
+
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          100L, 0, 100L, null);
+      MetadataStorageReportProto metaStorage1 =
+          HddsTestUtils.createMetadataStorageReport(
+              "/metadata1-" + datanodeInfo.getUuidString(),
+              100L, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+      datanodeInfo.updateMetaDataStorageReports(
+          new ArrayList<>(Arrays.asList(metaStorage1)));
+
+      datanodes.add(datanodeInfo);
+    }
+
+    StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+        datanodes.get(1).getUuid(),
+        "/data1-" + datanodes.get(1).getUuidString(),
+        100L, 90L, 10L, null);
+    datanodes.get(1).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage1)));
+
+    MetadataStorageReportProto metaStorage2 =
+        HddsTestUtils.createMetadataStorageReport(
+            "/metadata1-" + datanodes.get(2).getUuidString(),
+            100L, 90, 10L, null);
+    datanodes.get(2).updateMetaDataStorageReports(
+        new ArrayList<>(Arrays.asList(metaStorage2)));
+
+    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
+        .thenReturn(new ArrayList<>(datanodes));
+    when(mockNodeManager.getNodeByUuid(datanodes.get(0).getUuidString()))
+        .thenReturn(datanodes.get(0));
+    when(mockNodeManager.getNodeByUuid(datanodes.get(1).getUuidString()))
+        .thenReturn(datanodes.get(1));
+    when(mockNodeManager.getNodeByUuid(datanodes.get(2).getUuidString()))
+        .thenReturn(datanodes.get(2));
+
+    SCMContainerPlacementRandom scmContainerPlacementRandom =
+        new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
+            null);
+
+    Assert.assertTrue(
+        scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));
+    Assert.assertFalse(
+        scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L));
+    Assert.assertFalse(
+        scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L));
+
+  }
+
 }

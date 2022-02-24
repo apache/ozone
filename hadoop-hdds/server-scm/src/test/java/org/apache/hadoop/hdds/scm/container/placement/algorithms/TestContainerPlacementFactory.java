@@ -18,32 +18,38 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.when;
 
 /**
@@ -54,6 +60,7 @@ public class TestContainerPlacementFactory {
   private NetworkTopology cluster;
   // datanodes array list
   private List<DatanodeDetails> datanodes = new ArrayList<>();
+  private List<DatanodeInfo> dnInfos = new ArrayList<>();
   // node storage capacity
   private static final long STORAGE_CAPACITY = 100L;
   // configuration
@@ -71,6 +78,8 @@ public class TestContainerPlacementFactory {
   public void testRackAwarePolicy() throws IOException {
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementRackAware.class.getName());
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        0, StorageUnit.MB);
 
     NodeSchema[] schemas = new NodeSchema[]
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
@@ -82,24 +91,56 @@ public class TestContainerPlacementFactory {
     String hostname = "node";
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, rack + (i / 5));
-      datanodes.add(node);
-      cluster.add(node);
+      DatanodeDetails datanodeDetails = MockDatanodeDetails
+          .createDatanodeDetails(hostname + i, rack + (i / 5));
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          datanodeDetails, NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto());
+
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          STORAGE_CAPACITY, 0, 100L, null);
+      MetadataStorageReportProto metaStorage1 =
+          HddsTestUtils.createMetadataStorageReport(
+          "/metadata1-" + datanodeInfo.getUuidString(),
+          STORAGE_CAPACITY, 0, 100L, null);
+      datanodeInfo.updateStorageReports(
+          new ArrayList<>(Arrays.asList(storage1)));
+      datanodeInfo.updateMetaDataStorageReports(
+          new ArrayList<>(Arrays.asList(metaStorage1)));
+
+      datanodes.add(datanodeDetails);
+      cluster.add(datanodeDetails);
+      dnInfos.add(datanodeInfo);
     }
+
+    StorageReportProto storage2 = HddsTestUtils.createStorageReport(
+        dnInfos.get(2).getUuid(),
+        "/data1-" + dnInfos.get(2).getUuidString(),
+        STORAGE_CAPACITY, 90L, 10L, null);
+    dnInfos.get(2).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage2)));
+    StorageReportProto storage3 = HddsTestUtils.createStorageReport(
+        dnInfos.get(3).getUuid(),
+        "/data1-" + dnInfos.get(3).getUuidString(),
+        STORAGE_CAPACITY, 80L, 20L, null);
+    dnInfos.get(3).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage3)));
+    StorageReportProto storage4 = HddsTestUtils.createStorageReport(
+        dnInfos.get(4).getUuid(),
+        "/data1-" + dnInfos.get(4).getUuidString(),
+        STORAGE_CAPACITY, 70L, 30L, null);
+    dnInfos.get(4).updateStorageReports(
+        new ArrayList<>(Arrays.asList(storage4)));
 
     // create mock node manager
     nodeManager = Mockito.mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
-    when(nodeManager.getNodeStat(anyObject()))
-        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 0L, 100L));
-    when(nodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 90L, 10L));
-    when(nodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 80L, 20L));
-    when(nodeManager.getNodeStat(datanodes.get(4)))
-        .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 70L, 30L));
+    for (DatanodeInfo dn: dnInfos) {
+      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+          .thenReturn(dn);
+    }
 
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, nodeManager, cluster, true,
@@ -107,7 +148,7 @@ public class TestContainerPlacementFactory {
 
     int nodeNum = 3;
     List<DatanodeDetails> datanodeDetails =
-        policy.chooseDatanodes(null, null, nodeNum, 15);
+        policy.chooseDatanodes(null, null, nodeNum, 15, 15);
     Assert.assertEquals(nodeNum, datanodeDetails.size());
     Assert.assertTrue(cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(1)));
@@ -131,7 +172,7 @@ public class TestContainerPlacementFactory {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-        int nodesRequired, long sizeRequired) {
+        int nodesRequired, long metadataSizeRequired, long dataSizeRequired) {
       return null;
     }
 

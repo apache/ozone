@@ -68,6 +68,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMRatisServerImpl.class);
 
+  private final OzoneConfiguration ozoneConf = new OzoneConfiguration();
   private final RaftServer server;
   private final SCMStateMachine stateMachine;
   private final StorageContainerManager scm;
@@ -82,7 +83,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       final StorageContainerManager scm, final SCMHADBTransactionBuffer buffer)
       throws IOException {
     this.scm = scm;
-    this.stateMachine = new SCMStateMachine(scm, this, buffer);
     final RaftGroupId groupId = buildRaftGroupId(scm.getClusterId());
     LOG.info("starting Raft server for scm:{}", scm.getScmId());
     // During SCM startup, the bootstrapped node will be started just with
@@ -100,9 +100,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     Parameters parameters = createSCMServerTlsParameters(grpcTlsConfig);
 
     this.server = newRaftServer(scm.getScmId(), conf)
-        .setStateMachine(stateMachine)
+        .setStateMachineRegistry((gId) -> new SCMStateMachine(scm, buffer))
         .setGroup(RaftGroup.valueOf(groupId))
         .setParameters(parameters).build();
+
+    this.stateMachine =
+        (SCMStateMachine) server.getDivision(groupId).getStateMachine();
+
     this.division = server.getDivision(groupId);
   }
 
@@ -111,7 +115,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftGroup group = buildRaftGroup(details, scmId, clusterId);
     RaftServer server = null;
     try {
-      server = newRaftServer(scmId, conf).setGroup(group).build();
+      server = newRaftServer(scmId, conf).setGroup(group)
+              .setStateMachineRegistry((groupId -> new SCMStateMachine()))
+              .build();
       server.start();
       waitForLeaderToBeReady(server, conf, group);
     } finally {
@@ -130,9 +136,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       OzoneConfiguration conf, RaftGroup group) throws IOException {
     boolean ready;
     long st = Time.monotonicNow();
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
-    long waitTimeout = haConf.getLeaderReadyWaitTimeout();
-    long retryInterval = haConf.getLeaderReadyCheckInterval();
+    long waitTimeout = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    long retryInterval = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL,
+            ScmConfigKeys.
+                    OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
 
     do {
       ready = server.getDivision(group.getGroupId()).getInfo().isLeaderReady();
@@ -154,12 +166,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   private static RaftServer.Builder newRaftServer(final String scmId,
       final ConfigurationSource conf) {
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
     final RaftProperties serverProperties =
-        RatisUtil.newRaftProperties(haConf, conf);
+        RatisUtil.newRaftProperties(conf);
     return RaftServer.newBuilder().setServerId(RaftPeerId.getRaftPeerId(scmId))
-        .setProperties(serverProperties)
-        .setStateMachine(new SCMStateMachine());
+        .setProperties(serverProperties);
   }
 
   @Override
@@ -202,10 +212,12 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setType(RaftClientRequest.writeRequestType())
         .build();
     // any request submitted to
-    final long requestTimeout = scm.getConfiguration()
-        .getTimeDuration(ScmConfigKeys.OZONE_SCM_RATIS_REQUEST_TIMEOUT_KEY,
-            ScmConfigKeys.OZONE_SCM_RATIS_REQUEST_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
+    final long requestTimeout = ozoneConf.getTimeDuration(
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
+                TimeUnit.MILLISECONDS);
+    Preconditions.checkArgument(requestTimeout > 1000L,
+            "Ratis request timeout cannot be less than 1000ms.");
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
@@ -230,15 +242,24 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     List<String> ratisRoles = new ArrayList<>();
     for (RaftPeer peer : peers) {
-      InetAddress peerInetAddress = InetAddress.getByName(
-              HddsUtils.getHostName(peer.getAddress()).get());
-      boolean isLocal = NetUtils.isLocalAddress(peerInetAddress);
+      InetAddress peerInetAddress = null;
+      try {
+        peerInetAddress = InetAddress.getByName(
+            HddsUtils.getHostName(peer.getAddress()).get());
+      } catch (IOException ex) {
+        LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
+            peer.getAddress());
+      }
+      boolean isLocal = false;
+      if (peerInetAddress != null) {
+        isLocal = NetUtils.isLocalAddress(peerInetAddress);
+      }
       ratisRoles.add((peer.getAddress() == null ? "" :
               peer.getAddress().concat(isLocal ?
-                      ":".concat(RaftProtos.RaftPeerRole.LEADER
-                              .toString()) :
-                      ":".concat(RaftProtos.RaftPeerRole.FOLLOWER
-                              .toString()))));
+                  ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
+                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
+                  .concat(":".concat(peer.getId().toString()))
+                  .concat(":".concat(peerInetAddress.getHostAddress()))));
     }
     return ratisRoles;
   }

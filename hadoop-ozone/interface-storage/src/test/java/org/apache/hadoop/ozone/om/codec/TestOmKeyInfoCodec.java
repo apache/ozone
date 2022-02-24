@@ -19,8 +19,9 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -49,7 +50,7 @@ public class TestOmKeyInfoCodec {
 
   private OmKeyInfo getKeyInfo(int chunkNum) {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-    Pipeline pipeline = TestUtils.getRandomPipeline();
+    Pipeline pipeline = HddsTestUtils.getRandomPipeline();
     for (int i = 0; i < chunkNum; i++) {
       BlockID blockID = new BlockID(i, i);
       OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
@@ -63,8 +64,8 @@ public class TestOmKeyInfoCodec {
     return new OmKeyInfo.Builder()
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplicationConfig(
+                new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
         .setKeyName(KEYNAME)

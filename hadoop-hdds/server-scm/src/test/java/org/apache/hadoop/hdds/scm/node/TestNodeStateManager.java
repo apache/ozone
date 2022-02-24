@@ -22,16 +22,20 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -41,6 +45,8 @@ import java.util.UUID;
 
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertNull;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
 /**
  * Class to test the NodeStateManager, which is an internal class used by
@@ -72,7 +78,13 @@ public class TestNodeStateManager {
       }
     };
     eventPublisher = new MockEventPublisher();
-    nsm = new NodeStateManager(conf, eventPublisher);
+    LayoutVersionManager mockVersionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(mockVersionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager);
   }
 
   @After
@@ -84,7 +96,7 @@ public class TestNodeStateManager {
       throws NodeAlreadyExistsException, NodeNotFoundException {
     // Create a datanode, then add and retrieve it
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     assertEquals(dn.getUuid(), nsm.getNode(dn).getUuid());
     // Now get the status of the newly added node and it should be
     // IN_SERVICE and HEALTHY
@@ -96,9 +108,9 @@ public class TestNodeStateManager {
   public void testGetAllNodesReturnsCorrectly()
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     dn = generateDatanode();
-    nsm.addNode(dn);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     assertEquals(2, nsm.getAllNodes().size());
     assertEquals(2, nsm.getTotalNodeCount());
   }
@@ -107,7 +119,7 @@ public class TestNodeStateManager {
   public void testGetNodeCountReturnsCorrectly()
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
     assertEquals(1, nsm.getNodes(NodeStatus.inServiceHealthy()).size());
     assertEquals(0, nsm.getNodes(NodeStatus.inServiceStale()).size());
   }
@@ -115,8 +127,9 @@ public class TestNodeStateManager {
   @Test
   public void testGetNodeCount() throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn);
-    assertEquals(1, nsm.getNodeCount(NodeStatus.inServiceHealthy()));
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    assertEquals(1, nsm.getNodeCount(
+        NodeStatus.inServiceHealthy()));
     assertEquals(0, nsm.getNodeCount(NodeStatus.inServiceStale()));
   }
 
@@ -130,15 +143,15 @@ public class TestNodeStateManager {
     long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
 
     DatanodeDetails staleDn = generateDatanode();
-    nsm.addNode(staleDn);
+    nsm.addNode(staleDn, defaultLayoutVersionProto());
     nsm.getNode(staleDn).updateLastHeartbeatTime(now - staleLimit);
 
     DatanodeDetails deadDn = generateDatanode();
-    nsm.addNode(deadDn);
+    nsm.addNode(deadDn, defaultLayoutVersionProto());
     nsm.getNode(deadDn).updateLastHeartbeatTime(now - deadLimit);
 
     DatanodeDetails healthyDn = generateDatanode();
-    nsm.addNode(healthyDn);
+    nsm.addNode(healthyDn, defaultLayoutVersionProto());
     nsm.getNode(healthyDn).updateLastHeartbeatTime();
 
     nsm.checkNodesHealth();
@@ -163,8 +176,7 @@ public class TestNodeStateManager {
     long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
 
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn);
-    assertEquals(SCMEvents.NEW_NODE, eventPublisher.getLastEvent());
+    nsm.addNode(dn, defaultLayoutVersionProto());
     DatanodeInfo dni = nsm.getNode(dn);
     dni.updateLastHeartbeatTime();
 
@@ -189,8 +201,8 @@ public class TestNodeStateManager {
     // Transition back to healthy from dead
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
-    assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+    assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
+    assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
         eventPublisher.getLastEvent());
 
     // Make the node stale again, and transition to healthy.
@@ -200,8 +212,8 @@ public class TestNodeStateManager {
     assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
-    assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+    assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
+    assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
         eventPublisher.getLastEvent());
   }
 
@@ -209,7 +221,7 @@ public class TestNodeStateManager {
   public void testNodeOpStateCanBeSet()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
@@ -217,25 +229,24 @@ public class TestNodeStateManager {
     NodeStatus newStatus = nsm.getNodeStatus(dn);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         newStatus.getOperationalState());
-    assertEquals(NodeState.HEALTHY,
-        newStatus.getHealth());
+    assertEquals(NodeState.HEALTHY, newStatus.getHealth());
   }
 
   @Test
   public void testHealthEventsFiredWhenOpStateChanged()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn);
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
     // First set the node to decommissioned, then run through all op states in
-    // order and ensure the non_healthy_to_healthy event gets fired
+    // order and ensure the healthy_to_healthy_readonly event gets fired
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
     for (HddsProtos.NodeOperationalState s :
         HddsProtos.NodeOperationalState.values()) {
       eventPublisher.clearEvents();
       nsm.setNodeOperationalState(dn, s);
-      assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+      assertEquals(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
           eventPublisher.getLastEvent());
     }
 
@@ -293,7 +304,7 @@ public class TestNodeStateManager {
       if (events.size() == 0) {
         return null;
       } else {
-        return events.get(events.size()-1);
+        return events.get(events.size() - 1);
       }
     }
 

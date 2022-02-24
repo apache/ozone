@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateCli
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -276,8 +276,7 @@ public class TestDefaultCAServer {
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
-        CRLReason.lookup(CRLReason.keyCompromise), now,
-        new SecurityConfig(conf));
+        CRLReason.lookup(CRLReason.keyCompromise), now);
 
     // Revoking a valid certificate complete successfully without errors.
     assertTrue(revoked.isDone());
@@ -288,8 +287,7 @@ public class TestDefaultCAServer {
         () -> {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
-              CRLReason.lookup(CRLReason.keyCompromise), now,
-                  new SecurityConfig(conf));
+              CRLReason.lookup(CRLReason.keyCompromise), now);
           result.isDone();
           result.get();
         });
@@ -386,9 +384,11 @@ public class TestDefaultCAServer {
 
 
     Assert.assertNotNull(certificateHolder);
-    Assert.assertEquals(10, certificateHolder.getNotAfter().toInstant()
+    LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
         .atZone(ZoneId.systemDefault())
-        .toLocalDate().compareTo(LocalDate.now()));
+        .toLocalDate();
+    LocalDate now = LocalDate.now();
+    assertEquals(0, invalidAfterDate.compareTo(now.plusDays(3650)));
 
     X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 

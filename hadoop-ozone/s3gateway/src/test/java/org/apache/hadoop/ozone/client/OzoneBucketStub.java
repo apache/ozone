@@ -32,9 +32,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -76,8 +79,7 @@ public class OzoneBucketStub extends OzoneBucket {
       long creationTime) {
     super(volumeName,
         bucketName,
-        ReplicationFactor.ONE,
-        ReplicationType.STAND_ALONE,
+        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
         storageType,
         versioning,
         creationTime);
@@ -85,7 +87,7 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
-    return createKey(key, size, ReplicationType.STAND_ALONE,
+    return createKey(key, size, ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
   }
 
@@ -125,6 +127,25 @@ public class OzoneBucketStub extends OzoneBucket {
   public OzoneKeyDetails getKey(String key) throws IOException {
     if (keyDetails.containsKey(key)) {
       return keyDetails.get(key);
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public OzoneKey headObject(String key) throws IOException {
+    if (keyDetails.containsKey(key)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(key);
+      return new OzoneKey(ozoneKeyDetails.getVolumeName(),
+          ozoneKeyDetails.getBucketName(),
+          ozoneKeyDetails.getName(),
+          ozoneKeyDetails.getDataSize(),
+          ozoneKeyDetails.getCreationTime().toEpochMilli(),
+          ozoneKeyDetails.getModificationTime().toEpochMilli(),
+          ReplicationConfig.fromTypeAndFactor(
+              ozoneKeyDetails.getReplicationType(),
+              ReplicationFactor.valueOf(ozoneKeyDetails.getReplicationFactor())
+          ));
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }

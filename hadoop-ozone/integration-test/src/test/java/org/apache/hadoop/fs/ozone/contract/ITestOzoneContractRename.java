@@ -19,22 +19,35 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Ozone contract tests covering rename.
  */
+@RunWith(Parameterized.class)
 public class ITestOzoneContractRename extends AbstractContractRenameTest {
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+  private static boolean fsOptimizedServer;
+
+  public ITestOzoneContractRename(boolean fsoServer)
+      throws IOException {
+    if (fsOptimizedServer != fsoServer) {
+      setFsOptimizedServer(fsoServer);
+      ITestOzoneContractUtils.restartCluster(
+          fsOptimizedServer);
+    }
+  }
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractRename.fsOptimizedServer = fsOptimizedServer;
   }
 
   @AfterClass
@@ -47,4 +60,9 @@ public class ITestOzoneContractRename extends AbstractContractRenameTest {
     return new OzoneContract(conf);
   }
 
+
+  @Parameterized.Parameters
+  public static Collection data() {
+    return ITestOzoneContractUtils.getFsoCombinations();
+  }
 }

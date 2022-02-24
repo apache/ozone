@@ -150,8 +150,8 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT = 5000;
 
   public static final String OZONE_REPLICATION = "ozone.replication";
-  public static final int OZONE_REPLICATION_DEFAULT =
-      ReplicationFactor.THREE.getValue();
+  public static final String OZONE_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
 
   public static final String OZONE_REPLICATION_TYPE = "ozone.replication.type";
   public static final String OZONE_REPLICATION_TYPE_DEFAULT =
@@ -193,6 +193,11 @@ public final class OzoneConfigKeys {
       "ozone.block.deleting.service.timeout";
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT
       = "300s"; // 300s for default
+
+  public static final String OZONE_BLOCK_DELETING_SERVICE_WORKERS =
+      "ozone.block.deleting.service.workers";
+  public static final int OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT
+      = 10;
 
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
@@ -321,7 +326,7 @@ public final class OzoneConfigKeys {
   public static final String HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE =
       "hdds.datanode.metadata.rocksdb.cache.size";
   public static final String
-      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "64MB";
+      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "1GB";
 
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
@@ -368,7 +373,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
-      15;
+      500;
   public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
@@ -444,10 +449,28 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
       false;
 
+  public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
   public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =
       "ozone.client.key.provider.cache.expiry";
   public static final long OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
       TimeUnit.DAYS.toMillis(10); // 10 days
+
+  public static final String OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION =
+      "ozone.client.key.latest.version.location";
+  public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
+      true;
+
+  public static final String OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT =
+      "ozone.client.test.ofs.default.bucket.layout";
+
+  public static final String OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT =
+      "FILE_SYSTEM_OPTIMIZED";
+
+  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY =
+      "ozone.om.client.protocol.version";
+  // The version of the protocol for Client (S3G/OFS) to OM Communication.
+  // The protocol starts at 2.0.0 and a null or empty value for older versions.
+  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION = "2.0.0";
 
   /**
    * There is no need to instantiate this class.

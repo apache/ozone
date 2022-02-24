@@ -24,14 +24,6 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: potiuk/cancel-workflow-runs@a81b3c4d59c61e27484cfacdc13897dd908419c9
-        name: "Cancel duplicate PR builds"
-        with:
-          cancelMode: allDuplicates
-          cancelFutureDuplicates: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-          sourceRunId: ${{ github.event.workflow_run.id }}
-          skipEventTypes: '["push", "schedule"]'
-      - uses: potiuk/cancel-workflow-runs@a81b3c4d59c61e27484cfacdc13897dd908419c9
         name: "Cancel failing PR builds"
         with:
           cancelMode: failedJobs

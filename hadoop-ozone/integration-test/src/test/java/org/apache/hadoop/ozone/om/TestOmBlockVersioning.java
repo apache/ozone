@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -30,12 +31,14 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -55,6 +58,7 @@ public class TestOmBlockVersioning {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OzoneManager ozoneManager;
+  private static OzoneManagerProtocol writeClient;
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -72,6 +76,8 @@ public class TestOmBlockVersioning {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
   }
 
   /**
@@ -90,7 +96,10 @@ public class TestOmBlockVersioning {
     String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
 
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    // Versioning isn't supported currently, but just preserving old behaviour
+    bucket.setVersioning(true);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -99,14 +108,15 @@ public class TestOmBlockVersioning {
         .setDataSize(1000)
         .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())
+        .setReplicationConfig(new StandaloneReplicationConfig(ONE))
         .build();
 
     // 1st update, version 0
-    OpenKeySession openKey = ozoneManager.openKey(keyArgs);
+    OpenKeySession openKey = writeClient.openKey(keyArgs);
     // explicitly set the keyLocation list before committing the key.
     keyArgs.setLocationInfoList(openKey.getKeyInfo().getLatestVersionLocations()
         .getBlocksLatestVersionOnly());
-    ozoneManager.commitKey(keyArgs, openKey.getId());
+    writeClient.commitKey(keyArgs, openKey.getId());
 
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     OmKeyLocationInfoGroup highestVersion =
@@ -115,25 +125,25 @@ public class TestOmBlockVersioning {
     assertEquals(1, highestVersion.getLocationList().size());
 
     // 2nd update, version 1
-    openKey = ozoneManager.openKey(keyArgs);
+    openKey = writeClient.openKey(keyArgs);
     //OmKeyLocationInfo locationInfo =
-    //    ozoneManager.allocateBlock(keyArgs, openKey.getId());
+    //    writeClient.allocateBlock(keyArgs, openKey.getId());
     // explicitly set the keyLocation list before committing the key.
     keyArgs.setLocationInfoList(openKey.getKeyInfo().getLatestVersionLocations()
         .getBlocksLatestVersionOnly());
-    ozoneManager.commitKey(keyArgs, openKey.getId());
+    writeClient.commitKey(keyArgs, openKey.getId());
 
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(1, highestVersion.getVersion());
-    assertEquals(2, highestVersion.getLocationList().size());
+    assertEquals(1, highestVersion.getLocationList().size());
 
     // 3rd update, version 2
-    openKey = ozoneManager.openKey(keyArgs);
+    openKey = writeClient.openKey(keyArgs);
 
     // this block will be appended to the latest version of version 2.
     OmKeyLocationInfo locationInfo =
-        ozoneManager.allocateBlock(keyArgs, openKey.getId(),
+        writeClient.allocateBlock(keyArgs, openKey.getId(),
             new ExcludeList());
     List<OmKeyLocationInfo> locationInfoList =
         openKey.getKeyInfo().getLatestVersionLocations()
@@ -141,12 +151,12 @@ public class TestOmBlockVersioning {
     Assert.assertTrue(locationInfoList.size() == 1);
     locationInfoList.add(locationInfo);
     keyArgs.setLocationInfoList(locationInfoList);
-    ozoneManager.commitKey(keyArgs, openKey.getId());
+    writeClient.commitKey(keyArgs, openKey.getId());
 
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(2, highestVersion.getVersion());
-    assertEquals(4, highestVersion.getLocationList().size());
+    assertEquals(2, highestVersion.getLocationList().size());
   }
 
   private OmKeyLocationInfoGroup checkVersions(
@@ -155,18 +165,6 @@ public class TestOmBlockVersioning {
     for (OmKeyLocationInfoGroup version : versions) {
       if (currentVersion != null) {
         assertEquals(currentVersion.getVersion() + 1, version.getVersion());
-        for (OmKeyLocationInfo info : currentVersion.getLocationList()) {
-          boolean found = false;
-          // all the blocks from the previous version must present in the next
-          // version
-          for (OmKeyLocationInfo info2 : version.getLocationList()) {
-            if (info.getLocalID() == info2.getLocalID()) {
-              found = true;
-              break;
-            }
-          }
-          assertTrue(found);
-        }
       }
       currentVersion = version;
     }
@@ -208,7 +206,7 @@ public class TestOmBlockVersioning {
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
     assertEquals(1, keyInfo.getLatestVersionLocations().getVersion());
-    assertEquals(2,
+    assertEquals(1,
         keyInfo.getLatestVersionLocations().getLocationList().size());
 
     dataString = RandomStringUtils.randomAlphabetic(200);
@@ -217,7 +215,7 @@ public class TestOmBlockVersioning {
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
     assertEquals(2, keyInfo.getLatestVersionLocations().getVersion());
-    assertEquals(3,
+    assertEquals(1,
         keyInfo.getLatestVersionLocations().getLocationList().size());
   }
 }

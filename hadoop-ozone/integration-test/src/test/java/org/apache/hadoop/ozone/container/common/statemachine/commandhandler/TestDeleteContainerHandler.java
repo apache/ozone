@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -40,7 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -54,6 +55,8 @@ import org.junit.Rule;
 import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 
 /**
@@ -78,10 +81,13 @@ public class TestDeleteContainerHandler {
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        0, StorageUnit.MB);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 30000);
 
     OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
@@ -238,7 +244,7 @@ public class TestDeleteContainerHandler {
   private void createKey(String keyName) throws IOException {
     OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
-        .createKey(keyName, 1024, ReplicationType.STAND_ALONE,
+        .createKey(keyName, 1024, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
     key.write("test".getBytes(UTF_8));
     key.close();
@@ -254,8 +260,7 @@ public class TestDeleteContainerHandler {
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setType(HddsProtos.ReplicationType.STAND_ALONE)
-            .setFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();
@@ -277,7 +282,7 @@ public class TestDeleteContainerHandler {
   private Boolean isContainerClosed(HddsDatanodeService hddsDatanodeService,
       long containerID) {
     ContainerData containerData;
-    containerData =hddsDatanodeService
+    containerData = hddsDatanodeService
         .getDatanodeStateMachine().getContainer().getContainerSet()
         .getContainer(containerID).getContainerData();
     return !containerData.isOpen();

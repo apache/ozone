@@ -30,12 +30,13 @@ import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -50,9 +51,10 @@ public class TestContainerManagerImpl {
 
   private File testDir;
   private DBStore dbStore;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private SCMHAManager scmhaManager;
   private SequenceIdGenerator sequenceIdGen;
+  private NodeManager nodeManager;
 
   @Before
   public void setUp() throws Exception {
@@ -63,9 +65,11 @@ public class TestContainerManagerImpl {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = MockSCMHAManager.getInstance(true);
+    nodeManager = new MockNodeManager(true, 10);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    final PipelineManager pipelineManager = MockPipelineManager.getInstance();
+    final PipelineManager pipelineManager =
+        new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(new RatisReplicationConfig(
         ReplicationFactor.THREE));
     containerManager = new ContainerManagerImpl(conf,
@@ -75,7 +79,7 @@ public class TestContainerManagerImpl {
 
   @After
   public void cleanup() throws Exception {
-    if(containerManager != null) {
+    if (containerManager != null) {
       containerManager.close();
     }
 
@@ -121,12 +125,12 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testGetContainers() throws Exception{
+  public void testGetContainers() throws Exception {
     Assert.assertTrue(
         containerManager.getContainers().isEmpty());
 
     ContainerID[] cidArray = new ContainerID[10];
-    for(int i = 0; i < 10; i++){
+    for (int i = 0; i < 10; i++) {
       ContainerInfo container = containerManager.allocateContainer(
           new RatisReplicationConfig(
               ReplicationFactor.THREE), "admin");
@@ -150,5 +154,19 @@ public class TestContainerManagerImpl {
         containerManager.getContainers(HddsProtos.LifeCycleState.OPEN).size());
     Assert.assertEquals(2, containerManager
         .getContainers(HddsProtos.LifeCycleState.CLOSING).size());
+    containerManager.updateContainerState(cidArray[1],
+        HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    containerManager.updateContainerState(cidArray[2],
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    containerManager.updateContainerState(cidArray[2],
+        HddsProtos.LifeCycleEvent.CLOSE);
+    Assert.assertEquals(7, containerManager.
+        getContainerStateCount(HddsProtos.LifeCycleState.OPEN));
+    Assert.assertEquals(1, containerManager
+        .getContainerStateCount(HddsProtos.LifeCycleState.CLOSING));
+    Assert.assertEquals(1, containerManager
+        .getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED));
+    Assert.assertEquals(1, containerManager
+        .getContainerStateCount(HddsProtos.LifeCycleState.CLOSED));
   }
 }

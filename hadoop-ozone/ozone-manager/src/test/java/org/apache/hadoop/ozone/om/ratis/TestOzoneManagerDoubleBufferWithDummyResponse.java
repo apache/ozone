@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.test.GenericTestUtils.waitFor;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -109,7 +109,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(0, metrics.getTotalNumOfFlushedTransactions());
     assertEquals(0, metrics.getMaxNumberOfTransactionsFlushedInOneIteration());
 
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
           trxId.incrementAndGet());
     }

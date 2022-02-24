@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -90,7 +91,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
-  private final boolean isBlockTokenEnabled;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -109,10 +109,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.containerCloseThreshold = conf.getFloat(
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD,
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT);
-    this.isBlockTokenEnabled = conf.getBoolean(
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.tokenVerifier = tokenVerifier;
+    this.tokenVerifier = tokenVerifier != null ? tokenVerifier
+        : new NoopTokenVerifier();
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
@@ -124,8 +122,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",
             protocolMetrics,
             LOG,
-            ContainerUtils::processForDebug,
-            ContainerUtils::processForDebug);
+            HddsUtils::processForDebug,
+            HddsUtils::processForDebug);
   }
 
   @Override
@@ -208,7 +206,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
 
     try {
-      validateBlockToken(msg);
+      validateToken(msg);
     } catch (IOException ioe) {
       StorageContainerException sce = new StorageContainerException(
           "Block token verification failed. " + ioe.getMessage(), ioe,
@@ -350,6 +348,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // mark and persist the container state to be unhealthy
         try {
           handler.markContainerUnhealthy(container);
+          LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {
           // just log the error here in case marking the container fails,
           // Return the actual failure response to the client
@@ -425,15 +424,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     return handler.handle(requestBuilder.build(), null, null);
   }
 
-  private void validateBlockToken(
+  private void validateToken(
       ContainerCommandRequestProto msg) throws IOException {
-    if (isBlockTokenEnabled && tokenVerifier != null &&
-        HddsUtils.requireBlockToken(msg.getCmdType())) {
-      tokenVerifier.verify(
-          UserGroupInformation.getCurrentUser().getShortUserName(),
-          msg.getEncodedToken(), msg.getCmdType(),
-          HddsUtils.getBlockID(msg).getContainerBlockID().toString());
-    }
+    tokenVerifier.verify(
+        msg, UserGroupInformation.getCurrentUser().getShortUserName(),
+        msg.getEncodedToken()
+    );
   }
 
   /**
@@ -495,7 +491,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
 
     try {
-      validateBlockToken(msg);
+      validateToken(msg);
     } catch (IOException ioe) {
       throw new StorageContainerException(
           "Block token verification failed. " + ioe.getMessage(), ioe,
@@ -585,16 +581,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   private void audit(AuditAction action, EventType eventType,
-      Map<String, String> params, AuditEventStatus result, Throwable exception){
+      Map<String, String> params, AuditEventStatus result,
+      Throwable exception) {
     AuditMessage amsg;
     switch (result) {
     case SUCCESS:
-      if(isAllowed(action.getAction())) {
-        if(eventType == EventType.READ &&
+      if (isAllowed(action.getAction())) {
+        if (eventType == EventType.READ &&
             AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
           amsg = buildAuditMessageForSuccess(action, params);
           AUDIT.logReadSuccess(amsg);
-        } else if(eventType == EventType.WRITE &&
+        } else if (eventType == EventType.WRITE &&
             AUDIT.getLogger().isInfoEnabled(AuditMarker.WRITE.getMarker())) {
           amsg = buildAuditMessageForSuccess(action, params);
           AUDIT.logWriteSuccess(amsg);
@@ -603,11 +600,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       break;
 
     case FAILURE:
-      if(eventType == EventType.READ &&
+      if (eventType == EventType.READ &&
           AUDIT.getLogger().isErrorEnabled(AuditMarker.READ.getMarker())) {
         amsg = buildAuditMessageForFailure(action, params, exception);
         AUDIT.logReadFailure(amsg);
-      } else if(eventType == EventType.WRITE &&
+      } else if (eventType == EventType.WRITE &&
           AUDIT.getLogger().isErrorEnabled(AuditMarker.WRITE.getMarker())) {
         amsg = buildAuditMessageForFailure(action, params, exception);
         AUDIT.logWriteFailure(amsg);
@@ -660,7 +657,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    * @return true or false accordingly.
    */
   private boolean isAllowed(String action) {
-    switch(action) {
+    switch (action) {
     case "CLOSE_CONTAINER":
     case "CREATE_CONTAINER":
     case "LIST_CONTAINER":

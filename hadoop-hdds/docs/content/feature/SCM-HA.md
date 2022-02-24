@@ -25,10 +25,6 @@ summary: HA setup for Storage Container Manager to avoid any single point of fai
 
 Ozone has two metadata-manager nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and multiple storage nodes (Datanode). Data is replicated between Datanodes with the help of RAFT consensus algorithm.
 
-<div class="alert alert-warning" role="alert">
-Please note that SCM-HA is not ready for production in secure environments. Security work is in progress and will be finished soon.
-</div>
-
 To avoid any single point of failure the metadata-manager nodes also should have a HA setup.
 
 Both Ozone Manager and Storage Container Manager supports HA. In this mode the internal state is replicated via RAFT (with Apache Ratis) 
@@ -75,11 +71,11 @@ The defined prefixes can be used to define the address of each of the SCM servic
    <value>host1</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm2</name>
    <value>host2</value>
 </property>
 <property>
-   <name>ozone.scm.address.cluster1.scm1</name>
+   <name>ozone.scm.address.cluster1.scm3</name>
    <value>host3</value>
 </property>
 ```
@@ -110,6 +106,70 @@ In some environment -- such as containerized / K8s environment -- we need to hav
 This can be changed with using `ozone.scm.primordial.node.id`. You can define the primordial node. After setting this node, you should execute **both** `scm --init` and `scm --bootstrap` on **all** nodes.
 
 Based on the `ozone.scm.primordial.node.id`, the init process will be ignored on the second/third nodes and bootstrap process will be ignored on all nodes except the primordial one.
+
+## SCM HA Security
+
+{{< image src="scm-secure-ha.png">}}
+
+In a secure SCM HA cluster on the SCM where we perform init, we call this SCM as a primordial SCM. 
+Primordial SCM starts root-CA with self-signed certificates and is used to issue a signed certificate 
+to itself and other bootstrapped SCM’s. Only primordial SCM can issue signed certificates for other SCM’s.
+So, primordial SCM has a special role in the SCM HA cluster, as it is the only one that can issue certificates to SCM’s.
+
+The primordial SCM takes a root-CA role, which signs all SCM instances with a sub-CA certificate. 
+The sub-CA certificates are used by SCM to sign certificates for OM/Datanodes.
+
+When bootstrapping a SCM, it gets a signed certificate from the primary SCM and starts sub-CA.
+
+Sub-CA on the SCM’s are used to issue signed certificates for OM/DN in the cluster. Only the leader SCM issues a certificate to OM/DN.
+
+### How to enable security:
+
+```XML
+<property>
+<config>ozone.security.enable</config>
+<value>true</value>
+</property>
+
+<property>
+<config>hdds.grpc.tls.enabled</config>
+<value>true</value>
+</property>
+```
+
+Above configs are needed in addition to normal SCM HA configuration.
+
+### Primordial SCM:
+
+Primordial SCM is determined from the config ozone.scm.primordial.node.id. 
+The value for this can be node id or hostname of the SCM. If the config is 
+not defined, the node where init is run is considered as the primordial SCM.
+
+{{< highlight bash >}}
+bin/ozone scm --init
+{{< /highlight >}}
+
+This will set up a public,private key pair and self-signed certificate for root CA 
+and also generate public, private key pair and CSR to get a signed certificate for sub-CA from root CA.
+
+
+### Bootstrap SCM:
+
+{{< highlight bash >}}
+bin/ozone scm --bootstrap
+{{< /highlight >}}
+
+This will set up a public, private key pair for sub CA and generate CSR to get a 
+signed certificate for sub-CA from root CA.
+
+**Note**: Make sure to run **--init** only on one of the SCM host if 
+primordial SCM is not defined. Bring up other SCM's using **--bootstrap**. 
+
+### Current SCM HA Security limitation:
+1. When primordial SCM is down, new SCM’s cannot be bootstrapped and join the 
+quorum.
+2. Secure cluster upgrade to ratis-enable secure cluster is not supported.
+
 
 ## Implementation details
 

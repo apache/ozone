@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
@@ -39,12 +39,12 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
@@ -63,8 +63,8 @@ public class TestCloseContainerEventHandler {
 
   private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
-  private static PipelineManagerV2Impl pipelineManager;
-  private static ContainerManagerV2 containerManager;
+  private static PipelineManagerImpl pipelineManager;
+  private static ContainerManager containerManager;
   private static long size;
   private static File testDir;
   private static EventQueue eventQueue;
@@ -94,7 +94,7 @@ public class TestCloseContainerEventHandler {
     SCMServiceManager serviceManager = new SCMServiceManager();
 
     pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+        PipelineManagerImpl.newPipelineManager(
             configuration,
             scmhaManager,
             nodeManager,
@@ -123,7 +123,7 @@ public class TestCloseContainerEventHandler {
     eventQueue.addHandler(DATANODE_COMMAND, nodeManager);
     // Move all pipelines created by background from ALLOCATED to OPEN state
     Thread.sleep(2000);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
   }
 
   @AfterClass

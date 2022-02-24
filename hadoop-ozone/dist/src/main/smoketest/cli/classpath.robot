@@ -26,21 +26,21 @@ Ignores HADOOP_CLASSPATH if OZONE_CLASSPATH is set
     [setup]    Create File         %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
     Set Environment Variable   HADOOP_CLASSPATH  %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
     Set Environment Variable   OZONE_CLASSPATH   ${EMPTY}
-    ${output} =         Execute          ozone classpath hadoop-ozone-insight
-                        Should Contain   ${output}   hadoop-hdds-interface
+    ${output} =         Execute          ozone classpath ozone-insight
+                        Should Contain   ${output}   hdds-interface
                         Should Not Contain   ${output}   %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
     [teardown]    Remove File         %{HDDS_LIB_JARS_DIR}/hadoop-classpath.jar
 
 Picks up items from OZONE_CLASSPATH
     [setup]    Create File         %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
     Set Environment Variable   OZONE_CLASSPATH  %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
-    ${output} =         Execute          ozone classpath hadoop-ozone-insight
+    ${output} =         Execute          ozone classpath ozone-insight
                         Should Contain   ${output}   %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
     [teardown]    Remove File         %{HDDS_LIB_JARS_DIR}/ozone-classpath.jar
 
 Adds optional dir entries
-    [setup]    Create File         %{HDDS_LIB_JARS_DIR}/hadoop-ozone-insight/optional.jar
+    [setup]    Create File         %{HDDS_LIB_JARS_DIR}/ozone-insight/optional.jar
     Set Environment Variable   OZONE_CLASSPATH  ${EMPTY}
-    ${output} =         Execute          ozone classpath hadoop-ozone-insight
-                        Should Contain   ${output}   %{HDDS_LIB_JARS_DIR}/hadoop-ozone-insight/optional.jar
-    [teardown]    Remove File    %{HDDS_LIB_JARS_DIR}/hadoop-ozone-insight/optional.jar
+    ${output} =         Execute          ozone classpath ozone-insight
+                        Should Contain   ${output}   %{HDDS_LIB_JARS_DIR}/ozone-insight/optional.jar
+    [teardown]    Remove File    %{HDDS_LIB_JARS_DIR}/ozone-insight/optional.jar

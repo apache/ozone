@@ -29,6 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Maps types to the corresponding {@link Codec} implementation.
+ */
 public final class CodecFactory {
 
   private static Map<Class<?>, Codec> codecs = new HashMap<>();
@@ -44,7 +47,7 @@ public final class CodecFactory {
     codecs.put(X509Certificate.class, new X509CertificateCodec());
   }
 
-  private CodecFactory() {}
+  private CodecFactory() { }
 
   public static Codec getCodec(Class<?> type)
       throws InvalidProtocolBufferException {

@@ -21,13 +21,14 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -50,13 +51,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
   @Test
-  public void testPreExecute() throws Exception{
+  public void testPreExecute() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, false);
 
-    OMFileCreateRequest omFileCreateRequest =
-        new OMFileCreateRequest(omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
     Assert.assertNotEquals(omRequest, modifiedOmRequest);
@@ -91,13 +91,12 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @Test
-  public void testPreExecuteWithBlankKey() throws Exception{
+  public void testPreExecuteWithBlankKey() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, "",
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, false);
 
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
     Assert.assertNotEquals(omRequest, modifiedOmRequest);
@@ -119,23 +118,19 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, true);
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
     long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, id);
-
     // Before calling
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(keyName, id, false);
     Assert.assertNull(omKeyInfo);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -146,8 +141,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     // Check open table whether key is added or not.
 
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
-    Assert.assertNotNull(omKeyInfo);
+    omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
@@ -179,12 +173,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
             false, true);
 
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -199,14 +192,12 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, true);
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
-
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -221,16 +212,16 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath("a/b", false, false, true);
 
     // Create some child keys for the path
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/b/c/d", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/b/c/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/b/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
 
@@ -238,10 +229,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath("a/b/c", false, false, true);
 
     // Delete child key but retain path "a/b/ in the key table
-    omMetadataManager.getKeyTable().delete(omMetadataManager.getOzoneKey(
-        volumeName, bucketName, "a/b/c/d"));
-    omMetadataManager.getKeyTable().delete(omMetadataManager.getOzoneKey(
-        volumeName, bucketName, "a/b/c/"));
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, "a/b/c/d"));
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, "a/b/c/"));
 
     // can create non-recursive because parents already exist.
     testNonRecursivePath("a/b/e", false, false, false);
@@ -252,12 +243,12 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     // Should be able to create file even if parent directories does not
     // exist and key already exist, as this is with overwrite enabled.
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "c/d/e/f", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     testNonRecursivePath("c/d/e/f", true, true, false);
     // Create some child keys for the path
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/b/c/d", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     testNonRecursivePath("a/b/c", false, true, false);
@@ -272,7 +263,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath(key, false, true, false);
 
     // Add the key to key table
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         key, 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
 
@@ -289,19 +280,19 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     String key = "c/d/e/f";
     // Need to add the path which starts with "c/d/e" to keyTable as this is
     // non-recursive parent should exist.
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "c/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "c/d/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         "c/d/e/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     testNonRecursivePath(key, false, false, false);
 
     // Add the key to key table
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         key, 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
 
@@ -311,21 +302,19 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath(key, false, false, true);
   }
 
-
-  private void testNonRecursivePath(String key,
+  protected void testNonRecursivePath(String key,
       boolean overWrite, boolean recursive, boolean fail) throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, key,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         overWrite, recursive);
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -341,10 +330,9 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       Assert.assertTrue(omFileCreateResponse.getOMResponse().getSuccess());
       long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
-      String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-          key, id);
-      OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
-      Assert.assertNotNull(omKeyInfo);
+      verifyKeyNameInCreateFileResponse(key, omFileCreateResponse);
+
+      OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(key, id, true);
 
       List< OmKeyLocationInfo > omKeyLocationInfoList =
           omKeyInfo.getLatestVersionLocations().getLocationList();
@@ -368,6 +356,14 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     }
   }
 
+  private void verifyKeyNameInCreateFileResponse(String key,
+      OMClientResponse omFileCreateResponse) {
+    OzoneManagerProtocolProtos.CreateFileResponse createFileResponse =
+            omFileCreateResponse.getOMResponse().getCreateFileResponse();
+    String actualFileName = createFileResponse.getKeyInfo().getKeyName();
+    Assert.assertEquals("Incorrect keyName", key, actualFileName);
+  }
+
   /**
    * Create OMRequest which encapsulates OMFileCreateRequest.
    * @param volumeName
@@ -377,7 +373,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @param replicationType
    * @return OMRequest
    */
-  private OMRequest createFileRequest(
+  @NotNull
+  protected OMRequest createFileRequest(
       String volumeName, String bucketName, String keyName,
       HddsProtos.ReplicationFactor replicationFactor,
       HddsProtos.ReplicationType replicationType, boolean overWrite,
@@ -399,4 +396,16 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         .setCreateFileRequest(createFileRequest).build();
 
   }
+
+  /**
+   * Gets OMFileCreateRequest reference.
+   *
+   * @param omRequest om request
+   * @return OMFileCreateRequest reference
+   */
+  @NotNull
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
+    return new OMFileCreateRequest(omRequest);
+  }
+
 }

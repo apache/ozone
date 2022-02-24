@@ -30,7 +30,7 @@ import java.util.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
@@ -122,7 +122,7 @@ public class TestHddsUtils {
     assertThat(addresses.size(), is(3));
     it = addresses.iterator();
     HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
-    while(it.hasNext()) {
+    while (it.hasNext()) {
       InetSocketAddress current = it.next();
       assertTrue(expected1.remove(current.getHostName(),
           current.getPort()));
@@ -136,7 +136,7 @@ public class TestHddsUtils {
     assertThat(addresses.size(), is(3));
     it = addresses.iterator();
     HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
-    while(it.hasNext()) {
+    while (it.hasNext()) {
       InetSocketAddress current = it.next();
       assertTrue(expected2.remove(current.getHostName(),
           current.getPort()));

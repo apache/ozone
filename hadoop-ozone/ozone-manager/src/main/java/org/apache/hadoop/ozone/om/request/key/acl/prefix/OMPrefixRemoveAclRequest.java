@@ -130,5 +130,6 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
       OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
     return prefixManager.removeAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo);
   }
+
 }
 

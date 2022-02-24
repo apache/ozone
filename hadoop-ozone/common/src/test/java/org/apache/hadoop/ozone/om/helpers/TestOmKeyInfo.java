@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -52,8 +52,8 @@ public class TestOmKeyInfo {
         .setCreationTime(123L)
         .setModificationTime(123L)
         .setDataSize(123L)
-        .setReplicationFactor(ReplicationFactor.THREE)
-        .setReplicationType(ReplicationType.RATIS)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .build();
@@ -66,6 +66,15 @@ public class TestOmKeyInfo {
 
   @Test
   public void testCopyObject() {
+    createdAndTest(false);
+  }
+
+  @Test
+  public void testCopyObjectWithMPU() {
+    createdAndTest(true);
+  }
+
+  private void createdAndTest(boolean isMPU) {
     OmKeyInfo key = new Builder()
         .setKeyName("key1")
         .setBucketName("bucket")
@@ -73,12 +82,12 @@ public class TestOmKeyInfo {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(100L)
-        .setReplicationFactor(ReplicationFactor.THREE)
-        .setReplicationType(ReplicationType.RATIS)
+        .setReplicationConfig(
+            new RatisReplicationConfig(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .setOmKeyLocationInfos(
-            Collections.singletonList(createOmKeyLocationInfoGroup()))
+            Collections.singletonList(createOmKeyLocationInfoGroup(isMPU)))
         .build();
 
     OmKeyInfo cloneKey = key.copyObject();
@@ -87,6 +96,27 @@ public class TestOmKeyInfo {
     // method, so it checks only references.
     Assert.assertNotEquals(key, cloneKey);
 
+    // Check each version content here.
+    Assert.assertEquals(key.getKeyLocationVersions().size(),
+        cloneKey.getKeyLocationVersions().size());
+
+    // Check blocks for each version.
+    for (int i = 0; i < key.getKeyLocationVersions().size(); i++) {
+      OmKeyLocationInfoGroup orig = key.getKeyLocationVersions().get(i);
+      OmKeyLocationInfoGroup clone = key.getKeyLocationVersions().get(i);
+
+      Assert.assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
+      Assert.assertEquals(orig.getVersion(), clone.getVersion());
+
+      Assert.assertEquals(orig.getLocationList().size(),
+          clone.getLocationList().size());
+
+      for (int j = 0; j < orig.getLocationList().size(); j++) {
+        OmKeyLocationInfo origLocationInfo = orig.getLocationList().get(j);
+        OmKeyLocationInfo cloneLocationInfo = clone.getLocationList().get(j);
+        Assert.assertEquals(origLocationInfo, cloneLocationInfo);
+      }
+    }
 
     key.setAcls(Arrays.asList(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
@@ -101,17 +131,16 @@ public class TestOmKeyInfo {
     cloneKey = key.copyObject();
 
     Assert.assertEquals(key.getAcls(), cloneKey.getAcls());
-
-
   }
 
-  private OmKeyLocationInfoGroup createOmKeyLocationInfoGroup() {
+
+  private OmKeyLocationInfoGroup createOmKeyLocationInfoGroup(boolean isMPU) {
     List<OmKeyLocationInfo> omKeyLocationInfos = new ArrayList<>();
     omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(100L, 101L),
         getPipeline()));
     omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(101L, 100L),
         getPipeline()));
-    return new OmKeyLocationInfoGroup(0, omKeyLocationInfos);
+    return new OmKeyLocationInfoGroup(0, omKeyLocationInfos, isMPU);
 
   }
 

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +38,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -240,7 +243,7 @@ public final class OzoneManagerDoubleBuffer {
 
           setReadyBuffer();
           List<Long> flushedEpochs = null;
-          try(BatchOperation batchOperation = omMetadataManager.getStore()
+          try (BatchOperation batchOperation = omMetadataManager.getStore()
               .initBatchOperation()) {
 
             AtomicReference<String> lastTraceId = new AtomicReference<>();
@@ -312,7 +315,7 @@ public final class OzoneManagerDoubleBuffer {
 
           if (LOG.isDebugEnabled()) {
             LOG.debug("Sync Iteration {} flushed transactions in this " +
-                    "iteration{}", flushIterations.get(),
+                    "iteration {}", flushIterations.get(),
                 flushedTransactionsSize);
           }
 
@@ -372,7 +375,15 @@ public final class OzoneManagerDoubleBuffer {
     CleanupTableInfo cleanupTableInfo =
         responseClass.getAnnotation(CleanupTableInfo.class);
     if (cleanupTableInfo != null) {
-      String[] cleanupTables = cleanupTableInfo.cleanupTables();
+      String[] cleanupTables;
+      if (cleanupTableInfo.cleanupAll()) {
+        cleanupTables = Arrays
+            .stream(new OMDBDefinition().getColumnFamilies())
+            .map(DBColumnFamilyDefinition::getTableName)
+            .toArray(String[]::new);
+      } else {
+        cleanupTables = cleanupTableInfo.cleanupTables();
+      }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
             .add(entry.getTrxLogIndex());

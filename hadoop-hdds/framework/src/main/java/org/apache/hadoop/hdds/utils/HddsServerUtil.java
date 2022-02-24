@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -65,10 +67,13 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_WARN_DEFAULT;
@@ -197,7 +202,8 @@ public final class HddsServerUtil {
 
     return NetUtils.createSocketAddr(
         host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
+            port.orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
 
@@ -370,6 +376,20 @@ public final class HddsServerUtil {
     return rawLocations;
   }
 
+  public static Collection<String> getDatanodeStorageDirs(
+      ConfigurationSource conf) {
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(
+        HDDS_DATANODE_DIR_KEY);
+    if (rawLocations.isEmpty()) {
+      rawLocations = conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
+    }
+    if (rawLocations.isEmpty()) {
+      throw new IllegalArgumentException("No location configured in either "
+          + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
+    }
+    return rawLocations;
+  }
+
   /**
    * Get the path for datanode id file.
    *
@@ -378,8 +398,8 @@ public final class HddsServerUtil {
    */
   public static String getDatanodeIdFilePath(ConfigurationSource conf) {
     String dataNodeIDDirPath =
-        conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-    if (dataNodeIDDirPath == null) {
+        conf.getTrimmed(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
+    if (Strings.isNullOrEmpty(dataNodeIDDirPath)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       if (metaDirPath == null) {
         // this means meta data is not found, in theory should not happen at
@@ -543,5 +563,13 @@ public final class HddsServerUtil {
     String output = msg + "; status : " + statusCode
         + "; message : " + errMessage;
     return new IOException(output, e);
+  }
+
+  /**
+   * Add exception classes which server won't log at all.
+   * @param server
+   */
+  public static void addSuppressedLoggingExceptions(RPC.Server server) {
+    server.addSuppressedLoggingExceptions(ServerNotLeaderException.class);
   }
 }

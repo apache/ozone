@@ -107,6 +107,9 @@ public class SignatureInfo {
     return dateTime;
   }
 
+  /**
+   * Signature version.
+   */
   public enum Version {
     NONE, V4, V2;
   }

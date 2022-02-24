@@ -23,16 +23,20 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -40,7 +44,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -74,6 +77,7 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.NONE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
+
 /**
  * Handle create directory request.
  */
@@ -101,6 +105,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   public OMDirectoryCreateRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMDirectoryCreateRequest(OMRequest omRequest,
+                                  BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -184,7 +193,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException("Unable to create directory: " +keyName
+        throw new OMException("Unable to create directory: " + keyName
             + " in volume/bucket: " + volumeName + "/" + bucketName,
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
@@ -206,7 +215,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             Optional.of(missingParentInfos), trxnLogIndex);
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos, result);
+            dirKeyInfo, missingParentInfos, result, getBucketLayout());
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         result = Result.DIRECTORY_ALREADY_EXISTS;
@@ -280,7 +289,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
-      omMetadataManager.getKeyTable().addCacheEntry(
+      omMetadataManager.getKeyTable(BucketLayout.DEFAULT).addCacheEntry(
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
               bucketName, parentKeyInfo.getKeyName())),
           new CacheValue<>(Optional.of(parentKeyInfo),
@@ -355,10 +364,26 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setCreationTime(keyArgs.getModificationTime())
         .setModificationTime(keyArgs.getModificationTime())
         .setDataSize(0)
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(ReplicationConfig
+                .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
         .setObjectID(objectId)
         .setUpdateID(objectId);
   }
 
+  static long getMaxNumOfRecursiveDirs() {
+    return MAX_NUM_OF_RECURSIVE_DIRS;
+  }
+
+  public static OMDirectoryCreateRequest getInstance(
+      KeyArgs keyArgs, OMRequest omRequest, OzoneManager ozoneManager)
+      throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMDirectoryCreateRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMDirectoryCreateRequest(omRequest, bucketLayout);
+  }
 }

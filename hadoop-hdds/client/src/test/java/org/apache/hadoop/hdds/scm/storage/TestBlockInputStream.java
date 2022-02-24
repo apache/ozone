@@ -32,16 +32,20 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -208,6 +212,40 @@ public class TestBlockInputStream {
   }
 
   @Test
+  public void testReadWithByteBuffer() throws Exception {
+    // read 200 bytes of data starting from position 50. Chunk0 contains
+    // indices 0 to 99, chunk1 from 100 to 199 and chunk3 from 200 to 299. So
+    // the read should result in 3 ChunkInputStream reads
+    seekAndVerify(50);
+    ByteBuffer buffer = ByteBuffer.allocate(200);
+    blockStream.read(buffer);
+    matchWithInputData(buffer.array(), 50, 200);
+
+    // The new position of the blockInputStream should be the last index read
+    // + 1.
+    Assert.assertEquals(250, blockStream.getPos());
+    Assert.assertEquals(2, blockStream.getChunkIndex());
+  }
+
+  @Test
+  public void testReadWithDirectByteBuffer() throws Exception {
+    // read 200 bytes of data starting from position 50. Chunk0 contains
+    // indices 0 to 99, chunk1 from 100 to 199 and chunk3 from 200 to 299. So
+    // the read should result in 3 ChunkInputStream reads
+    seekAndVerify(50);
+    ByteBuffer buffer = ByteBuffer.allocateDirect(200);
+    blockStream.read(buffer);
+    for (int i = 50; i < 50 + 200; i++) {
+      Assert.assertEquals(blockData[i], buffer.get(i - 50));
+    }
+
+    // The new position of the blockInputStream should be the last index read
+    // + 1.
+    Assert.assertEquals(250, blockStream.getPos());
+    Assert.assertEquals(2, blockStream.getChunkIndex());
+  }
+
+  @Test
   public void testSeekAndRead() throws Exception {
     // Seek to a position and read data
     seekAndVerify(50);
@@ -229,7 +267,7 @@ public class TestBlockInputStream {
     BlockInputStream blockInputStreamWithRetry =
         new DummyBlockInputStreamWithRetry(blockID, blockSize,
             MockPipeline.createSingleNodePipeline(), null,
-            false, null, chunks, chunkDataMap, isRefreshed);
+            false, null, chunks, chunkDataMap, isRefreshed, null);
 
     try {
       Assert.assertFalse(isRefreshed.get());
@@ -237,6 +275,33 @@ public class TestBlockInputStream {
       byte[] b = new byte[200];
       blockInputStreamWithRetry.read(b, 0, 200);
       Assert.assertTrue(isRefreshed.get());
+    } finally {
+      blockInputStreamWithRetry.close();
+    }
+  }
+
+  @Test
+  public void testGetBlockInfoFailWithIOException() throws Exception {
+    GenericTestUtils.setLogLevel(BlockInputStream.getLog(), Level.DEBUG);
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
+            LoggerFactory.getLogger(BlockInputStream.class));
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    AtomicBoolean isRefreshed = new AtomicBoolean();
+    createChunkList(5);
+    BlockInputStream blockInputStreamWithRetry =
+        new DummyBlockInputStreamWithRetry(blockID, blockSize,
+            MockPipeline.createSingleNodePipeline(), null,
+            false, null, chunks, chunkDataMap, isRefreshed,
+            new IOException("unavailable"));
+    try {
+      Assert.assertFalse(isRefreshed.get());
+      byte[] b = new byte[200];
+      blockInputStreamWithRetry.read(b, 0, 200);
+      // As in case of IOException we do not do do refresh.
+      Assert.assertFalse(isRefreshed.get());
+      Assert.assertTrue(logCapturer.getOutput().contains(
+          "Retry to get chunk info fail"));
     } finally {
       blockInputStreamWithRetry.close();
     }

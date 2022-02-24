@@ -20,11 +20,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -53,7 +52,7 @@ public class NodeDecommissionManager {
   private DatanodeAdminMonitor monitor;
 
   private NodeManager nodeManager;
-  //private ContainerManagerV2 containerManager;
+  //private ContainerManager containerManager;
   private SCMContext scmContext;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
@@ -86,20 +85,20 @@ public class NodeDecommissionManager {
       return port;
     }
 
-    private void parseHostname() throws InvalidHostStringException{
+    private void parseHostname() throws InvalidHostStringException {
       try {
         // A URI *must* have a scheme, so just create a fake one
-        URI uri = new URI("empty://"+rawHostname.trim());
+        URI uri = new URI("empty://" + rawHostname.trim());
         this.hostname = uri.getHost();
         this.port = uri.getPort();
 
         if (this.hostname == null) {
-          throw new InvalidHostStringException("The string "+rawHostname+
+          throw new InvalidHostStringException("The string " + rawHostname +
               " does not contain a value hostname or hostname:port definition");
         }
       } catch (URISyntaxException e) {
         throw new InvalidHostStringException(
-            "Unable to parse the hoststring "+rawHostname, e);
+            "Unable to parse the hoststring " + rawHostname, e);
       }
     }
   }
@@ -139,7 +138,7 @@ public class NodeDecommissionManager {
         results.add(found.get(0));
       } else if (found.size() > 1) {
         DatanodeDetails match = null;
-        for(DatanodeDetails dn : found) {
+        for (DatanodeDetails dn : found) {
           if (validateDNPortMatch(host.getPort(), dn)) {
             match = dn;
             break;
@@ -174,8 +173,8 @@ public class NodeDecommissionManager {
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
-      ContainerManagerV2 containerManager, SCMContext scmContext,
-      EventPublisher eventQueue, ReplicationManager rm) {
+             ContainerManager containerManager, SCMContext scmContext,
+             EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
     //this.containerManager = containerManager;
@@ -232,7 +231,7 @@ public class NodeDecommissionManager {
         // NodeNotFoundException here expect if the node is remove in the
         // very short window between validation and starting decom. Therefore
         // log a warning and ignore the exception
-        LOG.warn("The host {} was not found in SCM. Ignoring the request to "+
+        LOG.warn("The host {} was not found in SCM. Ignoring the request to " +
             "decommission it", dn.getHostName());
         errors.add(new DatanodeAdminError(dn.getHostName(),
             "The host was not found in SCM"));
@@ -269,25 +268,18 @@ public class NodeDecommissionManager {
       throws NodeNotFoundException, InvalidNodeStateException {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
-    HddsProtos.NodeState health = nodeStatus.getHealth();
     if (opState == NodeOperationalState.IN_SERVICE) {
-      if (health != HddsProtos.NodeState.DEAD) {
-        LOG.info("Starting Decommission for node {}", dn);
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.DECOMMISSIONING);
-        monitor.startMonitoring(dn);
-      } else {
-        LOG.info("{} is dead. Moving to decommissioned immediately", dn);
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.DECOMMISSIONED);
-      }
+      LOG.info("Starting Decommission for node {}", dn);
+      nodeManager.setNodeOperationalState(
+          dn, NodeOperationalState.DECOMMISSIONING);
+      monitor.startMonitoring(dn);
     } else if (nodeStatus.isDecommission()) {
-      LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
+      LOG.info("Start Decommission called on node {} in state {}. Nothing to " +
           "do.", dn, opState);
     } else {
       LOG.error("Cannot decommission node {} in state {}", dn, opState);
-      throw new InvalidNodeStateException("Cannot decommission node "+
-          dn +" in state "+ opState);
+      throw new InvalidNodeStateException("Cannot decommission node " +
+          dn + " in state " + opState);
     }
   }
 
@@ -304,7 +296,7 @@ public class NodeDecommissionManager {
         // NodeNotFoundException here expect if the node is remove in the
         // very short window between validation and starting decom. Therefore
         // log a warning and ignore the exception
-        LOG.warn("Host {} was not found in SCM. Ignoring the request to "+
+        LOG.warn("Host {} was not found in SCM. Ignoring the request to " +
             "recommission it.", dn.getHostName());
         errors.add(new DatanodeAdminError(dn.getHostName(),
             "The host was not found in SCM"));
@@ -314,7 +306,7 @@ public class NodeDecommissionManager {
   }
 
   public synchronized void recommission(DatanodeDetails dn)
-      throws NodeNotFoundException{
+      throws NodeNotFoundException {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
     if (opState != NodeOperationalState.IN_SERVICE) {
@@ -323,7 +315,7 @@ public class NodeDecommissionManager {
       monitor.stopMonitoring(dn);
       LOG.info("Queued node {} for recommission", dn);
     } else {
-      LOG.info("Recommission called on node {} with state {}. "+
+      LOG.info("Recommission called on node {} with state {}. " +
           "Nothing to do.", dn, opState);
     }
   }
@@ -341,7 +333,7 @@ public class NodeDecommissionManager {
         // NodeNotFoundException here expect if the node is remove in the
         // very short window between validation and starting decom. Therefore
         // log a warning and ignore the exception
-        LOG.warn("The host {} was not found in SCM. Ignoring the request to "+
+        LOG.warn("The host {} was not found in SCM. Ignoring the request to " +
             "start maintenance on it", dn.getHostName());
       } catch (InvalidNodeStateException e) {
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
@@ -362,25 +354,18 @@ public class NodeDecommissionManager {
       maintenanceEnd =
           (System.currentTimeMillis() / 1000L) + (endInHours * 60L * 60L);
     }
-    HddsProtos.NodeState health = nodeStatus.getHealth();
     if (opState == NodeOperationalState.IN_SERVICE) {
-      if (health != HddsProtos.NodeState.DEAD) {
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
-        monitor.startMonitoring(dn);
-        LOG.info("Starting Maintenance for node {}", dn);
-      }  else {
-        LOG.info("{} is dead. Moving to maintenance immediately", dn);
-        nodeManager.setNodeOperationalState(
-            dn, NodeOperationalState.IN_MAINTENANCE);
-      }
+      nodeManager.setNodeOperationalState(
+          dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
+      monitor.startMonitoring(dn);
+      LOG.info("Starting Maintenance for node {}", dn);
     } else if (nodeStatus.isMaintenance()) {
-      LOG.info("Starting Maintenance called on node {} with state {}. "+
+      LOG.info("Starting Maintenance called on node {} with state {}. " +
           "Nothing to do.", dn, opState);
     } else {
       LOG.error("Cannot start maintenance on node {} in state {}", dn, opState);
-      throw new InvalidNodeStateException("Cannot start maintenance on node "+
-          dn +" in state "+ opState);
+      throw new InvalidNodeStateException("Cannot start maintenance on node " +
+          dn + " in state " + opState);
     }
   }
 

@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,15 +31,25 @@ import org.junit.Test;
  */
 public class TestChunkInputStream extends TestInputStreamBase {
 
-  public TestChunkInputStream(ChunkLayOutVersion layout) {
+  public TestChunkInputStream(ContainerLayoutVersion layout) {
     super(layout);
   }
+
+  /**
+   * Run the tests as a single test method to avoid needing a new mini-cluster
+   * for each test.
+   */
+  @Test
+  public void testAll() throws Exception {
+    testChunkReadBuffers();
+    testBufferRelease();
+  }
+
 
   /**
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  @Test
   public void testChunkReadBuffers() throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
@@ -104,7 +114,6 @@ public class TestChunkInputStream extends TestInputStreamBase {
    * Test that ChunkInputStream buffers are released as soon as the last byte
    * of the buffer is read.
    */
-  @Test
   public void testBufferRelease() throws Exception {
     String keyName = getNewKeyName();
     int dataLength = CHUNK_SIZE;

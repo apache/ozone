@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.OzoneSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
@@ -403,7 +404,7 @@ public class OzoneDelegationTokenSecretManager
   @Override
   public byte[] retrievePassword(OzoneTokenIdentifier identifier)
       throws InvalidToken {
-    if(identifier.getTokenType().equals(S3AUTHINFO)) {
+    if (identifier.getTokenType().equals(S3AUTHINFO)) {
       return validateS3AuthInfo(identifier);
     }
     return validateToken(identifier).getPassword();

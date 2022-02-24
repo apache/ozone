@@ -80,7 +80,6 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     OzoneObjInfo objInfo;
     RequestContext parentContext;
     boolean isACLTypeCreate = (context.getAclRights() == ACLType.CREATE);
-    boolean isACLTypeDelete = (context.getAclRights() == ACLType.DELETE);
 
     if (ozObject instanceof OzoneObjInfo) {
       objInfo = (OzoneObjInfo) ozObject;
@@ -102,20 +101,32 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return getAllowListAllVolumes();
     }
 
-    // For CREATE and DELETE acl requests, the parents need to be checked
-    // for WRITE acl. If Key create request is received, then we need to
-    // check if user has WRITE acl set on Bucket and Volume. In all other cases
-    // the parents also need to be checked for the same acl type.
-    if (isACLTypeCreate || isACLTypeDelete) {
-      parentContext = RequestContext.newBuilder()
+    // Refined the parent context
+    // OP         |CHILD     |PARENT
+
+    // CREATE      NONE         WRITE
+    // DELETE      DELETE       WRITE
+    // WRITE       WRITE        WRITE
+    // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
+
+    // READ        READ         READ
+    // LIST        LIST         READ      (V1 LIST=>READ)
+    // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
+
+    ACLType aclRight = context.getAclRights();
+    ACLType parentAclRight = aclRight;
+
+    if (aclRight == ACLType.CREATE || aclRight == ACLType.DELETE ||
+        aclRight == ACLType.WRITE_ACL) {
+      parentAclRight = ACLType.WRITE;
+    } else if (aclRight == ACLType.READ_ACL || aclRight == ACLType.LIST) {
+      parentAclRight = ACLType.READ;
+    }
+    parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
         .setAclType(context.getAclType())
-        .setAclRights(ACLType.WRITE)
-        .build();
-    } else {
-      parentContext = context;
-    }
+        .setAclRights(parentAclRight).build();
 
     switch (objInfo.getResourceType()) {
     case VOLUME:

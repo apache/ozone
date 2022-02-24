@@ -177,12 +177,12 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public String getSignatureAlgorithm(){
+  public String getSignatureAlgorithm() {
     return securityConfig.getSignatureAlgo();
   }
 
   @Override
-  public String getSecurityProvider(){
+  public String getSecurityProvider() {
     return securityConfig.getProvider();
   }
 
@@ -223,6 +223,20 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public long getLatestCrlId() throws IOException {
     return 0;
+  }
+
+  @Override
+  public long getLocalCrlId() {
+    return 0;
+  }
+
+  @Override
+  public void setLocalCrlId(long crlId) {
+  }
+
+  @Override
+  public boolean processCrl(CRLInfo crl) {
+    return false;
   }
 
 }

@@ -25,6 +25,9 @@ import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 
 import java.lang.reflect.InvocationTargetException;
 
+/**
+ * {@link Codec} for {@link ProtocolMessageEnum} objects.
+ */
 public class EnumCodec implements Codec {
 
   @Override

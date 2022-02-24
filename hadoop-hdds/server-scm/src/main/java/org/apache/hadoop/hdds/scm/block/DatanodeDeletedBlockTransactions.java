@@ -38,14 +38,12 @@ class DatanodeDeletedBlockTransactions {
   // counts blocks deleted across datanodes. Blocks deleted will be counted
   // for all the replicas and may not be unique.
   private int blocksDeleted = 0;
-  private final Map<Long, Long> containerIdToTxnId = new HashMap<>();
 
   DatanodeDeletedBlockTransactions() {
   }
 
   void addTransactionToDN(UUID dnID, DeletedBlocksTransaction tx) {
     transactions.computeIfAbsent(dnID, k -> new LinkedList<>()).add(tx);
-    containerIdToTxnId.put(tx.getContainerID(), tx.getTxID());
     blocksDeleted += tx.getLocalIDCount();
     if (SCMBlockDeletingService.LOG.isDebugEnabled()) {
       SCMBlockDeletingService.LOG
@@ -55,10 +53,6 @@ class DatanodeDeletedBlockTransactions {
 
   Map<UUID, List<DeletedBlocksTransaction>> getDatanodeTransactionMap() {
     return transactions;
-  }
-
-  Map<Long, Long> getContainerIdToTxnIdMap() {
-    return containerIdToTxnId;
   }
 
   int getBlocksDeleted() {

@@ -65,6 +65,9 @@ public class S3BucketAcl {
         '}';
   }
 
+  /**
+   * TODO: javadoc.
+   */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "AccessControlList")
   public static class AccessControlList {
@@ -96,6 +99,9 @@ public class S3BucketAcl {
     }
   }
 
+  /**
+   * TODO: javadoc.
+   */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Grant")
   public static class Grant {
@@ -163,10 +169,10 @@ public class S3BucketAcl {
     @XmlElement(name = "ID")
     private String id;
 
-    @XmlAttribute(name="xsi:type")
+    @XmlAttribute(name = "xsi:type")
     private String xsiType = "CanonicalUser";
 
-    @XmlAttribute(name="xmlns:xsi")
+    @XmlAttribute(name = "xmlns:xsi")
     private String xsiNs = "http://www.w3.org/2001/XMLSchema-instance";
 
     public String getXsiNs() {

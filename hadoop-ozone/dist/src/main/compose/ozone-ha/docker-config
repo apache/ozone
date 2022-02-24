@@ -31,10 +31,17 @@ OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3
 OZONE-SITE.XML_ozone.scm.ratis.enable=true
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
+OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
+OZONE-SITE.XML_hdds.container.report.interval=60s
+OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
+OZONE-SITE.XML_ozone.recon.address=recon:9891
+OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
+OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

@@ -16,27 +16,37 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.update.server.SCMUpdateServiceGrpcServer;
+import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
+import org.apache.hadoop.hdds.scm.update.server.SCMCRLStore;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
@@ -46,11 +56,14 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.KerberosInfo;
 
+import org.apache.hadoop.security.UserGroupInformation;
+import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +87,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
   private final X509Certificate rootCACertificate;
-  private final RPC.Server rpcServer;
+  private final RPC.Server rpcServer; // HADOOP RPC SERVER
+  private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
   private final StorageContainerManager storageContainerManager;
@@ -115,6 +129,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       rpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
+
+    this.grpcUpdateServer = new SCMUpdateServiceGrpcServer(
+        conf.getObject(UpdateServiceConfig.class),
+        new SCMCRLStore(scmCertificateServer));
   }
 
   /**
@@ -132,6 +150,17 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
     return getEncodedCertToString(certSignReq, NodeType.DATANODE);
+  }
+
+  @Override
+  public String getCertificate(
+      NodeDetailsProto nodeDetails,
+      String certSignReq) throws IOException {
+    LOGGER.info("Processing CSR for {} {}, UUID: {}",
+        nodeDetails.getNodeType(), nodeDetails.getHostName(),
+        nodeDetails.getUuid());
+    Objects.requireNonNull(nodeDetails);
+    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
   }
 
   /**
@@ -228,8 +257,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       errorCode = SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
     } else if (role == NodeType.OM) {
       errorCode = SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
-    } else {
+    } else if (role == NodeType.DATANODE) {
       errorCode = SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
+    } else {
+      errorCode = SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
     }
     return new SCMSecurityException("generate " + role.toString() +
         " Certificate operation failed", ex, errorCode);
@@ -333,6 +364,35 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     return scmCertificateServer.getLatestCrlId();
   }
 
+  @Override
+  public long revokeCertificates(List<String> certIds, int reason,
+      long revocationTime) throws IOException {
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser());
+
+    Future<Optional<Long>> revoked = scmCertificateServer.revokeCertificates(
+        certIds.stream().map(id -> new BigInteger(id))
+            .collect(Collectors.toList()), CRLReason.lookup(reason),
+        new Date(revocationTime));
+    try {
+      Long crlId = revoked.get().get();
+      getGrpcUpdateServer().notifyCrlUpdate();
+      return crlId;
+    } catch (InterruptedException | ExecutionException e) {
+      Thread.currentThread().interrupt();
+      throw new SCMException("Fail to revoke certs",
+          SCMException.ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
+    }
+  }
+
+  public SCMUpdateServiceGrpcServer getGrpcUpdateServer() {
+    return grpcUpdateServer;
+  }
+
+  @VisibleForTesting
+  public UserGroupInformation getRpcRemoteUser() {
+    return Server.getRemoteUser();
+  }
+
   public RPC.Server getRpcServer() {
     return rpcServer;
   }
@@ -341,12 +401,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     return rpcAddress;
   }
 
-  public void start() {
+  public void start() throws IOException {
     String startupMsg = StorageContainerManager.buildRpcServerStartMessage(
         "Starting RPC server for SCMSecurityProtocolServer.", getRpcAddress());
     LOGGER.info(startupMsg);
     metrics.register();
     getRpcServer().start();
+    getGrpcUpdateServer().start();
   }
 
   public void stop() {
@@ -354,6 +415,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       LOGGER.info("Stopping the SCMSecurityProtocolServer.");
       metrics.unregister();
       getRpcServer().stop();
+      getGrpcUpdateServer().stop();
     } catch (Exception ex) {
       LOGGER.error("SCMSecurityProtocolServer stop failed.", ex);
     }
@@ -362,6 +424,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public void join() throws InterruptedException {
     LOGGER.trace("Join RPC server for SCMSecurityProtocolServer.");
     getRpcServer().join();
+    LOGGER.trace("Join gRPC server for SCMSecurityProtocolServer.");
+    getGrpcUpdateServer().join();
+
   }
 
   public CertificateServer getRootCertificateServer() {

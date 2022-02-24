@@ -18,17 +18,18 @@ package org.apache.hadoop.ozone.scm;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -36,12 +37,13 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.ExitManager;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.junit.Assert.assertTrue;
@@ -85,12 +87,11 @@ public class TestSCMInstallSnapshotWithHA {
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-    SCMHAConfiguration scmhaConfiguration =
-        conf.getObject(SCMHAConfiguration.class);
-    scmhaConfiguration.setRaftLogPurgeEnabled(true);
-    scmhaConfiguration.setRaftLogPurgeGap(LOG_PURGE_GAP);
-    scmhaConfiguration.setRatisSnapshotThreshold(SNAPSHOT_THRESHOLD);
-    conf.setFromObject(scmhaConfiguration);
+
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+            SNAPSHOT_THRESHOLD);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
@@ -120,7 +121,7 @@ public class TestSCMInstallSnapshotWithHA {
     StorageContainerManager leaderSCM = getLeader(cluster);
     Assert.assertNotNull(leaderSCM);
     // Find the inactive SCM
-    String followerId = getInactiveSCM(cluster).getScmId();
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
 
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
     // Do some transactions so that the log index increases
@@ -134,6 +135,13 @@ public class TestSCMInstallSnapshotWithHA {
     // The recently started  should be lagging behind the leader .
     SCMStateMachine followerSM =
         followerSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
+    
+    // Wait & retry for follower to update transactions to leader
+    // snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
+    }, 100, 3000);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
     assertTrue(followerLastAppliedIndex >= 200);
@@ -152,8 +160,7 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    String leaderNodeId = leaderSCM.getScmNodeDetails().getNodeId();
-    String followerId = getInactiveSCM(cluster).getScmId();
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
     // Find the inactive SCM
 
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
@@ -186,8 +193,13 @@ public class TestSCMInstallSnapshotWithHA {
     TermIndex followerTermIndex = followerSM.getLastAppliedTermIndex();
     SCMHAManagerImpl scmhaManager =
         (SCMHAManagerImpl) (followerSCM.getScmHAManager());
-    TermIndex newTermIndex =
-        scmhaManager.installCheckpoint(leaderNodeId, leaderDbCheckpoint);
+
+    TermIndex newTermIndex = null;
+    try {
+      newTermIndex = scmhaManager.installCheckpoint(leaderDbCheckpoint);
+    } catch (IOException ioe) {
+      // throw IOException as expected
+    }
 
     String errorMsg = "Reloading old state of SCM";
     Assert.assertTrue(logCapture.getOutput().contains(errorMsg));
@@ -201,18 +213,17 @@ public class TestSCMInstallSnapshotWithHA {
   @Test
   public void testInstallCorruptedCheckpointFailure() throws Exception {
     StorageContainerManager leaderSCM = getLeader(cluster);
-    String leaderNodeId = leaderSCM.getScmId();
     // Find the inactive SCM
-    String followerId = getInactiveSCM(cluster).getScmId();
-    StorageContainerManager follower = cluster.getSCM(followerId);
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
+    StorageContainerManager followerSCM = cluster.getSCM(followerId);
     // Do some transactions so that the log index increases
     writeToIncreaseLogIndex(leaderSCM, 100);
     File oldDBLocation =
-        follower.getScmMetadataStore().getStore().getDbLocation();
+        followerSCM.getScmMetadataStore().getStore().getDbLocation();
 
-    SCMStateMachine sm =
-        follower.getScmHAManager().getRatisServer().getSCMStateMachine();
-    TermIndex termIndex = sm.getLastAppliedTermIndex();
+    SCMStateMachine followerSM =
+        followerSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
+    TermIndex termIndex = followerSM.getLastAppliedTermIndex();
     DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
@@ -229,8 +240,8 @@ public class TestSCMInstallSnapshotWithHA {
     File checkpointBackup = new File(dbDir, dbBackupName);
 
     // Take a backup of the leader checkpoint
-    Files.copy(leaderCheckpointLocation.toAbsolutePath(),
-        checkpointBackup.toPath());
+    FileUtils.copyDirectory(leaderCheckpointLocation.toFile(),
+        checkpointBackup, false);
     // Corrupt the leader checkpoint and install that on the follower. The
     // operation should fail and  should shutdown.
     boolean delete = true;
@@ -247,29 +258,26 @@ public class TestSCMInstallSnapshotWithHA {
     }
 
     SCMHAManagerImpl scmhaManager =
-        (SCMHAManagerImpl) (follower.getScmHAManager());
+        (SCMHAManagerImpl) (followerSCM.getScmHAManager());
     GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.ERROR);
     GenericTestUtils.LogCapturer logCapture =
         GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
     scmhaManager.setExitManagerForTesting(new DummyExitManager());
 
-    scmhaManager.installCheckpoint(leaderNodeId, leaderCheckpointLocation,
+    followerSM.pause();
+    scmhaManager.installCheckpoint(leaderCheckpointLocation,
         leaderCheckpointTrxnInfo);
 
     Assert.assertTrue(logCapture.getOutput()
         .contains("Failed to reload SCM state and instantiate services."));
-    Assert.assertTrue(sm.getLifeCycleState().isPausingOrPaused());
+    Assert.assertTrue(followerSM.getLifeCycleState().isPausingOrPaused());
 
     // Verify correct reloading
-    HAUtils
-        .replaceDBWithCheckpoint(leaderCheckpointTrxnInfo.getTransactionIndex(),
-            oldDBLocation, checkpointBackup.toPath(),
-            OzoneConsts.SCM_DB_BACKUP_PREFIX);
-    scmhaManager.startServices();
-    sm.unpause(leaderCheckpointTrxnInfo.getTerm(),
-        leaderCheckpointTrxnInfo.getTransactionIndex());
-    Assert.assertTrue(sm.getLastAppliedTermIndex()
-        .equals(leaderCheckpointTrxnInfo.getTermIndex()));
+    followerSM.setInstallingDBCheckpoint(
+        new RocksDBCheckpoint(checkpointBackup.toPath()));
+    followerSM.reinitialize();
+    Assert.assertEquals(followerSM.getLastAppliedTermIndex(),
+        leaderCheckpointTrxnInfo.getTermIndex());
   }
 
   private List<ContainerInfo> writeToIncreaseLogIndex(
@@ -309,13 +317,10 @@ public class TestSCMInstallSnapshotWithHA {
     return null;
   }
 
-  static StorageContainerManager getInactiveSCM(MiniOzoneHAClusterImpl impl) {
-    for (StorageContainerManager scm : impl.getStorageContainerManagers()) {
-      if (!impl.isSCMActive(scm.getScmId())) {
-        return scm;
-      }
-    }
-    return null;
+  private static StorageContainerManager getInactiveSCM(
+      MiniOzoneHAClusterImpl cluster) {
+    Iterator<StorageContainerManager> inactiveScms = cluster.getInactiveSCM();
+    return inactiveScms.hasNext() ? inactiveScms.next() : null;
   }
 }
 

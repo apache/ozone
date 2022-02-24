@@ -34,14 +34,16 @@ public class TestSCMContext {
   @Test
   public void testRaftOperations() {
     // start as follower
-    SCMContext scmContext =
-        new SCMContext.Builder().setLeader(false).setTerm(0).build();
+    SCMContext scmContext = new SCMContext.Builder()
+        .setLeader(false).setTerm(0).buildMaybeInvalid();
 
     assertFalse(scmContext.isLeader());
 
     // become leader
     scmContext.updateLeaderAndTerm(true, 10);
+    scmContext.setLeaderReady();
     assertTrue(scmContext.isLeader());
+    assertTrue(scmContext.isLeaderReady());
     try {
       assertEquals(scmContext.getTermOfLeader(), 10);
     } catch (NotLeaderException e) {
@@ -51,6 +53,7 @@ public class TestSCMContext {
     // step down
     scmContext.updateLeaderAndTerm(false, 0);
     assertFalse(scmContext.isLeader());
+    assertFalse(scmContext.isLeaderReady());
   }
 
   @Test
@@ -59,7 +62,7 @@ public class TestSCMContext {
     SCMContext scmContext = new SCMContext.Builder()
         .setIsInSafeMode(true)
         .setIsPreCheckComplete(false)
-        .build();
+        .buildMaybeInvalid();
 
     assertTrue(scmContext.isInSafeMode());
     assertFalse(scmContext.isPreCheckComplete());

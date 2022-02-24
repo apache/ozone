@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.junit.After;
 import org.junit.Assert;
@@ -45,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -111,11 +112,11 @@ public class TestS3MultipartRequest {
   protected OMRequest doPreExecuteInitiateMPU(
       String volumeName, String bucketName, String keyName) throws Exception {
     OMRequest omRequest =
-        TestOMRequestUtils.createInitiateMPURequest(volumeName, bucketName,
+        OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
             keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(omRequest);
+        getS3InitiateMultipartUploadReq(omRequest);
 
     OMRequest modifiedRequest =
         s3InitiateMultipartUploadRequest.preExecute(ozoneManager);
@@ -149,11 +150,10 @@ public class TestS3MultipartRequest {
     // Just set dummy size
     long dataSize = 100L;
     OMRequest omRequest =
-        TestOMRequestUtils.createCommitPartMPURequest(volumeName, bucketName,
+        OMRequestTestUtils.createCommitPartMPURequest(volumeName, bucketName,
             keyName, clientID, dataSize, multipartUploadID, partNumber);
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
-        new S3MultipartUploadCommitPartRequest(omRequest);
-
+            getS3MultipartUploadCommitReq(omRequest);
 
     OMRequest modifiedRequest =
         s3MultipartUploadCommitPartRequest.preExecute(ozoneManager);
@@ -179,12 +179,12 @@ public class TestS3MultipartRequest {
       String multipartUploadID) throws IOException {
 
     OMRequest omRequest =
-        TestOMRequestUtils.createAbortMPURequest(volumeName, bucketName,
+        OMRequestTestUtils.createAbortMPURequest(volumeName, bucketName,
             keyName, multipartUploadID);
 
 
     S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
-        new S3MultipartUploadAbortRequest(omRequest);
+        getS3MultipartUploadAbortReq(omRequest);
 
     OMRequest modifiedRequest =
         s3MultipartUploadAbortRequest.preExecute(ozoneManager);
@@ -201,11 +201,11 @@ public class TestS3MultipartRequest {
       List<Part> partList) throws IOException {
 
     OMRequest omRequest =
-        TestOMRequestUtils.createCompleteMPURequest(volumeName, bucketName,
+        OMRequestTestUtils.createCompleteMPURequest(volumeName, bucketName,
             keyName, multipartUploadID, partList);
 
     S3MultipartUploadCompleteRequest s3MultipartUploadCompleteRequest =
-        new S3MultipartUploadCompleteRequest(omRequest);
+            getS3MultipartUploadCompleteReq(omRequest);
 
     OMRequest modifiedRequest =
         s3MultipartUploadCompleteRequest.preExecute(ozoneManager);
@@ -217,5 +217,64 @@ public class TestS3MultipartRequest {
 
   }
 
+
+  /**
+   * Perform preExecute of Initiate Multipart upload request for given
+   * volume, bucket and key name.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteInitiateMPUWithFSO(
+      String volumeName, String bucketName, String keyName) throws Exception {
+    OMRequest omRequest =
+            OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
+                    keyName);
+
+    S3InitiateMultipartUploadRequestWithFSO
+        s3InitiateMultipartUploadRequestWithFSO =
+        new S3InitiateMultipartUploadRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMRequest modifiedRequest =
+            s3InitiateMultipartUploadRequestWithFSO.preExecute(ozoneManager);
+
+    Assert.assertNotEquals(omRequest, modifiedRequest);
+    Assert.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
+    Assert.assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
+            .getKeyArgs().getMultipartUploadID());
+    Assert.assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
+            .getKeyArgs().getModificationTime() > 0);
+
+    return modifiedRequest;
+  }
+
+  protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
+          OMRequest omRequest) {
+    return new S3MultipartUploadCompleteRequest(omRequest,
+        BucketLayout.DEFAULT);
+  }
+
+  protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
+          OMRequest omRequest) {
+    return new S3MultipartUploadCommitPartRequest(omRequest,
+        BucketLayout.DEFAULT);
+  }
+
+  protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
+      OMRequest initiateMPURequest) {
+    return new S3InitiateMultipartUploadRequest(initiateMPURequest,
+        BucketLayout.DEFAULT);
+  }
+
+  protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(
+      OMRequest omRequest) {
+    return new S3MultipartUploadAbortRequest(omRequest, BucketLayout.DEFAULT);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
 
 }

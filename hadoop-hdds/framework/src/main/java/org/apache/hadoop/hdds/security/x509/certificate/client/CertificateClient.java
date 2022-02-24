@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
@@ -30,6 +31,9 @@ import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Objects;
+
+import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST;
 
 /**
  * Certificate client provides and interface to certificate operations that
@@ -262,9 +266,8 @@ public interface CertificateClient {
    */
   List<String> updateCAList() throws IOException;
 
-
   /**
-   * Get the CRLInfo based on the CRL Ids.
+   * Get the CRLInfo based on the CRL Ids from SCM.
    * @param crlIds - list of crl ids
    * @return list of CRLInfo
    * @throws IOException
@@ -272,10 +275,42 @@ public interface CertificateClient {
   List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
 
   /**
-   * Get the latest CRL id.
+   * Get the latest CRL id from SCM.
    * @return latest CRL id.
    * @throws IOException
    */
   long getLatestCrlId() throws IOException;
+
+  default void assertValidKeysAndCertificate() throws OzoneSecurityException {
+    try {
+      Objects.requireNonNull(getPublicKey());
+      Objects.requireNonNull(getPrivateKey());
+      Objects.requireNonNull(getCertificate());
+    } catch (Exception e) {
+      throw new OzoneSecurityException("Error reading keypair & certificate", e,
+          OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST);
+    }
+  }
+
+  /**
+   * Get Local CRL id received.
+   * @return
+   */
+  long getLocalCrlId();
+
+  /**
+   * Set Local CRL id.
+   * @param crlId
+   */
+  void setLocalCrlId(long crlId);
+
+  /**
+   * Process crl and remove the certificates in the revoked cert list from
+   * client.
+   * @param crl
+   * @return true if the client's own cert needs to be reinit
+   * false otherwise;
+   */
+  boolean processCrl(CRLInfo crl);
 
 }

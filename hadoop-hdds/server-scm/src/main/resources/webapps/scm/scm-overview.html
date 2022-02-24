@@ -62,6 +62,14 @@
         <td>Node Manager: Safe mode status</td>
         <td>{{$ctrl.overview.jmx.InSafeMode}}</td>
     </tr>
+    <tr>
+        <td> SCM Roles (HA) </td>
+        <td>{{$ctrl.overview.jmx.ScmRatisRoles}}</td>
+    </tr>
+    <tr ng-hide="!$ctrl.overview.jmx.PrimordialNode">
+        <td> Primordial Node (HA) </td>
+        <td>{{$ctrl.overview.jmx.PrimordialNode}}</td>
+    </tr>
     </tbody>
 </table>
 

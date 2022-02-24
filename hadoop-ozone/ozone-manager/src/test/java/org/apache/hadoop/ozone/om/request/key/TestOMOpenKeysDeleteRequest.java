@@ -28,13 +28,12 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteRequest;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
 import org.junit.Test;
 import com.google.common.base.Optional;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status;
@@ -225,14 +224,14 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
       for (OpenKey openKey: openKeyBucket.getKeysList()) {
         if (keySize > 0) {
-          OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volume, bucket,
+          OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket,
               openKey.getName(), replicationType, replicationFactor);
-          TestOMRequestUtils.addKeyLocationInfo(keyInfo,  0, keySize);
+          OMRequestTestUtils.addKeyLocationInfo(keyInfo,  0, keySize);
 
-          TestOMRequestUtils.addKeyToTable(true, false,
+          OMRequestTestUtils.addKeyToTable(true, false,
               keyInfo, openKey.getClientID(), 0L, omMetadataManager);
         } else {
-          TestOMRequestUtils.addKeyToTable(true,
+          OMRequestTestUtils.addKeyToTable(true,
               volume, bucket, openKey.getName(), openKey.getClientID(),
               replicationType, replicationFactor, omMetadataManager);
         }
@@ -313,16 +312,18 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   private void assertInOpenKeyTable(OpenKeyBucket... openKeys)
       throws Exception {
 
-    for (String keyName: getFullOpenKeyNames(openKeys)) {
-      Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(keyName));
+    for (String keyName : getFullOpenKeyNames(openKeys)) {
+      Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .isExist(keyName));
     }
   }
 
   private void assertNotInOpenKeyTable(OpenKeyBucket... openKeys)
       throws Exception {
 
-    for (String keyName: getFullOpenKeyNames(openKeys)) {
-      Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(keyName));
+    for (String keyName : getFullOpenKeyNames(openKeys)) {
+      Assert.assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout())
+          .isExist(keyName));
     }
   }
 
@@ -336,7 +337,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   private List<String> getFullOpenKeyNames(OpenKeyBucket... openKeyBuckets) {
     List<String> fullKeyNames = new ArrayList<>();
 
-    for(OpenKeyBucket keysPerBucket: openKeyBuckets) {
+    for (OpenKeyBucket keysPerBucket: openKeyBuckets) {
       String volume = keysPerBucket.getVolumeName();
       String bucket = keysPerBucket.getBucketName();
 

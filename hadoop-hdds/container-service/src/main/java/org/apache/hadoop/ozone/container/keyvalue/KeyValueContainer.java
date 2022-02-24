@@ -25,7 +25,10 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -46,11 +49,13 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.base.Preconditions;
@@ -64,6 +69,9 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_DB_SYNC;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,15 +92,32 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private final KeyValueContainerData containerData;
   private ConfigurationSource config;
 
+  // Cache of Blocks (LocalIDs) awaiting final PutBlock call after the stream
+  // is closed. When a block is added to the DB as part of putBlock, it is
+  // added to the cache here. It is cleared from the Cache when the putBlock
+  // is called on the block as part of stream.close() (with endOfBlock = true
+  // in BlockManagerImpl#putBlock). Or when the container is marked for
+  // close, the whole cache is cleared as there can be no more writes to this
+  // container.
+  // We do not need to explicitly synchronize this cache as the writes to
+  // container are synchronous.
+  private Set<Long> pendingPutBlockCache;
+
   public KeyValueContainer(KeyValueContainerData containerData,
-      ConfigurationSource
-      ozoneConfig) {
+      ConfigurationSource ozoneConfig) {
     Preconditions.checkNotNull(containerData,
             "KeyValueContainerData cannot be null");
     Preconditions.checkNotNull(ozoneConfig,
             "Ozone configuration cannot be null");
     this.config = ozoneConfig;
     this.containerData = containerData;
+    if (this.containerData.isOpen() || this.containerData.isClosing()) {
+      // If container is not in OPEN or CLOSING state, there cannot be block
+      // writes to the container. So pendingPutBlockCache is not needed.
+      this.pendingPutBlockCache = new HashSet<>();
+    } else {
+      this.pendingPutBlockCache = Collections.emptySet();
+    }
   }
 
   @Override
@@ -108,18 +133,21 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long maxSize = containerData.getMaxSize();
     volumeSet.readLock();
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-          .getVolumesList(), maxSize);
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
+          maxSize);
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
       long containerID = containerData.getContainerID();
+      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+              containerVolume, clusterId);
 
       containerMetaDataPath = KeyValueContainerLocationUtil
-          .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerID);
+          .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
       containerData.setMetadataPath(containerMetaDataPath.getPath());
 
       File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-          hddsVolumeDir, clusterId, containerID);
+          hddsVolumeDir, idDir, containerID);
 
       // Check if it is new Container.
       ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
@@ -127,9 +155,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       //Create Metadata path chunks path and metadata db
       File dbFile = getContainerDBFile();
 
-      // This method is only called when creating new containers.
-      // Therefore, always use the newest schema version.
-      containerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
+      containerData.setSchemaVersion(
+          VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
       KeyValueContainerUtil.createContainerMetaData(containerID,
               containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);
@@ -225,6 +252,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
     } catch (IOException ex) {
+      onFailure(containerData.getVolume());
       throw new StorageContainerException("Error while creating/ updating " +
           ".container file. ContainerID: " + containerId, ex,
           CONTAINER_FILES_CREATE_ERROR);
@@ -259,6 +287,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } catch (IOException ex) {
       // TODO : An I/O error during delete can leave partial artifacts on the
       // disk. We will need the cleaner thread to cleanup this information.
+      onFailure(containerData.getVolume());
       String errMsg = String.format("Failed to cleanup container. ID: %d",
           containerId);
       LOG.error(errMsg, ex);
@@ -277,6 +306,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.CLOSING));
+      // Do not clear the pendingBlockCache here as a follower can still
+      // receive transactions from leader in CLOSING state. Refer to
+      // KeyValueHandler#checkContainerOpen()
     } finally {
       writeUnlock();
     }
@@ -288,9 +320,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     try {
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.UNHEALTHY));
+      clearPendingPutBlockCache();
     } finally {
       writeUnlock();
     }
+    LOG.warn("Moving container {} to state UNHEALTHY from state:{} Trace:{}",
+            containerData.getContainerPath(), containerData.getState(),
+            StringUtils.getStackTrace(Thread.currentThread()));
   }
 
   @Override
@@ -304,6 +340,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // been done outside the lock.
       flushAndSyncDB();
       updateContainerData(containerData::quasiCloseContainer);
+      clearPendingPutBlockCache();
     } finally {
       writeUnlock();
     }
@@ -320,6 +357,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // been done outside the lock.
       flushAndSyncDB();
       updateContainerData(containerData::closeContainer);
+      clearPendingPutBlockCache();
     } finally {
       writeUnlock();
     }
@@ -370,13 +408,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private void compactDB() throws StorageContainerException {
     try {
-      try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+      try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
         db.getStore().compactDB();
       }
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB compaction while closing container", ex);
+      onFailure(containerData.getVolume());
       throw new StorageContainerException(ex, ERROR_IN_COMPACT_DB);
     }
   }
@@ -393,6 +432,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw ex;
     } catch (IOException ex) {
       LOG.error("Error in DB sync while closing container", ex);
+      onFailure(containerData.getVolume());
       throw new StorageContainerException(ex, ERROR_IN_DB_SYNC);
     }
   }
@@ -421,7 +461,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     // holding lock and writing data to disk. We can have async implementation
     // to flush the update container data to disk.
     long containerId = containerData.getContainerID();
-    if(!containerData.isValid()) {
+    if (!containerData.isValid()) {
       LOG.debug("Invalid container data. ContainerID: {}", containerId);
       throw new StorageContainerException("Invalid container data. " +
           "ContainerID: " + containerId, INVALID_CONTAINER_STATE);
@@ -653,6 +693,50 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     return containerData.getBlockCommitSequenceId();
   }
 
+  /**
+   * Return whether the given localID of a block is present in the
+   * pendingPutBlockCache or not.
+   */
+  public boolean isBlockInPendingPutBlockCache(long localID) {
+    return pendingPutBlockCache.contains(localID);
+  }
+
+  /**
+   * Add the given localID of a block to the pendingPutBlockCache.
+   */
+  public void addToPendingPutBlockCache(long localID)
+      throws StorageContainerException {
+    try {
+      pendingPutBlockCache.add(localID);
+    } catch (UnsupportedOperationException e) {
+      // Getting an UnsupportedOperationException here implies that the
+      // pendingPutBlockCache is an Empty Set. This should not happen if the
+      // container is in OPEN or CLOSING state. Log the exception here and
+      // throw a non-Runtime exception so that putBlock request fails.
+      String msg = "Failed to add block " + localID + " to " +
+          "pendingPutBlockCache of container " + containerData.getContainerID()
+          + " (state: " + containerData.getState() + ")";
+      LOG.error(msg, e);
+      throw new StorageContainerException(msg,
+          ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Remove the given localID of a block from the pendingPutBlockCache.
+   */
+  public void removeFromPendingPutBlockCache(long localID) {
+    pendingPutBlockCache.remove(localID);
+  }
+
+  /**
+   * When a container is closed, quasi-closed or marked unhealthy, clear the
+   * pendingPutBlockCache as there won't be any more writes to the container.
+   */
+  private void clearPendingPutBlockCache() {
+    pendingPutBlockCache.clear();
+    pendingPutBlockCache = Collections.emptySet();
+  }
 
   /**
    * Returns KeyValueContainerReport for the KeyValueContainer.
@@ -667,7 +751,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setWriteCount(containerData.getWriteCount())
         .setReadBytes(containerData.getReadBytes())
         .setWriteBytes(containerData.getWriteBytes())
-        .setKeyCount(containerData.getKeyCount())
+        .setKeyCount(containerData.getBlockCount())
         .setUsed(containerData.getBytesUsed())
         .setState(getHddsState())
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
@@ -760,7 +844,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * @return
    * @throws IOException
    */
-  private File createTempFile(File file) throws IOException{
+  private File createTempFile(File file) throws IOException {
     return File.createTempFile("tmp_" + System.currentTimeMillis() + "_",
         file.getName(), file.getParentFile());
   }

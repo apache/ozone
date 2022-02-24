@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.test.TestGenericTestUtils;
@@ -117,7 +119,7 @@ public class TestMiniOzoneCluster {
     cluster.waitForClusterToBeReady();
     List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
     assertEquals(numberOfNodes, datanodes.size());
-    for(HddsDatanodeService dn : datanodes) {
+    for (HddsDatanodeService dn : datanodes) {
       // Create a single member pipe line
       List<DatanodeDetails> dns = new ArrayList<>();
       dns.add(dn.getDatanodeDetails());
@@ -130,7 +132,7 @@ public class TestMiniOzoneCluster {
           .build();
 
       // Verify client is able to connect to the container
-      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)){
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
         client.connect();
         assertTrue(client.isConnected(pipeline.getFirstNode()));
       }
@@ -221,7 +223,7 @@ public class TestMiniOzoneCluster {
 
       for (int i = 0; i < 3; i++) {
         stateMachines.add(new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf, null, null));
+            randomDatanodeDetails(), ozoneConf, null, null, null));
       }
 
       //we need to start all the servers to get the fix ports
@@ -266,11 +268,11 @@ public class TestMiniOzoneCluster {
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
     try (
         DatanodeStateMachine sm1 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null, null);
         DatanodeStateMachine sm2 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null, null);
         DatanodeStateMachine sm3 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null, null);
     ) {
       HashSet<Integer> ports = new HashSet<Integer>();
       assertTrue(ports.add(sm1.getContainer().getReadChannel().getIPCPort()));
@@ -283,7 +285,7 @@ public class TestMiniOzoneCluster {
   }
 
   private void createMalformedIDFile(File malformedFile)
-      throws IOException{
+      throws IOException {
     malformedFile.delete();
     DatanodeDetails id = randomDatanodeDetails();
     ContainerUtils.writeDatanodeDetailsTo(id, malformedFile);
@@ -351,16 +353,24 @@ public class TestMiniOzoneCluster {
    */
   @Test (timeout = 60000)
   public void testMultipleDataDirs() throws Exception {
-    // Start a cluster with 3 DN
+    // Start a cluster with 3 DN and configure reserved space in each DN
+    String reservedSpace = "1B";
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
         .setNumDataVolumes(3)
+        .setDatanodeReservedSpace(reservedSpace)
         .build();
     cluster.waitForClusterToBeReady();
 
-    Assert.assertEquals(3, cluster.getHddsDatanodes().get(0)
+    List<StorageVolume> volumeList = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer().getVolumeSet()
-        .getVolumesList().size());
+        .getVolumesList();
+
+    Assert.assertEquals(3, volumeList.size());
+
+    volumeList.forEach(storageVolume -> Assert.assertEquals(
+            (long) StorageSize.parse(reservedSpace).getValue(),
+            storageVolume.getVolumeInfo().getReservedInBytes()));
   }
 
   private static void assertDetailsEquals(DatanodeDetails expected,

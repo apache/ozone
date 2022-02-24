@@ -36,6 +36,50 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESE
 
 /**
  * Stores information about a disk/volume.
+ *
+ * Since we have a reserved space for each volume for other usage,
+ * let's clarify the space values a bit here:
+ * - used: hdds actual usage.
+ * - avail: remaining space for hdds usage.
+ * - reserved: total space for other usage.
+ * - capacity: total space for hdds usage.
+ * - other: space used by other service consuming the same volume.
+ * - fsAvail: reported remaining space from local fs.
+ * - fsUsed: reported total used space from local fs.
+ * - fsCapacity: reported total capacity from local fs.
+ *
+ * |----used----|   (avail)   |++++++++reserved++++++++|
+ * |<-     capacity         ->|
+ *              |     fsAvail      |-------other-------|
+ * |<-                   fsCapacity                  ->|
+ *
+ * What we could directly get from local fs:
+ *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
+ * We could get from config:
+ *     reserved
+ * Get from cmd line:
+ *     used: from cmd 'du' (by default)
+ * Get from calculation:
+ *     capacity = fsCapacity - reserved
+ *     other = fsUsed - used
+ *
+ * The avail is the result we want from calculation.
+ * So, it could be:
+ * A) avail = capacity - used
+ * B) avail = fsAvail - Max(reserved - other, 0);
+ *
+ * To be Conservative, we could get min
+ *     avail = Max(Min(A, B), 0);
+ *
+ * If we have a dedicated disk for hdds and are not using the reserved space,
+ * then we should use DedicatedDiskSpaceUsage for
+ * `hdds.datanode.du.factory.classname`,
+ * Then it is much simpler, since we don't care about other usage:
+ *
+ *  |----used----|             (avail)/fsAvail              |
+ *  |<-              capacity/fsCapacity                  ->|
+ *
+ *  We have avail == fsAvail.
  */
 public final class VolumeInfo {
 
@@ -140,7 +184,7 @@ public final class VolumeInfo {
         usageCheckFactory.paramsFor(root);
 
     this.reservedInBytes = getReserved(b.conf);
-    this.usage = new VolumeUsage(checkParams);
+    this.usage = new VolumeUsage(checkParams, reservedInBytes);
   }
 
   public long getCapacity() {
@@ -150,16 +194,24 @@ public final class VolumeInfo {
     return configuredCapacity;
   }
 
+  /**
+   * Calculate available space use method A.
+   * |----used----|   (avail)   |++++++++reserved++++++++|
+   * |<-     capacity         ->|
+   *
+   * A) avail = capacity - used
+   */
   public long getAvailable() {
-    return Math.max(usage.getAvailable() - reservedInBytes, 0);
+    long avail = getCapacity() - usage.getUsedSpace();
+    return Math.max(Math.min(avail, usage.getAvailable()), 0);
+  }
+
+  public void refreshNow() {
+    usage.refreshNow();
   }
 
   public long getScmUsed() {
     return usage.getUsedSpace();
-  }
-
-  void start() {
-    usage.start();
   }
 
   void shutdownUsageThread() {
@@ -180,5 +232,10 @@ public final class VolumeInfo {
   @VisibleForTesting
   public VolumeUsage getUsageForTesting() {
     return usage;
+  }
+
+  @VisibleForTesting
+  public long getReservedInBytes() {
+    return reservedInBytes;
   }
 }

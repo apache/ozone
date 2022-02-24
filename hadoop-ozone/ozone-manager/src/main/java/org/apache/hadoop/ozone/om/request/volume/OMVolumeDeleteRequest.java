@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
+
 /**
  * Handles volume delete request.
  */
@@ -162,5 +163,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     }
     return omClientResponse;
   }
+
 }
 

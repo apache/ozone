@@ -20,13 +20,16 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -106,7 +109,7 @@ public class TestContainerReportWithKeys {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey(keyName, keySize, ReplicationType.STAND_ALONE,
+            .createKey(keyName, keySize, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
     String dataString = RandomStringUtils.randomAlphabetic(keySize);
     key.write(dataString.getBytes(UTF_8));
@@ -116,8 +119,9 @@ public class TestContainerReportWithKeys {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(keySize)
+        .setReplicationConfig(
+            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(keySize)
         .setRefreshPipeline(true)
         .build();
 

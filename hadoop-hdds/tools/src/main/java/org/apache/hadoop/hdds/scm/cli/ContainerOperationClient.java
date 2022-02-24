@@ -17,11 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
@@ -35,19 +31,29 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
-import com.google.common.annotations.VisibleForTesting;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
@@ -64,16 +70,21 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+  private final boolean containerTokenEnabled;
+  private final OzoneConfiguration configuration;
+  private XceiverClientManager xceiverClientManager;
 
-  public XceiverClientManager getXceiverClientManager() {
+  public synchronized XceiverClientManager getXceiverClientManager()
+      throws IOException {
+    if (this.xceiverClientManager == null) {
+      this.xceiverClientManager = newXCeiverClientManager(configuration);
+    }
     return xceiverClientManager;
   }
 
-  private final XceiverClientManager xceiverClientManager;
-
-  public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
+  public ContainerOperationClient(OzoneConfiguration conf) {
+    this.configuration = conf;
     storageContainerLocationClient = newContainerRpcClient(conf);
-    this.xceiverClientManager = newXCeiverClientManager(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
@@ -86,6 +97,8 @@ public class ContainerOperationClient implements ScmClient {
       replicationFactor = HddsProtos.ReplicationFactor.ONE;
       replicationType = HddsProtos.ReplicationType.STAND_ALONE;
     }
+    containerTokenEnabled = conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
+        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
   }
 
   @VisibleForTesting
@@ -118,13 +131,14 @@ public class ContainerOperationClient implements ScmClient {
   public ContainerWithPipeline createContainer(String owner)
       throws IOException {
     XceiverClientSpi client = null;
+    XceiverClientManager clientManager = getXceiverClientManager();
     try {
       ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.
               allocateContainer(replicationType, replicationFactor, owner);
 
       Pipeline pipeline = containerWithPipeline.getPipeline();
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = clientManager.acquireClient(pipeline);
 
       Preconditions.checkState(
           pipeline.isOpen(),
@@ -136,7 +150,7 @@ public class ContainerOperationClient implements ScmClient {
       return containerWithPipeline;
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -150,7 +164,9 @@ public class ContainerOperationClient implements ScmClient {
    */
   public void createContainer(XceiverClientSpi client,
       long containerId) throws IOException {
-    ContainerProtocolCalls.createContainer(client, containerId, null);
+    String encodedToken = getEncodedContainerToken(containerId);
+
+    ContainerProtocolCalls.createContainer(client, containerId, encodedToken);
 
     // Let us log this info after we let SCM know that we have completed the
     // creation state.
@@ -158,6 +174,15 @@ public class ContainerOperationClient implements ScmClient {
       LOG.debug("Created container " + containerId
           + " machines:" + client.getPipeline().getNodes());
     }
+  }
+
+  private String getEncodedContainerToken(long containerId) throws IOException {
+    if (!containerTokenEnabled) {
+      return "";
+    }
+    ContainerID containerID = ContainerID.valueOf(containerId);
+    return storageContainerLocationClient.getContainerToken(containerID)
+        .encodeToUrlString();
   }
 
   /**
@@ -213,6 +238,7 @@ public class ContainerOperationClient implements ScmClient {
   public ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, String owner) throws IOException {
     XceiverClientSpi client = null;
+    XceiverClientManager clientManager = getXceiverClientManager();
     try {
       // allocate container on SCM.
       ContainerWithPipeline containerWithPipeline =
@@ -220,13 +246,13 @@ public class ContainerOperationClient implements ScmClient {
               owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = clientManager.acquireClient(pipeline);
       createContainer(client,
           containerWithPipeline.getContainerInfo().getContainerID());
       return containerWithPipeline;
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -315,7 +341,12 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public void close() {
     try {
-      xceiverClientManager.close();
+      if (xceiverClientManager != null) {
+        xceiverClientManager.close();
+      }
+      if (storageContainerLocationClient != null) {
+        storageContainerLocationClient.close();
+      }
     } catch (Exception ex) {
       LOG.error("Can't close " + this.getClass().getSimpleName(), ex);
     }
@@ -333,10 +364,13 @@ public class ContainerOperationClient implements ScmClient {
   public void deleteContainer(long containerId, Pipeline pipeline,
       boolean force) throws IOException {
     XceiverClientSpi client = null;
+    XceiverClientManager clientManager = getXceiverClientManager();
     try {
-      client = xceiverClientManager.acquireClient(pipeline);
+      String encodedToken = getEncodedContainerToken(containerId);
+
+      client = clientManager.acquireClient(pipeline);
       ContainerProtocolCalls
-          .deleteContainer(client, containerId, force, null);
+          .deleteContainer(client, containerId, force, encodedToken);
       storageContainerLocationClient
           .deleteContainer(containerId);
       if (LOG.isDebugEnabled()) {
@@ -345,7 +379,7 @@ public class ContainerOperationClient implements ScmClient {
       }
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -373,9 +407,10 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state) throws IOException {
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor) throws IOException {
     return storageContainerLocationClient.listContainer(
-        startContainerID, count, state);
+        startContainerID, count, state, factor);
   }
 
   /**
@@ -389,11 +424,13 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public ContainerDataProto readContainer(long containerID,
       Pipeline pipeline) throws IOException {
+    XceiverClientManager clientManager = getXceiverClientManager();
+    String encodedToken = getEncodedContainerToken(containerID);
     XceiverClientSpi client = null;
     try {
-      client = xceiverClientManager.acquireClientForReadData(pipeline);
-      ReadContainerResponseProto response =
-          ContainerProtocolCalls.readContainer(client, containerID, null);
+      client = clientManager.acquireClientForReadData(pipeline);
+      ReadContainerResponseProto response = ContainerProtocolCalls
+          .readContainer(client, containerID, encodedToken);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Read container {}, machines: {} ", containerID,
             pipeline.getNodes());
@@ -401,7 +438,7 @@ public class ContainerOperationClient implements ScmClient {
       return response.getContainerData();
     } finally {
       if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
+        clientManager.releaseClient(client, false);
       }
     }
   }
@@ -444,6 +481,25 @@ public class ContainerOperationClient implements ScmClient {
   public ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException {
     return storageContainerLocationClient.getContainerWithPipeline(containerId);
+  }
+
+  /**
+   * Gets the list of ReplicaInfo known by SCM for a given container.
+   * @param containerId - The Container ID
+   * @return List of ContainerReplicaInfo for the container or an empty list
+   *         if none.
+   * @throws IOException
+   */
+  @Override
+  public List<ContainerReplicaInfo>
+      getContainerReplicas(long containerId) throws IOException {
+    List<HddsProtos.SCMContainerReplicaProto> protos
+        = storageContainerLocationClient.getContainerReplicas(containerId);
+    List<ContainerReplicaInfo> replicas = new ArrayList<>();
+    for (HddsProtos.SCMContainerReplicaProto p : protos) {
+      replicas.add(ContainerReplicaInfo.fromProto(p));
+    }
+    return replicas;
   }
 
   /**
@@ -517,6 +573,36 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public ReplicationManagerReport getReplicationManagerReport()
+      throws IOException {
+    return storageContainerLocationClient.getReplicationManagerReport();
+  }
+
+  @Override
+  public boolean startContainerBalancer(
+      Optional<Double> threshold, Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTargetInGB,
+      Optional<Long> maxSizeLeavingSourceInGB)
+      throws IOException {
+    return storageContainerLocationClient.startContainerBalancer(threshold,
+        iterations, maxDatanodesPercentageToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB);
+  }
+
+  @Override
+  public void stopContainerBalancer() throws IOException {
+    storageContainerLocationClient.stopContainerBalancer();
+  }
+
+  @Override
+  public boolean getContainerBalancerStatus() throws IOException {
+    return storageContainerLocationClient.getContainerBalancerStatus();
+  }
+
+  @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
   }
@@ -550,5 +636,19 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
+  }
+
+  @Override
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException {
+    return storageContainerLocationClient.finalizeScmUpgrade(upgradeClientID);
+  }
+
+  @Override
+  public StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException {
+    return storageContainerLocationClient.queryUpgradeFinalizationProgress(
+        upgradeClientID, force, readonly);
   }
 }

@@ -69,7 +69,7 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
   private List<OzoneAcl> ozoneAcls;
   private OzoneObj obj;
 
-  public OMKeyAddAclRequest(OMRequest omRequest) {
+  public OMKeyAddAclRequest(OMRequest omRequest, OzoneManager ozoneManager) {
     super(omRequest);
     OzoneManagerProtocolProtos.AddAclRequest addAclRequest =
         getOmRequest().getAddAclRequest();
@@ -77,6 +77,8 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
     path = obj.getPath();
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(addAclRequest.getAcl()));
+
+    initializeBucketLayout(ozoneManager);
   }
 
   @Override

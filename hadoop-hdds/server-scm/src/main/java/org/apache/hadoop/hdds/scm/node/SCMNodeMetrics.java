@@ -33,6 +33,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -118,7 +119,6 @@ public final class SCMNodeMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Map<String, Integer>> nodeCount = managerMXBean.getNodeCount();
     Map<String, Long> nodeInfo = managerMXBean.getNodeInfo();
-
     /**
      * Loop over the Node map and create a metric for the cross product of all
      * Operational and health states, ie:
@@ -129,12 +129,12 @@ public final class SCMNodeMetrics implements MetricsSource {
      *     ...
      */
     MetricsRecordBuilder metrics = collector.addRecord(registry.info());
-    for(Map.Entry<String, Map<String, Integer>> e : nodeCount.entrySet()) {
-      for(Map.Entry<String, Integer> h : e.getValue().entrySet()) {
+    for (Map.Entry<String, Map<String, Integer>> e : nodeCount.entrySet()) {
+      for (Map.Entry<String, Integer> h : e.getValue().entrySet()) {
         metrics.addGauge(
             Interns.info(
-                StringUtils.camelize(e.getKey()+"_"+h.getKey()+"_nodes"),
-                "Number of "+e.getKey()+" "+h.getKey()+" datanodes"),
+                StringUtils.camelize(e.getKey() + "_" + h.getKey() + "_nodes"),
+                "Number of " + e.getKey() + " " + h.getKey() + " datanodes"),
             h.getValue());
       }
     }
@@ -171,3 +171,4 @@ public final class SCMNodeMetrics implements MetricsSource {
     return sb.toString();
   }
 }
+

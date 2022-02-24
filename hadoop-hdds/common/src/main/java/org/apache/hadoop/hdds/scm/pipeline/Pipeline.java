@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -337,7 +338,7 @@ public final class Pipeline {
     }
 
     final ReplicationConfig config = ReplicationConfig
-        .fromProto(pipeline.getType(), pipeline.getFactor());
+        .fromProtoTypeAndFactor(pipeline.getType(), pipeline.getFactor());
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setReplicationConfig(config)
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
@@ -386,7 +387,8 @@ public final class Pipeline {
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
-    b.append(", CreationTimestamp").append(getCreationTimestamp());
+    b.append(", CreationTimestamp").append(getCreationTimestamp()
+        .atZone(ZoneId.systemDefault()));
     b.append("]");
     return b.toString();
   }
@@ -413,7 +415,7 @@ public final class Pipeline {
     private Instant creationTimestamp = null;
     private UUID suggestedLeaderId = null;
 
-    public Builder() {}
+    public Builder() { }
 
     public Builder(Pipeline pipeline) {
       this.id = pipeline.id;
@@ -484,10 +486,10 @@ public final class Pipeline {
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
-        for(int i = 0; i < nodeOrder.size(); i++) {
+        for (int i = 0; i < nodeOrder.size(); i++) {
           int nodeIndex = nodeOrder.get(i);
           Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-          while(it.hasNext() && nodeIndex >= 0) {
+          while (it.hasNext() && nodeIndex >= 0) {
             DatanodeDetails node = it.next();
             if (nodeIndex == 0) {
               nodesWithOrder.add(node);
@@ -501,7 +503,7 @@ public final class Pipeline {
               nodesWithOrder, id);
         }
         pipeline.setNodesInOrder(nodesWithOrder);
-      } else if (nodesInOrder != null){
+      } else if (nodesInOrder != null) {
         // This branch is for pipeline clone
         pipeline.setNodesInOrder(nodesInOrder);
       }

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -147,4 +148,9 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    * Table that maintains sequence id information.
    */
   Table<String, Long> getSequenceIdTable();
+
+  /**
+   * Table that maintains move information.
+   */
+  Table<ContainerID, MoveDataNodePair> getMoveTable();
 }

@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -40,7 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -55,6 +55,8 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
@@ -115,8 +117,8 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setDataSize(1024)
             .setKeyName(keyName).setRefreshPipeline(true).build();
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
@@ -172,8 +174,8 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setDataSize(1024)
             .setKeyName("standalone")
             .setRefreshPipeline(true)
             .build();
@@ -230,8 +232,9 @@ public class TestCloseContainerByPipeline {
 
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test").
-        setBucketName("test").setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setDataSize(1024)
+        setBucketName("test")
+        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setDataSize(1024)
         .setKeyName("ratis").setRefreshPipeline(true).build();
 
     OmKeyLocationInfo omKeyLocationInfo =
@@ -260,7 +263,7 @@ public class TestCloseContainerByPipeline {
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
           .getContainer(containerID);
-      try(ReferenceCountedDB store = BlockUtils.getDB(
+      try (ReferenceCountedDB store = BlockUtils.getDB(
           (KeyValueContainerData) dnContainer.getContainerData(), conf)) {
         metadataStores.add(store);
       }
@@ -294,8 +297,8 @@ public class TestCloseContainerByPipeline {
 
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setDataSize(1024)
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();

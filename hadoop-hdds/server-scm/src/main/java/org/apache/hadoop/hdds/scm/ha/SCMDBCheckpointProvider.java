@@ -29,13 +29,15 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 
-
 // TODO: define a generic interface for this
+/**
+ * Checkpoint write stream and exception handling.
+ */
 public class SCMDBCheckpointProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMDBCheckpointProvider.class);
-  private transient DBStore scmDbStore;;
+  private transient DBStore scmDbStore;
 
   public SCMDBCheckpointProvider(DBStore scmDbStore) {
     this.scmDbStore = scmDbStore;

@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.freon.containergenerator;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -78,8 +78,8 @@ public class GeneratorScm extends BaseGenerator {
           new ContainerInfo.Builder()
               .setContainerID(containerId)
               .setState(LifeCycleState.CLOSED)
-              .setReplicationFactor(ReplicationFactor.THREE)
-              .setReplicationType(ReplicationType.STAND_ALONE)
+              .setReplicationConfig(
+                  new StandaloneReplicationConfig(ReplicationFactor.THREE))
               .setOwner(getUserId())
               .build();
 

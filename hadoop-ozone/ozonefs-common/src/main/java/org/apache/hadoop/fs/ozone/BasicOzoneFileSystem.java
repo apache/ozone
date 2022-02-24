@@ -115,9 +115,10 @@ public class BasicOzoneFileSystem extends FileSystem {
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
     setConf(conf);
-    Objects.requireNonNull(name.getScheme(), "No scheme provided in " + name);
+    Preconditions.checkNotNull(name.getScheme(),
+        "No scheme provided in %s", name);
     Preconditions.checkArgument(getScheme().equals(name.getScheme()),
-        "Invalid scheme provided in " + name);
+        "Invalid scheme provided in %s", name);
 
     String authority = name.getAuthority();
     if (authority == null) {
@@ -284,7 +285,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     @Override
     boolean processKey(List<String> keyList) throws IOException {
       // TODO RenameKey needs to be changed to batch operation
-      for(String key : keyList) {
+      for (String key : keyList) {
         String newKeyName = dstKey.concat(key.substring(srcKey.length()));
         adapter.renameKey(key, newKeyName);
       }
@@ -314,6 +315,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     String srcPath = src.toUri().getPath();
     String dstPath = dst.toUri().getPath();
+    // TODO: Discuss do we need to throw exception.
     if (srcPath.equals(dstPath)) {
       return true;
     }
@@ -323,6 +325,10 @@ public class BasicOzoneFileSystem extends FileSystem {
       // Cannot rename root of file system
       LOG.trace("Cannot rename the root of a filesystem");
       return false;
+    }
+
+    if (adapter.isFSOptimizedBucket()) {
+      return renameFSO(srcPath, dstPath);
     }
 
     // Check if the source exists
@@ -405,6 +411,24 @@ public class BasicOzoneFileSystem extends FileSystem {
     return result;
   }
 
+  private boolean renameFSO(String srcPath, String dstPath)
+      throws IOException {
+    try {
+      adapter.renameKey(srcPath, dstPath);
+    } catch (OMException ome) {
+      LOG.error("rename key failed: {}. Error code: {} source:{}, destin:{}",
+              ome.getMessage(), ome.getResult(), srcPath, dstPath);
+      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
+          OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
+          OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+        return false;
+      } else {
+        throw ome;
+      }
+    }
+    return true;
+  }
+
   /**
    * Intercept rename to trash calls from TrashPolicyDefault.
    */
@@ -485,6 +509,20 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
+
+    if (adapter.isFSOptimizedBucket()) {
+      if (f.isRoot()) {
+        if (!recursive && listStatus(f).length != 0) {
+          throw new PathIsNotEmptyDirectoryException(f.toString());
+        }
+        LOG.warn("Cannot delete root directory.");
+        return false;
+      }
+
+      String key = pathToKey(f);
+      return adapter.deleteObject(key, recursive);
+    }
+
     FileStatus status;
     try {
       status = getFileStatus(f);
@@ -762,7 +800,10 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
-    return super.getFileChecksum(f, length);
+    statistics.incrementReadOps(1);
+    Path qualifiedPath = f.makeQualified(uri, workingDir);
+    String key = pathToKey(qualifiedPath);
+    return adapter.getFileChecksum(key, length);
   }
 
   @Override

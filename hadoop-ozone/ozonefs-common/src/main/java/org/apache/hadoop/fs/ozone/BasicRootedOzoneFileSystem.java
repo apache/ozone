@@ -111,9 +111,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
     setConf(conf);
-    Objects.requireNonNull(name.getScheme(), "No scheme provided in " + name);
+    Preconditions.checkNotNull(name.getScheme(),
+        "No scheme provided in %s", name);
     Preconditions.checkArgument(getScheme().equals(name.getScheme()),
-        "Invalid scheme provided in " + name);
+        "Invalid scheme provided in %s", name);
 
     String authority = name.getAuthority();
     if (authority == null) {
@@ -308,6 +309,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (!ofsSrc.isInSameBucketAs(ofsDst)) {
       throw new IOException("Cannot rename a key to a different bucket");
     }
+    OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
+    if (bucket.getBucketLayout().isFileSystemOptimized()) {
+      return renameFSO(bucket, ofsSrc, ofsDst);
+    }
 
     // Cannot rename a directory to its own subdirectory
     Path dstParent = dst.getParent();
@@ -383,6 +388,29 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       createFakeParentDirectory(src);
     }
     return result;
+  }
+
+  private boolean renameFSO(OzoneBucket bucket,
+      OFSPath srcPath, OFSPath dstPath) throws IOException {
+    // construct src and dst key paths
+    String srcKeyPath = srcPath.getNonKeyPathNoPrefixDelim() +
+        OZONE_URI_DELIMITER + srcPath.getKeyName();
+    String dstKeyPath = dstPath.getNonKeyPathNoPrefixDelim() +
+        OZONE_URI_DELIMITER + dstPath.getKeyName();
+    try {
+      adapterImpl.rename(bucket, srcKeyPath, dstKeyPath);
+    } catch (OMException ome) {
+      LOG.error("rename key failed: {}. source:{}, destin:{}",
+          ome.getMessage(), srcKeyPath, dstKeyPath);
+      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
+          OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
+          OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+        return false;
+      } else {
+        throw ome;
+      }
+    }
+    return true;
   }
 
   /**
@@ -499,6 +527,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         LOG.warn("delete: OFS does not support rm root. "
             + "To wipe the cluster, please re-init OM instead.");
         return false;
+      }
+
+
+      if (!ofsPath.isVolume() && !ofsPath.isBucket()) {
+        OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+        if (bucket.getBucketLayout().isFileSystemOptimized()) {
+          String ofsKeyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
+              OZONE_URI_DELIMITER + ofsPath.getKeyName();
+          return adapterImpl.deleteObject(ofsKeyPath, recursive);
+        }
       }
 
       // Handle delete volume
@@ -794,7 +832,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
-    return super.getFileChecksum(f, length);
+    String key = pathToKey(f);
+    return adapter.getFileChecksum(key, length);
   }
 
   @Override

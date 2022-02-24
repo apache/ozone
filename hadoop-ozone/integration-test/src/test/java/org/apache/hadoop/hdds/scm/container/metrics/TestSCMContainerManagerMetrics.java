@@ -23,16 +23,17 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -70,6 +71,7 @@ public class TestSCMContainerManagerMetrics {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "3000s");
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
@@ -84,7 +86,7 @@ public class TestSCMContainerManagerMetrics {
   @Test
   public void testContainerOpsMetrics() throws IOException {
     MetricsRecordBuilder metrics;
-    ContainerManagerV2 containerManager = scm.getContainerManager();
+    ContainerManager containerManager = scm.getContainerManager();
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     long numSuccessfulCreateContainers = getLongCounter(
         "NumSuccessfulCreateContainers", metrics);

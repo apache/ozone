@@ -29,7 +29,9 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 
@@ -41,6 +43,8 @@ import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -88,7 +92,8 @@ public class TestVolumeSetDiskChecks {
 
     conf = getConfWithDataNodeDirs(numVolumes);
     final MutableVolumeSet volumeSet =
-        new MutableVolumeSet(UUID.randomUUID().toString(), conf);
+        new MutableVolumeSet(UUID.randomUUID().toString(), conf,
+            null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
     assertThat(volumeSet.getFailedVolumesList().size(), is(0));
@@ -112,19 +117,27 @@ public class TestVolumeSetDiskChecks {
     final int numBadVolumes = 2;
 
     conf = getConfWithDataNodeDirs(numVolumes);
+    StorageVolumeChecker dummyChecker =
+        new DummyChecker(conf, new Timer(), numBadVolumes);
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
-        UUID.randomUUID().toString(), conf) {
-      @Override
-      HddsVolumeChecker getVolumeChecker(ConfigurationSource configuration)
-          throws DiskErrorException {
-        return new DummyChecker(configuration, new Timer(), numBadVolumes);
-      }
-    };
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME,
+        dummyChecker);
+    final MutableVolumeSet metaVolumeSet = new MutableVolumeSet(
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.META_VOLUME,
+        dummyChecker);
 
-    assertThat(volumeSet.getFailedVolumesList().size(), is(numBadVolumes));
-    assertThat(volumeSet.getVolumesList().size(),
-        is(numVolumes - numBadVolumes));
+    Assert.assertEquals(volumeSet.getFailedVolumesList().size(),
+        numBadVolumes);
+    Assert.assertEquals(volumeSet.getVolumesList().size(),
+        numVolumes - numBadVolumes);
+    Assert.assertEquals(metaVolumeSet.getFailedVolumesList().size(),
+        numBadVolumes);
+    Assert.assertEquals(metaVolumeSet.getVolumesList().size(),
+        numVolumes - numBadVolumes);
     volumeSet.shutdown();
+    metaVolumeSet.shutdown();
   }
 
   /**
@@ -135,19 +148,24 @@ public class TestVolumeSetDiskChecks {
     final int numVolumes = 5;
 
     conf = getConfWithDataNodeDirs(numVolumes);
+    StorageVolumeChecker dummyChecker =
+        new DummyChecker(conf, new Timer(), numVolumes);
 
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
-        UUID.randomUUID().toString(), conf) {
-      @Override
-      HddsVolumeChecker getVolumeChecker(ConfigurationSource configuration)
-          throws DiskErrorException {
-        return new DummyChecker(configuration, new Timer(), numVolumes);
-      }
-    };
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME,
+        new DummyChecker(conf, new Timer(), numVolumes));
+    final MutableVolumeSet metaVolumeSet = new MutableVolumeSet(
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.META_VOLUME,
+        dummyChecker);
 
     assertEquals(volumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(volumeSet.getVolumesList().size(), 0);
+    assertEquals(metaVolumeSet.getFailedVolumesList().size(), numVolumes);
+    assertEquals(metaVolumeSet.getVolumesList().size(), 0);
     volumeSet.shutdown();
+    metaVolumeSet.shutdown();
   }
 
   /**
@@ -163,6 +181,18 @@ public class TestVolumeSetDiskChecks {
     }
     ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
         String.join(",", dirs));
+
+    final List<String> metaDirs = new ArrayList<>();
+    for (int i = 0; i < numDirs; ++i) {
+      metaDirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+    }
+    ozoneConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+        String.join(",", metaDirs));
+    DatanodeConfiguration dnConf =
+        ozoneConf.getObject(DatanodeConfiguration.class);
+    dnConf.setFailedDataVolumesTolerated(numDirs * 2);
+    dnConf.setFailedMetadataVolumesTolerated(numDirs * 2);
+    ozoneConf.setFromObject(dnConf);
     return ozoneConf;
   }
 
@@ -170,7 +200,7 @@ public class TestVolumeSetDiskChecks {
    * A no-op checker that fails the given number of volumes and succeeds
    * the rest.
    */
-  static class DummyChecker extends HddsVolumeChecker {
+  static class DummyChecker extends StorageVolumeChecker {
     private final int numBadVolumes;
 
     DummyChecker(ConfigurationSource conf, Timer timer, int numBadVolumes)
@@ -180,7 +210,8 @@ public class TestVolumeSetDiskChecks {
     }
 
     @Override
-    public Set<HddsVolume> checkAllVolumes(Collection<HddsVolume> volumes)
+    public Set<? extends StorageVolume> checkAllVolumes(
+        Collection<? extends StorageVolume> volumes)
         throws InterruptedException {
       // Return the first 'numBadVolumes' as failed.
       return ImmutableSet.copyOf(Iterables.limit(volumes, numBadVolumes));

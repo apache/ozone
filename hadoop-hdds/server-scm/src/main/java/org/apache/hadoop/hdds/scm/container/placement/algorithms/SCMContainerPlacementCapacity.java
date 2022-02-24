@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
 public final class SCMContainerPlacementCapacity
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementCapacity.class);
 
   /**
@@ -92,16 +92,18 @@ public final class SCMContainerPlacementCapacity
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of datanodes.
    * @throws SCMException  SCMException
    */
   @Override
   public List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      final int nodesRequired, final long sizeRequired) throws SCMException {
+      final int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
     List<DatanodeDetails> healthyNodes = super.chooseDatanodes(excludedNodes,
-        favoredNodes, nodesRequired, sizeRequired);
+        favoredNodes, nodesRequired, metadataSizeRequired, dataSizeRequired);
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;
     }
@@ -133,7 +135,7 @@ public final class SCMContainerPlacementCapacity
           getNodeManager().getNodeStat(firstNodeDetails);
       SCMNodeMetric secondNodeMetric =
           getNodeManager().getNodeStat(secondNodeDetails);
-      datanodeDetails = firstNodeMetric.isGreater(secondNodeMetric.get())
+      datanodeDetails = !firstNodeMetric.isGreater(secondNodeMetric.get())
           ? firstNodeDetails : secondNodeDetails;
     }
     healthyNodes.remove(datanodeDetails);

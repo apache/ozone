@@ -20,9 +20,9 @@ import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -107,8 +107,7 @@ public class OmKeyGenerator extends BaseFreonGenerator
     OmKeyArgs keyArgs = new Builder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
-        .setType(ReplicationType.RATIS)
-        .setFactor(factor)
+        .setReplicationConfig(new RatisReplicationConfig(factor))
         .setKeyName(generateObjectName(counter))
         .setLocationInfoList(new ArrayList<>())
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),

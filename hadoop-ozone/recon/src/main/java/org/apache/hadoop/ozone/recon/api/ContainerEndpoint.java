@@ -41,6 +41,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -59,7 +60,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 
@@ -76,10 +77,11 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
  */
 @Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class ContainerEndpoint {
 
   @Inject
-  private ContainerDBServiceProvider containerDBServiceProvider;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
@@ -113,8 +115,9 @@ public class ContainerEndpoint {
     Map<Long, ContainerMetadata> containersMap;
     long containersCount;
     try {
-      containersMap = containerDBServiceProvider.getContainers(limit, prevKey);
-      containersCount = containerDBServiceProvider.getCountForContainers();
+      containersMap =
+              reconContainerMetadataManager.getContainers(limit, prevKey);
+      containersCount = reconContainerMetadataManager.getCountForContainers();
     } catch (IOException ioEx) {
       throw new WebApplicationException(ioEx,
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -147,7 +150,7 @@ public class ContainerEndpoint {
     long totalCount;
     try {
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
-          containerDBServiceProvider.getKeyPrefixesForContainer(containerID,
+          reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
               prevKeyPrefix);
 
       // Get set of Container-Key mappings for given containerId.
@@ -157,8 +160,8 @@ public class ContainerEndpoint {
         // Directly calling get() on the Key table instead of iterating since
         // only full keys are supported now. When we change to using a prefix
         // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().getSkipCache(
-            containerKeyPrefix.getKeyPrefix());
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+            .getSkipCache(containerKeyPrefix.getKeyPrefix());
         if (null != omKeyInfo) {
           // Filter keys by version.
           List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo
@@ -204,7 +207,7 @@ public class ContainerEndpoint {
       }
 
       totalCount =
-          containerDBServiceProvider.getKeyCountForContainer(containerID);
+          reconContainerMetadataManager.getKeyCountForContainer(containerID);
     } catch (IOException ioEx) {
       throw new WebApplicationException(ioEx,
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -252,7 +255,7 @@ public class ContainerEndpoint {
 
             List<ContainerHistory> datanodes =
                 containerManager.getLatestContainerHistory(containerID,
-                    containerInfo.getReplicationFactor().getNumber());
+                    containerInfo.getReplicationConfig().getRequiredNodes());
             missingContainers.add(new MissingContainerMetadata(containerID,
                 container.getInStateSince(), keyCount, pipelineID, datanodes));
           } catch (IOException ioEx) {
@@ -312,7 +315,7 @@ public class ContainerEndpoint {
         UUID pipelineID = containerInfo.getPipelineID().getId();
         List<ContainerHistory> datanodes =
             containerManager.getLatestContainerHistory(containerID,
-                containerInfo.getReplicationFactor().getNumber());
+                containerInfo.getReplicationConfig().getRequiredNodes());
         unhealthyMeta.add(new UnhealthyContainerMetadata(
             c, datanodes, pipelineID, keyCount));
       }
@@ -374,5 +377,9 @@ public class ContainerEndpoint {
       }
     }
     return blockIds;
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

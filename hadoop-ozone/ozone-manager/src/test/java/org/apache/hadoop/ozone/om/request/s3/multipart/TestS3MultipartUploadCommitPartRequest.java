@@ -20,7 +20,8 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -41,27 +42,28 @@ public class TestS3MultipartUploadCommitPartRequest
   public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
 
     doPreExecuteCommitMPU(volumeName, bucketName, keyName, Time.now(),
         UUID.randomUUID().toString(), 1);
   }
 
-
   @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
+
+    createParentPath(volumeName, bucketName);
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
-        new S3InitiateMultipartUploadRequest(initiateMPURequest);
+            getS3InitiateMultipartUploadReq(initiateMPURequest);
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
@@ -75,12 +77,10 @@ public class TestS3MultipartUploadCommitPartRequest
         bucketName, keyName, clientID, multipartUploadID, 1);
 
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
-        new S3MultipartUploadCommitPartRequest(commitMultipartRequest);
+        getS3MultipartUploadCommitReq(commitMultipartRequest);
 
     // Add key to open key table.
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
-        keyName, clientID, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+    addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
 
     omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
@@ -90,6 +90,9 @@ public class TestS3MultipartUploadCommitPartRequest
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
         == OzoneManagerProtocolProtos.Status.OK);
 
+    String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
+        keyName, multipartUploadID);
+
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
 
@@ -97,21 +100,26 @@ public class TestS3MultipartUploadCommitPartRequest
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
     Assert.assertTrue(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey).getPartKeyInfoMap().size() == 1);
-    Assert.assertNull(omMetadataManager.getOpenKeyTable()
-        .get(omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
-            clientID)));
+    Assert.assertNotNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
+        .get(multipartOpenKey));
 
+    String partKey = getOpenKey(volumeName, bucketName, keyName, clientID);
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
+        .get(partKey));
   }
 
   @Test
   public void testValidateAndUpdateCacheMultipartNotFound() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
+    createParentPath(volumeName, bucketName);
 
     long clientID = Time.now();
     String multipartUploadID = UUID.randomUUID().toString();
@@ -120,12 +128,10 @@ public class TestS3MultipartUploadCommitPartRequest
         bucketName, keyName, clientID, multipartUploadID, 1);
 
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
-        new S3MultipartUploadCommitPartRequest(commitMultipartRequest);
+        getS3MultipartUploadCommitReq(commitMultipartRequest);
 
     // Add key to open key table.
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
-        keyName, clientID, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+    addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
 
     OMClientResponse omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
@@ -147,9 +153,9 @@ public class TestS3MultipartUploadCommitPartRequest
   public void testValidateAndUpdateCacheKeyNotFound() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
 
@@ -163,15 +169,20 @@ public class TestS3MultipartUploadCommitPartRequest
     // part. It will fail with KEY_NOT_FOUND
 
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
-        new S3MultipartUploadCommitPartRequest(commitMultipartRequest);
+        getS3MultipartUploadCommitReq(commitMultipartRequest);
 
 
     OMClientResponse omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
             2L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
+    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+          == OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND);
+    } else {
+      Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+          == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
+    }
 
   }
 
@@ -180,9 +191,9 @@ public class TestS3MultipartUploadCommitPartRequest
   public void testValidateAndUpdateCacheBucketFound() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
 
     long clientID = Time.now();
@@ -195,7 +206,7 @@ public class TestS3MultipartUploadCommitPartRequest
     // part. It will fail with KEY_NOT_FOUND
 
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
-        new S3MultipartUploadCommitPartRequest(commitMultipartRequest);
+        getS3MultipartUploadCommitReq(commitMultipartRequest);
 
 
     OMClientResponse omClientResponse =
@@ -205,5 +216,33 @@ public class TestS3MultipartUploadCommitPartRequest
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
         == OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
 
+  }
+
+  protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
+      String keyName, long clientID) throws Exception {
+    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
+            keyName, clientID, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+  }
+
+  protected String getKeyName() {
+    return UUID.randomUUID().toString();
+  }
+
+  protected String getMultipartOpenKey(String volumeName, String bucketName,
+      String keyName, String multipartUploadID) {
+    return omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+  }
+
+  protected String getOpenKey(String volumeName, String bucketName,
+      String keyName, long clientID) {
+    return omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, clientID);
+  }
+
+  protected void createParentPath(String volumeName, String bucketName)
+          throws Exception {
+    // no parent hierarchy
   }
 }

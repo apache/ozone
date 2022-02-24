@@ -21,6 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for a *unstable* .proto interface.
  */
+syntax = "proto2";
 
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 
@@ -53,7 +54,8 @@ message SCMSecurityRequest {
     optional SCMListCACertificateRequestProto listCACertificateRequestProto = 9;
     optional SCMGetCrlsRequestProto getCrlsRequest = 10;
     optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
-
+    optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
+    optional SCMGetCertRequestProto getCertRequest = 13;
 }
 
 message SCMSecurityResponse {
@@ -77,6 +79,8 @@ message SCMSecurityResponse {
 
     optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
 
+    optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
+
 }
 
 enum Type {
@@ -90,6 +94,8 @@ enum Type {
     ListCACertificate = 8;
     GetCrls = 9;
     GetLatestCrlId = 10;
+    RevokeCertificates = 11;
+    GetCert = 12;
 }
 
 enum Status {
@@ -109,6 +115,7 @@ enum Status {
     BLOCK_TOKEN_VERIFICATION_FAILED = 14;
     GET_ROOT_CA_CERTIFICATE_FAILED = 15;
     NOT_A_PRIMARY_SCM = 16;
+    REVOKE_CERTIFICATE_FAILED = 17;
 }
 /**
 * This message is send by data node to prove its identity and get an SCM
@@ -125,6 +132,11 @@ message SCMGetDataNodeCertRequestProto {
 */
 message SCMGetOMCertRequestProto {
     required OzoneManagerDetailsProto omDetails = 1;
+    required string CSR = 2;
+}
+
+message SCMGetCertRequestProto {
+    required NodeDetailsProto nodeDetails = 1;
     required string CSR = 2;
 }
 
@@ -208,6 +220,29 @@ message SCMGetLatestCrlIdRequestProto {
 }
 
 message SCMGetLatestCrlIdResponseProto {
+    optional int64 crlId = 1;
+}
+
+message SCMRevokeCertificatesRequestProto {
+    // Match with org.bouncycastle.asn1.x509.CRLReason
+    enum Reason {
+        unspecified = 0;
+        keyCompromise = 1;
+        cACompromise = 2;
+        affiliationChanged = 3;
+        superseded = 4;
+        cessationOfOperation = 5;
+        certificateHold = 6;
+        removeFromCRL = 8;
+        privilegeWithdrawn = 9;
+        aACompromise = 10;
+    };
+    repeated string certIds = 1;
+    optional Reason reason = 2 [default = unspecified];
+    optional uint64 revokeTime = 3;
+}
+
+message SCMRevokeCertificatesResponseProto {
     optional int64 crlId = 1;
 }
 

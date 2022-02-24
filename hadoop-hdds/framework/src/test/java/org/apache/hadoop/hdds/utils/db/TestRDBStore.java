@@ -74,7 +74,7 @@ public class TestRDBStore {
     statistics.setStatsLevel(StatsLevel.ALL);
     options = options.setStatistics(statistics);
     configSet = new HashSet<>();
-    for(String name : families) {
+    for (String name : families) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }
@@ -165,7 +165,7 @@ public class TestRDBStore {
         Assert.assertNotNull(newvalue);
         //and it is not same as what we wrote to the FirstTable, and equals
         // the new value.
-        Assert.assertArrayEquals(nextValue, nextValue);
+        Assert.assertArrayEquals(nextValue, newvalue);
       }
     }
 
@@ -288,42 +288,6 @@ public class TestRDBStore {
     }
   }
 
-  /**
-   * Not strictly a unit test. Just a confirmation of the expected behavior
-   * of RocksDB keyMayExist API.
-   * Expected behavior - On average, keyMayExist latency < key.get() latency
-   * for invalid keys.
-   * @throws Exception if unable to read from RocksDB.
-   */
-  @Test
-  public void testRocksDBKeyMayExistApi() throws Exception {
-    try (RDBStore newStore =
-             new RDBStore(folder.newFolder(), options, configSet)) {
-      RocksDB db = newStore.getDb();
-
-      //Test with 50 invalid keys.
-      long start = System.nanoTime();
-      for (int i = 0; i < 50; i++) {
-        Assert.assertTrue(db.get(
-            org.apache.commons.codec.binary.StringUtils
-                .getBytesUtf16("key" + i)) == null);
-      }
-      long end = System.nanoTime();
-      long keyGetLatency = end - start;
-
-      start = System.nanoTime();
-      for (int i = 0; i < 50; i++) {
-        Assert.assertFalse(db.keyMayExist(
-            org.apache.commons.codec.binary.StringUtils
-                .getBytesUtf16("key" + i), null));
-      }
-      end = System.nanoTime();
-      long keyMayExistLatency = end - start;
-
-      Assert.assertTrue(keyMayExistLatency < keyGetLatency);
-    }
-  }
-
   @Test
   public void testGetDBUpdatesSince() throws Exception {
 
@@ -349,6 +313,30 @@ public class TestRDBStore {
   }
 
   @Test
+  public void testGetDBUpdatesSinceWithLimitCount() throws Exception {
+
+    try (RDBStore newStore =
+             new RDBStore(folder.newFolder(), options, configSet)) {
+
+      try (Table firstTable = newStore.getTable(families.get(1))) {
+        firstTable.put(
+            org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key1"),
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("Value1"));
+        firstTable.put(
+            org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("Value2"));
+      }
+      Assert.assertTrue(
+          newStore.getDb().getLatestSequenceNumber() == 2);
+
+      DBUpdatesWrapper dbUpdatesSince = newStore.getUpdatesSince(0, 1);
+      Assert.assertEquals(1, dbUpdatesSince.getData().size());
+    }
+  }
+
+  @Test
   public void testDowngrade() throws Exception {
 
     // Write data to current DB which has 6 column families at the time of
@@ -370,7 +358,7 @@ public class TestRDBStore {
     options.setCreateMissingColumnFamilies(true);
     configSet = new HashSet<>();
     List<String> familiesMinusOne = families.subList(0, families.size() - 1);
-    for(String name : familiesMinusOne) {
+    for (String name : familiesMinusOne) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
       configSet.add(newConfig);
     }

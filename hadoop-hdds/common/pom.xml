@@ -18,20 +18,25 @@
 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-hdds</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-hdds-common</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <artifactId>hdds-common</artifactId>
+  <version>1.3.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Common</description>
   <name>Apache Ozone HDDS Common</name>
   <packaging>jar</packaging>
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>info.picocli</groupId>
@@ -66,23 +71,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jackson-annotations</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-config</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-config</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.fusesource.leveldbjni</groupId>
-      <artifactId>leveldbjni-all</artifactId>
     </dependency>
 
     <dependency>
@@ -167,6 +167,21 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>io.jaegertracing</groupId>
       <artifactId>jaeger-client</artifactId>
     </dependency>
@@ -183,22 +198,34 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>snakeyaml</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.reflections</groupId>
+      <artifactId>reflections</artifactId>
+      <version>0.9.11</version>
+    </dependency>
+    <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-interface-client</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-interface-admin</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-admin</artifactId>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-all</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.codahale.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+      <version>3.0.2</version>
+      <scope>test</scope>
+      <!-- Needed for mocking RaftServerImpl -->
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>

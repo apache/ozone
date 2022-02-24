@@ -23,25 +23,33 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -59,6 +67,10 @@ import org.junit.rules.TemporaryFolder;
 public class TestKeyDeletingService {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager om;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestKeyDeletingService.class);
 
   private OzoneConfiguration createConfAndInitValues() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -77,6 +89,11 @@ public class TestKeyDeletingService {
     return conf;
   }
 
+  @After
+  public void cleanup() throws Exception {
+    om.stop();
+  }
+
   /**
    * In this test, we create a bunch of keys and delete them. Then we start the
    * KeyDeletingService and pass a SCMClient which does not fail. We make sure
@@ -88,14 +105,15 @@ public class TestKeyDeletingService {
 
   @Test(timeout = 30000)
   public void checkIfDeleteServiceisDeletingKeys()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(conf);
-    KeyManager keyManager =
-        new KeyManagerImpl(
-            new ScmBlockLocationTestingClient(null, null, 0),
-            metaMgr, conf, UUID.randomUUID().toString(), null);
-    keyManager.start(conf);
+    OmTestManagers omTestManagers
+        = new OmTestManagers(conf);
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
@@ -108,24 +126,40 @@ public class TestKeyDeletingService {
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), 0);
   }
 
-  @Test(timeout = 30000)
+  @Test(timeout = 40000)
   public void checkIfDeleteServiceWithFailingSCM()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(conf);
-    //failCallsFrequency = 1 , means all calls fail.
-    KeyManager keyManager =
-        new KeyManagerImpl(
-            new ScmBlockLocationTestingClient(null, null, 1),
-            metaMgr, conf, UUID.randomUUID().toString(), null);
-    keyManager.start(conf);
+    ScmBlockLocationProtocol blockClient =
+        //failCallsFrequency = 1 , means all calls fail.
+        new ScmBlockLocationTestingClient(null, null, 1);
+    OmTestManagers omTestManagers
+        = new OmTestManagers(conf, blockClient, null);
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 1);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    keyManager.start(conf);
-    Assert.assertEquals(
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            int numPendingDeletionKeys =
+                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
+            if (numPendingDeletionKeys != keyCount) {
+              LOG.info("Expected {} keys to be pending deletion, but got {}",
+                  keyCount, numPendingDeletionKeys);
+              return false;
+            }
+            return true;
+          } catch (IOException e) {
+            LOG.error("Error while getting pending deletion keys.", e);
+            return false;
+          }
+        }, 100, 2000);
     // Make sure that we have run the background thread 5 times more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 5,
@@ -138,20 +172,22 @@ public class TestKeyDeletingService {
 
   @Test(timeout = 30000)
   public void checkDeletionForEmptyKey()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
-    OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(conf);
-    //failCallsFrequency = 1 , means all calls fail.
-    KeyManager keyManager =
-        new KeyManagerImpl(
-            new ScmBlockLocationTestingClient(null, null, 1),
-            metaMgr, conf, UUID.randomUUID().toString(), null);
-    keyManager.start(conf);
+    ScmBlockLocationProtocol blockClient =
+        //failCallsFrequency = 1 , means all calls fail.
+        new ScmBlockLocationTestingClient(null, null, 1);
+    OmTestManagers omTestManagers
+        = new OmTestManagers(conf, blockClient, null);
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+
     final int keyCount = 100;
     createAndDeleteKeys(keyManager, keyCount, 0);
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
-    keyManager.start(conf);
 
     // Since empty keys are directly deleted from db there should be no
     // pending deletion keys. Also deletedKeyCount should be zero.
@@ -180,14 +216,14 @@ public class TestKeyDeletingService {
       // cheat here, just create a volume and bucket entry so that we can
       // create the keys, we put the same data for key and value since the
       // system does not decode the object
-      TestOMRequestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+      OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
           OmVolumeArgs.newBuilder()
               .setOwnerName("o")
               .setAdminName("a")
               .setVolume(volumeName)
               .build());
 
-      TestOMRequestUtils.addBucketToOM(keyManager.getMetadataManager(),
+      OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
           OmBucketInfo.newBuilder().setVolumeName(volumeName)
               .setBucketName(bucketName)
               .build());
@@ -198,16 +234,18 @@ public class TestKeyDeletingService {
               .setBucketName(bucketName)
               .setKeyName(keyName)
               .setAcls(Collections.emptyList())
+              .setReplicationConfig(new StandaloneReplicationConfig(
+                  HddsProtos.ReplicationFactor.ONE))
               .setLocationInfoList(new ArrayList<>())
               .build();
       //Open, Commit and Delete the Keys in the Key Manager.
-      OpenKeySession session = keyManager.openKey(arg);
+      OpenKeySession session = writeClient.openKey(arg);
       for (int i = 0; i < numBlocks; i++) {
         arg.addLocationInfo(
-            keyManager.allocateBlock(arg, session.getId(), new ExcludeList()));
+            writeClient.allocateBlock(arg, session.getId(), new ExcludeList()));
       }
-      keyManager.commitKey(arg, session.getId());
-      keyManager.deleteKey(arg);
+      writeClient.commitKey(arg, session.getId());
+      writeClient.deleteKey(arg);
     }
   }
 }

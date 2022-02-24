@@ -40,5 +40,13 @@ public @interface CleanupTableInfo {
    * during cleanup table cache.
    * @return list of table names.
    */
-  String[] cleanupTables();
+  String[] cleanupTables() default {};
+
+  /**
+   * If all tables are affected, like at update finalization, one can specify
+   * cleanupAll=true, instead of the list of all tables. In this case the
+   * cleanupTable property has to be defined as an empty array (the default).
+   * @return whether to cleanup all tables.
+   */
+  boolean cleanupAll() default false;
 }

@@ -25,4 +25,4 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Run scm roles
     ${output} =         Execute          ozone admin scm roles
-                        Should Match Regexp   ${output}  [scm:9865(:LEADER|)]
+                        Should Match Regexp   ${output}  [scm:9894(:LEADER|)]

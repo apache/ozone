@@ -19,22 +19,15 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
-
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 
 /**
  * Certificate client for OzoneManager.
  */
-public class OMCertificateClient extends DefaultCertificateClient {
+public class OMCertificateClient extends CommonCertificateClient {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMCertificateClient.class);
@@ -42,91 +35,23 @@ public class OMCertificateClient extends DefaultCertificateClient {
   public static final String COMPONENT_NAME = "om";
 
   public OMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
+      String certSerialId, String localCrlId) {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
+    this.setLocalCrlId(localCrlId != null ?
+        Long.parseLong(localCrlId) : 0);
+  }
+
+  public OMCertificateClient(SecurityConfig securityConfig,
+      String certSerialId) {
+    this(securityConfig, certSerialId, null);
   }
 
   public OMCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME);
+    this(securityConfig, null, null);
   }
-
-  @Override
-  protected InitResponse handleCase(InitCase init) throws
-      CertificateException {
-    switch (init) {
-    case NONE:
-      LOG.info("Creating keypair for client as keypair and certificate not " +
-          "found.");
-      bootstrapClientKeys();
-      return GETCERT;
-    case CERT:
-      LOG.error("Private key not found, while certificate is still present." +
-          "Delete keypair and try again.");
-      return FAILURE;
-    case PUBLIC_KEY:
-      LOG.error("Found public key but private key and certificate missing.");
-      return FAILURE;
-    case PRIVATE_KEY:
-      LOG.info("Found private key but public key and certificate is missing.");
-      // TODO: Recovering public key from private might be possible in some
-      //  cases.
-      return FAILURE;
-    case PUBLICKEY_CERT:
-      LOG.error("Found public key and certificate but private key is " +
-          "missing.");
-      return FAILURE;
-    case PRIVATEKEY_CERT:
-      LOG.info("Found private key and certificate but public key missing.");
-      if (recoverPublicKey()) {
-        return SUCCESS;
-      } else {
-        LOG.error("Public key recovery failed.");
-        return FAILURE;
-      }
-    case PUBLICKEY_PRIVATEKEY:
-      LOG.info("Found private and public key but certificate is missing.");
-      if (validateKeyPair(getPublicKey())) {
-        return RECOVER;
-      } else {
-        LOG.error("Keypair validation failed.");
-        return FAILURE;
-      }
-    case ALL:
-      LOG.info("Found certificate file along with KeyPair.");
-      if (validateKeyPairAndCertificate()) {
-        return SUCCESS;
-      } else {
-        return FAILURE;
-      }
-    default:
-      LOG.error("Unexpected case: {} (private/public/cert)",
-          Integer.toBinaryString(init.ordinal()));
-      return FAILURE;
-    }
-  }
-
-  /**
-   * Returns a CSR builder that can be used to creates a Certificate signing
-   * request.
-   *
-   * @return CertificateSignRequest.Builder
-   */
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
-    return super.getCSRBuilder()
-        .setDigitalEncryption(true)
-        .setDigitalSignature(true);
-  }
-
 
   @Override
   public Logger getLogger() {
     return LOG;
-  }
-
-  @Override
-  public String getComponentName() {
-    return COMPONENT_NAME;
   }
 }

@@ -24,6 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+/**
+ * Utilities for buffers.
+ */
 public final class BufferUtils {
 
   /** Utility classes should not be constructed. **/

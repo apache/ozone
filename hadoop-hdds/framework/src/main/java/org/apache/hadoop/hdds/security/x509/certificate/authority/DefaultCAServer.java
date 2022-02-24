@@ -228,7 +228,7 @@ public class DefaultCAServer implements CertificateServer {
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
 
-    if(xcertHolder.isCompletedExceptionally()) {
+    if (xcertHolder.isCompletedExceptionally()) {
       // This means that approver told us there are things which it disagrees
       // with in this Certificate Request. Since the first set of sanity
       // checks failed, we just return the future object right here.
@@ -301,8 +301,7 @@ public class DefaultCAServer implements CertificateServer {
   public Future<Optional<Long>> revokeCertificates(
       List<BigInteger> certificates,
       CRLReason reason,
-      Date revocationTime,
-      SecurityConfig securityConfig) {
+      Date revocationTime) {
     CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
     if (CollectionUtils.isEmpty(certificates)) {
       revoked.completeExceptionally(new SCMSecurityException(
@@ -325,7 +324,7 @@ public class DefaultCAServer implements CertificateServer {
   public List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException {
     return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
-        isRevoked? CertificateStore.CertType.REVOKED_CERTS :
+        isRevoked ? CertificateStore.CertType.REVOKED_CERTS :
             CertificateStore.CertType.VALID_CERTS);
   }
 
@@ -555,7 +554,7 @@ public class DefaultCAServer implements CertificateServer {
       OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
           ip -> {
             builder.addIpAddress(ip.getHostAddress());
-            if(validator.isValid(ip.getCanonicalHostName())) {
+            if (validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
             }
           });

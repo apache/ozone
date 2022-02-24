@@ -16,14 +16,19 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -33,7 +38,8 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -49,9 +55,12 @@ public class TestNodeReportHandler implements EventPublisher {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestNodeReportHandler.class);
   private NodeReportHandler nodeReportHandler;
+  private HDDSLayoutVersionManager versionManager;
   private SCMNodeManager nodeManager;
   private String storagePath = GenericTestUtils.getRandomizedTempPath()
-      .concat("/" + UUID.randomUUID().toString());
+      .concat("/data-" + UUID.randomUUID().toString());
+  private String metaStoragePath = GenericTestUtils.getRandomizedTempPath()
+      .concat("/metadata-" + UUID.randomUUID().toString());
 
   @Before
   public void resetEventCollector() throws IOException {
@@ -59,31 +68,43 @@ public class TestNodeReportHandler implements EventPublisher {
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    nodeManager = new SCMNodeManager(conf, storageConfig,
-        new EventQueue(), clusterMap, SCMContext.emptyContext());
+
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    nodeManager =
+        new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,
+            SCMContext.emptyContext(), versionManager);
     nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 
   @Test
   public void testNodeReport() throws IOException {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-    StorageReportProto storageOne = TestUtils
+    StorageReportProto storageOne = HddsTestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
+    MetadataStorageReportProto metaStorageOne = HddsTestUtils
+        .createMetadataStorageReport(metaStoragePath, 100, 10, 90, null);
 
     SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
     Assert.assertNull(nodeMetric);
 
-    nodeManager.register(dn, getNodeReport(dn, storageOne).getReport(), null);
+    nodeManager.register(dn, getNodeReport(dn, Arrays.asList(storageOne),
+        Arrays.asList(metaStorageOne)).getReport(), null);
     nodeMetric = nodeManager.getNodeStat(dn);
 
     Assert.assertTrue(nodeMetric.get().getCapacity().get() == 100);
     Assert.assertTrue(nodeMetric.get().getRemaining().get() == 90);
     Assert.assertTrue(nodeMetric.get().getScmUsed().get() == 10);
 
-    StorageReportProto storageTwo = TestUtils
+    StorageReportProto storageTwo = HddsTestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
     nodeReportHandler.onMessage(
-        getNodeReport(dn, storageOne, storageTwo), this);
+        getNodeReport(dn, Arrays.asList(storageOne, storageTwo),
+            Arrays.asList(metaStorageOne)), this);
     nodeMetric = nodeManager.getNodeStat(dn);
 
     Assert.assertTrue(nodeMetric.get().getCapacity().get() == 200);
@@ -93,8 +114,10 @@ public class TestNodeReportHandler implements EventPublisher {
   }
 
   private NodeReportFromDatanode getNodeReport(DatanodeDetails dn,
-      StorageReportProto... reports) {
-    NodeReportProto nodeReportProto = TestUtils.createNodeReport(reports);
+      List<StorageReportProto> reports,
+      List<MetadataStorageReportProto> metaReports) {
+    NodeReportProto nodeReportProto =
+        HddsTestUtils.createNodeReport(reports, metaReports);
     return new NodeReportFromDatanode(dn, nodeReportProto);
   }
 

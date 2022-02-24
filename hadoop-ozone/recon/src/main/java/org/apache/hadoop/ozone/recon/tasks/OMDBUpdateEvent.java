@@ -83,6 +83,7 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
     }
     OMDBUpdateEvent that = (OMDBUpdateEvent) o;
     return this.updatedKey.equals(that.updatedKey) &&
+        this.table.equals(that.table) &&
         this.action.equals(that.action);
   }
 

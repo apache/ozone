@@ -68,6 +68,16 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
       throws IOException;
 
+  /**
+   * Add container to pipeline during SCM Start.
+   *
+   * @param pipelineID ID of the pipeline to which container is added.
+   * @param containerID ID of the container which is added to the pipeline.
+   * @throws IOException in case of any Exception
+   */
+  void addContainerToPipelineSCMStart(PipelineID pipelineID,
+      ContainerID containerID) throws IOException;
+
   void removeContainerFromPipeline(PipelineID pipelineID,
       ContainerID containerID) throws IOException;
 
@@ -132,4 +142,34 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    */
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
+
+  /**
+   * Ask pipeline manager to not create any new pipelines.
+   */
+  void freezePipelineCreation();
+
+  /**
+   * Ask pipeline manager to resume creating new pipelines.
+   */
+  void resumePipelineCreation();
+
+  /**
+   * Acquire read lock.
+   */
+  void acquireReadLock();
+
+  /**
+   * Release read lock.
+   */
+  void releaseReadLock();
+
+  /**
+   * Acquire write lock.
+   */
+  void acquireWriteLock();
+
+  /**
+   * Release write lock.
+   */
+  void releaseWriteLock();
 }

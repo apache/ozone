@@ -156,6 +156,10 @@ public class ObjectStore {
     return proxy.getS3Secret(kerberosID);
   }
 
+  public void revokeS3Secret(String kerberosID) throws IOException {
+    proxy.revokeS3Secret(kerberosID);
+  }
+
   /**
    * Returns Iterator to iterate over all the volumes in object store.
    * The result can be restricted using volume prefix, will return all
@@ -203,7 +207,7 @@ public class ObjectStore {
   public Iterator<? extends OzoneVolume> listVolumesByUser(String user,
       String volumePrefix, String prevVolume)
       throws IOException {
-    if(Strings.isNullOrEmpty(user)) {
+    if (Strings.isNullOrEmpty(user)) {
       user = UserGroupInformation.getCurrentUser().getUserName();
     }
     return new VolumeIterator(user, volumePrefix, prevVolume);
@@ -265,7 +269,7 @@ public class ObjectStore {
 
     @Override
     public OzoneVolume next() {
-      if(hasNext()) {
+      if (hasNext()) {
         currentValue = currentIterator.next();
         return currentValue;
       }
@@ -280,7 +284,7 @@ public class ObjectStore {
     private List<OzoneVolume> getNextListOfVolumes(String prevVolume) {
       try {
         //if user is null, we do list of all volumes.
-        if(user != null) {
+        if (user != null) {
           return proxy.listVolumes(user, volPrefix, prevVolume, listCacheSize);
         }
         return proxy.listVolumes(volPrefix, prevVolume, listCacheSize);

@@ -26,16 +26,19 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
-import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -57,8 +60,6 @@ import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.SCM_NOT_INITIALIZED;
-
 /**
  * The SCMStateMachine is the state machine for SCMRatisServer. It is
  * responsible for applying ratis committed transactions to
@@ -76,21 +77,25 @@ public class SCMStateMachine extends BaseStateMachine {
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
+  // The atomic variable RaftServerImpl#inProgressInstallSnapshotRequest
+  // ensures serializable between notifyInstallSnapshotFromLeader()
+  // and reinitialize().
+  private DBCheckpoint installingDBCheckpoint = null;
+
+  private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
+  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean(false);
+
   public SCMStateMachine(final StorageContainerManager scm,
-      final SCMRatisServer ratisServer, SCMHADBTransactionBuffer buffer)
-      throws SCMException {
+      SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
-    if (!latestTrxInfo.isDefault() &&
-        !updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
-            latestTrxInfo.getTransactionIndex())) {
-      throw new SCMException(
-          String.format("Failed to update LastAppliedTermIndex " +
-                  "in StateMachine to term:{} index:{}",
-              latestTrxInfo.getTerm(), latestTrxInfo.getTransactionIndex()
-          ), SCM_NOT_INITIALIZED);
+    if (!latestTrxInfo.isDefault()) {
+      updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
+          latestTrxInfo.getTransactionIndex());
+      LOG.info("Updated lastAppliedTermIndex {} with transactionInfo term and" +
+          "Index", latestTrxInfo);
     }
     this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
     isInitialized = true;
@@ -132,6 +137,12 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
       applyTransactionFuture.complete(process(request));
+
+      // After previous term transactions are applied, still in safe mode,
+      // perform refreshAndValidate to update the safemode rule state.
+      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
+        scm.getScmSafeModeManager().refreshAndValidate();
+      }
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.builder()
           .setCurrentTerm(trx.getLogEntry().getTerm())
           .setTransactionIndex(trx.getLogEntry().getIndex())
@@ -162,6 +173,13 @@ public class SCMStateMachine extends BaseStateMachine {
       final Exception targetEx = (Exception) e.getTargetException();
       throw targetEx != null ? targetEx : e;
     }
+  }
+
+  @Override
+  public void notifyLogFailed(Throwable ex,
+      RaftProtos.LogEntryProto failedEntry) {
+    LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
+    ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
   }
 
   @Override
@@ -202,7 +220,23 @@ public class SCMStateMachine extends BaseStateMachine {
         + "term index: {}", leaderAddress, firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
-        () -> scm.getScmHAManager().installSnapshotFromLeader(leaderNodeId),
+        () -> {
+          DBCheckpoint checkpoint =
+              scm.getScmHAManager().downloadCheckpointFromLeader(leaderNodeId);
+
+          if (checkpoint == null) {
+            return null;
+          }
+
+          TermIndex termIndex =
+              scm.getScmHAManager().verifyCheckpointFromLeader(
+                  leaderNodeId, checkpoint);
+
+          if (termIndex != null) {
+            setInstallingDBCheckpoint(checkpoint);
+          }
+          return termIndex;
+        },
         installSnapshotExecutor);
     return future;
   }
@@ -213,29 +247,26 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
+
+    currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
+        .getInfo().getCurrentTerm());
+
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
       LOG.info("leader changed, yet current SCM is still follower.");
       return;
     }
 
-    long term = scm.getScmHAManager()
-        .getRatisServer()
-        .getDivision()
-        .getInfo()
-        .getCurrentTerm();
+    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
 
-    LOG.info("current SCM becomes leader of term {}.", term);
-
-    scm.getScmContext().updateLeaderAndTerm(true, term);
-    scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getScmContext().updateLeaderAndTerm(true,
+        currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
     Preconditions.checkArgument(
-        deletedBlockLog instanceof DeletedBlockLogImplV2);
-    ((DeletedBlockLogImplV2) deletedBlockLog).onBecomeLeader();
-
+        deletedBlockLog instanceof DeletedBlockLogImpl);
+    ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
     scm.getScmDecommissionManager().onBecomeLeader();
   }
 
@@ -270,17 +301,48 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyTermIndexUpdated(long term, long index) {
-    if (transactionBuffer != null) {
-      transactionBuffer.updateLatestTrxInfo(
-          TransactionInfo.builder().setCurrentTerm(term)
-              .setTransactionIndex(index).build());
-    }
+
     // We need to call updateLastApplied here because now in ratis when a
     // node becomes leader, it is checking stateMachineIndex >=
     // placeHolderIndex (when a node becomes leader, it writes a conf entry
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastAppliedTermIndex(term, index);
+
+    // Skip below part if state machine is not initialized.
+
+    if (!isInitialized) {
+      return;
+    }
+
+    if (transactionBuffer != null) {
+      transactionBuffer.updateLatestTrxInfo(
+          TransactionInfo.builder().setCurrentTerm(term)
+              .setTransactionIndex(index).build());
+    }
+
+    if (currentLeaderTerm.get() == term) {
+      // On leader SCM once after it is ready, notify SCM services and also set
+      // leader ready  in SCMContext.
+      if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
+          .isLeaderReady()) {
+        scm.getScmContext().setLeaderReady();
+        scm.getSCMServiceManager().notifyStatusChanged();
+      }
+
+      // Means all transactions before this term have been applied.
+      // This means after a restart, all pending transactions have been applied.
+      // Perform
+      // 1. Refresh Safemode rules state.
+      // 2. Start DN Rpc server.
+      if (!refreshedAfterLeaderReady.get()) {
+        scm.getScmSafeModeManager().refresh();
+        scm.getDatanodeProtocolServer().start();
+
+        refreshedAfterLeaderReady.set(true);
+      }
+      currentLeaderTerm.set(-1L);
+    }
   }
 
   @Override
@@ -295,11 +357,32 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void reinitialize() {
-    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
-      getLifeCycle().transition(LifeCycle.State.STARTING);
-      getLifeCycle().transition(LifeCycle.State.RUNNING);
+  public void reinitialize() throws IOException {
+    Preconditions.checkNotNull(installingDBCheckpoint);
+    DBCheckpoint checkpoint = installingDBCheckpoint;
+
+    // explicitly set installingDBCheckpoint to be null
+    installingDBCheckpoint = null;
+
+    TermIndex termIndex = null;
+    try {
+      termIndex =
+          scm.getScmHAManager().installCheckpoint(checkpoint);
+    } catch (Exception e) {
+      LOG.error("Failed to reinitialize SCMStateMachine.", e);
+      throw new IOException(e);
     }
+
+    // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
+    try {
+      transactionBuffer.init();
+      this.setLastAppliedTermIndex(termIndex);
+    } catch (IOException ioe) {
+      LOG.error("Failed to unpause ", ioe);
+    }
+
+    getLifeCycle().transition(LifeCycle.State.STARTING);
+    getLifeCycle().transition(LifeCycle.State.RUNNING);
   }
 
   @Override
@@ -312,21 +395,10 @@ public class SCMStateMachine extends BaseStateMachine {
     HadoopExecutors.
         shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }
-  /**
-   * Unpause the StateMachine, re-initialize the DoubleBuffer and update the
-   * lastAppliedIndex. This should be done after uploading new state to the
-   * StateMachine.
-   */
-  public void unpause(long newLastAppliedSnapShotTerm,
-      long newLastAppliedSnapshotIndex) {
-    getLifeCycle().startAndTransition(() -> {
-      try {
-        transactionBuffer.init();
-        this.setLastAppliedTermIndex(TermIndex
-            .valueOf(newLastAppliedSnapShotTerm, newLastAppliedSnapshotIndex));
-      } catch (IOException ioe) {
-        LOG.error("Failed to unpause ", ioe);
-      }
-    });
+
+  @VisibleForTesting
+  public void setInstallingDBCheckpoint(DBCheckpoint checkpoint) {
+    Preconditions.checkArgument(installingDBCheckpoint == null);
+    installingDBCheckpoint = checkpoint;
   }
 }

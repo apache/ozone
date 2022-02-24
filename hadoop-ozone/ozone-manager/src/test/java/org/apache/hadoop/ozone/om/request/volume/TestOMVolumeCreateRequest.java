@@ -23,13 +23,13 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -84,7 +84,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
       Assert.assertEquals(expectedObjId, respone.getOmVolumeArgs()
           .getObjectID());
       Assert.assertEquals(txLogIndex, respone.getOmVolumeArgs().getUpdateID());
-    } catch (IllegalArgumentException ex){
+    } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("should be greater than zero",
           ex);
     }
@@ -183,7 +183,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String adminName = "user1";
     String ownerName = "user1";
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
         ownerName);

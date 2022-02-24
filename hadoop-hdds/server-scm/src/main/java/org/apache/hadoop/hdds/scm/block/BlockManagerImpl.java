@@ -31,12 +31,9 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -44,6 +41,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -69,7 +67,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private final StorageContainerManager scm;
   private final PipelineManager pipelineManager;
-  private final ContainerManagerV2 containerManager;
+  private final WritableContainerFactory writableContainerFactory;
 
   private final long containerSize;
 
@@ -77,9 +75,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private final SCMBlockDeletingService blockDeletingService;
 
   private ObjectName mxBean;
-  private final PipelineChoosePolicy pipelineChoosePolicy;
   private final SequenceIdGenerator sequenceIdGen;
-
+  private ScmBlockDeletingServiceMetrics metrics;
   /**
    * Constructor.
    *
@@ -93,24 +90,25 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.scm = scm;
     this.pipelineManager = scm.getPipelineManager();
-    this.containerManager = scm.getContainerManager();
-    this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
     this.sequenceIdGen = scm.getSequenceIdGen();
     this.containerSize = (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    this.writableContainerFactory = scm.getWritableContainerFactory();
 
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
+    metrics = ScmBlockDeletingServiceMetrics.create();
 
     // SCM block deleting transaction log and deleting service.
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm.getContainerManager(),
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scm.getScmHAManager().getDBTransactionBuffer(),
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     Duration svcInterval = conf.getObject(
             ScmConfig.class).getBlockDeletionInterval();
     long serviceTimeout =
@@ -119,9 +117,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
     blockDeletingService =
-        new SCMBlockDeletingService(deletedBlockLog, containerManager,
+        new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
-            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf);
+            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf,
+            metrics);
   }
 
   /**
@@ -174,89 +173,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
           INVALID_BLOCK_SIZE);
     }
 
-    /*
-      Here is the high level logic.
+    ContainerInfo containerInfo = writableContainerFactory.getContainer(
+        size, replicationConfig, owner, excludeList);
 
-      1. We try to find pipelines in open state.
-
-      2. If there are no pipelines in OPEN state, then we try to create one.
-
-      3. We allocate a block from the available containers in the selected
-      pipeline.
-
-      TODO : #CLUTIL Support random picking of two containers from the list.
-      So we can use different kind of policies.
-    */
-
-    ContainerInfo containerInfo;
-
-    //TODO we need to continue the refactor to use ReplicationConfig everywhere
-    //in downstream managers.
-
-    while (true) {
-      List<Pipeline> availablePipelines =
-          pipelineManager
-              .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN,
-                  excludeList.getDatanodes(), excludeList.getPipelineIds());
-      Pipeline pipeline = null;
-      if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-        // if no pipelines can be found, try finding pipeline without
-        // exclusion
-        availablePipelines = pipelineManager
-            .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
-      }
-      if (availablePipelines.size() == 0) {
-        try {
-          // TODO: #CLUTIL Remove creation logic when all replication types and
-          // factors are handled by pipeline creator
-          pipeline = pipelineManager.createPipeline(replicationConfig);
-
-          // wait until pipeline is ready
-          pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-        } catch (SCMException se) {
-          LOG.warn("Pipeline creation failed for replicationConfig {} " +
-              "Datanodes may be used up.", replicationConfig, se);
-          break;
-        } catch (IOException e) {
-          LOG.warn("Pipeline creation failed for replicationConfig: {}. "
-              + "Retrying get pipelines call once.", replicationConfig, e);
-          availablePipelines = pipelineManager
-              .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN,
-                  excludeList.getDatanodes(), excludeList.getPipelineIds());
-          if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
-            // if no pipelines can be found, try finding pipeline without
-            // exclusion
-            availablePipelines = pipelineManager
-                .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
-          }
-          if (availablePipelines.size() == 0) {
-            LOG.info(
-                "Could not find available pipeline of replicationConfig: {} "
-                    + "even after retrying",
-                replicationConfig);
-            break;
-          }
-        }
-      }
-
-      if (null == pipeline) {
-        PipelineRequestInformation pri =
-            PipelineRequestInformation.Builder.getBuilder()
-                .setSize(size)
-                .build();
-        pipeline = pipelineChoosePolicy.choosePipeline(
-            availablePipelines, pri);
-      }
-
-      // look for OPEN containers that match the criteria.
-      containerInfo = containerManager.getMatchingContainer(size, owner,
-          pipeline, excludeList.getContainerIds());
-
-      if (containerInfo != null) {
-        return newBlock(containerInfo);
-      }
+    if (containerInfo != null) {
+      return newBlock(containerInfo);
     }
-
     // we have tried all strategies we know and but somehow we are not able
     // to get a container for this block. Log that info and return a null.
     LOG.error(
@@ -359,6 +281,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       deletedBlockLog.close();
     }
     blockDeletingService.shutdown();
+    if (metrics != null) {
+      ScmBlockDeletingServiceMetrics.unRegister();
+      metrics = null;
+    }
     if (mxBean != null) {
       MBeans.unregister(mxBean);
       mxBean = null;
@@ -386,8 +312,4 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public static Logger getLogger() {
     return LOG;
   }
-
-  /**
-   * This class uses system current time milliseconds to generate unique id.
-   */
 }

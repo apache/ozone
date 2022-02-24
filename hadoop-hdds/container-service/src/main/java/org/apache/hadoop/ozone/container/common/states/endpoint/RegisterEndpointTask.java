@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
@@ -23,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
 import org.apache.hadoop.hdds.protocol.proto
@@ -31,6 +34,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
@@ -54,6 +59,7 @@ public final class RegisterEndpointTask implements
   private DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
   private StateContext stateContext;
+  private HDDSLayoutVersionManager layoutVersionManager;
 
   /**
    * Creates a register endpoint task.
@@ -61,16 +67,40 @@ public final class RegisterEndpointTask implements
    * @param rpcEndPoint - endpoint
    * @param conf - conf
    * @param ozoneContainer - container
+   * @param context - State context
+   */
+  @VisibleForTesting
+  public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
+                              ConfigurationSource conf,
+                              OzoneContainer ozoneContainer,
+                              StateContext context) {
+    this(rpcEndPoint, conf, ozoneContainer, context,
+        context.getParent().getLayoutVersionManager());
+  }
+
+  /**
+   * Creates a register endpoint task.
+   *
+   * @param rpcEndPoint - endpoint
+   * @param conf - conf
+   * @param ozoneContainer - container
+   * @param context - State context
+   * @param versionManager - layout version Manager
    */
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
       ConfigurationSource conf, OzoneContainer ozoneContainer,
-      StateContext context) {
+      StateContext context, HDDSLayoutVersionManager versionManager) {
     this.rpcEndPoint = rpcEndPoint;
     this.conf = conf;
     this.datanodeContainerManager = ozoneContainer;
     this.stateContext = context;
-
+    if (versionManager != null) {
+      this.layoutVersionManager = versionManager;
+    } else {
+      this.layoutVersionManager =
+          context.getParent().getLayoutVersionManager();
+    }
   }
 
   /**
@@ -112,6 +142,12 @@ public final class RegisterEndpointTask implements
 
       if (rpcEndPoint.getState()
           .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
+        LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+            .setMetadataLayoutVersion(
+                layoutVersionManager.getMetadataLayoutVersion())
+            .setSoftwareLayoutVersion(
+                layoutVersionManager.getSoftwareLayoutVersion())
+            .build();
         ContainerReportsProto containerReport =
             datanodeContainerManager.getController().getContainerReport();
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
@@ -120,12 +156,14 @@ public final class RegisterEndpointTask implements
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
             .register(datanodeDetails.getExtendedProtoBufMessage(),
-                nodeReport, containerReport, pipelineReportsProto);
+            nodeReport, containerReport, pipelineReportsProto, layoutInfo);
         Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
                 .equals(datanodeDetails.getUuid()),
             "Unexpected datanode ID in the response.");
         Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
+        Preconditions.checkState(response.getErrorCode() == success,
+            "DataNode has higher Software Layout Version than SCM.");
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());
           datanodeDetails.setIpAddress(response.getIpAddress());
@@ -167,6 +205,7 @@ public final class RegisterEndpointTask implements
     private DatanodeDetails datanodeDetails;
     private OzoneContainer container;
     private StateContext context;
+    private HDDSLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -193,6 +232,17 @@ public final class RegisterEndpointTask implements
      */
     public Builder setConfig(ConfigurationSource config) {
       this.conf = config;
+      return this;
+    }
+
+    /**
+     * Sets the LayoutVersionManager.
+     *
+     * @param versionMgr - config
+     * @return Builder.
+     */
+    public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {
+      this.versionManager = lvm;
       return this;
     }
 
@@ -238,7 +288,7 @@ public final class RegisterEndpointTask implements
 
       if (datanodeDetails == null) {
         LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A vaild Node ID is needed to " +
+        throw new IllegalArgumentException("A valid Node ID is needed to " +
             "construct RegisterEndpoint task");
       }
 
@@ -255,10 +305,10 @@ public final class RegisterEndpointTask implements
       }
 
       RegisterEndpointTask task = new RegisterEndpointTask(this
-          .endPointStateMachine, this.conf, this.container, this.context);
+          .endPointStateMachine, this.conf, this.container, this.context,
+          this.versionManager);
       task.setDatanodeDetails(datanodeDetails);
       return task;
     }
-
   }
 }

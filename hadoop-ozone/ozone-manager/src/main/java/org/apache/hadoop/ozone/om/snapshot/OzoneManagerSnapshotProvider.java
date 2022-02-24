@@ -26,7 +26,6 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -37,7 +36,7 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
@@ -72,15 +71,13 @@ public class OzoneManagerSnapshotProvider {
   private static final String OM_SNAPSHOT_DB = "om.snapshot.db";
 
   public OzoneManagerSnapshotProvider(MutableConfigurationSource conf,
-      File omRatisSnapshotDir, List<OMNodeDetails> peerNodes) {
+      File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
 
     LOG.info("Initializing OM Snapshot Provider");
     this.omSnapshotDir = omRatisSnapshotDir;
 
     this.peerNodesMap = new HashMap<>();
-    for (OMNodeDetails peerNode : peerNodes) {
-      this.peerNodesMap.put(peerNode.getNodeId(), peerNode);
-    }
+    peerNodesMap.putAll(peerNodeDetails);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
@@ -120,7 +117,7 @@ public class OzoneManagerSnapshotProvider {
     File targetFile = new File(snapshotFileName + ".tar.gz");
 
     String omCheckpointUrl = peerNodesMap.get(leaderOMNodeID)
-        .getOMDBCheckpointEnpointUrl(httpPolicy);
+        .getOMDBCheckpointEnpointUrl(httpPolicy.isHttpEnabled());
 
     LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
         "URL: {}", leaderOMNodeID, omCheckpointUrl);
@@ -158,5 +155,19 @@ public class OzoneManagerSnapshotProvider {
     if (connectionFactory != null) {
       connectionFactory.destroy();
     }
+  }
+
+  /**
+   * When a new OM is bootstrapped, add it to the peerNode map.
+   */
+  public void addNewPeerNode(OMNodeDetails newOMNode) {
+    peerNodesMap.put(newOMNode.getNodeId(), newOMNode);
+  }
+
+  /**
+   * When an OM is decommissioned, remove it from the peerNode map.
+   */
+  public void removeDecommissionedPeerNode(String decommNodeId) {
+    peerNodesMap.remove(decommNodeId);
   }
 }

@@ -97,7 +97,9 @@ public class RunningDatanodeState implements DatanodeState {
           endPointTask = HeartbeatEndpointTask.newBuilder()
               .setConfig(conf)
               .setEndpointStateMachine(endpoint)
-              .setDatanodeDetails(context.getParent().getDatanodeDetails())
+              .setDatanodeDetails(context
+                  .getParent()
+                  .getDatanodeDetails())
               .setContext(context)
               .build();
           break;
@@ -150,8 +152,8 @@ public class RunningDatanodeState implements DatanodeState {
       } else {
         // This can happen if a task is taking more time than the timeOut
         // specified for the task in await, and when it is completed the task
-        // has set the state to Shutdown, we may see the state as shutdown
-        // here. So, we need to Shutdown DatanodeStateMachine.
+        // has set the state to shut down, we may see the state as shutdown
+        // here. So, we need to shut down DatanodeStateMachine.
         LOG.error("State is Shutdown in RunningDatanodeState");
         context.setState(DatanodeStateMachine.DatanodeStates.SHUTDOWN);
       }

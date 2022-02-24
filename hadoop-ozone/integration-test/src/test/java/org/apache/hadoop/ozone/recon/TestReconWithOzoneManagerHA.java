@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -27,20 +27,21 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -53,9 +54,9 @@ import org.junit.rules.Timeout;
  */
 public class TestReconWithOzoneManagerHA {
   @Rule
-  public Timeout timeout = Timeout.seconds(300);;
+  public Timeout timeout = Timeout.seconds(300);
 
-  private MiniOzoneOMHAClusterImpl cluster;
+  private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
   private static final String OM_SERVICE_ID = "omService1";
   private static final String VOL_NAME = "testrecon";
@@ -64,13 +65,14 @@ public class TestReconWithOzoneManagerHA {
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, Boolean.TRUE.toString());
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
 
     // Sync to disk enabled
     RocksDBConfiguration dbConf = conf.getObject(RocksDBConfiguration.class);
     dbConf.setSyncOption(true);
     conf.setFromObject(dbConf);
 
-    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(OM_SERVICE_ID)
@@ -114,7 +116,7 @@ public class TestReconWithOzoneManagerHA {
     String expectedUrl = "http://" +
         (hostname.equals("0.0.0.0") ? "localhost" : hostname) + ":" +
         ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
-        OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
     Assert.assertEquals("OM Snapshot should be requested from the leader.",
         expectedUrl, snapshotUrl);
@@ -130,10 +132,10 @@ public class TestReconWithOzoneManagerHA {
     // Sync data to Recon
     impl.syncDataFromOM();
 
-    ContainerDBServiceProvider containerDBServiceProvider =
-        cluster.getReconServer().getContainerDBServiceProvider();
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        cluster.getReconServer().getReconContainerMetadataManager();
     TableIterator iterator =
-        containerDBServiceProvider.getContainerTableIterator();
+        reconContainerMetadataManager.getContainerTableIterator();
     String reconKeyPrefix = null;
     while (iterator.hasNext()) {
       Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =

@@ -19,7 +19,11 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -37,7 +41,11 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -55,7 +63,7 @@ public class SimpleMockNodeManager implements NodeManager {
   public void register(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status));
+    nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status, null));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {
@@ -78,7 +86,7 @@ public class SimpleMockNodeManager implements NodeManager {
    */
   public void setPipelines(DatanodeDetails dd, int count) {
     Set<PipelineID> pipelines = new HashSet<>();
-    for (int i=0; i<count; i++) {
+    for (int i = 0; i < count; i++) {
       pipelines.add(PipelineID.randomId());
     }
     pipelineMap.put(dd.getUuid(), pipelines);
@@ -105,13 +113,15 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void setNodeOperationalState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+                                      NodeOperationalState newState)
+      throws NodeNotFoundException {
     setNodeOperationalState(dn, newState, 0);
   }
 
   @Override
   public void setNodeOperationalState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
+                                      NodeOperationalState newState,
+                                      long opStateExpiryEpocSec)
       throws NodeNotFoundException {
     DatanodeInfo dni = nodeMap.get(dn.getUuid());
     if (dni == null) {
@@ -148,7 +158,8 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void setContainers(DatanodeDetails dn,
-      Set<ContainerID> containerIds) throws NodeNotFoundException {
+                            Set<ContainerID> containerIds)
+      throws NodeNotFoundException {
     containerMap.put(dn.getUuid(), containerIds);
   }
 
@@ -182,7 +193,7 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public List<DatanodeDetails> getNodes(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState health) {
+      NodeOperationalState opState, HddsProtos.NodeState health) {
     return null;
   }
 
@@ -192,7 +203,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public int getNodeCount(HddsProtos.NodeOperationalState opState,
+  public int getNodeCount(NodeOperationalState opState,
                           HddsProtos.NodeState health) {
     return 0;
   }
@@ -227,6 +238,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
+    return null;
+  }
+
+  @Override
   public SCMNodeMetric getNodeStat(DatanodeDetails datanodeDetails) {
     return null;
   }
@@ -241,7 +257,8 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void addContainer(DatanodeDetails datanodeDetails,
-      ContainerID containerId) throws NodeNotFoundException {
+                           ContainerID containerId)
+      throws NodeNotFoundException {
   }
 
 
@@ -252,7 +269,12 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void processNodeReport(DatanodeDetails datanodeDetails,
-      StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport) {
+                                NodeReportProto nodeReport) {
+  }
+
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails datanodeDetails,
+                                         LayoutVersionProto layoutReport) {
   }
 
   @Override
@@ -319,14 +341,15 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
-      StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport,
-      StorageContainerDatanodeProtocolProtos.PipelineReportsProto
-      pipelineReport) {
+                                    NodeReportProto nodeReport,
+                                    PipelineReportsProto pipelineReport,
+                                    LayoutVersionProto layoutreport) {
     return null;
   }
 
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                           LayoutVersionProto layoutInfo) {
     return null;
   }
 

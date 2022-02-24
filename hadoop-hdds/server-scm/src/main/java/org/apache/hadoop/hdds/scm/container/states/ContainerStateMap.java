@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.Collections;
 import java.util.Map;
@@ -27,12 +28,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
  * replication pipeline they want to use. Each Container exists on top of a
  * pipeline, so we need to get ReplicationType that is specified by the user.
  * <p>
- * 4. ReplicationFactor - The replication factor represents how many copies
+ * 4. ReplicationConfig - The replication config represents how many copies
  * of data should be made, right now we support 2 different types, ONE
  * Replica and THREE Replica. User can specify how many copies should be made
  * for a ozone key.
@@ -84,7 +85,7 @@ public class ContainerStateMap {
 
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
   private final ContainerAttribute<String> ownerMap;
-  private final ContainerAttribute<ReplicationFactor> factorMap;
+  private final ContainerAttribute<ReplicationConfig> repConfigMap;
   private final ContainerAttribute<ReplicationType> typeMap;
   private final Map<ContainerID, ContainerInfo> containerMap;
   private final Map<ContainerID, Set<ContainerReplica>> replicaMap;
@@ -96,7 +97,7 @@ public class ContainerStateMap {
   public ContainerStateMap() {
     this.lifeCycleStateMap = new ContainerAttribute<>();
     this.ownerMap = new ContainerAttribute<>();
-    this.factorMap = new ContainerAttribute<>();
+    this.repConfigMap = new ContainerAttribute<>();
     this.typeMap = new ContainerAttribute<>();
     this.containerMap = new ConcurrentHashMap<>();
     this.replicaMap = new ConcurrentHashMap<>();
@@ -117,9 +118,9 @@ public class ContainerStateMap {
       containerMap.put(id, info);
       lifeCycleStateMap.insert(info.getState(), id);
       ownerMap.insert(info.getOwner(), id);
-      factorMap.insert(info.getReplicationFactor(), id);
+      repConfigMap.insert(info.getReplicationConfig(), id);
       typeMap.insert(info.getReplicationType(), id);
-      replicaMap.put(id, ConcurrentHashMap.newKeySet());
+      replicaMap.put(id, Collections.emptySet());
 
       // Flush the cache of this container type, will be added later when
       // get container queries are executed.
@@ -145,8 +146,9 @@ public class ContainerStateMap {
       final ContainerInfo info = containerMap.remove(id);
       lifeCycleStateMap.remove(info.getState(), id);
       ownerMap.remove(info.getOwner(), id);
-      factorMap.remove(info.getReplicationFactor(), id);
+      repConfigMap.remove(info.getReplicationConfig(), id);
       typeMap.remove(info.getReplicationType(), id);
+      replicaMap.remove(id);
       // Flush the cache of this container type.
       flushCache(info);
       LOG.trace("Container {} removed from ContainerStateMap.", id);
@@ -173,8 +175,7 @@ public class ContainerStateMap {
   public Set<ContainerReplica> getContainerReplicas(
       final ContainerID containerID) {
     Preconditions.checkNotNull(containerID);
-    final Set<ContainerReplica> replicas = replicaMap.get(containerID);
-    return replicas == null ? null : Collections.unmodifiableSet(replicas);
+    return replicaMap.get(containerID);
   }
 
   /**
@@ -189,9 +190,10 @@ public class ContainerStateMap {
       final ContainerReplica replica) {
     Preconditions.checkNotNull(containerID);
     if (contains(containerID)) {
-      final Set<ContainerReplica> replicas = replicaMap.get(containerID);
-      replicas.remove(replica);
-      replicas.add(replica);
+      final Set<ContainerReplica> newSet = createNewReplicaSet(containerID);
+      newSet.remove(replica);
+      newSet.add(replica);
+      replaceReplicaSet(containerID, newSet);
     }
   }
 
@@ -207,8 +209,20 @@ public class ContainerStateMap {
     Preconditions.checkNotNull(containerID);
     Preconditions.checkNotNull(replica);
     if (contains(containerID)) {
-      replicaMap.get(containerID).remove(replica);
+      final Set<ContainerReplica> newSet = createNewReplicaSet(containerID);
+      newSet.remove(replica);
+      replaceReplicaSet(containerID, newSet);
     }
+  }
+
+  private Set<ContainerReplica> createNewReplicaSet(ContainerID containerID) {
+    Set<ContainerReplica> existingSet = replicaMap.get(containerID);
+    return existingSet == null ? new HashSet<>() : new HashSet<>(existingSet);
+  }
+
+  private void replaceReplicaSet(ContainerID containerID,
+      Set<ContainerReplica> newSet) {
+    replicaMap.put(containerID, Collections.unmodifiableSet(newSet));
   }
 
   /**
@@ -319,13 +333,13 @@ public class ContainerStateMap {
   /**
    * Returns Containers by replication factor.
    *
-   * @param factor - Replication Factor.
+   * @param repConfig - ReplicationConfig.
    * @return NavigableSet.
    */
-  NavigableSet<ContainerID> getContainerIDsByFactor(
-      final ReplicationFactor factor) {
-    Preconditions.checkNotNull(factor);
-    return factorMap.getCollection(factor);
+  NavigableSet<ContainerID> getContainerIDsByRepConfig(
+      final ReplicationConfig repConfig) {
+    Preconditions.checkNotNull(repConfig);
+    return repConfigMap.getCollection(repConfig);
   }
 
   /**
@@ -345,22 +359,20 @@ public class ContainerStateMap {
    *
    * @param state - LifeCycleState
    * @param owner - Owner
-   * @param factor - Replication Factor
-   * @param type - Replication Type
+   * @param repConfig - Replication Config
    * @return ContainerInfo or Null if not container satisfies the criteria.
    */
   public NavigableSet<ContainerID> getMatchingContainerIDs(
       final LifeCycleState state, final String owner,
-      final ReplicationFactor factor, final ReplicationType type) {
+      final ReplicationConfig repConfig) {
 
     Preconditions.checkNotNull(state, "State cannot be null");
     Preconditions.checkNotNull(owner, "Owner cannot be null");
-    Preconditions.checkNotNull(factor, "Factor cannot be null");
-    Preconditions.checkNotNull(type, "Type cannot be null");
+    Preconditions.checkNotNull(repConfig, "RepConfig cannot be null");
 
     final ContainerQueryKey queryKey =
-        new ContainerQueryKey(state, owner, factor, type);
-    if(resultCache.containsKey(queryKey)){
+        new ContainerQueryKey(state, owner, repConfig);
+    if (resultCache.containsKey(queryKey)) {
       return resultCache.get(queryKey);
     }
 
@@ -380,13 +392,13 @@ public class ContainerStateMap {
     }
 
     final NavigableSet<ContainerID> factorSet =
-        factorMap.getCollection(factor);
+        repConfigMap.getCollection(repConfig);
     if (factorSet.size() == 0) {
       return EMPTY_SET;
     }
 
     final NavigableSet<ContainerID> typeSet =
-        typeMap.getCollection(type);
+        typeMap.getCollection(repConfig.getReplicationType());
     if (typeSet.size() == 0) {
       return EMPTY_SET;
     }
@@ -455,8 +467,7 @@ public class ContainerStateMap {
       final ContainerQueryKey key = new ContainerQueryKey(
           containerInfo.getState(),
           containerInfo.getOwner(),
-          containerInfo.getReplicationFactor(),
-          containerInfo.getReplicationType());
+              containerInfo.getReplicationConfig());
       resultCache.remove(key);
     }
   }

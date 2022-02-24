@@ -1,4 +1,4 @@
-  /**
+/**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateV
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.log4j.Logger;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -62,7 +62,7 @@ import java.util.TreeSet;
 import java.util.Iterator;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
@@ -93,6 +93,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     return retVolume;
   }
+
   @Test
   public void testAllVolumeOperations() throws Exception {
 
@@ -325,7 +326,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     ObjectStore objectStore = getObjectStore();
 
     Set<String> expectedVolumes = new TreeSet<>();
-    for (int i=0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
       String volumeName = "vol" + i;
       expectedVolumes.add(volumeName);
       VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()

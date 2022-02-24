@@ -34,11 +34,12 @@ import org.apache.hadoop.hdds.scm.protocolPB.
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -164,7 +165,7 @@ public class Test2WayCommitInRatis {
     xceiverClient.watchForCommit(reply.getLogIndex());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       // shutdown the ratis follower
-      if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
+      if (RatisTestHelper.isRatisFollower(dn, pipeline)) {
         cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
         break;
       }

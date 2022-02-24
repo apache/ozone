@@ -20,7 +20,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -28,12 +28,13 @@ import org.apache.hadoop.ozone.container.common.statemachine
     .DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -66,19 +67,20 @@ public class TestCloseContainerCommandHandler {
   private Handler containerHandler;
   private PipelineID pipelineID;
   private PipelineID nonExistentPipelineID = PipelineID.randomId();
-
+  private ContainerController controller;
+  private ContainerSet containerSet;
   private CloseContainerCommandHandler subject =
       new CloseContainerCommandHandler();
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestCloseContainerCommandHandler(ChunkLayOutVersion layout) {
+  public TestCloseContainerCommandHandler(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -96,11 +98,11 @@ public class TestCloseContainerCommandHandler {
         pipelineID.getId().toString(), null);
 
     container = new KeyValueContainer(data, new OzoneConfiguration());
-    ContainerSet containerSet = new ContainerSet();
+    containerSet = new ContainerSet();
     containerSet.addContainer(container);
 
     containerHandler = mock(Handler.class);
-    ContainerController controller = new ContainerController(containerSet,
+    controller = new ContainerController(containerSet,
         singletonMap(ContainerProtos.ContainerType.KeyValueContainer,
             containerHandler));
 
@@ -139,7 +141,7 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .markContainerUnhealthy(container);
+        .quasiCloseContainer(container);
   }
 
   @Test
@@ -166,7 +168,7 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .markContainerUnhealthy(container);
+        .quasiCloseContainer(container);
   }
 
   @Test
@@ -202,6 +204,31 @@ public class TestCloseContainerCommandHandler {
         .closeContainer(container);
     verify(writeChannel, never())
         .submitRequest(any(), any());
+  }
+
+  @Test
+  public void closeNonExistenceContainer() {
+    long containerID = 1L;
+    try {
+      controller.markContainerForClose(containerID);
+    } catch (IOException e) {
+
+      GenericTestUtils.assertExceptionContains("The Container " +
+                      "is not found. ContainerID: " + containerID, e);
+    }
+  }
+
+  @Test
+  public void closeMissingContainer() {
+    long containerID = 2L;
+    containerSet.getMissingContainerSet().add(containerID);
+    try {
+      controller.markContainerForClose(containerID);
+    } catch (IOException e) {
+      GenericTestUtils.assertExceptionContains("The Container is in " +
+              "the MissingContainerSet hence we can't close it. " +
+              "ContainerID: " + containerID, e);
+    }
   }
 
   private CloseContainerCommand closeWithKnownPipeline() {

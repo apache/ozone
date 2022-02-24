@@ -18,12 +18,12 @@
 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-hdds</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-hdds-interface-admin</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <artifactId>hdds-interface-admin</artifactId>
+  <version>1.3.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Admin interface
   </description>
   <name>Apache Ozone HDDS Admin Interface</name>
@@ -36,8 +36,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <!-- required to use common hdds.proto -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-interface-client</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-client</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -60,7 +60,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <protocArtifact>
-                com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+                com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
               </protocArtifact>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <outputDirectory>target/generated-sources/java</outputDirectory>

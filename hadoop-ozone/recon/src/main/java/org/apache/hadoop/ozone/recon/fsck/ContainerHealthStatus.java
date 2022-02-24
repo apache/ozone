@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -36,20 +37,23 @@ public class ContainerHealthStatus {
 
   private ContainerInfo container;
   private int replicaDelta;
-  private Set<ContainerReplica> replicas;
+  private Set<ContainerReplica> healthyReplicas;
   private ContainerPlacementStatus placementStatus;
+  private int numReplicas;
 
   ContainerHealthStatus(ContainerInfo container,
-      Set<ContainerReplica> replicas, PlacementPolicy placementPolicy) {
+                        Set<ContainerReplica> healthyReplicas,
+                        PlacementPolicy placementPolicy) {
     this.container = container;
-    int repFactor = container.getReplicationFactor().getNumber();
-    this.replicas = replicas
+    int repFactor = container.getReplicationConfig().getRequiredNodes();
+    this.healthyReplicas = healthyReplicas
         .stream()
         .filter(r -> !r.getState()
             .equals((ContainerReplicaProto.State.UNHEALTHY)))
         .collect(Collectors.toSet());
-    this.replicaDelta = repFactor - this.replicas.size();
+    this.replicaDelta = repFactor - this.healthyReplicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);
+    this.numReplicas = healthyReplicas.size();
   }
 
   public long getContainerID() {
@@ -61,11 +65,16 @@ public class ContainerHealthStatus {
   }
 
   public int getReplicationFactor() {
-    return container.getReplicationFactor().getNumber();
+    return container.getReplicationConfig().getRequiredNodes();
   }
 
   public boolean isHealthy() {
     return replicaDelta == 0 && !isMisReplicated();
+  }
+
+  public boolean isDeleted() {
+    return container.getState() == HddsProtos.LifeCycleState.DELETED ||
+        container.getState() == HddsProtos.LifeCycleState.DELETING;
   }
 
   public boolean isOverReplicated() {
@@ -81,7 +90,7 @@ public class ContainerHealthStatus {
   }
 
   public int getReplicaCount() {
-    return replicas.size();
+    return healthyReplicas.size();
   }
 
   public boolean isMisReplicated() {
@@ -105,12 +114,12 @@ public class ContainerHealthStatus {
   }
 
   public boolean isMissing() {
-    return replicas.size() == 0;
+    return numReplicas == 0;
   }
 
   private ContainerPlacementStatus getPlacementStatus(
       PlacementPolicy policy, int repFactor) {
-    List<DatanodeDetails> dns = replicas.stream()
+    List<DatanodeDetails> dns = healthyReplicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
     return policy.validateContainerPlacement(dns, repFactor);

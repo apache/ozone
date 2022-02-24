@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +68,21 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
   public OMBucketSetPropertyRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager)
+      throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
+        setBucketPropertyRequestBuilder = getOmRequest()
+        .getSetBucketPropertyRequest().toBuilder()
+        .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   @Override
@@ -153,8 +169,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
           .get(volumeKey);
-      if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs,
-          volumeKey)) {
+      if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs)) {
         bucketInfoBuilder.setQuotaInBytes(omBucketArgs.getQuotaInBytes());
       } else {
         bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
@@ -168,7 +183,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
-
+      bucketInfoBuilder.setModificationTime(
+          setBucketPropertyRequest.getModificationTime());
       // Set acls from dbBucketInfo if it has any.
       if (dbBucketInfo.getAcls() != null) {
         bucketInfoBuilder.setAcls(dbBucketInfo.getAcls());
@@ -228,7 +244,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   }
 
   public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
-      OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs, String volumeKey)
+                     OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs)
       throws IOException {
     long quotaInBytes = omBucketArgs.getQuotaInBytes();
 
@@ -251,20 +267,20 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
-    for(OmBucketInfo bucketInfo : bucketList) {
+    for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
           !omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
         totalBucketQuota += nextQuotaInBytes;
       }
     }
 
-    if(volumeQuotaInBytes < totalBucketQuota &&
+    if (volumeQuotaInBytes < totalBucketQuota &&
         volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
-      throw new IllegalArgumentException("Total buckets quota in this volume " +
+      throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +
           " set to:" + totalBucketQuota + ". But the volume space quota is:" +
-          volumeQuotaInBytes);
+          volumeQuotaInBytes, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
   }
@@ -278,4 +294,5 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     return true;
   }
+
 }

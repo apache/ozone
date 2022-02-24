@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -160,7 +161,14 @@ public class TestBlockOutputStreamWithFailures {
   }
 
   @Test
-  public void testWatchForCommitWithCloseContainerException()
+  public void testContainerClose() throws Exception {
+    testWatchForCommitWithCloseContainerException();
+    testWatchForCommitWithSingleNodeRatis();
+    testFailureWithPrimeSizedData();
+    testExceptionDuringClose();
+  }
+
+  private void testWatchForCommitWithCloseContainerException()
       throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -178,7 +186,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 4 buffers allocated worth of chunk size
@@ -268,7 +276,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
@@ -334,7 +342,7 @@ public class TestBlockOutputStreamWithFailures {
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
-  
+
   @Test
   public void test2DatanodesFailure() throws Exception {
     String keyName = getKeyName();
@@ -353,7 +361,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
@@ -440,8 +448,7 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, data1);
   }
 
-  @Test
-  public void testFailureWithPrimeSizedData() throws Exception {
+  private void testFailureWithPrimeSizedData() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     int dataLength = maxFlushSize + 69;
@@ -458,7 +465,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
     Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
@@ -504,8 +511,7 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  @Test
-  public void testExceptionDuringClose() throws Exception {
+  private void testExceptionDuringClose() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     int dataLength = 167;
@@ -522,7 +528,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     Assert.assertEquals(2, blockOutputStream.getBufferPool().getSize());
     Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
@@ -575,8 +581,7 @@ public class TestBlockOutputStreamWithFailures {
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  @Test
-  public void testWatchForCommitWithSingleNodeRatis() throws Exception {
+  private void testWatchForCommitWithSingleNodeRatis() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 0, ReplicationFactor.ONE);
@@ -594,7 +599,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 4 buffers allocated worth of chunk size
@@ -686,7 +691,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
@@ -780,7 +785,7 @@ public class TestBlockOutputStreamWithFailures {
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size

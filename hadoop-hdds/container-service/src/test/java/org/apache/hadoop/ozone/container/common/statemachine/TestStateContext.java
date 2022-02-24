@@ -21,22 +21,23 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
-import static org.apache.hadoop.test.GenericTestUtils.waitFor;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
@@ -48,12 +49,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -106,29 +111,7 @@ public class TestStateContext {
     // getReports dequeues incremental reports
     expectedReportCount.clear();
 
-    // Case 2: Attempt to put back a full report
-
-    try {
-      ctx.putBackReports(Collections.singletonList(
-          newMockReport(StateContext.CONTAINER_REPORTS_PROTO_NAME)), scm1);
-      fail("Should throw exception when putting back unaccepted reports!");
-    } catch (IllegalArgumentException ignored) {
-    }
-    try {
-      ctx.putBackReports(Collections.singletonList(
-          newMockReport(StateContext.NODE_REPORT_PROTO_NAME)), scm2);
-      fail("Should throw exception when putting back unaccepted reports!");
-    } catch (IllegalArgumentException ignored) {
-    }
-    try {
-      ctx.putBackReports(Collections.singletonList(
-          newMockReport(StateContext.PIPELINE_REPORTS_PROTO_NAME)), scm1);
-      fail("Should throw exception when putting back unaccepted reports!");
-    } catch (IllegalArgumentException ignored) {
-    }
-
-    // Case 3: Put back mixed types of incremental reports
-
+    // Case 2: Put back mixed types of incremental reports
     ctx.putBackReports(Arrays.asList(
         newMockReport(StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME),
         newMockReport(StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME),
@@ -146,38 +129,21 @@ public class TestStateContext {
     checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
     // getReports dequeues incremental reports
     expectedReportCount.clear();
-
-    // Case 4: Attempt to put back mixed types of full reports
-
-    try {
-      ctx.putBackReports(Arrays.asList(
-          newMockReport(StateContext.CONTAINER_REPORTS_PROTO_NAME),
-          newMockReport(StateContext.NODE_REPORT_PROTO_NAME),
-          newMockReport(StateContext.PIPELINE_REPORTS_PROTO_NAME)
-      ), scm1);
-      fail("Should throw exception when putting back unaccepted reports!");
-    } catch (IllegalArgumentException ignored) {
-    }
-
-    // Case 5: Attempt to put back mixed full and incremental reports
-
-    try {
-      ctx.putBackReports(Arrays.asList(
-          newMockReport(StateContext.CONTAINER_REPORTS_PROTO_NAME),
-          newMockReport(StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME),
-          newMockReport(StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME)
-      ), scm2);
-      fail("Should throw exception when putting back unaccepted reports!");
-    } catch (IllegalArgumentException ignored) {
-    }
   }
 
   @Test
-  public void testReportQueueWithAddReports() {
+  public void testReportQueueWithAddReports() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
-
+    OzoneContainer o = mock(OzoneContainer.class);
+    ContainerSet s = mock(ContainerSet.class);
+    when(datanodeStateMachineMock.getContainer()).thenReturn(o);
+    when(o.getContainerSet()).thenReturn(s);
+    when(s.getContainerReport())
+        .thenReturn(
+            StorageContainerDatanodeProtocolProtos
+                .ContainerReportsProto.getDefaultInstance());
     StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
         datanodeStateMachineMock);
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
@@ -191,35 +157,35 @@ public class TestStateContext {
     Map<String, Integer> expectedReportCount = new HashMap<>();
 
     // Add a bunch of ContainerReports
-    batchAddReports(ctx, StateContext.CONTAINER_REPORTS_PROTO_NAME, 128);
+    batchRefreshfullReports(ctx,
+        StateContext.CONTAINER_REPORTS_PROTO_NAME, 128);
     // Should only keep the latest one
     expectedReportCount.put(StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
     checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
     checkReportCount(ctx.getAllAvailableReports(scm2), expectedReportCount);
+    // every time getAllAvailableReports is called , if we want to get a full
+    // report of a certain type, we must call "batchRefreshfullReports" for
+    // this type to refresh.
+    expectedReportCount.remove(StateContext.CONTAINER_REPORTS_PROTO_NAME);
 
     // Add a bunch of NodeReport
-    batchAddReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 128);
+    batchRefreshfullReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 128);
     // Should only keep the latest one
     expectedReportCount.put(StateContext.NODE_REPORT_PROTO_NAME, 1);
     checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
     checkReportCount(ctx.getAllAvailableReports(scm2), expectedReportCount);
+    expectedReportCount.remove(StateContext.NODE_REPORT_PROTO_NAME);
 
     // Add a bunch of PipelineReports
-    batchAddReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 128);
+    batchRefreshfullReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 128);
     // Should only keep the latest one
     expectedReportCount.put(StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
     checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
     checkReportCount(ctx.getAllAvailableReports(scm2), expectedReportCount);
-
-    // Add a bunch of PipelineReports
-    batchAddReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 128);
-    // Should only keep the latest one
-    expectedReportCount.put(StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
-    checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
-    checkReportCount(ctx.getAllAvailableReports(scm2), expectedReportCount);
+    expectedReportCount.remove(StateContext.PIPELINE_REPORTS_PROTO_NAME);
 
     // Add a bunch of CommandStatusReports
-    batchAddReports(ctx,
+    batchAddIncrementalReport(ctx,
         StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME, 128);
     expectedReportCount.put(
         StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME, 128);
@@ -231,21 +197,49 @@ public class TestStateContext {
         StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME);
 
     // Add a bunch of IncrementalContainerReport
-    batchAddReports(ctx,
+    batchAddIncrementalReport(ctx,
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 128);
     // Should keep all of them
     expectedReportCount.put(
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 128);
     checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
     checkReportCount(ctx.getAllAvailableReports(scm2), expectedReportCount);
+    expectedReportCount.remove(
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
+
+    // Test FCR collection clears pending ICRs.
+    // Add a bunch of IncrementalContainerReport
+    batchAddIncrementalReport(ctx,
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 128);
+    // Add a FCR
+    batchRefreshfullReports(ctx,
+        StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
+
+    // Get FCR
+    ctx.getFullContainerReportDiscardPendingICR();
+
+    // Only FCR should be part of all available reports.
+    expectedReportCount.put(
+        StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
+    checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
+    checkReportCount(ctx.getAllAvailableReports(scm2), expectedReportCount);
     // getReports dequeues incremental reports
     expectedReportCount.remove(
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
+    expectedReportCount.remove(
+        StateContext.CONTAINER_REPORTS_PROTO_NAME);
   }
 
-  void batchAddReports(StateContext ctx, String reportName, int count) {
+  void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
     for (int i = 0; i < count; i++) {
-      ctx.addReport(newMockReport(reportName));
+      ctx.refreshFullReport(newMockReport(reportName));
+    }
+  }
+
+  void batchAddIncrementalReport(StateContext ctx,
+                                 String reportName, int count) {
+    for (int i = 0; i < count; i++) {
+      ctx.addIncrementalReport(newMockReport(reportName));
     }
   }
 
@@ -276,7 +270,7 @@ public class TestStateContext {
     assertNull(context1.getPipelineReports());
     GeneratedMessage containerReports =
         newMockReport(StateContext.CONTAINER_REPORTS_PROTO_NAME);
-    context1.addReport(containerReports);
+    context1.refreshFullReport(containerReports);
 
     assertNotNull(context1.getContainerReports());
     assertEquals(StateContext.CONTAINER_REPORTS_PROTO_NAME,
@@ -288,7 +282,7 @@ public class TestStateContext {
     StateContext context2 = newStateContext(conf, datanodeStateMachineMock);
     GeneratedMessage nodeReport =
         newMockReport(StateContext.NODE_REPORT_PROTO_NAME);
-    context2.addReport(nodeReport);
+    context2.refreshFullReport(nodeReport);
 
     assertNull(context2.getContainerReports());
     assertNotNull(context2.getNodeReport());
@@ -300,7 +294,7 @@ public class TestStateContext {
     StateContext context3 = newStateContext(conf, datanodeStateMachineMock);
     GeneratedMessage pipelineReports =
         newMockReport(StateContext.PIPELINE_REPORTS_PROTO_NAME);
-    context3.addReport(pipelineReports);
+    context3.refreshFullReport(pipelineReports);
 
     assertNull(context3.getContainerReports());
     assertNull(context3.getNodeReport());
@@ -321,12 +315,17 @@ public class TestStateContext {
   }
 
   private GeneratedMessage newMockReport(String messageType) {
-    GeneratedMessage pipelineReports = mock(GeneratedMessage.class);
-    when(pipelineReports.getDescriptorForType()).thenReturn(
+    GeneratedMessage report = mock(GeneratedMessage.class);
+    if (StateContext
+        .INCREMENTAL_CONTAINER_REPORT_PROTO_NAME.equals(messageType)) {
+      report =
+          mock(IncrementalContainerReportProto.class);
+    }
+    when(report.getDescriptorForType()).thenReturn(
         mock(Descriptor.class));
-    when(pipelineReports.getDescriptorForType().getFullName()).thenReturn(
+    when(report.getDescriptorForType().getFullName()).thenReturn(
         messageType);
-    return pipelineReports;
+    return report;
   }
 
   @Test
@@ -340,14 +339,11 @@ public class TestStateContext {
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
 
-    GeneratedMessage generatedMessage = mock(GeneratedMessage.class);
-    when(generatedMessage.getDescriptorForType()).thenReturn(
-        mock(Descriptor.class));
-    when(generatedMessage.getDescriptorForType().getFullName()).thenReturn(
-        "hadoop.hdds.CommandStatusReportsProto");
+    GeneratedMessage generatedMessage =
+        newMockReport(StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME);
 
     // Try to add report with zero endpoint. Should not be stored.
-    stateContext.addReport(generatedMessage);
+    stateContext.addIncrementalReport(generatedMessage);
     assertTrue(stateContext.getAllAvailableReports(scm1).isEmpty());
 
     // Add 2 scm endpoints.
@@ -355,7 +351,7 @@ public class TestStateContext {
     stateContext.addEndpoint(scm2);
 
     // Add report. Should be added to all endpoints.
-    stateContext.addReport(generatedMessage);
+    stateContext.addIncrementalReport(generatedMessage);
     List<GeneratedMessage> allAvailableReports =
         stateContext.getAllAvailableReports(scm1);
     assertEquals(1, allAvailableReports.size());
@@ -498,9 +494,9 @@ public class TestStateContext {
 
     // task num greater than pool size
     for (int i = 0; i < threadPoolSize; i++) {
-      executorService.submit(() -> futureOne.get());
+      executorService.submit((Callable<String>) futureOne::get);
     }
-    executorService.submit(() -> futureTwo.get());
+    executorService.submit((Callable<String>) futureTwo::get);
 
     Assert.assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
@@ -519,8 +515,8 @@ public class TestStateContext {
 
     ExecutorService executorService = Executors.newFixedThreadPool(1);
     CompletableFuture<String> future = new CompletableFuture<>();
-    executorService.submit(() -> future.get());
-    executorService.submit(() -> future.get());
+    executorService.submit((Callable<String>) future::get);
+    executorService.submit((Callable<String>) future::get);
 
     StateContext subject = new StateContext(new OzoneConfiguration(),
         DatanodeStates.INIT, mock(DatanodeStateMachine.class)) {
@@ -583,22 +579,41 @@ public class TestStateContext {
     assertEquals(0, ctx.getAllAvailableReports(scm2).size());
 
     Map<String, Integer> expectedReportCount = new HashMap<>();
-
+    int totalIncrementalCount = 128;
     // Add a bunch of ContainerReports
-    batchAddReports(ctx, StateContext.CONTAINER_REPORTS_PROTO_NAME, 128);
-    batchAddReports(ctx, StateContext.NODE_REPORT_PROTO_NAME, 128);
-    batchAddReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME, 128);
-    batchAddReports(ctx,
-        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 128);
+    batchRefreshfullReports(ctx,
+        StateContext.CONTAINER_REPORTS_PROTO_NAME, totalIncrementalCount);
+    batchRefreshfullReports(ctx, StateContext.NODE_REPORT_PROTO_NAME,
+        totalIncrementalCount);
+    batchRefreshfullReports(ctx, StateContext.PIPELINE_REPORTS_PROTO_NAME,
+        totalIncrementalCount);
+    batchRefreshfullReports(ctx,
+        StateContext.CRL_STATUS_REPORT_PROTO_NAME, totalIncrementalCount);
+    batchAddIncrementalReport(ctx,
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME,
+        totalIncrementalCount);
 
     // Should only keep the latest one
     expectedReportCount.put(StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
     expectedReportCount.put(StateContext.NODE_REPORT_PROTO_NAME, 1);
     expectedReportCount.put(StateContext.PIPELINE_REPORTS_PROTO_NAME, 1);
+    expectedReportCount.put(StateContext.CRL_STATUS_REPORT_PROTO_NAME, 1);
     // Should keep less or equal than maxLimit depending on other reports' size.
+    // Here, the incremental container reports count must be 96
+    // (100 - 4 non-incremental reports)
     expectedReportCount.put(
-        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 97);
-    checkReportCount(ctx.getReports(scm1, 100), expectedReportCount);
-    checkReportCount(ctx.getReports(scm2, 100), expectedReportCount);
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 96);
+    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
+        expectedReportCount);
+    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
+        expectedReportCount);
+    expectedReportCount.clear();
+    expectedReportCount.put(
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME,
+        totalIncrementalCount - 96);
+    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm1, 100),
+        expectedReportCount);
+    checkReportCount(ctx.getAllAvailableReportsUpToLimit(scm2, 100),
+        expectedReportCount);
   }
 }

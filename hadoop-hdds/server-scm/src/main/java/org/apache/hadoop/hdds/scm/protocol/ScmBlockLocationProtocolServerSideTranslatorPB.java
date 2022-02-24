@@ -104,7 +104,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   @Override
   public SCMBlockLocationResponse send(RpcController controller,
       SCMBlockLocationRequest request) throws ServiceException {
-    if (!scm.getScmContext().isLeader()) {
+    if (!scm.checkLeader()) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
           scm.getBlockProtocolRpcPort(), scm.getScmId());
@@ -179,7 +179,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),
-            ReplicationConfig.fromProto(
+            ReplicationConfig.fromProtoTypeAndFactor(
                 request.getType(),
                 request.getFactor()),
             request.getOwner(),

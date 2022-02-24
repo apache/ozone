@@ -26,14 +26,14 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .CommandStatusReportFromDatanode;
 
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -82,7 +82,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
 
   private CommandStatusReportFromDatanode getStatusReport(
       List<CommandStatus> reports) {
-    CommandStatusReportsProto report = TestUtils.createCommandStatusReport(
+    CommandStatusReportsProto report = HddsTestUtils.createCommandStatusReport(
         reports);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     return new SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode(

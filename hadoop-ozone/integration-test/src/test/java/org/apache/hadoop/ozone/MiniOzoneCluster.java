@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -35,7 +36,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -61,7 +63,7 @@ public interface MiniOzoneCluster {
    * @return MiniOzoneCluster builder
    */
   static Builder newOMHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneOMHAClusterImpl.Builder(conf);
+    return new MiniOzoneHAClusterImpl.Builder(conf);
   }
 
   static Builder newHABuilder(OzoneConfiguration conf) {
@@ -74,6 +76,11 @@ public interface MiniOzoneCluster {
    * @return Configuration
    */
   OzoneConfiguration getConf();
+
+  /**
+   * Set the configuration for the MiniOzoneCluster.
+   */
+  void setConf(OzoneConfiguration newConf);
 
   /**
    * Waits for the cluster to be ready, this call blocks till all the
@@ -152,6 +159,8 @@ public interface MiniOzoneCluster {
    * @return List of {@link HddsDatanodeService}
    */
   List<HddsDatanodeService> getHddsDatanodes();
+
+  HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
    * Returns a {@link ReconServer} instance.
@@ -290,7 +299,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_PIPELIME_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
-    protected final OzoneConfiguration conf;
+    protected OzoneConfiguration conf;
     protected String path;
 
     protected String clusterId;
@@ -309,6 +318,7 @@ public interface MiniOzoneCluster {
     protected Optional<String> omId = Optional.empty();
     
     protected Boolean randomContainerPort = true;
+    protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
@@ -316,6 +326,11 @@ public interface MiniOzoneCluster {
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
+
+
+    protected Optional<Integer> omLayoutVersion = Optional.empty();
+    protected Optional<Integer> scmLayoutVersion = Optional.empty();
+    protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
@@ -329,6 +344,12 @@ public interface MiniOzoneCluster {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      ExitUtils.disableSystemExit();
+    }
+
+    public Builder setConf(OzoneConfiguration config) {
+      this.conf = config;
+      return this;
     }
 
     /**
@@ -342,6 +363,17 @@ public interface MiniOzoneCluster {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
+      return this;
+    }
+
+    /**
+     * For tests that do not use any features of SCM, we can get by with
+     * 0 datanodes.  Also need to skip safemode in this case.
+     * This allows the cluster to come up much faster.
+     */
+    public Builder withoutDatanodes() {
+      setNumDatanodes(0);
+      conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
       return this;
     }
 
@@ -472,6 +504,24 @@ public interface MiniOzoneCluster {
     }
 
     /**
+     * Sets the reserved space
+     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
+     * HDDS_DATANODE_DIR_DU_RESERVED
+     * for each volume in each datanode.
+     * @param reservedSpace String that contains the numeric size value and
+     *                      ends with a
+     *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
+     *                      suffix. For example, "50GB".
+     * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
+     *
+     * @return {@link MiniOzoneCluster} Builder
+     */
+    public Builder setDatanodeReservedSpace(String reservedSpace) {
+      datanodeReservedSpace = Optional.of(reservedSpace);
+      return this;
+    }
+
+    /**
      * Sets the chunk size.
      *
      * @return MiniOzoneCluster.Builder
@@ -553,6 +603,21 @@ public interface MiniOzoneCluster {
 
     public Builder setSCMServiceId(String serviceId) {
       this.scmServiceId = serviceId;
+      return this;
+    }
+
+    public Builder setScmLayoutVersion(int layoutVersion) {
+      scmLayoutVersion = Optional.of(layoutVersion);
+      return this;
+    }
+
+    public Builder setOmLayoutVersion(int layoutVersion) {
+      omLayoutVersion = Optional.of(layoutVersion);
+      return this;
+    }
+
+    public Builder setDnLayoutVersion(int layoutVersion) {
+      dnLayoutVersion = Optional.of(layoutVersion);
       return this;
     }
 

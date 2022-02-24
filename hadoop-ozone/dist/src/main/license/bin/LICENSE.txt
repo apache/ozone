@@ -218,6 +218,8 @@ EPL
    org.eclipse.jetty:jetty-util-ajax
    org.eclipse.jetty:jetty-webapp
    org.eclipse.jetty:jetty-xml
+   org.aspectj:aspectjrt
+   org.aspectj:aspectjweaver
 
 
 BSD
@@ -385,7 +387,6 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
-   org.fusesource.leveldbjni:leveldbjni-all
    org.ow2.asm:asm
 
 
@@ -395,8 +396,14 @@ BSD 2-Clause
    dnsjava:dnsjava
 
 
+WTFPL
+=====================
+
+   org.reflections:reflections
+
+
 --------------------------------------------------------------------------------
-hadoop-hdds-server-scm, hadoop-ozone-ozone-manager, hadoop-ozone-s3gateway and hadoop-hdds-server-framework
+hdds-server-scm, ozone-manager, ozone-s3gateway and hdds-server-framework
 contains the source of the following javascript/css components (See licenses/ for text of these licenses):
 
 Apache Software Foundation License 2.0

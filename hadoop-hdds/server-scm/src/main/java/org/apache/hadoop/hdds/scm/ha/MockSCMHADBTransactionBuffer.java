@@ -25,6 +25,10 @@ import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
 
+// TODO: Move this class to test package after fixing Recon
+/**
+ * Mock SCMHADBTransactionBuffer implementation for testing.
+ */
 public class MockSCMHADBTransactionBuffer implements SCMHADBTransactionBuffer {
   private DBStore dbStore;
   private BatchOperation currentBatchOperation;

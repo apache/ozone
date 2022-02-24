@@ -30,13 +30,11 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
-@Ignore("HDDS-3290")
 public class TestRandomKeyGenerator {
 
   private static MiniOzoneCluster cluster;
@@ -127,7 +125,6 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  @Ignore("HDDS-2011")
   public void bigFileThan2GB() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
@@ -178,5 +175,25 @@ public class TestRandomKeyGenerator {
     randomKeyGenerator.call();
     Assert.assertEquals(10, randomKeyGenerator.getThreadPoolSize());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+  }
+
+  @Test
+  @org.junit.Ignore("HDDS-5993")
+  public void cleanObjectsTest() throws Exception {
+    RandomKeyGenerator randomKeyGenerator =
+        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
+    randomKeyGenerator.setNumOfVolumes(2);
+    randomKeyGenerator.setNumOfBuckets(5);
+    randomKeyGenerator.setNumOfKeys(10);
+    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
+    randomKeyGenerator.setType(ReplicationType.RATIS);
+    randomKeyGenerator.setNumOfThreads(10);
+    randomKeyGenerator.setCleanObjects(true);
+    randomKeyGenerator.call();
+    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCleaned());
+    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCleaned());
   }
 }

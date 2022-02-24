@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -57,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * instances.
  */
 public class ChunkInputStream extends InputStream
-    implements Seekable, CanUnbuffer {
+    implements Seekable, CanUnbuffer, ByteBufferReadable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkInputStream.class);
@@ -191,6 +192,41 @@ public class ChunkInputStream extends InputStream
     return total;
   }
 
+  @Override
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
+    if (byteBuffer == null) {
+      throw new NullPointerException();
+    }
+    int len = byteBuffer.remaining();
+    if (len == 0) {
+      return 0;
+    }
+    acquireClient();
+    int total = 0;
+    while (len > 0) {
+      int available = prepareRead(len);
+      if (available == EOF) {
+        // There is no more data in the chunk stream. The buffers should have
+        // been released by now
+        Preconditions.checkState(buffers == null);
+        return total != 0 ? total : EOF;
+      }
+      ByteBuffer readBuf = buffers[bufferIndex];
+      ByteBuffer tmpBuf = readBuf.duplicate();
+      tmpBuf.limit(tmpBuf.position() + available);
+      byteBuffer.put(tmpBuf);
+      readBuf.position(tmpBuf.position());
+
+      len -= available;
+      total += available;
+
+      if (bufferEOF()) {
+        releaseBuffers(bufferIndex);
+      }
+    }
+    return total;
+  }
+
   /**
    * Seeks the ChunkInputStream to the specified position. This is done by
    * updating the chunkPosition to the seeked position in case the buffers
@@ -251,7 +287,7 @@ public class ChunkInputStream extends InputStream
 
   protected synchronized void releaseClient() {
     if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClient(xceiverClient, false);
+      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
       xceiverClient = null;
     }
   }

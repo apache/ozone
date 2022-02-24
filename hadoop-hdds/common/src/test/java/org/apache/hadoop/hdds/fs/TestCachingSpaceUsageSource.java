@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageCheckParams.newBuilder;
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;

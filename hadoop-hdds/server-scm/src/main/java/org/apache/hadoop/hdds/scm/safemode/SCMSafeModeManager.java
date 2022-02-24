@@ -28,6 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
@@ -109,9 +110,10 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final SafeModeMetrics safeModeMetrics;
 
   public SCMSafeModeManager(ConfigurationSource conf,
-      List<ContainerInfo> allContainers, PipelineManager pipelineManager,
-      EventQueue eventQueue, SCMServiceManager serviceManager,
-      SCMContext scmContext) {
+             List<ContainerInfo> allContainers,
+             ContainerManager containerManager, PipelineManager pipelineManager,
+             EventQueue eventQueue, SCMServiceManager serviceManager,
+             SCMContext scmContext) {
     this.config = conf;
     this.pipelineManager = pipelineManager;
     this.eventPublisher = eventQueue;
@@ -125,7 +127,7 @@ public class SCMSafeModeManager implements SafeModeManager {
       this.safeModeMetrics = SafeModeMetrics.create();
       ContainerSafeModeRule containerSafeModeRule =
           new ContainerSafeModeRule(CONT_EXIT_RULE, eventQueue, config,
-              allContainers, this);
+              allContainers,  containerManager, this);
       DataNodeSafeModeRule dataNodeSafeModeRule =
           new DataNodeSafeModeRule(DN_EXIT_RULE, eventQueue, config, this);
       exitRules.put(CONT_EXIT_RULE, containerSafeModeRule);
@@ -194,11 +196,13 @@ public class SCMSafeModeManager implements SafeModeManager {
       EventPublisher eventQueue) {
 
     if (exitRules.get(ruleName) != null) {
-      validatedRules.add(ruleName);
+      boolean added = validatedRules.add(ruleName);
       if (preCheckRules.contains(ruleName)) {
         validatedPreCheckRules.add(ruleName);
       }
-      LOG.info("{} rule is successfully validated", ruleName);
+      if (added) {
+        LOG.info("{} rule is successfully validated", ruleName);
+      }
     } else {
       // This should never happen
       LOG.error("No Such Exit rule {}", ruleName);
@@ -251,6 +255,35 @@ public class SCMSafeModeManager implements SafeModeManager {
     // register events anymore.
 
     emitSafeModeStatus();
+  }
+
+  /**
+   * Refresh Rule state.
+   */
+  public void refresh() {
+    if (inSafeMode.get()) {
+      exitRules.values().forEach(rule -> {
+        // Refresh rule irrespective of validate(), as at this point validate
+        // does not represent current state validation, as validate is being
+        // done with stale state.
+        rule.refresh(true);
+      });
+    }
+  }
+
+  /**
+   * Refresh Rule state and validate rules.
+   */
+  public void refreshAndValidate() {
+    if (inSafeMode.get()) {
+      exitRules.values().forEach(rule -> {
+        rule.refresh(false);
+        if (rule.validate() && inSafeMode.get()) {
+          validateSafeModeExitRules(rule.getRuleName(), eventPublisher);
+          rule.cleanup();
+        }
+      });
+    }
   }
 
   @Override

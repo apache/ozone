@@ -25,7 +25,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -44,6 +48,7 @@ public class ReplicationSupervisor {
   private final ContainerSet containerSet;
   private final ContainerReplicator replicator;
   private final ExecutorService executor;
+  private final StateContext context;
 
   private final AtomicLong requestCounter = new AtomicLong();
   private final AtomicLong successCounter = new AtomicLong();
@@ -58,25 +63,36 @@ public class ReplicationSupervisor {
 
   @VisibleForTesting
   ReplicationSupervisor(
-      ContainerSet containerSet, ContainerReplicator replicator,
-      ExecutorService executor
-  ) {
+      ContainerSet containerSet, StateContext context,
+      ContainerReplicator replicator, ExecutorService executor) {
     this.containerSet = containerSet;
     this.replicator = replicator;
     this.containersInFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
+    this.context = context;
   }
 
   public ReplicationSupervisor(
-      ContainerSet containerSet,
-      ContainerReplicator replicator, int poolSize
-  ) {
-    this(containerSet, replicator, new ThreadPoolExecutor(
+      ContainerSet containerSet, StateContext context,
+      ContainerReplicator replicator, ReplicationConfig replicationConfig) {
+    this(containerSet, context, replicator,
+        replicationConfig.getReplicationMaxStreams());
+  }
+
+  public ReplicationSupervisor(
+      ContainerSet containerSet, StateContext context,
+      ContainerReplicator replicator, int poolSize) {
+    this(containerSet, context, replicator, new ThreadPoolExecutor(
         poolSize, poolSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ContainerReplicationThread-%d")
             .build()));
+  }
+
+  public ReplicationSupervisor(ContainerSet containerSet,
+      ContainerReplicator replicator, int poolSize) {
+    this(containerSet, null, replicator, poolSize);
   }
 
   /**
@@ -112,11 +128,13 @@ public class ReplicationSupervisor {
    *
    * @return Count of in-flight replications.
    */
-  @VisibleForTesting
   int getInFlightReplications() {
     return containersInFlight.size();
   }
 
+  /**
+   * An executable form of a replication task with status handling.
+   */
   public final class TaskRunner implements Runnable {
     private final ReplicationTask task;
 
@@ -129,6 +147,17 @@ public class ReplicationSupervisor {
       final Long containerId = task.getContainerId();
       try {
         requestCounter.incrementAndGet();
+
+        if (context != null) {
+          DatanodeDetails dn = context.getParent().getDatanodeDetails();
+          if (dn.getPersistedOpState() !=
+              HddsProtos.NodeOperationalState.IN_SERVICE) {
+            LOG.info("Dn is of {} state. Ignore this replicate container " +
+                "command for container {}", dn.getPersistedOpState(),
+                containerId);
+            return;
+          }
+        }
 
         if (containerSet.getContainer(task.getContainerId()) != null) {
           LOG.debug("Container {} has already been downloaded.", containerId);
@@ -160,6 +189,14 @@ public class ReplicationSupervisor {
 
   public long getReplicationRequestCount() {
     return requestCounter.get();
+  }
+
+  public long getQueueSize() {
+    if (executor instanceof ThreadPoolExecutor) {
+      return ((ThreadPoolExecutor)executor).getQueue().size();
+    } else {
+      return 0;
+    }
   }
 
   public long getReplicationSuccessCount() {

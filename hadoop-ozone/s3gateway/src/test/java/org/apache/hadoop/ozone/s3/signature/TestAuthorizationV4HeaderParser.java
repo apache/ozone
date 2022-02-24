@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.s3.signature;
 import java.time.LocalDate;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 
 import static java.time.temporal.ChronoUnit.DAYS;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;

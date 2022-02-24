@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
@@ -55,11 +54,14 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -69,10 +71,14 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.sun.jmx.mbeanserver.Introspector;
+
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,12 +110,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
+      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
-  public HddsDatanodeService(){}
+  public HddsDatanodeService() { }
 
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
@@ -166,7 +172,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           HddsDatanodeService.class, args, LOG);
     }
     start(createOzoneConfiguration());
-    join();
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      try {
+        stop();
+        join();
+      } catch (Exception e) {
+        LOG.error("Error during stop Ozone Datanode.", e);
+      }
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
@@ -230,12 +243,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
               DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
-              conf.get(DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY));
+              conf.get(
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
           UserGroupInformation.setConfiguration(conf);
 
           SecurityUtil
-              .login(conf, DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY,
+              .login(conf,
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
                   DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY,
                   hostname);
         } else {
@@ -246,6 +261,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.info("Hdds Datanode login successful.");
       }
 
+      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+          datanodeDetails.getUuidString());
+      if (layoutStorage.getState() != INITIALIZED) {
+        layoutStorage.initialize();
+      }
+
       // initialize datanode CRL store
       dnCRLStore = new DatanodeCRLStoreImpl(conf);
 
@@ -253,7 +274,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         initializeCertificateClient(conf);
       }
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, this::terminateDatanode);
+          dnCertClient, this::terminateDatanode, dnCRLStore);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
@@ -289,18 +310,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * datanode.
    */
   private void startRatisForTest() throws IOException {
-    String scmId = "scm-01";
     String clusterId = "clusterId";
     datanodeStateMachine.getContainer().start(clusterId);
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
-    Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();
+    Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
 
-    for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
-      HddsVolume hddsVolume = entry.getValue();
-      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
-          clusterId, LOG);
+    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
+      HddsVolume hddsVolume = (HddsVolume) entry.getValue();
+      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, clusterId,
+          clusterId, conf, LOG);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }
@@ -355,7 +375,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));
       // Persist certificates.
-      if(response.hasX509CACertificate()) {
+      if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
@@ -432,16 +452,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DatanodeDetails initializeDatanodeDetails()
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     if (idFile.exists()) {
@@ -466,16 +476,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);

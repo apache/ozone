@@ -129,7 +129,7 @@ public class ProfileServlet extends HttpServlet {
   private static final int DEFAULT_DURATION_SECONDS = 10;
   private static final AtomicInteger ID_GEN = new AtomicInteger(0);
   static final Path OUTPUT_DIR =
-      Paths.get(System.getProperty("java.io.tmpdir"), "prof-output");
+      Paths.get(System.getProperty("java.io.tmpdir"), "prof-output-ozone");
   public static final String FILE_PREFIX = "async-prof-pid-";
 
   public static final Pattern FILE_NAME_PATTERN =
@@ -192,7 +192,7 @@ public class ProfileServlet extends HttpServlet {
   protected static String generateFileName(Integer pid, Output output,
       Event event) {
     String outputFormat = output.name().toLowerCase();
-    if(output == Output.FLAMEGRAPH) {
+    if (output == Output.FLAMEGRAPH) {
       outputFormat = "html";
     }
     return FILE_PREFIX + pid + "-" +

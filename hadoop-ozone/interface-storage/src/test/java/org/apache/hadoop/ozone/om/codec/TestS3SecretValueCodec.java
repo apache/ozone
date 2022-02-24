@@ -28,7 +28,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static org.junit.Assert.fail;
 

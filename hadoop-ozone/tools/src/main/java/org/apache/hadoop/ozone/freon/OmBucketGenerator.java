@@ -86,7 +86,7 @@ public class OmBucketGenerator extends BaseFreonGenerator
   private void createBucket(long index) throws Exception {
 
     OmBucketInfo bucketInfo = new OmBucketInfo.Builder()
-        .setBucketName(getPrefix()+index)
+        .setBucketName(generateBucketName(index))
         .setVolumeName(volumeName)
         .setStorageType(StorageType.DISK)
         .build();

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+syntax = "proto2";
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 option java_outer_classname = "SCMRatisProtocol";
 option java_generate_equals_and_hash = true;
@@ -26,6 +26,7 @@ enum RequestType {
     BLOCK = 3;
     SEQUENCE_ID = 4;
     CERT_STORE = 5;
+    MOVE = 6;
 }
 
 message Method {

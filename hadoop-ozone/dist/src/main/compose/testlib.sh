@@ -40,13 +40,19 @@ create_results_dir() {
 }
 
 ## @description find all the test.sh scripts in the immediate child dirs
+all_tests_in_immediate_child_dirs() {
+  find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | sort
+}
+
+## @description Find all test.sh scripts in immediate child dirs,
+## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$")
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
+       untagged="$(all_tests_in_immediate_child_dirs | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -55,9 +61,11 @@ find_tests(){
     if [[ -z "${tests}" ]]; then
        echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
        exit 1
-  fi
+    fi
+  elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
+    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(all_tests_in_immediate_child_dirs | xargs grep -L '^#suite:failing')
   fi
   echo $tests
 }
@@ -76,7 +84,7 @@ wait_for_safemode_exit(){
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
          status=$(docker-compose exec -T ${SCM} bash -c "$command")
      fi
@@ -110,9 +118,9 @@ wait_for_om_leader() {
 
   #Don't give it up until 120 seconds
   while [[ $SECONDS -lt 120 ]]; do
-    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/${SCM}@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
       status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
     fi
@@ -143,7 +151,7 @@ start_docker_env(){
   if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
-    OUTPUT_NAME="$COMPOSE_ENV_NAME"
+    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
   fi
@@ -162,7 +170,7 @@ execute_robot_test(){
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
-  OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
@@ -289,10 +297,15 @@ cleanup_docker_images() {
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
   local dir="${2:-${RESULT_DIR}}"
+  local xunitdir="${3:-}"
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     if [ -z "${xunitdir}" ]; then
+       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     else
+       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
+     fi
   else
      echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
      exit 1
@@ -318,6 +331,11 @@ copy_results() {
 
 run_test_script() {
   local d="$1"
+  local test_script="$2"
+
+  if [[ -z "$test_script" ]]; then
+    test_script=./test.sh
+  fi
 
   echo "Executing test in ${d}"
 
@@ -325,7 +343,7 @@ run_test_script() {
   cd "${d}" || return
 
   local ret=0
-  if ! ./test.sh; then
+  if ! "$test_script"; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
   fi
@@ -383,34 +401,10 @@ prepare_for_binary_image() {
 prepare_for_runner_image() {
   local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
   local v=${1:-${runner_version}} # prefer explicit argument
 
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="apache/ozone-runner:${v}"
+  export OZONE_IMAGE="${runner_image}:${v}"
 }
 
-## @description Print the logical version for a specific release
-## @param the release for which logical version should be printed
-get_logical_version() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
-}
-
-## @description Activate the version-specific behavior for a given release
-## @param the release for which definitions should be loaded
-load_version_specifics() {
-  local v="$1"
-
-  # shellcheck source=/dev/null
-  source "${_testlib_dir}/versions/${v}.sh"
-
-  ozone_version_load
-}
-
-## @description Deactivate the previously version-specific behavior,
-##   reverting to the current version's definitions
-unload_version_specifics() {
-  ozone_version_unload
-}

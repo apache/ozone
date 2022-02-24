@@ -35,6 +35,9 @@ import java.util.List;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 
+/**
+ * TODO: javadoc.
+ */
 public final class S3Acl {
   private static final Logger LOG = LoggerFactory.getLogger(S3Acl.class);
 
@@ -80,7 +83,7 @@ public final class S3Acl {
 
 
     public static ACLType getType(String typeStr) {
-      for(ACLType type: ACLType.values()) {
+      for (ACLType type: ACLType.values()) {
         if (type.getValue().equals(typeStr)) {
           return type;
         }
@@ -89,6 +92,9 @@ public final class S3Acl {
     }
   }
 
+  /**
+   * TODO: javadoc.
+   */
   enum ACLIdentityType {
     USER("CanonicalUser", true, "id"),
     GROUP("Group", false, "url"),
@@ -133,7 +139,7 @@ public final class S3Acl {
     }
 
     public static ACLIdentityType getTypeFromGranteeType(String typeStr) {
-      for(ACLIdentityType type: ACLIdentityType.values()) {
+      for (ACLIdentityType type: ACLIdentityType.values()) {
         if (type.getGranteeType().equals(typeStr)) {
           return type;
         }
@@ -142,7 +148,7 @@ public final class S3Acl {
     }
 
     public static ACLIdentityType getTypeFromHeaderType(String typeStr) {
-      for(ACLIdentityType type: ACLIdentityType.values()) {
+      for (ACLIdentityType type: ACLIdentityType.values()) {
         if (type.getHeaderType().equals(typeStr)) {
           return type;
         }

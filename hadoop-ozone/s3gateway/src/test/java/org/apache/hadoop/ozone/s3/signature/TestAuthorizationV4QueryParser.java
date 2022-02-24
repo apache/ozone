@@ -27,6 +27,9 @@ import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeySt
 import org.junit.Assert;
 import org.junit.Test;
 
+/**
+ * Tests for {@link AuthorizationV4QueryParser}.
+ */
 public class TestAuthorizationV4QueryParser {
 
   @Test(expected = IllegalArgumentException.class)

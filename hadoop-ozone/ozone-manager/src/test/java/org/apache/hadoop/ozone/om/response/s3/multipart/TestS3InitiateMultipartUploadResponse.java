@@ -31,7 +31,7 @@ public class TestS3InitiateMultipartUploadResponse
     extends TestS3MultipartResponse {
 
   @Test
-  public void addDBToBatch() throws Exception {
+  public void testAddDBToBatch() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
@@ -52,7 +52,8 @@ public class TestS3InitiateMultipartUploadResponse
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
 
-    Assert.assertNotNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNotNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
     Assert.assertNotNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
 

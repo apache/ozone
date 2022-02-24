@@ -24,8 +24,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -41,12 +43,14 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -268,11 +272,28 @@ public interface ClientProtocol {
    * @return {@link OzoneOutputStream}
    *
    */
+  @Deprecated
   OzoneOutputStream createKey(String volumeName, String bucketName,
                               String keyName, long size, ReplicationType type,
                               ReplicationFactor factor,
                               Map<String, String> metadata)
       throws IOException;
+
+  /**
+   * Writes a key in an existing bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param metadata custom key value metadata
+   * @return {@link OzoneOutputStream}
+   *
+   */
+  OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata)
+      throws IOException;
+
 
   /**
    * Reads a key from an existing bucket.
@@ -291,9 +312,12 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
    * @throws IOException
    */
-  void deleteKey(String volumeName, String bucketName, String keyName)
+  void deleteKey(String volumeName, String bucketName, String keyName,
+                 boolean recursive)
       throws IOException;
 
   /**
@@ -404,9 +428,23 @@ public interface ClientProtocol {
    * @return {@link OmMultipartInfo}
    * @throws IOException
    */
+  @Deprecated
   OmMultipartInfo initiateMultipartUpload(String volumeName, String
       bucketName, String keyName, ReplicationType type, ReplicationFactor
       factor) throws IOException;
+
+  /**
+   * Initiate Multipart upload.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param replicationConfig
+   * @return {@link OmMultipartInfo}
+   * @throws IOException
+   */
+  OmMultipartInfo initiateMultipartUpload(String volumeName, String
+      bucketName, String keyName, ReplicationConfig replicationConfig)
+      throws IOException;
 
   /**
    * Create a part key for a multipart upload key.
@@ -509,6 +547,13 @@ public interface ClientProtocol {
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
+   * Revoke S3 Secret of given kerberos user.
+   * @param kerberosID
+   * @throws IOException
+   */
+  void revokeS3Secret(String kerberosID) throws IOException;
+
+  /**
    * Get KMS client provider.
    * @return KMS client provider.
    * @throws IOException
@@ -593,9 +638,36 @@ public interface ClientProtocol {
    *                     invalid arguments
    */
   @SuppressWarnings("checkstyle:parameternumber")
+  @Deprecated
   OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationType type, ReplicationFactor factor,
       boolean overWrite, boolean recursive) throws IOException;
+
+
+  /**
+   * Creates an output stream for writing to a file.
+   *
+   * @param volumeName Volume name
+   * @param bucketName Bucket name
+   * @param keyName    Absolute path of the file to be written
+   * @param size       Size of data to be written
+   * @param replicationConfig Replication config
+   * @param overWrite  if true existing file at the location will be overwritten
+   * @param recursive  if true file would be created even if parent directories
+   *                   do not exist
+   * @return Output stream for writing to the file
+   * @throws OMException if given key is a directory
+   *                     if file exists and isOverwrite flag is false
+   *                     if an ancestor exists as a file
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      boolean overWrite, boolean recursive) throws IOException;
+
 
   /**
    * List the status for a file or a directory and its contents.
@@ -668,4 +740,63 @@ public interface ClientProtocol {
    */
   void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException;
+
+  /**
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object.
+   *
+   * If Key exists, return returns OzoneKey.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @return OzoneKey which gives basic information about the key.
+   * @throws IOException
+   */
+  OzoneKey headObject(String volumeName, String bucketName,
+      String keyName) throws IOException;
+
+  /**
+   * Sets the S3 Authentication information for the requests executed on behalf
+   * of the S3 API implementation within Ozone.
+   * @param s3Auth authentication information for each S3 API call.
+   */
+  void setThreadLocalS3Auth(S3Auth s3Auth);
+
+  /**
+   * Gets the S3 Authentication information that is attached to the thread.
+   * @return S3 Authentication information.
+   */
+  S3Auth getThreadLocalS3Auth();
+
+  /**
+   * Clears the S3 Authentication information attached to the thread.
+   */
+  void clearThreadLocalS3Auth();
+
+  /**
+   * Sets the owner of bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param owner to be set for the bucket
+   * @throws IOException
+   */
+  boolean setBucketOwner(String volumeName, String bucketName,
+      String owner) throws IOException;
+
+  /**
+   * Reads every replica for all the blocks associated with a given key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @return For every OmKeyLocationInfo (represents a block) it is mapped
+   * every replica, which is constructed by the DatanodeDetails and an
+   * inputstream made from the block.
+   * @throws IOException
+   */
+  Map<OmKeyLocationInfo,
+      Map<DatanodeDetails, OzoneInputStream>> getKeysEveryReplicas(
+          String volumeName, String bucketName, String keyName)
+      throws IOException;
 }

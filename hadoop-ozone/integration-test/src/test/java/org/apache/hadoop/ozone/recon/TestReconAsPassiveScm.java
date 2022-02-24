@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -34,8 +34,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -80,6 +80,7 @@ public class TestReconAsPassiveScm {
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
+    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
   }
 
   @After
@@ -116,7 +117,7 @@ public class TestReconAsPassiveScm {
         () -> reconPipelineManager
             .createPipeline(new RatisReplicationConfig(ONE)));
 
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
 
     // Verify if all the 3 nodes are registered with Recon.
@@ -126,7 +127,7 @@ public class TestReconAsPassiveScm {
         reconNodeManager.getAllNodes().size());
 
     // Create container
-    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
             .allocateContainer(new RatisReplicationConfig(ONE), "test");
@@ -157,9 +158,9 @@ public class TestReconAsPassiveScm {
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
     // Stop Recon
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
-    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
     assertTrue(reconContainerManager.getContainers().isEmpty());
 
     LambdaTestUtils.await(60000, 5000,

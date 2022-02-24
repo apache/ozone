@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.genconf;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -144,10 +144,10 @@ public class TestGenerateOzoneRequiredConfigurations {
             throw ex;
           }
         };
-    try{
+    try {
       cmd.parseWithHandlers(new CommandLine.RunLast(),
           exceptionHandler, args);
-    }catch(Exception ex){
+    }  catch (Exception ex) {
       Assert.assertTrue("Expected " + msg + ", but got: " + ex.getMessage(),
           ex.getMessage().contains(msg));
     }

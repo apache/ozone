@@ -110,16 +110,16 @@ public class SCMSnapshotProvider {
     // the downloadClient instance will be created as and when install snapshot
     // request is received. No caching of the client as it should be a very rare
     int port = peerNodesMap.get(leaderSCMNodeID).getGrpcPort();
-    SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-        peerNodesMap.get(leaderSCMNodeID).getInetAddress().getHostAddress(),
-        port, conf, scmCertificateClient);
-    try {
+    String host = peerNodesMap.get(leaderSCMNodeID).getInetAddress()
+            .getHostAddress();
+
+    try (SCMSnapshotDownloader downloadClient =
+        new InterSCMGrpcClient(host, port, conf, scmCertificateClient)) {
       downloadClient.download(targetFile.toPath()).get();
     } catch (ExecutionException | InterruptedException e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
+      Thread.currentThread().interrupt();
       throw new IOException(e);
-    } finally {
-      downloadClient.close();
     }
 
 

@@ -25,6 +25,9 @@ import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
+/**
+ * {@link Codec} for {@link List} objects.
+ */
 public class ListCodec implements Codec {
 
   @Override

@@ -30,7 +30,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -90,12 +91,19 @@ public class TestCloseContainer {
     bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
   }
 
+  @After
+  public void cleanup() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+  }
+
   @Test
   public void testReplicasAreReportedForClosedContainerAfterRestart()
       throws Exception {
     // Create some keys to write data into the open containers
-    for (int i=0; i<10; i++) {
-      TestDataUtil.createKey(bucket, "key"+i, ReplicationFactor.THREE,
+    for (int i = 0; i < 10; i++) {
+      TestDataUtil.createKey(bucket, "key" + i, ReplicationFactor.THREE,
           ReplicationType.RATIS, "this is the content");
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();

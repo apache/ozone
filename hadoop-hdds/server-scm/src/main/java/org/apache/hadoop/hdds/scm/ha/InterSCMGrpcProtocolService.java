@@ -101,8 +101,9 @@ public class InterSCMGrpcProtocolService {
       server.shutdown();
       try {
         server.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
+      } catch (InterruptedException e) {
         LOG.error("failed to shutdown XceiverServerGrpc", e);
+        Thread.currentThread().interrupt();
       }
       isStarted.set(false);
     }

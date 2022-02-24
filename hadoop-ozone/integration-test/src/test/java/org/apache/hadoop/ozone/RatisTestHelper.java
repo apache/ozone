@@ -33,10 +33,14 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newRaftClient;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,5 +128,34 @@ public interface RatisTestHelper {
         newRaftClient(rpc, p, RatisHelper.createRetryPolicy(conf), conf);
     client.getGroupManagementApi(p.getId())
         .add(RatisHelper.newRaftGroup(pipeline));
+  }
+
+  static RaftServer.Division getRaftServerDivision(
+      HddsDatanodeService dn, Pipeline pipeline) throws Exception {
+    if (!pipeline.getNodes().contains(dn.getDatanodeDetails())) {
+      throw new IllegalArgumentException("Pipeline:" + pipeline.getId() +
+          " not exist in datanode:" + dn.getDatanodeDetails().getUuid());
+    }
+
+    XceiverServerRatis server =
+        (XceiverServerRatis) (dn.getDatanodeStateMachine().
+        getContainer().getWriteChannel());
+    return server.getServerDivision(
+        RatisHelper.newRaftGroup(pipeline).getGroupId());
+  }
+
+  static StateMachine getStateMachine(HddsDatanodeService dn,
+      Pipeline pipeline) throws Exception {
+    return getRaftServerDivision(dn, pipeline).getStateMachine();
+  }
+
+  static boolean isRatisLeader(HddsDatanodeService dn, Pipeline pipeline)
+      throws Exception {
+    return getRaftServerDivision(dn, pipeline).getInfo().isLeader();
+  }
+
+  static boolean isRatisFollower(HddsDatanodeService dn,
+      Pipeline pipeline) throws Exception {
+    return getRaftServerDivision(dn, pipeline).getInfo().isFollower();
   }
 }

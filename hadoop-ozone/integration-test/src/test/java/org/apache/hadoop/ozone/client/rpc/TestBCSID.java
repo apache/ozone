@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,7 +30,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -48,12 +49,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.
     HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
-    HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+
 import org.junit.Rule;
 import org.junit.rules.Timeout;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
-    OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Tests the validity BCSID of a container.
@@ -93,6 +94,7 @@ public class TestBCSID {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).setHbInterval(200)
             .build();
@@ -127,8 +129,10 @@ public class TestBCSID {
 
     // get the name of a valid container.
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
-        setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName("ratis")
+        setBucketName(bucketName)
+        .setReplicationConfig(
+            new RatisReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setKeyName("ratis")
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);

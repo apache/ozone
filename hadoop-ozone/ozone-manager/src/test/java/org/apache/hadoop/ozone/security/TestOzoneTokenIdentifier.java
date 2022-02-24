@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.TestSSLFactory;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -218,7 +218,7 @@ public class TestOzoneTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with HmacSha256(RSA/1024 key) is {} ns",
-        duration/testTokenCount);
+        duration / testTokenCount);
 
     startTime = Time.monotonicNowNanos();
     for (int i = 0; i < testTokenCount; i++) {
@@ -226,7 +226,7 @@ public class TestOzoneTokenIdentifier {
     }
     duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token verify time with HmacSha256(RSA/1024 key) "
-        + "is {} ns", duration/testTokenCount);
+        + "is {} ns", duration / testTokenCount);
   }
 
   @Test
@@ -273,7 +273,7 @@ public class TestOzoneTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
-        hmacAlgorithm, keyLen, duration/testTokenCount);
+        hmacAlgorithm, keyLen, duration / testTokenCount);
   }
 
   /*

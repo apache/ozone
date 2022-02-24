@@ -27,13 +27,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -42,7 +39,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -80,7 +76,6 @@ public class KeyOutputStream extends OutputStream {
       LoggerFactory.getLogger(KeyOutputStream.class);
 
   private boolean closed;
-  private FileEncryptionInfo feInfo;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   // how much of data is actually written yet to underlying stream
@@ -91,6 +86,8 @@ public class KeyOutputStream extends OutputStream {
   // not succeed
   private boolean isException;
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
+
+  private long clientID;
 
   /**
    * A constructor for testing purpose only.
@@ -127,37 +124,39 @@ public class KeyOutputStream extends OutputStream {
     return retryCount;
   }
 
+  @VisibleForTesting
+  public long getClientID() {
+    return clientID;
+  }
+
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public KeyOutputStream(
       OzoneClientConfig config,
       OpenKeySession handler,
       XceiverClientFactory xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
-      String requestId, ReplicationFactor factor, ReplicationType type,
+      String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion
   ) {
     this.config = config;
-    OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(
             config,
             omClient,
-            requestId, factor, type,
+            requestId, replicationConfig,
             uploadID, partNumber,
-            isMultipart, info,
+            isMultipart, handler.getKeyInfo(),
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId());
 
-    // Retrieve the file encryption key info, null if file is not in
-    // encrypted bucket.
-    this.feInfo = info.getFileEncryptionInfo();
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
+    this.clientID = handler.getId();
   }
 
   /**
@@ -300,8 +299,7 @@ public class KeyOutputStream extends OutputStream {
     Pipeline pipeline = streamEntry.getPipeline();
     PipelineID pipelineId = pipeline.getId();
     long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
-    //set the correct length for the current stream
-    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
+    streamEntry.resetToAckedPosition();
     long bufferedDataLen = blockOutputStreamEntryPool.computeBufferData();
     if (containerExclusionException) {
       LOG.debug(
@@ -535,10 +533,6 @@ public class KeyOutputStream extends OutputStream {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
 
-  public FileEncryptionInfo getFileEncryptionInfo() {
-    return feInfo;
-  }
-
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockOutputStreamEntryPool.getExcludeList();
@@ -549,17 +543,16 @@ public class KeyOutputStream extends OutputStream {
    */
   public static class Builder {
     private OpenKeySession openHandler;
-    private XceiverClientManager xceiverManager;
+    private XceiverClientFactory xceiverManager;
     private OzoneManagerProtocol omClient;
     private int chunkSize;
     private String requestID;
-    private ReplicationType type;
-    private ReplicationFactor factor;
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
+    private ReplicationConfig replicationConfig;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -576,7 +569,7 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setXceiverClientManager(XceiverClientManager manager) {
+    public Builder setXceiverClientManager(XceiverClientFactory manager) {
       this.xceiverManager = manager;
       return this;
     }
@@ -596,16 +589,6 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setType(ReplicationType replicationType) {
-      this.type = replicationType;
-      return this;
-    }
-
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
-      return this;
-    }
-
     public Builder setIsMultipartKey(boolean isMultipart) {
       this.isMultipartKey = isMultipart;
       return this;
@@ -621,6 +604,12 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+
+    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+      this.replicationConfig = replConfig;
+      return this;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(
           clientConfig,
@@ -629,13 +618,13 @@ public class KeyOutputStream extends OutputStream {
           omClient,
           chunkSize,
           requestID,
-          factor,
-          type,
+          replicationConfig,
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion);
     }
+
   }
 
   /**

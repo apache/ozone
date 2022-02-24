@@ -40,7 +40,11 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -85,7 +89,7 @@ public class TestOzoneContainer {
       Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
       Mockito.when(context.getParent()).thenReturn(dsm);
       container = new OzoneContainer(datanodeDetails, conf, context, null);
-      //Set scmId and manually start ozone container.
+      //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
@@ -128,10 +132,10 @@ public class TestOzoneContainer {
       container = new OzoneContainer(datanodeDetails, conf,
           context, null);
 
-      String scmId = UUID.randomUUID().toString();
-      container.start(scmId);
+      String clusterId = UUID.randomUUID().toString();
+      container.start(clusterId);
       try {
-        container.start(scmId);
+        container.start(clusterId);
       } catch (Exception e) {
         Assert.fail();
       }
@@ -231,18 +235,9 @@ public class TestOzoneContainer {
           getChunksCount();
       ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
 
-
-      // Delete Block
-      request =
-          ContainerTestHelper.getDeleteBlockRequest(
-              pipeline, putBlockRequest.getPutBlock());
-      response = client.sendCommand(request);
-      Assert.assertNotNull(response);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
-      //Delete Chunk
-      request = ContainerTestHelper.getDeleteChunkRequest(
-          pipeline, writeChunkRequest.getWriteChunk());
+      // Delete Block and Delete Chunk are handled by BlockDeletingService
+      // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
+      // are deprecated
 
       response = client.sendCommand(request);
       Assert.assertNotNull(response);
@@ -397,10 +392,6 @@ public class TestOzoneContainer {
           .getChunksCount();
       ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
 
-      // Delete block must fail on a closed container.
-      request =
-          ContainerTestHelper.getDeleteBlockRequest(client.getPipeline(),
-              putBlockRequest.getPutBlock());
       response = client.sendCommand(request);
       Assert.assertNotNull(response);
       Assert.assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO,
@@ -487,7 +478,7 @@ public class TestOzoneContainer {
       final List<CompletableFuture> computeResults = new LinkedList<>();
       int requestCount = 1000;
       // Create a bunch of Async calls from this test.
-      for(int x = 0; x <requestCount; x++) {
+      for (int x = 0; x < requestCount; x++) {
         BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
         final ContainerProtos.ContainerCommandRequestProto smallFileRequest
             = ContainerTestHelper.getWriteSmallFileRequest(

@@ -36,13 +36,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
@@ -115,7 +115,7 @@ public class TestOzoneManagerRatisServer {
     secConfig = new SecurityConfig(conf);
     certClient = new OMCertificateClient(secConfig);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-      omNodeDetails, Collections.emptyList(), secConfig, certClient);
+      omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();
   }
 
@@ -155,7 +155,7 @@ public class TestOzoneManagerRatisServer {
 
     // Start new Ratis server. It should pick up and load the new SnapshotInfo
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
-        omNodeDetails, Collections.emptyList(), secConfig, certClient);
+        omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();
     TermIndex lastAppliedTermIndex =
         omRatisServer.getLastAppliedTermIndex();
@@ -185,7 +185,7 @@ public class TestOzoneManagerRatisServer {
       OmUtils.isReadOnly(request);
       assertFalse(cmdtype + " is not categorized in " +
               "OmUtils#isReadyOnly",
-          logCapturer.getOutput().contains("CmdType " + cmdtype +" is not " +
+          logCapturer.getOutput().contains("CmdType " + cmdtype + " is not " +
               "categorized as readOnly or not."));
       logCapturer.clearOutput();
     }
@@ -225,7 +225,7 @@ public class TestOzoneManagerRatisServer {
     omRatisServer.stop();
     OzoneManagerRatisServer newOmRatisServer = OzoneManagerRatisServer
         .newOMRatisServer(newConf, ozoneManager, nodeDetails,
-            Collections.emptyList(), secConfig, certClient);
+            Collections.emptyMap(), secConfig, certClient, false);
     newOmRatisServer.start();
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));

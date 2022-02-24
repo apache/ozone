@@ -48,7 +48,7 @@ public class IncrementalContainerReportHandler extends
 
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
-      final ContainerManagerV2 containerManager,
+      final ContainerManager containerManager,
       final SCMContext scmContext) {
     super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
@@ -71,31 +71,37 @@ public class IncrementalContainerReportHandler extends
     }
 
     boolean success = true;
-    for (ContainerReplicaProto replicaProto :
-        report.getReport().getReportList()) {
-      try {
-        final ContainerID id = ContainerID.valueOf(
-            replicaProto.getContainerID());
-        if (!replicaProto.getState().equals(
-            ContainerReplicaProto.State.DELETED)) {
-          nodeManager.addContainer(dd, id);
+    // HDDS-5249 - we must ensure that an ICR and FCR for the same datanode
+    // do not run at the same time or it can result in a data consistency
+    // issue between the container list in NodeManager and the replicas in
+    // ContainerManager.
+    synchronized (dd) {
+      for (ContainerReplicaProto replicaProto :
+          report.getReport().getReportList()) {
+        try {
+          final ContainerID id = ContainerID.valueOf(
+              replicaProto.getContainerID());
+          if (!replicaProto.getState().equals(
+              ContainerReplicaProto.State.DELETED)) {
+            nodeManager.addContainer(dd, id);
+          }
+          processContainerReplica(dd, replicaProto, publisher);
+        } catch (ContainerNotFoundException e) {
+          success = false;
+          LOG.warn("Container {} not found!", replicaProto.getContainerID());
+        } catch (NodeNotFoundException ex) {
+          success = false;
+          LOG.error("Received ICR from unknown datanode {}",
+              report.getDatanodeDetails(), ex);
+        } catch (ContainerReplicaNotFoundException e) {
+          success = false;
+          LOG.warn("Container {} replica not found!",
+              replicaProto.getContainerID());
+        } catch (IOException | InvalidStateTransitionException e) {
+          success = false;
+          LOG.error("Exception while processing ICR for container {}",
+              replicaProto.getContainerID(), e);
         }
-        processContainerReplica(dd, replicaProto, publisher);
-      } catch (ContainerNotFoundException e) {
-        success = false;
-        LOG.warn("Container {} not found!", replicaProto.getContainerID());
-      } catch (NodeNotFoundException ex) {
-        success = false;
-        LOG.error("Received ICR from unknown datanode {}",
-            report.getDatanodeDetails(), ex);
-      } catch (ContainerReplicaNotFoundException e){
-        success = false;
-        LOG.warn("Container {} replica not found!",
-            replicaProto.getContainerID());
-      } catch (IOException | InvalidStateTransitionException e) {
-        success = false;
-        LOG.error("Exception while processing ICR for container {}",
-            replicaProto.getContainerID(), e);
       }
     }
 

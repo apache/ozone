@@ -27,12 +27,15 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
@@ -141,6 +144,17 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setGetLatestCrlIdResponseProto(getLatestCrlId(
                 request.getGetLatestCrlIdRequest()))
             .build();
+      case RevokeCertificates:
+        return SCMSecurityResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setRevokeCertificatesResponseProto(revokeCertificates(
+                request.getRevokeCertificatesRequest()))
+            .build();
+      case GetCert:
+        return scmSecurityResponse.setGetCertResponseProto(
+            getCertificate(request.getGetCertRequest()))
+            .build();
+
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -201,6 +215,28 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
     return builder.build();
 
+  }
+
+  /**
+   * Get SCM signed certificate.
+   *
+   * @param request
+   * @return SCMGetCertResponseProto.
+   */
+  public SCMGetCertResponseProto getCertificate(
+      SCMGetCertRequestProto request) throws IOException {
+    String certificate = impl
+        .getCertificate(request.getNodeDetails(),
+            request.getCSR());
+    SCMGetCertResponseProto.Builder builder =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(ResponseCode.success)
+            .setX509Certificate(certificate)
+            .setX509CACertificate(impl.getCACertificate());
+    setRootCAIfNeeded(builder);
+
+    return builder.build();
   }
 
   /**
@@ -322,6 +358,14 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     return builder.build();
   }
 
+  public SCMRevokeCertificatesResponseProto revokeCertificates(
+      SCMRevokeCertificatesRequestProto request) throws IOException {
+    SCMRevokeCertificatesResponseProto.Builder builder =
+        SCMRevokeCertificatesResponseProto.newBuilder().setCrlId(
+            impl.revokeCertificates(request.getCertIdsList(),
+                request.getReason().getNumber(), request.getRevokeTime()));
+    return builder.build();
+  }
 
   public SCMGetCertResponseProto getRootCACertificate() throws IOException {
     if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {

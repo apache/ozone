@@ -26,7 +26,7 @@ import java.io.File;
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.fs.TestDU.createFile;
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.junit.Assert.assertTrue;
 
 /**

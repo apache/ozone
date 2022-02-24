@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.event.Level;
@@ -109,7 +109,7 @@ public class TestOMFailovers {
     public OMResponse submitRequest(RpcController controller,
         OzoneManagerProtocolProtos.OMRequest request) throws ServiceException {
       throw new ServiceException("ServiceException of type " +
-          exception.getClass() + " for "+ omNodeId, exception);
+          exception.getClass() + " for " + omNodeId, exception);
     }
   }
 
@@ -118,7 +118,7 @@ public class TestOMFailovers {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {
-      super(configuration, null, null);
+      super(configuration, null, null, OzoneManagerProtocolPB.class);
     }
 
     @Override

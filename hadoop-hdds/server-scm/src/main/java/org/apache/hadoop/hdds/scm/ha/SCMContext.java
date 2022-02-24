@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -46,20 +48,18 @@ public final class SCMContext {
    */
   public static final long INVALID_TERM = -1;
 
-  private static final SCMContext EMPTY_CONTEXT
-      = new SCMContext.Builder().build();
-
   /**
    * Used by non-HA mode SCM, Recon and Unit Tests.
    */
   public static SCMContext emptyContext() {
-    return EMPTY_CONTEXT;
+    return new SCMContext.Builder().buildMaybeInvalid();
   }
 
   /**
    * Raft related info.
    */
   private boolean isLeader;
+  private boolean isLeaderReady;
   private long term;
 
   /**
@@ -67,15 +67,17 @@ public final class SCMContext {
    */
   private SafeModeStatus safeModeStatus;
 
-  private final StorageContainerManager scm;
+  private final OzoneStorageContainerManager scm;
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
   private SCMContext(boolean isLeader, long term,
-      final SafeModeStatus safeModeStatus, final StorageContainerManager scm) {
+      final SafeModeStatus safeModeStatus,
+      final OzoneStorageContainerManager scm) {
     this.isLeader = isLeader;
     this.term = term;
     this.safeModeStatus = safeModeStatus;
     this.scm = scm;
+    this.isLeaderReady = false;
   }
 
   /**
@@ -89,6 +91,12 @@ public final class SCMContext {
           isLeader, term, leader, newTerm);
 
       isLeader = leader;
+      // If it is not leader, set isLeaderReady to false.
+      if (!isLeader) {
+        isLeaderReady = false;
+        LOG.info("update <isLeaderReady> from <{}> to <{}>", isLeaderReady,
+            false);
+      }
       term = newTerm;
     } finally {
       lock.writeLock().unlock();
@@ -96,7 +104,31 @@ public final class SCMContext {
   }
 
   /**
+   * Set isLeaderReady flag to true, this indicate leader is ready to accept
+   * transactions.
+   *
+   * On the leader SCM once all the previous leader term transaction are
+   * applied, this will be called to set the isLeaderReady to true.
+   *
+   */
+  public void setLeaderReady() {
+    lock.writeLock().lock();
+    try {
+      LOG.info("update <isLeaderReady> from <{}> to <{}>",
+          isLeaderReady, true);
+
+      isLeaderReady = true;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
    * Check whether current SCM is leader or not.
+   *
+   * Use this API to know if SCM can send a command to DN once after it is
+   * elected as leader.
+   * True - it is leader, else false.
    *
    * @return isLeader
    */
@@ -108,6 +140,34 @@ public final class SCMContext {
       }
 
       return isLeader;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+
+  /**
+   * Check whether current SCM is leader ready.
+   *
+   * Use this API to know when all the previous leader term transactions are
+   * applied and the SCM DB/in-memory state is latest state and then only
+   * particular command/action need to be taken by SCM.
+   *
+   * In general all background services should use this API to start their
+   * service.
+   *
+   * True - it is leader and ready, else false.
+   *
+   * @return isLeaderReady
+   */
+  public boolean isLeaderReady() {
+    lock.readLock().lock();
+    try {
+      if (term == INVALID_TERM) {
+        return true;
+      }
+
+      return isLeaderReady;
     } finally {
       lock.readLock().unlock();
     }
@@ -128,9 +188,13 @@ public final class SCMContext {
 
       if (!isLeader) {
         LOG.warn("getTerm is invoked when not leader.");
-        throw scm.getScmHAManager()
-            .getRatisServer()
-            .triggerNotLeaderException();
+        if (scm instanceof StorageContainerManager) {
+          StorageContainerManager storageContainerManager =
+                  (StorageContainerManager) scm;
+          throw storageContainerManager.getScmHAManager()
+                  .getRatisServer()
+                  .triggerNotLeaderException();
+        }
       }
       return term;
     } finally {
@@ -172,11 +236,13 @@ public final class SCMContext {
   /**
    * @return StorageContainerManager
    */
-  public StorageContainerManager getScm() {
-    Preconditions.checkNotNull(scm, "scm == null");
+  public OzoneStorageContainerManager getScm() {
     return scm;
   }
 
+  /**
+   * Builder for SCMContext.
+   */
   public static class Builder {
     /**
      * The default context:
@@ -186,7 +252,7 @@ public final class SCMContext {
     private long term = INVALID_TERM;
     private boolean isInSafeMode = false;
     private boolean isPreCheckComplete = true;
-    private StorageContainerManager scm = null;
+    private OzoneStorageContainerManager scm = null;
 
     public Builder setLeader(boolean leader) {
       this.isLeader = leader;
@@ -208,12 +274,22 @@ public final class SCMContext {
       return this;
     }
 
-    public Builder setSCM(StorageContainerManager storageContainerManager) {
+    public Builder setSCM(
+        OzoneStorageContainerManager storageContainerManager) {
       this.scm = storageContainerManager;
       return this;
     }
 
     public SCMContext build() {
+      Preconditions.checkNotNull(scm, "scm == null");
+      return buildMaybeInvalid();
+    }
+
+    /**
+     * Allows {@code null} SCM.  Only for tests.
+     */
+    @VisibleForTesting
+    SCMContext buildMaybeInvalid() {
       return new SCMContext(
           isLeader,
           term,

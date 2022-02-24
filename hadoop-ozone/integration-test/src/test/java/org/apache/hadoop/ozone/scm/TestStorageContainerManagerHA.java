@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.scm;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -36,7 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -57,7 +58,7 @@ import java.io.IOException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
 /**
  * Base class for Ozone Manager HA tests.
@@ -87,6 +88,7 @@ public class TestStorageContainerManagerHA {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
@@ -153,7 +155,7 @@ public class TestStorageContainerManagerHA {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket
-        .createKey(keyName, value.getBytes(UTF_8).length, STAND_ALONE, ONE,
+        .createKey(keyName, value.getBytes(UTF_8).length, RATIS, ONE,
             new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
@@ -167,8 +169,10 @@ public class TestStorageContainerManagerHA {
     Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     is.close();
     final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setReplicationConfig(new RatisReplicationConfig(
+            HddsProtos.ReplicationFactor.ONE))
+        .setKeyName(keyName)
         .setRefreshPipeline(true).build();
     final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     final List<OmKeyLocationInfo> keyLocationInfos =

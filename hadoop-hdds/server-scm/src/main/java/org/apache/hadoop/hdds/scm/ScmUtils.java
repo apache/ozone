@@ -37,6 +37,7 @@ import java.util.OptionalInt;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
@@ -95,12 +96,18 @@ public final class ScmUtils {
         OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, localScmServiceId, nodeId);
     final OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
 
+    if (port.isPresent()) {
+      logWarn(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+          OZONE_SCM_BLOCK_CLIENT_PORT_KEY);
+    }
     return NetUtils.createSocketAddr(
         host.orElse(
-            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(conf.getInt(ConfUtils.addKeySuffixes(
-                OZONE_SCM_BLOCK_CLIENT_PORT_KEY, localScmServiceId, nodeId),
-                OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT)));
+            OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT) + ":" +
+            port.orElse(conf.getInt(
+                ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+                    localScmServiceId, nodeId),
+                conf.getInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+                    OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT))));
   }
 
   public static String getScmBlockProtocolServerAddressKey(
@@ -120,11 +127,18 @@ public final class ScmUtils {
     String addressKey = ConfUtils.addKeySuffixes(
         OZONE_SCM_CLIENT_ADDRESS_KEY, localScmServiceId, nodeId);
 
-    final int port = getPortNumberFromConfigKeys(conf, addressKey)
-        .orElse(conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
-            localScmServiceId, nodeId), OZONE_SCM_CLIENT_PORT_DEFAULT));
+    OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
 
-    return NetUtils.createSocketAddr(host + ":" + port);
+    if (port.isPresent()) {
+      logWarn(OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_CLIENT_PORT_KEY);
+    }
+
+    return NetUtils.createSocketAddr(host + ":" +
+        port.orElse(
+            conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
+                localScmServiceId, nodeId),
+            conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
+                OZONE_SCM_CLIENT_PORT_DEFAULT))));
   }
 
   public static String getClientProtocolServerAddressKey(
@@ -136,20 +150,22 @@ public final class ScmUtils {
   public static InetSocketAddress getScmDataNodeBindAddress(
       ConfigurationSource conf, String localScmServiceId, String nodeId) {
     String bindHostKey = ConfUtils.addKeySuffixes(
-        OZONE_SCM_DATANODE_BIND_HOST_KEY,
-        localScmServiceId, nodeId
-    );
+        OZONE_SCM_DATANODE_BIND_HOST_KEY, localScmServiceId, nodeId);
     final Optional<String> host = getHostNameFromConfigKeys(conf, bindHostKey);
     String addressKey = ConfUtils.addKeySuffixes(
-        OZONE_SCM_DATANODE_ADDRESS_KEY, localScmServiceId,
-        nodeId);
+        OZONE_SCM_DATANODE_ADDRESS_KEY, localScmServiceId, nodeId);
     final OptionalInt port = getPortNumberFromConfigKeys(conf, addressKey);
+
+    if (port.isPresent()) {
+      logWarn(OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY);
+    }
 
     return NetUtils.createSocketAddr(
         host.orElse(OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
             port.orElse(conf.getInt(ConfUtils.addKeySuffixes(
                 OZONE_SCM_DATANODE_PORT_KEY, localScmServiceId, nodeId),
-                OZONE_SCM_DATANODE_PORT_DEFAULT)));
+                conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                    OZONE_SCM_DATANODE_PORT_DEFAULT))));
   }
 
   public static String getScmDataNodeBindAddressKey(
@@ -158,4 +174,21 @@ public final class ScmUtils {
         OZONE_SCM_DATANODE_ADDRESS_KEY,
         serviceId, nodeId);
   }
+
+  private static void logWarn(String confKey, String portKey) {
+    LOG.warn("ConfigKey {} is deprecated, For configuring different ports " +
+            "for each SCM use PortConfigKey {} appended with serviceId and " +
+            "nodeId. If want to configure same port configure {}", confKey,
+        portKey, portKey);
+  }
+
+  public static boolean shouldRemovePeers(final ConfigurationSource conf) {
+    int pipelineLimitPerDn =
+        conf.getInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
+    return (1 != pipelineLimitPerDn && conf
+        .getBoolean(ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS,
+            ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT));
+  }
+
 }

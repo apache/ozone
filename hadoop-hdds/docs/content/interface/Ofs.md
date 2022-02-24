@@ -82,10 +82,10 @@ This will make all the volumes and buckets to be the default Hadoop compatible f
 You also need to add the ozone-filesystem-hadoop3.jar file to the classpath:
 
 {{< highlight bash >}}
-export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
+export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
 {{< /highlight >}}
 
-(Note: with Hadoop 2.x, use the `hadoop-ozone-filesystem-hadoop2-*.jar`)
+(Note: with Hadoop 2.x, use the `ozone-filesystem-hadoop2-*.jar`)
 
 Once the default Filesystem has been setup, users can run commands like ls, put, mkdir, etc.
 For example:
@@ -109,10 +109,6 @@ hdfs dfs -put /etc/hosts /volume1/bucket1/test
 {{< /highlight >}}
 
 For more usage, see: https://issues.apache.org/jira/secure/attachment/12987636/Design%20ofs%20v1.pdf
-
-## Special note
-
-Trash is disabled even if `fs.trash.interval` is set on purpose. (HDDS-3982)
 
 ## Differences from [o3fs]({{< ref "interface/O3fs.md" >}})
 
@@ -198,6 +194,20 @@ $ ozone fs -touch /tmp/key1
 
 ## Delete with trash enabled
 
+In order to enable trash in Ozone, Please add these configs to core-site.xml
+
+{{< highlight xml >}}
+<property>
+<name>fs.trash.interval</name>
+<value>10</value>
+</property>
+<property>
+<name>fs.trash.classname</name>
+<value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+</property>
+{{< /highlight >}}
+                                           
+ 
 When keys are deleted with trash enabled, they are moved to a trash directory
 under each bucket, because keys aren't allowed to be moved(renamed) between
 buckets in Ozone.
@@ -208,6 +218,13 @@ $ ozone fs -rm /volume1/bucket1/key1
 ```
 
 This is very similar to how the HDFS encryption zone handles trash location.
+
+**Note**
+ 
+ 1.The flag `-skipTrash` can be used to delete files permanently without being moved to trash.
+ 
+ 2.Deletes at bucket or volume level with trash enabled are not allowed. One must use skipTrash in such cases.
+ i.e `ozone fs -rm -R ofs://vol1/bucket1` or  `ozone fs -rm -R o3fs://bucket1.vol1` are not allowed without skipTrash
 
 ## Recursive listing
 
@@ -222,6 +239,3 @@ This feature wouldn't degrade server performance as the loop is on the client.
 Think it as a client is issuing multiple requests to the server to get all the
 information.
 
-## Special note
-
-Trash is disabled even if `fs.trash.interval` is set on purpose. (HDDS-3982)

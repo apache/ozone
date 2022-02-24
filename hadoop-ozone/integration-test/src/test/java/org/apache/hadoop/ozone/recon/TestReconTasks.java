@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.After;
@@ -102,7 +102,7 @@ public class TestReconTasks {
     LambdaTestUtils.await(60000, 5000,
         () -> (reconPipelineManager.getPipelines().size() >= 1));
 
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
         (ReconContainerManager) reconScm.getContainerManager();
     ContainerInfo containerInfo =

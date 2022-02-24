@@ -24,6 +24,9 @@ import org.apache.hadoop.ozone.s3.EmptyContentTypeFilter.EnumerationWrapper;
 import org.junit.Assert;
 import org.junit.Test;
 
+/**
+ * Tests for {@link EmptyContentTypeFilter}.
+ */
 public class TestEmptyContentTypeFilter {
 
   @Test

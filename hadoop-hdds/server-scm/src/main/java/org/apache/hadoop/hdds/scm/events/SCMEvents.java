@@ -20,11 +20,11 @@
 package org.apache.hadoop.hdds.scm.events;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CRLStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -58,7 +58,7 @@ public final class SCMEvents {
       "Node_Registration_Container_Report");
 
   /**
-   * ContainerReports are send out by Datanodes. This report is received by
+   * ContainerReports are sent out by Datanodes. This report is received by
    * SCMDatanodeHeartbeatDispatcher and Container_Report Event is generated.
    */
   public static final TypedEvent<ContainerReportFromDatanode> CONTAINER_REPORT =
@@ -171,8 +171,18 @@ public final class SCMEvents {
    * This event will be triggered whenever a datanode is moved from non-healthy
    * state to healthy state.
    */
-  public static final TypedEvent<DatanodeDetails> NON_HEALTHY_TO_HEALTHY_NODE =
-      new TypedEvent<>(DatanodeDetails.class, "NON_HEALTHY_TO_HEALTHY_NODE");
+  public static final TypedEvent<DatanodeDetails>
+      HEALTHY_READONLY_TO_HEALTHY_NODE =
+      new TypedEvent<>(DatanodeDetails.class,
+          "HEALTHY_READONLY_TO_HEALTHY_NODE");
+
+  /**
+   * This event will be triggered whenever a datanode is moved to a
+   * healthy-readonly state.
+   */
+  public static final TypedEvent<DatanodeDetails>
+      HEALTHY_READONLY_NODE =
+      new TypedEvent<>(DatanodeDetails.class, "HEALTHY_READONLY_NODE");
 
   /**
    * This event will be triggered by CommandStatusReportHandler whenever a
@@ -183,16 +193,17 @@ public final class SCMEvents {
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
 
-  /**
-   * This event will be triggered while processing container reports from DN
-   * when deleteTransactionID of container in report mismatches with the
-   * deleteTransactionID on SCM.
-   */
-  public static final Event<PendingDeleteStatusList> PENDING_DELETE_STATUS =
-      new TypedEvent<>(PendingDeleteStatusList.class, "Pending_Delete_Status");
-
   public static final TypedEvent<SafeModeStatus> SAFE_MODE_STATUS =
       new TypedEvent<>(SafeModeStatus.class, "Safe mode status");
+
+  /**
+   * A CRL status report will be sent by datanodes. This report is received
+   * and processed by SCMDatanodeHeartbeatDispatcher.
+   */
+  public static final TypedEvent<CRLStatusReportFromDatanode>
+      CRL_STATUS_REPORT =
+      new TypedEvent<>(CRLStatusReportFromDatanode.class,
+          "Crl_Status_Report");
 
   /**
    * Private Ctor. Never Constructed.

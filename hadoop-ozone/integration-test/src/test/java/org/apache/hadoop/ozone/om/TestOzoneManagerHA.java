@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -36,9 +36,10 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Before;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.BeforeClass;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Assert;
 
@@ -68,12 +69,14 @@ import static org.junit.Assert.fail;
  */
 public abstract class TestOzoneManagerHA {
 
-  private MiniOzoneOMHAClusterImpl cluster = null;
-  private ObjectStore objectStore;
-  private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omServiceId;
+  private static MiniOzoneHAClusterImpl cluster = null;
+  private static MiniOzoneCluster.Builder clusterBuilder = null;
+  private static ObjectStore objectStore;
+  private static OzoneConfiguration conf;
+  private static String clusterId;
+  private static String scmId;
+  private static String omId;
+  private static String omServiceId;
   private static int numOfOMs = 3;
   private static final int LOG_PURGE_GAP = 50;
   /* Reduce max number of retries to speed up unit test. */
@@ -86,9 +89,9 @@ public abstract class TestOzoneManagerHA {
   public ExpectedException exception = ExpectedException.none();
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);;
+  public Timeout timeout = Timeout.seconds(300);
 
-  public MiniOzoneOMHAClusterImpl getCluster() {
+  public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
   }
 
@@ -98,6 +101,10 @@ public abstract class TestOzoneManagerHA {
 
   public OzoneConfiguration getConf() {
     return conf;
+  }
+
+  public MiniOzoneCluster.Builder getClusterBuilder() {
+    return clusterBuilder;
   }
 
   public String getOmServiceId() {
@@ -131,12 +138,13 @@ public abstract class TestOzoneManagerHA {
    *
    * @throws IOException
    */
-  @Before
-  public void init() throws Exception {
+  @BeforeClass
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
+    omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
@@ -164,22 +172,37 @@ public abstract class TestOzoneManagerHA {
      */
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
-    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+
+    clusterBuilder = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .build();
+        .setOmId(omId)
+        .setNumOfOzoneManagers(numOfOMs);
+
+    cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
         .getObjectStore();
   }
 
+
   /**
-   * Shutdown MiniDFSCluster.
+   * Reset cluster between tests.
    */
   @After
-  public void shutdown() {
+  public void resetCluster()
+      throws IOException {
+    if (cluster != null) {
+      cluster.restartOzoneManager();
+    }
+  }
+
+  /**
+   * Shutdown MiniDFSCluster after all tests of a class have run.
+   */
+  @AfterClass
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -187,13 +210,14 @@ public abstract class TestOzoneManagerHA {
 
   /**
    * Create a key in the bucket.
+   *
    * @return the key name.
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
     String data = "data" + RandomStringUtils.randomNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), ReplicationType.STAND_ALONE,
+        data.length(), ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
@@ -230,6 +254,7 @@ public abstract class TestOzoneManagerHA {
 
   /**
    * Stop the current leader OM.
+   *
    * @throws Exception
    */
   protected void stopLeaderOM() {
@@ -290,6 +315,7 @@ public abstract class TestOzoneManagerHA {
   /**
    * This method createFile and verifies the file is successfully created or
    * not.
+   *
    * @param ozoneBucket
    * @param keyName
    * @param data
@@ -298,7 +324,8 @@ public abstract class TestOzoneManagerHA {
    * @throws Exception
    */
   protected void testCreateFile(OzoneBucket ozoneBucket, String keyName,
-      String data, boolean recursive, boolean overwrite)
+                                String data, boolean recursive,
+                                boolean overwrite)
       throws Exception {
 
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createFile(keyName,
@@ -321,6 +348,62 @@ public abstract class TestOzoneManagerHA {
     byte[] fileContent = new byte[data.getBytes(UTF_8).length];
     ozoneInputStream.read(fileContent);
     Assert.assertEquals(data, new String(fileContent, UTF_8));
+  }
+
+  protected void createKeyTest(boolean checkSuccess) throws Exception {
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(adminName)
+        .build();
+
+    try {
+      getObjectStore().createVolume(volumeName, createVolumeArgs);
+
+      OzoneVolume retVolumeinfo = getObjectStore().getVolume(volumeName);
+
+      Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
+      Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
+      Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
+
+      String bucketName = UUID.randomUUID().toString();
+      String keyName = UUID.randomUUID().toString();
+      retVolumeinfo.createBucket(bucketName);
+
+      OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
+
+      Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+      Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
+
+      String value = "random data";
+      OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
+          value.length(), ReplicationType.RATIS,
+          ReplicationFactor.ONE, new HashMap<>());
+      ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
+      ozoneOutputStream.close();
+
+      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
+
+      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+      ozoneInputStream.read(fileContent);
+      Assert.assertEquals(value, new String(fileContent, UTF_8));
+
+    } catch (ConnectException | RemoteException e) {
+      if (!checkSuccess) {
+        // If the last OM to be tried by the RetryProxy is down, we would get
+        // ConnectException. Otherwise, we would get a RemoteException from the
+        // last running OM as it would fail to get a quorum.
+        if (e instanceof RemoteException) {
+          GenericTestUtils.assertExceptionContains(
+              "OMNotLeaderException", e);
+        }
+      } else {
+        throw e;
+      }
+    }
   }
 
 }

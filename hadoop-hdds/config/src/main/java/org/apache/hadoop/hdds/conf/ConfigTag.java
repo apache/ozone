@@ -45,5 +45,6 @@ public enum ConfigTag {
   RECON,
   DELETION,
   HA,
-  BALANCER
+  BALANCER,
+  UPGRADE
 }

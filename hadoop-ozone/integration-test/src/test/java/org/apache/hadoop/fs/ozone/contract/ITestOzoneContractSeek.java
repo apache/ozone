@@ -31,6 +31,7 @@ import org.junit.BeforeClass;
  * Ozone contract tests covering file seek.
  */
 public class ITestOzoneContractSeek extends AbstractContractSeekTest {
+
   @BeforeClass
   public static void createCluster() throws IOException {
     OzoneContract.createCluster();

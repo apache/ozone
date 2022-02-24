@@ -21,6 +21,9 @@ import com.google.common.primitives.Longs;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+/**
+ * {@link Codec} for {@code Long} objects.
+ */
 public class LongCodec implements Codec {
 
   @Override

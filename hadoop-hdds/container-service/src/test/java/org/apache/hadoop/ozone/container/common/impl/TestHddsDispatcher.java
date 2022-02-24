@@ -36,22 +36,24 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
@@ -65,7 +67,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -80,18 +81,18 @@ import static org.mockito.Mockito.verify;
 @RunWith(Parameterized.class)
 public class TestHddsDispatcher {
 
-  public static final Consumer<ContainerReplicaProto> NO_OP_ICR_SENDER =
-      c -> {};
+  public static final IncrementalReportSender<Container>
+      NO_OP_ICR_SENDER = c -> { };
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestHddsDispatcher(ChunkLayOutVersion layout) {
+  public TestHddsDispatcher(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Test
@@ -100,8 +101,10 @@ public class TestHddsDispatcher {
         TestHddsDispatcher.class.getSimpleName());
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
     DatanodeDetails dd = randomDatanodeDetails();
-    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf);
+    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf,
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     try {
       UUID scmId = UUID.randomUUID();
@@ -162,6 +165,7 @@ public class TestHddsDispatcher {
       UUID scmId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest =
@@ -197,6 +201,7 @@ public class TestHddsDispatcher {
       UUID scmId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest =
@@ -238,6 +243,7 @@ public class TestHddsDispatcher {
       UUID scmId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
@@ -277,7 +283,8 @@ public class TestHddsDispatcher {
   private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet();
-    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf);
+    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);

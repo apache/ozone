@@ -44,6 +44,7 @@ import java.util.List;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 
 /**
  * Endpoint to fetch current state of ozone cluster.
@@ -81,7 +82,8 @@ public class ClusterStateEndpoint {
     int containers = this.containerManager.getContainers().size();
     int pipelines = this.pipelineManager.getPipelines().size();
     int healthyDatanodes =
-        nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
+        nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
+            nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
     SCMNodeStat stats = nodeManager.getStats();
     DatanodeStorageReport storageReport =
         new DatanodeStorageReport(stats.getCapacity().get(),
@@ -91,17 +93,29 @@ public class ClusterStateEndpoint {
         TableCountTask.getRowKeyFromTable(VOLUME_TABLE));
     GlobalStats bucketRecord = globalStatsDao.findById(
         TableCountTask.getRowKeyFromTable(BUCKET_TABLE));
+    // Keys from OBJECT_STORE buckets.
     GlobalStats keyRecord = globalStatsDao.findById(
         TableCountTask.getRowKeyFromTable(KEY_TABLE));
+    // Keys from FILE_SYSTEM_OPTIMIZED buckets
+    GlobalStats fileRecord = globalStatsDao.findById(
+        TableCountTask.getRowKeyFromTable(FILE_TABLE));
+
     if (volumeRecord != null) {
       builder.setVolumes(volumeRecord.getValue());
     }
     if (bucketRecord != null) {
       builder.setBuckets(bucketRecord.getValue());
     }
+
+    Long totalKeys = 0L;
     if (keyRecord != null) {
-      builder.setKeys(keyRecord.getValue());
+      totalKeys += keyRecord.getValue();
     }
+    if (fileRecord != null) {
+      totalKeys += fileRecord.getValue();
+    }
+    builder.setKeys(totalKeys);
+
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
         .setPipelines(pipelines)

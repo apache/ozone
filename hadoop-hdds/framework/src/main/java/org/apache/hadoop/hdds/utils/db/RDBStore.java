@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -369,6 +370,10 @@ public class RDBStore implements DBStore {
     return tableNames;
   }
 
+  public List<ColumnFamilyHandle> getColumnFamilyHandles() {
+    return Collections.unmodifiableList(columnFamilyHandles);
+  }
+
   @Override
   public CodecRegistry getCodecRegistry() {
     return codecRegistry;
@@ -377,7 +382,15 @@ public class RDBStore implements DBStore {
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
       throws SequenceNumberNotFoundException {
+    return getUpdatesSince(sequenceNumber, Long.MAX_VALUE);
+  }
 
+  @Override
+  public DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
+      throws SequenceNumberNotFoundException {
+    if (limitCount <= 0) {
+      throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
+    }
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
     try {
       TransactionLogIterator transactionLogIterator =
@@ -410,6 +423,9 @@ public class RDBStore implements DBStore {
         }
         dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
             result.sequenceNumber());
+        if (currSequenceNumber - sequenceNumber >= limitCount) {
+          break;
+        }
         transactionLogIterator.next();
       }
     } catch (RocksDBException e) {
@@ -422,6 +438,15 @@ public class RDBStore implements DBStore {
   @VisibleForTesting
   public RocksDB getDb() {
     return db;
+  }
+
+  public String getProperty(String property) throws RocksDBException {
+    return db.getProperty(property);
+  }
+
+  public String getProperty(ColumnFamilyHandle handle, String property)
+      throws RocksDBException {
+    return db.getProperty(handle, property);
   }
 
   public RDBMetrics getMetrics() {

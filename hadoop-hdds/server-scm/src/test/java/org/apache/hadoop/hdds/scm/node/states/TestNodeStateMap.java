@@ -57,7 +57,7 @@ public class TestNodeStateMap {
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
     NodeStatus status = NodeStatus.inServiceHealthy();
-    map.addNode(dn, status);
+    map.addNode(dn, status, null);
     assertEquals(dn, map.getNodeInfo(dn.getUuid()));
     assertEquals(status, map.getNodeStatus(dn.getUuid()));
   }
@@ -67,7 +67,7 @@ public class TestNodeStateMap {
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
     NodeStatus status = NodeStatus.inServiceHealthy();
-    map.addNode(dn, status);
+    map.addNode(dn, status, null);
 
     NodeStatus expectedStatus = NodeStatus.inServiceStale();
     NodeStatus returnedStatus =
@@ -81,7 +81,7 @@ public class TestNodeStateMap {
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
     NodeStatus status = NodeStatus.inServiceHealthy();
-    map.addNode(dn, status);
+    map.addNode(dn, status, null);
 
     NodeStatus expectedStatus = new NodeStatus(
         NodeOperationalState.DECOMMISSIONING,
@@ -98,8 +98,8 @@ public class TestNodeStateMap {
       throws NodeAlreadyExistsException {
     // Add one node for all possible states
     int nodeCount = 0;
-    for(NodeOperationalState op : NodeOperationalState.values()) {
-      for(NodeState health : NodeState.values()) {
+    for (NodeOperationalState op : NodeOperationalState.values()) {
+      for (NodeState health : NodeState.values()) {
         addRandomNodeWithState(op, health);
         nodeCount++;
       }
@@ -118,7 +118,7 @@ public class TestNodeStateMap {
         map.getNodeCount(NodeOperationalState.DECOMMISSIONING,
             NodeState.STALE));
     assertEquals(5, map.getNodeCount(null, NodeState.HEALTHY));
-    assertEquals(3,
+    assertEquals(4,
         map.getNodeCount(NodeOperationalState.DECOMMISSIONING, null));
   }
 
@@ -127,18 +127,16 @@ public class TestNodeStateMap {
    */
   @Test
   public void testConcurrency() throws Exception {
-    NodeStateMap nodeStateMap = new NodeStateMap();
-
     final DatanodeDetails datanodeDetails =
         MockDatanodeDetails.randomDatanodeDetails();
 
-    nodeStateMap.addNode(datanodeDetails, NodeStatus.inServiceHealthy());
+    map.addNode(datanodeDetails, NodeStatus.inServiceHealthy(), null);
 
     UUID dnUuid = datanodeDetails.getUuid();
 
-    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(1L));
-    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(2L));
-    nodeStateMap.addContainer(dnUuid, ContainerID.valueOf(3L));
+    map.addContainer(dnUuid, ContainerID.valueOf(1L));
+    map.addContainer(dnUuid, ContainerID.valueOf(2L));
+    map.addContainer(dnUuid, ContainerID.valueOf(3L));
 
     CountDownLatch elementRemoved = new CountDownLatch(1);
     CountDownLatch loopStarted = new CountDownLatch(1);
@@ -146,7 +144,7 @@ public class TestNodeStateMap {
     new Thread(() -> {
       try {
         loopStarted.await();
-        nodeStateMap.removeContainer(dnUuid, ContainerID.valueOf(1L));
+        map.removeContainer(dnUuid, ContainerID.valueOf(1L));
         elementRemoved.countDown();
       } catch (Exception e) {
         e.printStackTrace();
@@ -155,7 +153,7 @@ public class TestNodeStateMap {
     }).start();
 
     boolean first = true;
-    for (ContainerID key : nodeStateMap.getContainers(dnUuid)) {
+    for (ContainerID key : map.getContainers(dnUuid)) {
       if (first) {
         loopStarted.countDown();
         elementRemoved.await();
@@ -171,7 +169,7 @@ public class TestNodeStateMap {
   )
       throws NodeAlreadyExistsException {
     NodeStatus status = new NodeStatus(opState, health);
-    map.addNode(dn, status);
+    map.addNode(dn, status, null);
   }
 
   private void addRandomNodeWithState(

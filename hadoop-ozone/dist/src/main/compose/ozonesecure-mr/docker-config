@@ -16,7 +16,9 @@
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
+OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
@@ -26,6 +28,7 @@ OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.handler.type=distributed
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.block.token.enabled=true
+OZONE-SITE.XML_hdds.container.token.enabled=true
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.scm.kerberos.principal=scm/scm@EXAMPLE.COM
@@ -36,18 +39,23 @@ OZONE-SITE.XML_ozone.administrators=*
 
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_hdds.scm.http.auth.kerberos.principal=HTTP/scm@EXAMPLE.COM
-OZONE-SITE.XML_hdds.scm.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
+OZONE-SITE.XML_hdds.scm.http.auth.kerberos.keytab=/etc/security/keytabs/scm.keytab
 OZONE-SITE.XML_ozone.om.http.auth.kerberos.principal=HTTP/om@EXAMPLE.COM
-OZONE-SITE.XML_ozone.om.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
-OZONE-SITE.XML_hdds.datanode.http.auth.kerberos.principal=HTTP/_HOST@EXAMPLE.COM
+OZONE-SITE.XML_ozone.om.http.auth.kerberos.keytab=/etc/security/keytabs/om.keytab
+OZONE-SITE.XML_hdds.datanode.http.auth.kerberos.principal=HTTP/dn@EXAMPLE.COM
 OZONE-SITE.XML_hdds.datanode.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
-OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
+OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.keytab=/etc/security/keytabs/s3g.keytab
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.principal=HTTP/s3g@EXAMPLE.COM
+OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 
-HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/_HOST@EXAMPLE.COM
-HDFS-SITE.XML_dfs.datanode.keytab.file=/etc/security/keytabs/dn.keytab
-HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/_HOST@EXAMPLE.COM
-HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
+OZONE-SITE.XML_ozone.s3g.kerberos.keytab.file=/etc/security/keytabs/s3g.keytab
+OZONE-SITE.XML_ozone.s3g.kerberos.principal=s3g/s3g@EXAMPLE.COM
+
+HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
+HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
+HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/dn@EXAMPLE.COM
+HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/dn.keytab
+
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
@@ -79,7 +87,7 @@ MAPRED-SITE.XML_mapreduce.reduce.env=HADOOP_MAPRED_HOME=$HADOOP_HOME
 MAPRED-SITE.XML_mapreduce.map.memory.mb=2048
 MAPRED-SITE.XML_mapreduce.reduce.memory.mb=2048
 #MAPRED-SITE.XML_mapred.child.java.opts=-Xmx2048
-MAPRED-SITE.XML_mapreduce.application.classpath=/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
+MAPRED-SITE.XML_mapreduce.application.classpath=/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop3-@project.version@.jar
 
 YARN-SITE.XML_yarn.app.mapreduce.am.staging-dir=/user
 YARN-SITE.XML_yarn.timeline-service.enabled=true
@@ -89,7 +97,7 @@ YARN-SITE.XML_yarn.timeline-service.principal=jhs/jhs@EXAMPLE.COM
 YARN-SITE.XML_yarn.timeline-service.keytab=/etc/security/keytabs/jhs.keytab
 YARN-SITE.XML_yarn.log.server.url=http://jhs:8188/applicationhistory/logs/
 
-YARN-SITE.XML_yarn.nodemanager.principal=nm/_HOST@EXAMPLE.COM
+YARN-SITE.XML_yarn.nodemanager.principal=nm/nm@EXAMPLE.COM
 YARN-SITE.XML_yarn.nodemanager.keytab=/etc/security/keytabs/nm.keytab
 YARN-SITE.XML_yarn.nodemanager.pmem-check-enabled=false
 YARN-SITE.XML_yarn.nodemanager.delete.debug-delay-sec=600
@@ -132,15 +140,11 @@ CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.queue-mappings-override.enable=fa
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
 OZONE_DATANODE_SECURE_USER=root
-KEYTAB_DIR=/etc/security/keytabs
-KERBEROS_KEYSTORES=hadoop
-KERBEROS_SERVER=kdc
 JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 SLEEP_SECONDS=5
-KERBEROS_ENABLED=true
 
-HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
+HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop3-@project.version@.jar
 OZONE_CLASSPATH=
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

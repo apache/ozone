@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -27,14 +27,18 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
@@ -42,6 +46,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Comm
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
@@ -49,9 +55,15 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.Time;
 
@@ -73,41 +85,61 @@ public class DatanodeStateMachine implements Closeable {
   private final SCMConnectionManager connectionManager;
   private StateContext context;
   private final OzoneContainer container;
-  private DatanodeDetails datanodeDetails;
+  private final DatanodeCRLStore dnCRLStore;
+  private final DatanodeDetails datanodeDetails;
   private final CommandDispatcher commandDispatcher;
   private final ReportManager reportManager;
   private long commandsHandled;
-  private AtomicLong nextHB;
-  private Thread stateMachineThread = null;
+  private final AtomicLong nextHB;
+  private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
 
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
   private final HddsDatanodeStopService hddsDatanodeStopService;
+
+  private HDDSLayoutVersionManager layoutVersionManager;
+  private DatanodeLayoutStorage layoutStorage;
+  private DataNodeUpgradeFinalizer upgradeFinalizer;
+
   /**
    * Used to synchronize to the OzoneContainer object created in the
    * constructor in a non-thread-safe way - see HDDS-3116.
    */
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
   private final MeasuredReplicator replicatorMetrics;
+  private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
 
   /**
-   * Constructs a a datanode state machine.
+   * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
    * @param conf - Configuration.
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
    */
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
-      ConfigurationSource conf, CertificateClient certClient,
-      HddsDatanodeStopService hddsDatanodeStopService) throws IOException {
+                              ConfigurationSource conf,
+                              CertificateClient certClient,
+                              HddsDatanodeStopService hddsDatanodeStopService,
+                              DatanodeCRLStore crlStore) throws IOException {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
 
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
+
+    // Expected to be initialized already.
+    layoutStorage = new DatanodeLayoutStorage(conf,
+        datanodeDetails.getUuidString());
+
+    layoutVersionManager = new HDDSLayoutVersionManager(
+        layoutStorage.getLayoutVersion());
+    upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
+    VersionedDatanodeFeatures.initialize(layoutVersionManager);
+
+    this.dnCRLStore = crlStore;
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
         new ThreadFactoryBuilder()
@@ -135,22 +167,31 @@ public class DatanodeStateMachine implements Closeable {
 
     replicatorMetrics = new MeasuredReplicator(replicator);
 
+    ReplicationConfig replicationConfig =
+        conf.getObject(ReplicationConfig.class);
     supervisor =
-        new ReplicationSupervisor(container.getContainerSet(),
-            replicatorMetrics, dnConf.getReplicationMaxStreams());
+        new ReplicationSupervisor(container.getContainerSet(), context,
+            replicatorMetrics, replicationConfig);
+
+    replicationSupervisorMetrics =
+        ReplicationSupervisorMetrics.create(supervisor);
+
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
-            conf))
+            conf, dnConf.getBlockDeleteThreads(),
+            dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))
+        .addHandler(new FinalizeNewLayoutVersionCommandHandler())
+        .addHandler(new RefreshVolumeUsageCommandHandler())
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -162,6 +203,7 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(ContainerReportsProto.class)
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
+        .addPublisherFor(CRLStatusReport.class)
         .build();
   }
 
@@ -177,6 +219,8 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("Fail to get scm addresses", e);
     }
 
+    LOG.info("Datanode State Machine Task Thread Pool size {}",
+        totalServerCount);
     return totalServerCount;
   }
 
@@ -210,14 +254,20 @@ public class DatanodeStateMachine implements Closeable {
     }
   }
 
+  public DatanodeCRLStore getDnCRLStore() {
+    return dnCRLStore;
+  }
+
   /**
    * Runs the state machine at a fixed frequency.
    */
-  private void start() throws IOException {
+  private void startStateMachineThread() throws IOException {
     long now = 0;
 
     reportManager.init();
     initCommandHandlerThread(conf);
+
+    upgradeFinalizer.runPrefinalizeStateActions(layoutStorage, this);
 
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
@@ -233,7 +283,7 @@ public class DatanodeStateMachine implements Closeable {
         context.execute(executorService, heartbeatFrequency,
             TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
-        // Some one has sent interrupt signal, this could be because
+        // Someone has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
         Thread.currentThread().interrupt();
@@ -243,11 +293,12 @@ public class DatanodeStateMachine implements Closeable {
 
       now = Time.monotonicNow();
       if (now < nextHB.get()) {
-        if(!Thread.interrupted()) {
+        if (!Thread.interrupted()) {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
             //triggerHeartbeat is called during the sleep
+            Thread.currentThread().interrupt();
           }
         }
       }
@@ -260,6 +311,14 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("DatanodeStateMachine Shutdown due to an critical error");
       hddsDatanodeStopService.stopService();
     }
+  }
+
+  public void handleFatalVolumeFailures() {
+    LOG.error("DatanodeStateMachine Shutdown due to too many bad volumes, "
+        + "check " + DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY
+        + " and "
+        + DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY);
+    hddsDatanodeStopService.stopService();
   }
 
   /**
@@ -300,6 +359,7 @@ public class DatanodeStateMachine implements Closeable {
       cmdProcessThread.interrupt();
     }
     context.setState(DatanodeStates.getLastState());
+    replicationSupervisorMetrics.unRegister();
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -319,7 +379,7 @@ public class DatanodeStateMachine implements Closeable {
       connectionManager.close();
     }
 
-    if(container != null) {
+    if (container != null) {
       container.stop();
     }
 
@@ -407,15 +467,15 @@ public class DatanodeStateMachine implements Closeable {
   public void startDaemon() {
     Runnable startStateMachineTask = () -> {
       try {
-        start();
         LOG.info("Ozone container server started.");
+        startStateMachineThread();
       } catch (Exception ex) {
         LOG.error("Unable to start the DatanodeState Machine", ex);
       }
     };
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("Datanode State Machine Thread - %d")
+        .setNameFormat("Datanode State Machine Daemon Thread")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate Datanode, encounter uncaught exception"
               + " in Datanode State Machine Thread";
@@ -431,7 +491,7 @@ public class DatanodeStateMachine implements Closeable {
    * be sent by datanode.
    */
   public void triggerHeartbeat() {
-    if (stateMachineThread != null) {
+    if (stateMachineThread != null && isDaemonStarted()) {
       stateMachineThread.interrupt();
     }
   }
@@ -470,6 +530,10 @@ public class DatanodeStateMachine implements Closeable {
     } catch (IOException e) {
       LOG.error("Stop ozone container server failed.", e);
     }
+  }
+
+  public boolean isDaemonStarted() {
+    return this.getContext().getExecutionCount() > 0;
   }
 
   /**
@@ -514,6 +578,7 @@ public class DatanodeStateMachine implements Closeable {
             }
           } catch (InterruptedException e) {
             // Ignore this exception.
+            Thread.currentThread().interrupt();
           }
         }
       }
@@ -559,5 +624,29 @@ public class DatanodeStateMachine implements Closeable {
   @VisibleForTesting
   public ReplicationSupervisor getSupervisor() {
     return supervisor;
+  }
+
+  @VisibleForTesting
+  public HDDSLayoutVersionManager getLayoutVersionManager() {
+    return layoutVersionManager;
+  }
+
+  @VisibleForTesting
+  public DatanodeLayoutStorage getLayoutStorage() {
+    return layoutStorage;
+  }
+
+  public StatusAndMessages finalizeUpgrade()
+      throws IOException {
+    return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
+  }
+
+  public StatusAndMessages queryUpgradeStatus()
+      throws IOException {
+    return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
+        true);
+  }
+  public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
+    return upgradeFinalizer;
   }
 }

@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -53,6 +54,7 @@ public class ReportPublisherFactory {
         CommandStatusReportPublisher.class);
     report2publisher.put(PipelineReportsProto.class,
             PipelineReportPublisher.class);
+    report2publisher.put(CRLStatusReport.class, CRLStatusReportPublisher.class);
   }
 
   /**

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Properties;
 import java.util.UUID;
@@ -160,4 +161,119 @@ public class TestHddsVolume {
         volume.getAvailable() + reservedSpaceInBytes);
   }
 
+  /**
+   * Test conservative avail space.
+   * |----used----|   (avail)   |++++++++reserved++++++++|
+   * |<-     capacity         ->|
+   *              |     fsAvail      |-------other-------|
+   *                          ->|~~~~|<-
+   *                       remainingReserved
+   * |<-                   fsCapacity                  ->|
+   * A) avail = capacity - used
+   * B) avail = fsAvail - Max(reserved - other, 0);
+   *
+   * So, conservatively, avail = Max(Min(A, B), 0);
+   * This test avail == A, which implies there are deletes
+   * that release space, but 'du' report is delayed.
+   */
+  @Test
+  public void testReportUsedBiggerThanActualUsed() throws IOException {
+    // fsCapacity = 500, fsAvail = 290, reserved = 100
+    // used = 300(cached value from previous refresh)
+    // actual used = 200(due to deletes)
+    // so, other = max((500 - 290 - 300, 0) = 0
+    // actual other = 10(system usage)
+    // A = 500 - 100 - 300 = 100, B = 290 - max((100 - 0), 0) = 190
+    SpaceUsageSource spaceUsage = fixed(500, 290, 300);
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+
+    HddsVolume volume = volumeBuilder.build();
+
+    assertEquals(400, volume.getCapacity());
+    assertEquals(100, volume.getAvailable());
+
+    // Shutdown the volume.
+    volume.shutdown();
+  }
+
+  /**
+   * Continue the above.
+   * This test avail == B, which implies there are new allocates
+   * that consumes space, but 'du' report is delayed.
+   */
+  @Test
+  public void testReportUsedSmallerThanActualUsed() throws IOException {
+    // fsCapacity = 500, fsAvail = 190, reserved = 100
+    // used = 0(cached value from previous refresh)
+    // actual used = 300(new allocates)
+    // so, other = max(500 - 190 - 0, 0) = 310
+    // actual other = 10(system usage)
+    // A = 500 - 100 - 0 = 400, B = 190 - max((100 - 310), 0) = 190
+    SpaceUsageSource spaceUsage = fixed(500, 190, 0);
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+
+    HddsVolume volume = volumeBuilder.build();
+
+    assertEquals(400, volume.getCapacity());
+    assertEquals(190, volume.getAvailable());
+
+    // Shutdown the volume.
+    volume.shutdown();
+  }
+
+  /**
+   * Test over used space by other app: other > reserved.
+   * remainingReserved == 0 && avail == fsAvail
+   */
+  @Test
+  public void testOverUsedReservedSpace() throws IOException {
+    // fsCapacity = 500, fsAvail = 300, reserved = 100
+    // used = 0(cached value from previous refresh)
+    // actual used = 0(no writes yet)
+    // so, other = max(500 - 300 - 0, 0) = 200
+    // actual other = 200(e.g. yarn usage + system usage)
+    // A = 500 - 100 - 0 = 400, B = 300 - max((100 - 200), 0) = 300
+    SpaceUsageSource spaceUsage = fixed(500, 300, 0);
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+
+    HddsVolume volume = volumeBuilder.build();
+
+    assertEquals(400, volume.getCapacity());
+    assertEquals(300, volume.getAvailable());
+
+    // Shutdown the volume.
+    volume.shutdown();
+  }
+
+  /**
+   * Test over used space by hdds.
+   * used >= capacity && avail == 0
+   */
+  @Test
+  public void testOverUsedHddsSpace() throws IOException {
+    // fsCapacity = 500, fsAvail = 40, reserved = 100
+    // used = 450(exact report)
+    // actual used = 450
+    // so, other = max(500 - 40 - 450, 0) = 10
+    // actual other = 10(e.g. system usage)
+    // A = 500 - 100 - 450 = -50, B = 40 - max((100 - 10), 0) = -50
+    SpaceUsageSource spaceUsage = fixed(500, 40, 450);
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+
+    HddsVolume volume = volumeBuilder.build();
+
+    assertEquals(400, volume.getCapacity());
+    assertEquals(0, volume.getAvailable());
+
+    // Shutdown the volume.
+    volume.shutdown();
+  }
 }

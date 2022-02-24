@@ -30,8 +30,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.OptionalLong;
 
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
-import static org.apache.hadoop.test.GenericTestUtils.waitFor;
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

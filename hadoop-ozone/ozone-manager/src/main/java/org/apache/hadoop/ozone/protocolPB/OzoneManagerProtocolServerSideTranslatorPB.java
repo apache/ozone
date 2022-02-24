@@ -16,6 +16,11 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
+
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -40,13 +45,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
-import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -106,8 +109,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     }
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
-        metrics, LOG);
-
+        metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
   }
 
   /**
@@ -125,30 +127,157 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
-    RaftServerStatus raftServerStatus;
     if (isRatisEnabled) {
+      boolean s3Auth = false;
+      try {
+        // If Request has S3Authentication validate S3 credentials
+        // if current OM is leader and then proceed with processing the request.
+        if (request.hasS3Authentication()) {
+          s3Auth = true;
+          checkLeaderStatus();
+          S3SecurityUtil.validateS3Credential(request, ozoneManager);
+        }
+      } catch (IOException ex) {
+        // If validate credentials fail return error OM Response.
+        return createErrorResponse(request, ex);
+      }
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
-        return submitReadRequestToOM(request);
-      } else {
-        raftServerStatus = omRatisServer.checkLeaderStatus();
-        if (raftServerStatus == LEADER_AND_READY) {
-          try {
-            OMClientRequest omClientRequest =
-                OzoneManagerRatisUtils.createClientRequest(request);
-            request = omClientRequest.preExecute(ozoneManager);
-          } catch (IOException ex) {
-            // As some of the preExecute returns error. So handle here.
-            return createErrorResponse(request, ex);
+        try {
+          if (request.hasS3Authentication()) {
+            ozoneManager.setS3Auth(request.getS3Authentication());
           }
-          return submitRequestToRatis(request);
-        } else {
-          throw createLeaderErrorException(raftServerStatus);
+          return submitReadRequestToOM(request);
+        } finally {
+          ozoneManager.setS3Auth(null);
         }
+      } else {
+        // To validate credentials we have already verified leader status.
+        // This will skip of checking leader status again if request has S3Auth.
+        if (!s3Auth) {
+          checkLeaderStatus();
+        }
+        try {
+          OMClientRequest omClientRequest =
+              createClientRequest(request, ozoneManager);
+          request = omClientRequest.preExecute(ozoneManager);
+        } catch (IOException ex) {
+          // As some of the preExecute returns error. So handle here.
+          return createErrorResponse(request, ex);
+        }
+        return submitRequestToRatis(request);
       }
     } else {
       return submitRequestDirectlyToOM(request);
     }
+  }
+
+  /**
+   * Submits request to OM's Ratis server.
+   */
+  private OMResponse submitRequestToRatis(OMRequest request)
+      throws ServiceException {
+    return omRatisServer.submitRequest(request);
+  }
+
+  private OMResponse submitReadRequestToOM(OMRequest request)
+      throws ServiceException {
+    // Check if this OM is the leader.
+    RaftServerStatus raftServerStatus = omRatisServer.checkLeaderStatus();
+    if (raftServerStatus == LEADER_AND_READY ||
+        request.getCmdType().equals(PrepareStatus)) {
+      return handler.handleReadRequest(request);
+    } else {
+      throw createLeaderErrorException(raftServerStatus);
+    }
+  }
+
+  private ServiceException createLeaderErrorException(
+      RaftServerStatus raftServerStatus) {
+    if (raftServerStatus == NOT_LEADER) {
+      return createNotLeaderException();
+    } else {
+      return createLeaderNotReadyException();
+    }
+  }
+
+  private ServiceException createNotLeaderException() {
+    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
+
+    // TODO: Set suggest leaderID. Right now, client is not using suggest
+    // leaderID. Need to fix this.
+
+    OMNotLeaderException notLeaderException =
+        new OMNotLeaderException(raftPeerId);
+
+    LOG.debug(notLeaderException.getMessage());
+
+    return new ServiceException(notLeaderException);
+  }
+
+  private ServiceException createLeaderNotReadyException() {
+    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
+
+    OMLeaderNotReadyException leaderNotReadyException =
+        new OMLeaderNotReadyException(raftPeerId.toString() + " is Leader " +
+            "but not ready to process request yet.");
+
+    LOG.debug(leaderNotReadyException.getMessage());
+
+    return new ServiceException(leaderNotReadyException);
+  }
+
+  /**
+   * Submits request directly to OM.
+   */
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
+    OMClientResponse omClientResponse = null;
+    long index = 0L;
+    try {
+      // If Request has S3Authentication validate S3 credentials and
+      // then proceed with processing the request.
+      if (request.hasS3Authentication()) {
+        S3SecurityUtil.validateS3Credential(request, ozoneManager);
+      }
+      if (OmUtils.isReadOnly(request)) {
+        try {
+          if (request.hasS3Authentication()) {
+            ozoneManager.setS3Auth(request.getS3Authentication());
+          }
+          return handler.handleReadRequest(request);
+        } finally {
+          ozoneManager.setS3Auth(null);
+        }
+      } else {
+        OMClientRequest omClientRequest =
+            createClientRequest(request, ozoneManager);
+        request = omClientRequest.preExecute(ozoneManager);
+        index = transactionIndex.incrementAndGet();
+        omClientResponse = handler.handleWriteRequest(request, index);
+      }
+    } catch (IOException ex) {
+      // As some of the preExecute returns error. So handle here.
+      return createErrorResponse(request, ex);
+    }
+    try {
+      omClientResponse.getFlushFuture().get();
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Future for {} is completed", request);
+      }
+    } catch (ExecutionException | InterruptedException ex) {
+      // terminate OM. As if we are in this stage means, while getting
+      // response from flush future, we got an exception.
+      String errorMessage = "Got error during waiting for flush to be " +
+          "completed for " + "request" + request.toString();
+      ExitUtils.terminate(1, errorMessage, ex, LOG);
+      Thread.currentThread().interrupt();
+    }
+    return omClientResponse.getOMResponse();
+  }
+
+  private void checkLeaderStatus() throws ServiceException {
+    OzoneManagerRatisUtils.checkLeaderStatus(omRatisServer.checkLeaderStatus(),
+        omRatisServer.getRaftPeerId());
   }
 
   /**
@@ -174,99 +303,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     return omResponse.build();
   }
 
-  /**
-   * Submits request to OM's Ratis server.
-   */
-  private OMResponse submitRequestToRatis(OMRequest request)
-      throws ServiceException {
-    return omRatisServer.submitRequest(request);
-  }
-
-  private OMResponse submitReadRequestToOM(OMRequest request)
-      throws ServiceException {
-    // Check if this OM is the leader.
-    RaftServerStatus raftServerStatus = omRatisServer.checkLeaderStatus();
-    if (raftServerStatus == LEADER_AND_READY) {
-      return handler.handleReadRequest(request);
-    } else {
-      throw createLeaderErrorException(raftServerStatus);
-    }
-  }
-
-  private ServiceException createNotLeaderException() {
-    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
-
-    OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(notLeaderException.getMessage());
-    }
-
-    return new ServiceException(notLeaderException);
-  }
-
-  private ServiceException createLeaderErrorException(
-      RaftServerStatus raftServerStatus) {
-    if (raftServerStatus == NOT_LEADER) {
-      return createNotLeaderException();
-    } else {
-      return createLeaderNotReadyException();
-    }
-  }
-
-
-  private ServiceException createLeaderNotReadyException() {
-    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-
-    OMLeaderNotReadyException leaderNotReadyException =
-        new OMLeaderNotReadyException(raftPeerId.toString() + " is Leader " +
-            "but not ready to process request");
-
-    return new ServiceException(leaderNotReadyException);
-  }
-
-  /**
-   * Submits request directly to OM.
-   */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
-    OMClientResponse omClientResponse = null;
-    long index = 0L;
-    try {
-      if (OmUtils.isReadOnly(request)) {
-        return handler.handleReadRequest(request);
-      } else {
-        OMClientRequest omClientRequest =
-            OzoneManagerRatisUtils.createClientRequest(request);
-        request = omClientRequest.preExecute(ozoneManager);
-        index = transactionIndex.incrementAndGet();
-        omClientResponse = handler.handleWriteRequest(request, index);
-      }
-    } catch(IOException ex) {
-      // As some of the preExecute returns error. So handle here.
-      return createErrorResponse(request, ex);
-    }
-    try {
-      omClientResponse.getFlushFuture().get();
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Future for {} is completed", request);
-      }
-    } catch (ExecutionException | InterruptedException ex) {
-      // terminate OM. As if we are in this stage means, while getting
-      // response from flush future, we got an exception.
-      String errorMessage = "Got error during waiting for flush to be " +
-          "completed for " + "request" + request.toString();
-      ExitUtils.terminate(1, errorMessage, ex, LOG);
-    }
-    return omClientResponse.getOMResponse();
-  }
-
   public void stop() {
     if (!isRatisEnabled) {
       ozoneManagerDoubleBuffer.stop();
     }
+  }
+
+  public static Logger getLog() {
+    return LOG;
   }
 }

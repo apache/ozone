@@ -22,10 +22,9 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -43,8 +42,8 @@ import static org.junit.Assert.assertTrue;
 public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
 
   @Override
-  protected ChunkLayoutTestInfo getStrategy() {
-    return ChunkLayoutTestInfo.FILE_PER_CHUNK;
+  protected ContainerLayoutTestInfo getStrategy() {
+    return ContainerLayoutTestInfo.FILE_PER_CHUNK;
   }
 
   @Test
@@ -67,7 +66,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
 
     long term = 0;
     long index = 0;
-    File chunkFile = ChunkLayOutVersion.FILE_PER_CHUNK
+    File chunkFile = ContainerLayoutVersion.FILE_PER_CHUNK
         .getChunkFile(container.getContainerData(), blockID, chunkInfo);
     File tempChunkFile = new File(chunkFile.getParent(),
         chunkFile.getName() + OzoneConsts.CONTAINER_CHUNK_NAME_DELIMITER
@@ -110,11 +109,11 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
 
     ChunkInfo oldDatanodeChunkInfo = new ChunkInfo(chunkInfo.getChunkName(),
         offset, chunkInfo.getLen());
-    File file = ChunkLayOutVersion.FILE_PER_CHUNK.getChunkFile(
+    File file = ContainerLayoutVersion.FILE_PER_CHUNK.getChunkFile(
         container.getContainerData(), blockID, chunkInfo);
     ChunkUtils.writeData(file,
         ChunkBuffer.wrap(getData()), offset, chunkInfo.getLen(),
-        new VolumeIOStats(), true);
+        null, true);
     checkChunkFileCount(1);
     assertTrue(file.exists());
     assertEquals(offset + chunkInfo.getLen(), file.length());

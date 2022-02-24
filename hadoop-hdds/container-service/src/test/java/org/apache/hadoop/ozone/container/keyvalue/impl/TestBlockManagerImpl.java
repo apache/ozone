@@ -22,19 +22,17 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -50,7 +48,6 @@ import java.util.UUID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -75,15 +72,15 @@ public class TestBlockManagerImpl {
   private BlockID blockID;
   private BlockID blockID1;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestBlockManagerImpl(ChunkLayOutVersion layout) {
+  public TestBlockManagerImpl(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -142,7 +139,7 @@ public class TestBlockManagerImpl {
 
   @Test
   public void testPutBlock() throws Exception {
-    assertEquals(0, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block with bcsId != 0
     blockManager.putBlock(keyValueContainer, blockData1);
 
@@ -150,7 +147,7 @@ public class TestBlockManagerImpl {
     //Check Container's bcsId
     fromGetBlockData = blockManager.getBlock(keyValueContainer,
         blockData1.getBlockID());
-    assertEquals(1, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
     assertEquals(1,
         keyValueContainer.getContainerData().getBlockCommitSequenceId());
     assertEquals(1, fromGetBlockData.getBlockCommitSequenceId());
@@ -161,7 +158,7 @@ public class TestBlockManagerImpl {
     //Check Container's bcsId
     fromGetBlockData = blockManager.getBlock(keyValueContainer,
         blockData.getBlockID());
-    assertEquals(2, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(2, keyValueContainer.getContainerData().getBlockCount());
     assertEquals(0, fromGetBlockData.getBlockCommitSequenceId());
     assertEquals(1,
         keyValueContainer.getContainerData().getBlockCommitSequenceId());
@@ -170,11 +167,11 @@ public class TestBlockManagerImpl {
 
   @Test
   public void testPutAndGetBlock() throws Exception {
-    assertEquals(0, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block
     blockManager.putBlock(keyValueContainer, blockData);
 
-    assertEquals(1, keyValueContainer.getContainerData().getKeyCount());
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
     //Get Block
     BlockData fromGetBlockData = blockManager.getBlock(keyValueContainer,
         blockData.getBlockID());
@@ -186,27 +183,6 @@ public class TestBlockManagerImpl {
     assertEquals(blockData.getMetadata().size(), fromGetBlockData.getMetadata()
         .size());
 
-  }
-
-  @Test
-  public void testDeleteBlock() throws Exception {
-    assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
-    //Put Block
-    blockManager.putBlock(keyValueContainer, blockData);
-    assertEquals(1,
-        keyValueContainer.getContainerData().getKeyCount());
-    //Delete Block
-    blockManager.deleteBlock(keyValueContainer, blockID);
-    assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
-    try {
-      blockManager.getBlock(keyValueContainer, blockID);
-      fail("testDeleteBlock");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains(
-          "Unable to find the block", ex);
-    }
   }
 
   @Test
@@ -235,28 +211,5 @@ public class TestBlockManagerImpl {
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
     assertTrue(listBlockData.size() == 10);
-  }
-
-  @Test
-  public void testGetNoSuchBlock() throws Exception {
-    assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
-    //Put Block
-    blockManager.putBlock(keyValueContainer, blockData);
-    assertEquals(1,
-        keyValueContainer.getContainerData().getKeyCount());
-    //Delete Block
-    blockManager.deleteBlock(keyValueContainer, blockID);
-    assertEquals(0,
-        keyValueContainer.getContainerData().getKeyCount());
-    try {
-      //Since the block has been deleted, we should not be able to find it
-      blockManager.getBlock(keyValueContainer, blockID);
-      fail("testGetNoSuchBlock failed");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains(
-          "Unable to find the block", ex);
-      assertEquals(ContainerProtos.Result.NO_SUCH_BLOCK, ex.getResult());
-    }
   }
 }

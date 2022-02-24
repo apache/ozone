@@ -51,24 +51,22 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private int currentHealthyPipelineCount = 0;
   private final double healthyPipelinesPercent;
   private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
+  private final PipelineManager pipelineManager;
+  private final int minHealthyPipelines;
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
       SCMSafeModeManager manager, ConfigurationSource configuration) {
     super(manager, ruleName, eventQueue);
+    this.pipelineManager = pipelineManager;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT);
 
-    int minDatanodes = configuration.getInt(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
-
     // We only care about THREE replica pipeline
-    int minHealthyPipelines = minDatanodes /
-        HddsProtos.ReplicationFactor.THREE_VALUE;
+    minHealthyPipelines = getMinHealthyPipelines(configuration);
 
     Preconditions.checkArgument(
         (healthyPipelinesPercent >= 0.0 && healthyPipelinesPercent <= 1.0),
@@ -76,26 +74,22 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
             HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT
             + " value should be >= 0.0 and <= 1.0");
 
-    // We want to wait for RATIS THREE factor write pipelines
-    int pipelineCount = pipelineManager.getPipelines(
-        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
-        Pipeline.PipelineState.OPEN).size();
+    initializeRule(false);
+  }
 
-    // This value will be zero when pipeline count is 0.
-    // On a fresh installed cluster, there will be zero pipelines in the SCM
-    // pipeline DB.
-    healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
-        (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
+  private int getMinHealthyPipelines(ConfigurationSource config) {
+    int minDatanodes = config.getInt(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
 
-    LOG.info("Total pipeline count is {}, healthy pipeline " +
-        "threshold count is {}", pipelineCount, healthyPipelineThresholdCount);
+    // We only care about THREE replica pipeline
+    return minDatanodes / HddsProtos.ReplicationFactor.THREE_VALUE;
 
-    getSafeModeMetrics().setNumHealthyPipelinesThreshold(
-        healthyPipelineThresholdCount);
   }
 
   @VisibleForTesting
-  public void setHealthyPipelineThresholdCount(int actualPipelineCount) {
+  public synchronized void setHealthyPipelineThresholdCount(
+      int actualPipelineCount) {
     healthyPipelineThresholdCount =
         (int) Math.ceil(healthyPipelinesPercent * actualPipelineCount);
   }
@@ -106,12 +100,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   @Override
-  protected boolean validate() {
+  protected synchronized boolean validate() {
     return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
   }
 
   @Override
-  protected void process(Pipeline pipeline) {
+  protected synchronized void process(Pipeline pipeline) {
 
     // When SCM is in safe mode for long time, already registered
     // datanode can send pipeline report again, or SCMPipelineManager will
@@ -130,22 +124,57 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
       SCMSafeModeManager.getLogger().info(
           "SCM in safe mode. Healthy pipelines reported count is {}, " +
               "required healthy pipeline reported count is {}",
-          currentHealthyPipelineCount, healthyPipelineThresholdCount);
+          currentHealthyPipelineCount, getHealthyPipelineThresholdCount());
+
     }
   }
 
+
+  public synchronized void refresh(boolean forceRefresh) {
+    if (forceRefresh) {
+      initializeRule(true);
+    } else {
+      if (!validate()) {
+        initializeRule(true);
+      }
+    }
+  }
+
+  private synchronized void initializeRule(boolean refresh) {
+    int pipelineCount = pipelineManager.getPipelines(
+        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
+        Pipeline.PipelineState.OPEN).size();
+
+    healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
+        (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
+
+    if (refresh) {
+      LOG.info("Refreshed total pipeline count is {}, healthy pipeline " +
+          "threshold count is {}", pipelineCount,
+          healthyPipelineThresholdCount);
+    } else {
+      LOG.info("Total pipeline count is {}, healthy pipeline " +
+          "threshold count is {}", pipelineCount,
+          healthyPipelineThresholdCount);
+    }
+
+    getSafeModeMetrics().setNumHealthyPipelinesThreshold(
+        healthyPipelineThresholdCount);
+  }
+
+
   @Override
-  protected void cleanup() {
+  protected synchronized void cleanup() {
     processedPipelineIDs.clear();
   }
 
   @VisibleForTesting
-  public int getCurrentHealthyPipelineCount() {
+  public synchronized int getCurrentHealthyPipelineCount() {
     return currentHealthyPipelineCount;
   }
 
   @VisibleForTesting
-  public int getHealthyPipelineThresholdCount() {
+  public synchronized int getHealthyPipelineThresholdCount() {
     return healthyPipelineThresholdCount;
   }
 
@@ -153,7 +182,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   public String getStatusText() {
     return String.format("healthy Ratis/THREE pipelines (=%d) >= "
             + "healthyPipelineThresholdCount (=%d)",
-        this.currentHealthyPipelineCount,
-        this.healthyPipelineThresholdCount);
+        getCurrentHealthyPipelineCount(),
+        getHealthyPipelineThresholdCount());
   }
 }
