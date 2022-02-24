@@ -302,19 +302,19 @@ public class HeartbeatEndpointTask
         }
         break;
       case deleteBlocksCommand:
-        DeleteBlocksCommand db = DeleteBlocksCommand
+        DeleteBlocksCommand deleteBlocksCommand = DeleteBlocksCommand
             .getFromProtobuf(
                 commandResponseProto.getDeleteBlocksCommandProto());
         if (commandResponseProto.hasTerm()) {
-          db.setTerm(commandResponseProto.getTerm());
+          deleteBlocksCommand.setTerm(commandResponseProto.getTerm());
         }
-        if (!db.blocksTobeDeleted().isEmpty()) {
+        if (!deleteBlocksCommand.blocksTobeDeleted().isEmpty()) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(DeletedContainerBlocksSummary
-                .getFrom(db.blocksTobeDeleted())
+                .getFrom(deleteBlocksCommand.blocksTobeDeleted())
                 .toString());
           }
-          this.context.addCommand(db);
+          this.context.addCommand(deleteBlocksCommand);
         }
         break;
       case closeContainerCommand:

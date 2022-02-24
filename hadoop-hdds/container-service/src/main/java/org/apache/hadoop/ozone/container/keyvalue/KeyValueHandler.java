@@ -92,7 +92,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
@@ -453,16 +452,16 @@ public class KeyValueHandler extends Handler {
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
 
-      boolean incrKeyCount = false;
+      boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
         chunkManager.finishWriteChunks(kvContainer, blockData);
-        incrKeyCount = true;
+        endOfBlock = true;
       }
 
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      blockManager.putBlock(kvContainer, blockData, incrKeyCount);
+      blockManager.putBlock(kvContainer, blockData, endOfBlock);
 
       blockDataProto = blockData.getProtoBufMessage();
 
@@ -550,33 +549,14 @@ public class KeyValueHandler extends Handler {
   /**
    * Handle Delete Block operation. Calls BlockManager to process the request.
    */
+  @Deprecated
   ContainerCommandResponseProto handleDeleteBlock(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
-
-    if (!request.hasDeleteBlock()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Malformed Delete Key request. trace ID: {}",
-            request.getTraceID());
-      }
-      return malformedRequest(request);
-    }
-
-    try {
-      checkContainerOpen(kvContainer);
-
-      BlockID blockID = BlockID.getFromProtobuf(
-          request.getDeleteBlock().getBlockID());
-
-      blockManager.deleteBlock(kvContainer, blockID);
-    } catch (StorageContainerException ex) {
-      return ContainerUtils.logAndReturnError(LOG, ex, request);
-    } catch (IOException ex) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException("Delete Key failed", ex, IO_EXCEPTION),
-          request);
-    }
-
-    return getBlockResponseSuccess(request);
+    // Block/ Chunk Deletion is handled by BlockDeletingService.
+    // SCM sends Block Deletion commands directly to Datanodes and not
+    // through a Pipeline.
+    throw new UnsupportedOperationException("Datanode handles block deletion " +
+        "using BlockDeletingService");
   }
 
   /**
@@ -662,37 +642,14 @@ public class KeyValueHandler extends Handler {
   /**
    * Handle Delete Chunk operation. Calls ChunkManager to process the request.
    */
+  @Deprecated
   ContainerCommandResponseProto handleDeleteChunk(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
-
-    if (!request.hasDeleteChunk()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Malformed Delete Chunk request. trace ID: {}",
-            request.getTraceID());
-      }
-      return malformedRequest(request);
-    }
-
-    try {
-      checkContainerOpen(kvContainer);
-
-      BlockID blockID = BlockID.getFromProtobuf(
-          request.getDeleteChunk().getBlockID());
-      ContainerProtos.ChunkInfo chunkInfoProto = request.getDeleteChunk()
-          .getChunkData();
-      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
-
-      chunkManager.deleteChunk(kvContainer, blockID, chunkInfo);
-    } catch (StorageContainerException ex) {
-      return ContainerUtils.logAndReturnError(LOG, ex, request);
-    } catch (IOException ex) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException("Delete Chunk failed", ex,
-              IO_EXCEPTION), request);
-    }
-
-    return getSuccessResponse(request);
+    // Block/ Chunk Deletion is handled by BlockDeletingService.
+    // SCM sends Block Deletion commands directly to Datanodes and not
+    // through a Pipeline.
+    throw new UnsupportedOperationException("Datanode handles chunk deletion " +
+        "using BlockDeletingService");
   }
 
   private void validateChunkChecksumData(ChunkBuffer data, ChunkInfo info)
@@ -1068,13 +1025,17 @@ public class KeyValueHandler extends Handler {
     deleteInternal(container, force);
   }
 
+  /**
+   * Called by BlockDeletingService to delete all the chunks in a block
+   * before proceeding to delete the block info from DB.
+   */
   @Override
   public void deleteBlock(Container container, BlockData blockData)
       throws IOException {
     chunkManager.deleteChunks(container, blockData);
-    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
-      if (LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
+      for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+        ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
         LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
       }
     }
