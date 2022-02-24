@@ -59,6 +59,21 @@ By default, a group of Ranger policies are created when a tenant is created on t
 2. Only the bucket owner (i.e. the user that creates the bucket) and tenant admins can access the bucket content. 
    - Note: For Ozone admins, there typically are independent Ranger policies that grants them full access to the cluster, so they should be able to access the buckets as well. But it is still possible to create new policies to explicitly deny them access to buckets. 
 
+### Ranger Roles
+
+These new Ranger policies would have the corresponding **Ranger roles** added in their **Allow Conditions**.
+
+Namely, `tenantName-UserRole` and `tenantName-AdminRole` Ranger roles are created when a tenant is created by an Ozone administrator under the CLI.
+
+`tenantName-UserRole` contains a list of all user names that are assigned to this tenant.
+
+`tenantName-AdminRole` contains a list of all tenant admins that are assigned to this tenant.
+
+We leverage Ranger roles mainly for the advantage of easier user management in a tenant:
+1. When new users are assigned to a tenant, Ozone Manager simply adds the new user to `tenantName-UserRole` Ranger role.
+2. When new tenant admins are assigned, Ozone Manager simply adds the user name to `tenantName-AdminRole` Ranger role. Delegated tenant admins will have the "Role Admin" checkbox checked, while non-delegated tenant admins won't.
+   - Role admins in a Ranger role has the permission to edit that Ranger role.
+3. And because `tenantName-AdminRole` is the "Role Admin" of `tenantName-UserRole`, whichever user in the `tenantName-AdminRole` automatically has the permission to add new users to the tenant, meaning all tenant admins (whether delegated or not) has the permission to assign and revoke users in this tenant.
 
 ## Setup
 
