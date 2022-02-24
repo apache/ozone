@@ -221,11 +221,11 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked admin of accessId '{}' from tenant '{}'",
           accessId, tenantId);
-      // TODO: omMetrics.incNumTenantRevokeAdmin()
+      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeAdmin()
     } else {
       LOG.error("Failed to revoke admin of accessId '{}' from tenant '{}': {}",
           accessId, tenantId, exception.getMessage());
-      // TODO: omMetrics.incNumTenantRevokeAdminFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeAdminFails()
     }
     return omClientResponse;
   }

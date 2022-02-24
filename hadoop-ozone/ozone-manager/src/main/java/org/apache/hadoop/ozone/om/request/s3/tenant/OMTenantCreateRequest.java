@@ -367,10 +367,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     if (exception == null) {
       LOG.info("Created tenant '{}' and volume '{}'", tenantId, volumeName);
-      // TODO: omMetrics.incNumTenants()
+      // TODO: HDDS-6375: omMetrics.incNumTenants()
     } else {
       LOG.error("Failed to create tenant '{}'", tenantId, exception);
-      // TODO: omMetrics.incNumTenantCreateFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantCreateFails()
     }
     return omClientResponse;
   }

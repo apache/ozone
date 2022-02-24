@@ -241,12 +241,12 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Assigned admin to accessId '{}' in tenant '{}', "
               + "delegated: {}", accessId, tenantId, delegated);
-      // TODO: omMetrics.incNumTenantAssignAdmin()
+      // TODO: HDDS-6375: omMetrics.incNumTenantAssignAdmin()
     } else {
       LOG.error("Failed to assign admin to accessId '{}' in tenant '{}', "
               + "delegated: {}: {}",
           accessId, tenantId, delegated, exception.getMessage());
-      // TODO: omMetrics.incNumTenantAssignAdminFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantAssignAdminFails()
     }
     return omClientResponse;
   }

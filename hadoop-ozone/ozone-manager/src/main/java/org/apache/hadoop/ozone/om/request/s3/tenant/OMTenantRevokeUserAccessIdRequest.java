@@ -248,11 +248,11 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked user '{}' accessId '{}' to tenant '{}'",
           userPrincipal, accessId, tenantId);
-      // TODO: omMetrics.incNumTenantRevokeUser()
+      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUser()
     } else {
       LOG.error("Failed to revoke user '{}' accessId '{}' to tenant '{}': {}",
           userPrincipal, accessId, tenantId, exception.getMessage());
-      // TODO: omMetrics.incNumTenantRevokeUserFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUserFails()
     }
     return omClientResponse;
   }

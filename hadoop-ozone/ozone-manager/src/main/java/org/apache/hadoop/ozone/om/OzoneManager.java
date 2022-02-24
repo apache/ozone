@@ -254,6 +254,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -3014,7 +3015,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     //  tenantGetUserInfo lists all accessIds assigned to a user across
     //  multiple tenants.
 
-    // Retrieve a list of accessIds associates to this user principal
+    // Retrieve the list of accessIds associated to this user principal
     final OmDBKerberosPrincipalInfo kerberosPrincipalInfo =
         metadataManager.getPrincipalToAccessIdsTable().get(userPrincipal);
     if (kerberosPrincipalInfo == null) {
@@ -3029,12 +3030,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       try {
         final OmDBAccessIdInfo accessIdInfo =
             metadataManager.getTenantAccessIdTable().get(accessId);
-        // Sanity check
         if (accessIdInfo == null) {
-          LOG.error("Potential metadata error. Unexpected null accessIdInfo: "
-              + "entry for accessId '{}' doesn't exist in TenantAccessIdTable",
-              accessId);
-          throw new NullPointerException("accessIdInfo is null");
+          // As we are not acquiring a lock, the accessId entry might have been
+          //  removed from the TenantAccessIdTable already.
+          //  Log a warning (shouldn't happen very often) and move on.
+          LOG.warn("Expected accessId '{}' not found in TenantAccessIdTable. "
+                  + "Might have been removed already.", accessId);
+          return;
         }
         assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
@@ -3070,7 +3072,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (!multiTenantManager.tenantExists(tenantId)) {
       // Throw exception to the client, which will handle this gracefully
-      throw new IOException("Tenant '" + tenantId + "' not found!");
+      throw new OMException("Tenant '" + tenantId + "' not found",
+          TENANT_NOT_FOUND);
     }
 
     final String volumeName = OMTenantRequestHelper.getTenantVolumeName(

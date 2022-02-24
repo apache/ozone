@@ -381,12 +381,11 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Assigned user '{}' to tenant '{}' with accessId '{}'",
           userPrincipal, tenantId, accessId);
-      // TODO: omMetrics.incNumTenantAssignUser()
+      // TODO: HDDS-6375: omMetrics.incNumTenantAssignUser()
     } else {
       LOG.error("Failed to assign '{}' to tenant '{}' with accessId '{}': {}",
           userPrincipal, tenantId, accessId, exception.getMessage());
-      // TODO: Check if the exception message is sufficient.
-      // TODO: omMetrics.incNumTenantAssignUserFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantAssignUserFails()
     }
     return omClientResponse;
   }
