@@ -39,7 +39,7 @@ import java.util.NoSuchElementException;
  * Tests OmKeyDelete request with prefix layout.
  */
 public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
-  private static final String PARTIAL_PARENT_DIR = "c/d/";
+  private static final String INTERMEDIATE_DIR = "c/d/";
   private static final String PARENT_DIR = "c/d/e";
   private static final String FILE_NAME = "file1";
   private static final String FILE_KEY = PARENT_DIR + "/" + FILE_NAME;
@@ -158,7 +158,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Case 1:
     // We create an empty directory structure.
-    String partialKey = "x/y/";
+    String parentKey = "x/y/";
     String key = "x/y/z/";
     addKeyToDirTable(volumeName, bucketName, key);
 
@@ -172,7 +172,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for partial key.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, partialKey, ozoneManager.getKeyManager());
+        bucketName, parentKey, ozoneManager.getKeyManager());
 
     // 'x/y/' has a sub-directory 'z', hence, we should be performing recursive
     // access check.
@@ -191,7 +191,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for partial key 'c/d/'.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, PARTIAL_PARENT_DIR, ozoneManager.getKeyManager());
+        bucketName, INTERMEDIATE_DIR, ozoneManager.getKeyManager());
 
     // 'c/d' has a sub-directory 'e', hence, we should be performing recursive
     // access check.
