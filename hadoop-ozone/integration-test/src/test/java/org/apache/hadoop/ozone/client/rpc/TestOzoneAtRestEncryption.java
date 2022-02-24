@@ -499,8 +499,6 @@ public class TestOzoneAtRestEncryption {
     // Create an input stream to read the data
     OzoneInputStream inputStream = bucket.readKey(keyName);
     Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
-    MultipartCryptoKeyInputStream cryptoInputStream =
-        (MultipartCryptoKeyInputStream) inputStream;
 
     // Test complete read
     byte[] completeRead = new byte[keySize];
