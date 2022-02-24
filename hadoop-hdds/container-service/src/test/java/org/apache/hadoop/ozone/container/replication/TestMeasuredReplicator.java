@@ -119,4 +119,16 @@ public class TestMeasuredReplicator {
     Assert.assertEquals(0, measuredReplicator.getSuccessTime().value());
   }
 
+  @Test
+  public void testReplicationQueueTimeMetrics() {
+    ReplicationTask task = new ReplicationTask(100L, new ArrayList<>());
+    try {
+      Thread.sleep(1000L);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+    measuredReplicator.replicate(task);
+    // There might be some deviation, so we use >= 1000 here.
+    Assert.assertTrue(measuredReplicator.getQueueTime().value() >= 1000);
+  }
 }
