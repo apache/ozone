@@ -39,10 +39,10 @@ import java.util.NoSuchElementException;
  * Tests OmKeyDelete request with prefix layout.
  */
 public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
-  private final static String partialParentDir = "c/d/";
-  private final static String parentDir = "c/d/e";
-  private final static String fileName = "file1";
-  private final static String fileKey = parentDir + "/" + fileName;
+  private static final String PARTIAL_PARENT_DIR = "c/d/";
+  private static final String PARENT_DIR = "c/d/e";
+  private static final String FILE_NAME = "file1";
+  private static final String FILE_KEY = PARENT_DIR + "/" + FILE_NAME;
 
   @Override
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
@@ -58,21 +58,21 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
   @Override
   protected String addKeyToTable() throws Exception {
-    keyName = fileKey; // updated key name
+    keyName = FILE_KEY; // updated key name
 
     // Create parent dirs for the path
     long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName,
-            bucketName, parentDir, omMetadataManager);
+            bucketName, PARENT_DIR, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fileKey,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentId + 1,
                     parentId, 100, Time.now());
-    omKeyInfo.setKeyName(fileName);
+    omKeyInfo.setKeyName(FILE_NAME);
     OMRequestTestUtils.addFileToKeyTable(false, false,
-            fileName, omKeyInfo, -1, 50, omMetadataManager);
+        FILE_NAME, omKeyInfo, -1, 50, omMetadataManager);
     return omKeyInfo.getPath();
   }
 
@@ -191,7 +191,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for partial key 'c/d/'.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, partialParentDir, ozoneManager.getKeyManager());
+        bucketName, PARTIAL_PARENT_DIR, ozoneManager.getKeyManager());
 
     // 'c/d' has a sub-directory 'e', hence, we should be performing recursive
     // access check.
@@ -199,7 +199,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete directory structure (without file).
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, parentDir, ozoneManager.getKeyManager());
+        bucketName, PARENT_DIR, ozoneManager.getKeyManager());
 
     // 'c/d/e/' has a 'file1' under it, hence, we should be performing recursive
     // access check.
@@ -207,7 +207,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete file1.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, fileKey, ozoneManager.getKeyManager());
+        bucketName, FILE_KEY, ozoneManager.getKeyManager());
 
     // Recursive access check is only enabled for directories, hence should be
     // false for file1.
