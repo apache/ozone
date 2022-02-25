@@ -109,7 +109,7 @@ public interface TableCache<CACHEKEY extends CacheKey,
 
 
   @VisibleForTesting
-  Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
+  Set<Map.Entry<Long, Set<CACHEKEY>>> getEpochEntrySet();
 
   /**
    * Cache completeness.
