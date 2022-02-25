@@ -160,6 +160,8 @@ public interface MiniOzoneCluster {
    */
   List<HddsDatanodeService> getHddsDatanodes();
 
+  HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
+
   /**
    * Returns a {@link ReconServer} instance.
    *

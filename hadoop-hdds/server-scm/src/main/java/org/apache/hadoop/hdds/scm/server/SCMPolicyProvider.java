@@ -31,7 +31,10 @@ import org.apache.hadoop.security.authorize.Service;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.*;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_DATANODE_CONTAINER_PROTOCOL_ACL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_BLOCK_PROTOCOL_ACL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_CERTIFICATE_PROTOCOL_ACL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_CONTAINER_PROTOCOL_ACL;
 
 /**
  * {@link PolicyProvider} for SCM protocols.

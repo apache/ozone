@@ -172,6 +172,10 @@ public class MultipartCryptoKeyInputStream extends OzoneInputStream
             actualNumBytesRead, numBytesRead, readPositionAdjustedBy,
             actualNumBytesRead - readPositionAdjustedBy);
 
+        if (readLengthAdjustedBy > 0) {
+          current.seek(current.getPos() - readLengthAdjustedBy);
+        }
+
         // Reset readPositionAdjustedBy and readLengthAdjustedBy
         readPositionAdjustedBy = 0;
         readLengthAdjustedBy = 0;

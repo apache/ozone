@@ -70,35 +70,43 @@ public class TestEventQueue {
 
     TestHandler testHandler = new TestHandler();
 
-    queue.addHandler(EVENT1, new FixedThreadPoolExecutor<>(EVENT1.getName(),
-            EventQueue.getExecutorName(EVENT1, testHandler)), testHandler);
+    queue.addHandler(EVENT1,
+        new FixedThreadPoolWithAffinityExecutor<>(
+            EventQueue.getExecutorName(EVENT1, testHandler),
+            FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
+                EVENT1.getName())),
+        testHandler);
 
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
-    queue.fireEvent(EVENT1, 11L);
+    queue.fireEvent(EVENT1, 12L);
+    queue.fireEvent(EVENT1, 13L);
+    queue.fireEvent(EVENT1, 14L);
+    queue.fireEvent(EVENT1, 15L);
+    queue.fireEvent(EVENT1, 16L);
+    queue.fireEvent(EVENT1, 17L);
+    queue.fireEvent(EVENT1, 18L);
+    queue.fireEvent(EVENT1, 19L);
+    queue.fireEvent(EVENT1, 20L);
 
     EventExecutor eventExecutor =
         queue.getExecutorAndHandler(EVENT1).keySet().iterator().next();
 
     // As it is fixed threadpool executor with 10 threads, all should be
     // scheduled.
-    Assert.assertEquals(10, eventExecutor.queuedEvents());
+    Assert.assertEquals(11, eventExecutor.queuedEvents());
 
     // As we don't see all 10 events scheduled.
     Assert.assertTrue(eventExecutor.scheduledEvents() > 1 &&
         eventExecutor.scheduledEvents() <= 10);
 
     queue.processAll(60000);
-    Assert.assertEquals(110, eventTotal.intValue());
 
-    Assert.assertEquals(10, eventExecutor.successfulEvents());
+    Assert.assertTrue(eventExecutor.scheduledEvents() == 11);
+
+    Assert.assertEquals(166, eventTotal.intValue());
+
+    Assert.assertEquals(11, eventExecutor.successfulEvents());
     eventTotal.set(0);
 
   }
@@ -131,5 +139,4 @@ public class TestEventQueue {
     Assert.assertEquals(23, result[1]);
 
   }
-
 }

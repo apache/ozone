@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
@@ -258,7 +259,8 @@ public final class RatisUtil {
         throw new ServiceException(new RetriableWithFailOverException(e));
       } else if (ex.getErrorCode().equals(GET_SCM_CERTIFICATE_FAILED) ||
           ex.getErrorCode().equals(GET_OM_CERTIFICATE_FAILED) ||
-          ex.getErrorCode().equals(GET_DN_CERTIFICATE_FAILED)) {
+          ex.getErrorCode().equals(GET_DN_CERTIFICATE_FAILED) ||
+          ex.getErrorCode().equals(GET_CERTIFICATE_FAILED)) {
         throw new ServiceException(new RetriableWithNoFailoverException(e));
       }
     }

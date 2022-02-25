@@ -131,18 +131,18 @@ public class TestIncrementalContainerReportHandler {
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     Mockito.when(containerManager.getContainerReplicas(
         Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     Mockito.doAnswer(invocation -> {
       containerStateManager
           .removeContainerReplica(((ContainerID)invocation
-                  .getArguments()[0]).getProtobuf(),
+                  .getArguments()[0]),
               (ContainerReplica)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
@@ -162,7 +162,7 @@ public class TestIncrementalContainerReportHandler {
     Mockito.doAnswer(invocation -> {
       containerStateManager
           .updateContainerReplica(((ContainerID)invocation
-                  .getArguments()[0]).getProtobuf(),
+                  .getArguments()[0]),
               (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
@@ -201,7 +201,7 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -234,7 +234,7 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
 
 
     final IncrementalContainerReportProto containerReport =
@@ -272,7 +272,7 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -305,9 +305,9 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
     Assert.assertEquals(3, containerStateManager
-        .getContainerReplicas(container.containerID().getProtobuf()).size());
+        .getContainerReplicas(container.containerID()).size());
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
             ContainerReplicaProto.State.DELETED,
@@ -317,7 +317,7 @@ public class TestIncrementalContainerReportHandler {
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
     Assert.assertEquals(2, containerStateManager
-        .getContainerReplicas(container.containerID().getProtobuf()).size());
+        .getContainerReplicas(container.containerID()).size());
   }
 
   @Test
@@ -376,7 +376,7 @@ public class TestIncrementalContainerReportHandler {
           // If we find "container" in the NM, then we must also have it in
           // Container Manager.
           Assert.assertEquals(1, containerStateManager
-              .getContainerReplicas(container.containerID().getProtobuf())
+              .getContainerReplicas(container.containerID())
               .size());
           Assert.assertEquals(2, nmContainers.size());
         } else {
@@ -385,12 +385,12 @@ public class TestIncrementalContainerReportHandler {
           // NM, but have found something for it in ContainerManager, and that
           // should not happen. It should be in both, or neither.
           Assert.assertEquals(0, containerStateManager
-              .getContainerReplicas(container.containerID().getProtobuf())
+              .getContainerReplicas(container.containerID())
               .size());
           Assert.assertEquals(1, nmContainers.size());
         }
         Assert.assertEquals(1, containerStateManager
-            .getContainerReplicas(containerTwo.containerID().getProtobuf())
+            .getContainerReplicas(containerTwo.containerID())
             .size());
       }
     } finally {
