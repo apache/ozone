@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +77,8 @@ public class GrpcOmTransport implements OmTransport {
   private int lastVisited = -1;
   private ConfigurationSource conf;
 
-  private String host = "om";
+  //private String host = "om";
+  private AtomicReference<String> host;
   private int maxSize;
 
   private List<String> oms;
@@ -92,6 +94,7 @@ public class GrpcOmTransport implements OmTransport {
     this.channels = new HashMap<>();
     this.clients = new HashMap<>();
     this.conf = conf;
+    this.host = new AtomicReference();
 
     maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
         OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
@@ -106,9 +109,9 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   public void start() throws IOException {
-    host = omFailoverProxyProvider
+    host.set(omFailoverProxyProvider
         .getGrpcProxyAddress(
-            omFailoverProxyProvider.getCurrentProxyOMNodeId());
+            omFailoverProxyProvider.getCurrentProxyOMNodeId()));
 
     if (!isRunning.compareAndSet(false, true)) {
       LOG.info("Ignore. already started.");
@@ -146,7 +149,7 @@ public class GrpcOmTransport implements OmTransport {
     while (tryOtherHost) {
       tryOtherHost = false;
       try {
-        resp = clients.get(host).submitRequest(payload);
+        resp = clients.get(host.get()).submitRequest(payload);
       } catch (StatusRuntimeException e) {
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
           resultCode = ResultCodes.TIMEOUT;
@@ -220,9 +223,9 @@ public class GrpcOmTransport implements OmTransport {
             }
           }
           // switch om host to current proxy OMNodeId
-          host = omFailoverProxyProvider
+          host.set(omFailoverProxyProvider
               .getGrpcProxyAddress(
-                  omFailoverProxyProvider.getCurrentProxyOMNodeId());
+                  omFailoverProxyProvider.getCurrentProxyOMNodeId()));
           retry = true;
         }
       }
