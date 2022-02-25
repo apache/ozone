@@ -297,8 +297,8 @@ public class DatanodeStateMachine implements Closeable {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
-            //triggerHeartbeat is called during the sleep
-            Thread.currentThread().interrupt();
+            // TriggerHeartbeat is called during the sleep. Don't need to set
+            // the interrupted state to true.
           }
         }
       }
