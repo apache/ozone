@@ -229,7 +229,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
-      long correctedSpace = omKeyInfo.getDataSize() * factor -
+      long correctedSpace = omKeyInfo.getReplicatedSize() -
           keyArgs.getKeyLocationsList().size() * scmBlockSize * factor;
       omBucketInfo.incrUsedBytes(correctedSpace);
 

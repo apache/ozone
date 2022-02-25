@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -564,11 +565,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
-    int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
       for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
-        bytesUsed += locationInfo.getLength() * keyFactor;
+        bytesUsed += QuotaUtil.getReplicatedSize(
+            locationInfo.getLength(), omKeyInfo.getReplicationConfig());
       }
     }
 
