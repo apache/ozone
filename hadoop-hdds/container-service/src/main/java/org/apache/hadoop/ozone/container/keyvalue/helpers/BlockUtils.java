@@ -52,13 +52,14 @@ public final class BlockUtils {
   }
 
   /**
-   * Obtain a DB handler for a given container. This handler is not cached and
-   * the caller must close it after using it.
+   * Obtain a DB handler for a given container or the underlying volume.
+   * This handler is not cached and the caller must close it after using it.
    * If another thread attempts to open the same container when it is already
    * opened by this thread, the other thread will get a RocksDB exception.
    * @param containerDBPath The absolute path to the container database folder
    * @param schemaVersion The Container Schema version
    * @param conf Configuration
+   * @param readOnly open DB in read-only mode or not
    * @return Handler to the given container.
    * @throws IOException
    */
