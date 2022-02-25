@@ -124,10 +124,11 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "trigger.du.before.move.enable", type = ConfigType.BOOLEAN,
       defaultValue = "false", tags = {ConfigTag.BALANCER},
-      description = "whether to send command to all the data nodes to run du " +
-          "immediately before starting a balance iteration. note that " +
-          "running du is very time consuming , especially when the disk " +
-          "usage rate of a data node is very high")
+      description = "whether to send command to all the healthy and " +
+          "in-service data nodes to run du immediately before starting" +
+          "a balance iteration. note that running du is very time " +
+          "consuming , especially when the disk usage rate of a " +
+          "data node is very high")
   private boolean triggerDuEnable = false;
 
   /**

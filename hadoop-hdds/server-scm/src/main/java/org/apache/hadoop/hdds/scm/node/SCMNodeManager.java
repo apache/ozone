@@ -86,6 +86,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 
@@ -681,7 +682,7 @@ public class SCMNodeManager implements NodeManager {
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
     List<DatanodeDetails> healthyNodes =
-        getNodes(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY);
+        getNodes(IN_SERVICE, NodeState.HEALTHY);
 
     List<DatanodeUsageInfo> datanodeUsageInfoList =
         new ArrayList<>(healthyNodes.size());
@@ -1024,15 +1025,7 @@ public class SCMNodeManager implements NodeManager {
           + " since current SCM is not leader.", nle);
       return;
     }
-    getAllNodes().stream().filter(dn -> {
-      boolean isHealthy = false;
-      try {
-        isHealthy = getNodeStatus(dn).isHealthy();
-      } catch (NodeNotFoundException nnfe) {
-        LOG.warn("datanode {} is not found", dn.getIpAddress());
-      }
-      return isHealthy;
-    }).forEach(datanode ->
+    getNodes(IN_SERVICE, HEALTHY).forEach(datanode ->
         addDatanodeCommand(datanode.getUuid(), refreshVolumeUsageCommand));
   }
 

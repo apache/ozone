@@ -285,8 +285,7 @@ public class HeartbeatEndpointTask
             .equalsIgnoreCase(datanodeDetails.getUuid()),
         "Unexpected datanode ID in the response.");
     // Verify the response is indeed for this datanode.
-    for (SCMCommandProto commandResponseProto : response
-        .getCommandsList()) {
+    for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
       switch (commandResponseProto.getCommandType()) {
       case reregisterCommand:
         if (rpcEndpoint.getState() == EndPointStates.HEARTBEAT) {
