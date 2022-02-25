@@ -19,13 +19,13 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -104,8 +104,8 @@ public class FullTableCache<CACHEKEY extends CacheKey,
     try {
       lock.writeLock().lock();
       cache.put(cacheKey, value);
-      epochEntries.computeIfAbsent(value.getEpoch(), v -> new HashSet<>())
-              .add(cacheKey);
+      epochEntries.computeIfAbsent(value.getEpoch(),
+          v -> new CopyOnWriteArraySet<>()).add(cacheKey);
     } finally {
       lock.writeLock().unlock();
     }
@@ -191,8 +191,8 @@ public class FullTableCache<CACHEKEY extends CacheKey,
 
   @VisibleForTesting
   @Override
-  public Set<Map.Entry<Long, Set<CACHEKEY>>> getEpochEntrySet() {
-    return epochEntries.entrySet();
+  public NavigableMap<Long, Set<CACHEKEY>> getEpochEntries() {
+    return epochEntries;
   }
 
 }

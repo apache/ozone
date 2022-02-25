@@ -168,10 +168,10 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     }
   }
 
-  @Override
   @VisibleForTesting
-  public Set<Map.Entry<Long, Set<CACHEKEY>>> getEpochEntrySet() {
-    return epochEntries.entrySet();
+  @Override
+  public NavigableMap<Long, Set<CACHEKEY>> getEpochEntries() {
+    return epochEntries;
   }
 
 }
