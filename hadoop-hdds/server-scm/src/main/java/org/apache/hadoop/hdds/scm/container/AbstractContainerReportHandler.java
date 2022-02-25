@@ -71,6 +71,7 @@ public class AbstractContainerReportHandler {
   }
 
   /**
+   * Process the given ContainerReplica received from specified datanode.
    *
    * @param datanodeDetails DatanodeDetails for the DN
    * @param replicaProto Protobuf representing the replicas
