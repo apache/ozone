@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -86,23 +85,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
   @VisibleForTesting
   public List<OmKeyLocationInfo> getLocationInfoList() {
     return blockOutputStreamEntryPool.getLocationInfoList();
-  }
-
-  @VisibleForTesting
-  public List<OmKeyLocationInfo> getAllLocationInfoList() {
-    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    for (BlockOutputStreamEntry streamEntry : getStreamEntries()) {
-      OmKeyLocationInfo info =
-          new OmKeyLocationInfo.Builder()
-              .setBlockID(streamEntry.getBlockID())
-              .setLength(streamEntry.getCurrentPosition())
-              .setOffset(0)
-              .setToken(streamEntry.getToken())
-              .setPipeline(streamEntry.getPipeline())
-              .build();
-      locationInfoList.add(info);
-    }
-    return locationInfoList;
   }
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})

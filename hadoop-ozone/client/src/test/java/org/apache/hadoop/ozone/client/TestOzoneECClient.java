@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -933,24 +934,22 @@ public class TestOzoneECClient {
 
     int numStripesBeforeFailure = 1;
     int numStripesAfterFailure = 1;
-    int numSTripesTotal = numStripesBeforeFailure + numStripesAfterFailure;
-    int numChunksToWriteAfterFailure = dataBlocks;
+    int numStripesTotal = numStripesBeforeFailure + numStripesAfterFailure;
     int numExpectedBlockGrps = 2;
-    // fail the DNs for parity blocks
-    int[] nodesIndexesToMarkFailure = {3, 4};
+    // fail any DNs to trigger retry
+    int[] nodesIndexesToMarkFailure = {0, 1};
+    long keySize = (long) chunkSize * dataBlocks * numStripesTotal;
 
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        1024 * dataBlocks * numStripesBeforeFailure
-            + numChunksToWriteAfterFailure,
+    try (OzoneOutputStream out = bucket.createKey(keyName, keySize,
         new ECReplicationConfig(dataBlocks, parityBlocks,
             ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
       ECKeyOutputStream kos = (ECKeyOutputStream) out.getOutputStream();
-      List<OmKeyLocationInfo> blockInfos = kos.getAllLocationInfoList();
+      List<OmKeyLocationInfo> blockInfos = getAllLocationInfoList(kos);
       Assert.assertEquals(1, blockInfos.size());
 
-      // Mock some pre-allocated blocks to the key
+      // Mock some pre-allocated blocks to the key,
       // should be > maxRetries
       int numPreAllocatedBlocks = maxRetries + 1;
       BlockID blockID = blockInfos.get(0).getBlockID();
@@ -968,31 +967,35 @@ public class TestOzoneECClient {
           new OmKeyLocationInfoGroup(0, omKeyLocationInfos);
       kos.addPreallocateBlocks(omKeyLocationInfoGroup, 0);
 
+      // Good writes
       for (int j = 0; j < numStripesBeforeFailure; j++) {
         for (int i = 0; i < dataBlocks; i++) {
           out.write(inputChunks[i]);
         }
       }
 
-      // Make the parity write fail to trigger retry
+      // Make the writes fail to trigger retry
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
       for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
         failedDNs.add(DatanodeDetails
             .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
       }
-
       // First let's set storage as bad
       ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
 
-      for (int j = 0; j < numStripesAfterFailure; j++) {
-        for (int i = 0; i < dataBlocks; i++) {
-          out.write(inputChunks[i]);
+      // Writes that will retry due to failed DNs
+      try {
+        for (int j = 0; j < numStripesAfterFailure; j++) {
+          for (int i = 0; i < dataBlocks; i++) {
+            out.write(inputChunks[i]);
+          }
         }
+      } catch (IOException e) {
+        // If we don't discard pre-allocated blocks,
+        // retries should exceed the maxRetries and write will fail.
+        Assert.fail("Max retries exceeded");
       }
-
-      // if we don't discard pre-allocated blocks,
-      // we will get retries > maxRetries
     }
 
     final OzoneKeyDetails key = bucket.getKey(keyName);
@@ -1001,7 +1004,7 @@ public class TestOzoneECClient {
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
-      for (int i = 0; i < dataBlocks * numSTripesTotal; i++) {
+      for (int i = 0; i < dataBlocks * numStripesTotal; i++) {
         Assert.assertEquals(inputChunks[i % dataBlocks].length,
             is.read(fileContent));
         Assert.assertArrayEquals(
@@ -1039,5 +1042,22 @@ public class TestOzoneECClient {
       }
     }
     return bucket;
+  }
+
+  private List<OmKeyLocationInfo> getAllLocationInfoList(
+      ECKeyOutputStream kos) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (BlockOutputStreamEntry streamEntry : kos.getStreamEntries()) {
+      OmKeyLocationInfo info =
+          new OmKeyLocationInfo.Builder()
+              .setBlockID(streamEntry.getBlockID())
+              .setLength(streamEntry.getCurrentPosition())
+              .setOffset(0)
+              .setToken(streamEntry.getToken())
+              .setPipeline(streamEntry.getPipeline())
+              .build();
+      locationInfoList.add(info);
+    }
+    return locationInfoList;
   }
 }
