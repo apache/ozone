@@ -213,7 +213,7 @@ message ContainerReplicaProto {
   required State state = 2;
   optional int64 size = 3;
   optional int64 used = 4;
-  optional int64 keyCount = 5;
+  optional int64 keyCount = 5; // keyCount here refers to BlockCount
   optional int64 readCount = 6;
   optional int64 writeCount = 7;
   optional int64 readBytes = 8;

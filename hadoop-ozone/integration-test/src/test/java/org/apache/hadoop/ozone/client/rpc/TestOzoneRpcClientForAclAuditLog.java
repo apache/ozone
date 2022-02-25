@@ -279,8 +279,7 @@ public class TestOzoneRpcClientForAclAuditLog {
   private void verifyLog(String... expected) throws Exception {
     File file = new File("audit.log");
     final List<String> lines = FileUtils.readLines(file, (String)null);
-    GenericTestUtils.waitFor(() ->
-        (lines != null) ? true : false, 100, 60000);
+    GenericTestUtils.waitFor(() -> lines != null, 100, 60000);
 
     try {
       // When log entry is expected, the log file will contain one line and
