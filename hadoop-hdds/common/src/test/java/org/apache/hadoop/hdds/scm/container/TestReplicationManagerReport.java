@@ -101,7 +101,7 @@ public class TestReplicationManagerReport {
 
   @Test
   public void testSamplesAreLimited() {
-    for (int i = 1; i <= ReplicationManagerReport.SAMPLE_LIMIT * 2; i++) {
+    for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT * 2; i++) {
       report.incrementAndSample(
           ReplicationManagerReport.HealthState.UNDER_REPLICATED,
           new ContainerID(i));
@@ -109,8 +109,8 @@ public class TestReplicationManagerReport {
     List<ContainerID> sample =
         report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
     Assert.assertEquals(ReplicationManagerReport.SAMPLE_LIMIT, sample.size());
-    for (int i = 1; i <= ReplicationManagerReport.SAMPLE_LIMIT; i++) {
-      Assert.assertEquals(new ContainerID(i), sample.get(i-1));
+    for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT; i++) {
+      Assert.assertEquals(new ContainerID(i), sample.get(i));
     }
   }
 
