@@ -85,15 +85,8 @@ public abstract class OMClientResponse {
    */
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    switch (omResponse.getStatus()) {
-    case PARTIAL_DELETE:
-    case PARTIAL_RENAME:
-    case OK:
+    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK) {
       addToDBBatch(omMetadataManager, batchOperation);
-      break;
-    default:
-      // do nothing
-      break;
     }
   }
 
