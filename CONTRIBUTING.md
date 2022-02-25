@@ -192,5 +192,6 @@ IntelliJ may not pick up protoc generated classes as they can be very huge. If t
 2. Add `idea.max.intellisense.filesize=10000` entry
 3. Restart your IDE
 
+
 ## CI
 The Ozone project uses Github Actions for its CI system.  The configuration is described in detail [here](.github/ci.md).
