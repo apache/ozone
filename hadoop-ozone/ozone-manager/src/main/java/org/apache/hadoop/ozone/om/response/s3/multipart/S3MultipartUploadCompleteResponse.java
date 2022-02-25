@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -53,19 +54,26 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private String multipartOpenKey;
   private OmKeyInfo omKeyInfo;
   private List<OmKeyInfo> partsUnusedList;
+  private OmBucketInfo omBucketInfo;
+  private RepeatedOmKeyInfo keysToDelete;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull String multipartKey,
       @Nonnull String multipartOpenKey,
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> unUsedParts,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout,
+      @Nonnull OmBucketInfo omBucketInfo,
+      RepeatedOmKeyInfo keysToDelete) {
     super(omResponse, bucketLayout);
     this.partsUnusedList = unUsedParts;
     this.multipartKey = multipartKey;
     this.multipartOpenKey = multipartOpenKey;
     this.omKeyInfo = omKeyInfo;
+    this.omBucketInfo = omBucketInfo;
+    this.keysToDelete = keysToDelete;
   }
 
   /**
@@ -94,19 +102,23 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
     // 3. Delete unused parts
     if (!partsUnusedList.isEmpty()) {
       // Add unused parts to deleted key table.
-      RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager.getDeletedTable()
-          .get(ozoneKey);
-      if (repeatedOmKeyInfo == null) {
-        repeatedOmKeyInfo = new RepeatedOmKeyInfo(partsUnusedList);
+      if (keysToDelete == null) {
+        keysToDelete = new RepeatedOmKeyInfo(partsUnusedList);
       } else {
-        for (OmKeyInfo unUsedPart : partsUnusedList) {
-          repeatedOmKeyInfo.addOmKeyInfo(unUsedPart);
+        for (OmKeyInfo unusedParts : partsUnusedList) {
+          keysToDelete.addOmKeyInfo(unusedParts);
         }
       }
-
-      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          ozoneKey, repeatedOmKeyInfo);
     }
+    if (keysToDelete != null) {
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+          ozoneKey, keysToDelete);
+    }
+
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
 
   protected String addToKeyTable(OMMetadataManager omMetadataManager,

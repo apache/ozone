@@ -25,6 +25,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -58,8 +59,40 @@ public class TestS3MultipartUploadCompleteRequest
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName);
+    checkDeleteTableCount(volumeName, bucketName, keyName, 0);
 
     addVolumeAndBucket(volumeName, bucketName);
+    // Do it twice to test overwrite
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName);
+    // After overwrite, one entry must be in delete table
+    checkDeleteTableCount(volumeName, bucketName, keyName, 1);
+  }
+
+  public void checkDeleteTableCount(String volumeName,
+      String bucketName, String keyName, int count) throws Exception {
+    String dbOzoneKey = getOzoneDBKey(volumeName, bucketName, keyName);
+    RepeatedOmKeyInfo keysToDelete =
+        omMetadataManager.getDeletedTable().get(dbOzoneKey);
+
+    // deleted key entries count is expected to be 0
+    if (count == 0) {
+      Assert.assertNull(keysToDelete);
+      return;
+    }
+
+    Assert.assertNotNull(keysToDelete);
+
+    // Count must consider unused parts on commit
+    Assert.assertEquals(count, keysToDelete.getOmKeyInfoList().size());
+  }
+
+  private void checkValidateAndUpdateCacheSuccess(String volumeName,
+      String bucketName, String keyName) throws Exception {
+
+    addVolumeAndBucket(volumeName, bucketName);
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);

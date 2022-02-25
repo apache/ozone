@@ -22,7 +22,9 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -35,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Iterator;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -149,11 +152,29 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected OMClientResponse getOmClientResponse(String multipartKey,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> unUsedParts) {
+      List<OmKeyInfo> unUsedParts, OmBucketInfo omBucketInfo,
+      RepeatedOmKeyInfo keysToDelete) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout());
+        getBucketLayout(), omBucketInfo, keysToDelete);
+  }
+
+  private long getParentId(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName) throws IOException {
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+    long bucketId = omBucketInfo.getObjectID();
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    return OMFileRequest
+        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
 

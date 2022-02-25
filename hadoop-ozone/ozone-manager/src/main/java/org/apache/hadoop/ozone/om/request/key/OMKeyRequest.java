@@ -34,6 +34,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -769,5 +771,39 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, uploadID);
+  }
+
+  /**
+   * Prepare key for deletion service on overwrite.
+   *
+   * @param dbOzoneKey key to point to an object in RocksDB
+   * @param omMetadataManager
+   * @param isVersionEnabled
+   * @param trxnLogIndex
+   * @param isRatisEnabled
+   * @return Old keys eligible for deletion.
+   * @throws IOException
+   */
+  protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
+      String dbOzoneKey, OMMetadataManager omMetadataManager,
+      boolean isVersionEnabled, long trxnLogIndex,
+      boolean isRatisEnabled) throws IOException {
+    if (isVersionEnabled) {
+      // Nothing to clean up in case versioning is on.
+      return null;
+    }
+    // Past keys that was deleted but still in deleted table,
+    // waiting for deletion service.
+    RepeatedOmKeyInfo keysToDelete =
+        omMetadataManager.getDeletedTable().get(dbOzoneKey);
+    // Current key to be overwritten
+    OmKeyInfo keyToDelete =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+
+    if (keyToDelete != null) {
+      keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+          trxnLogIndex, isRatisEnabled);
+    }
+    return keysToDelete;
   }
 }
