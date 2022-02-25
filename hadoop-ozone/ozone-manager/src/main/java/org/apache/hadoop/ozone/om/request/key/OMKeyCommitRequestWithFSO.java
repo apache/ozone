@@ -175,12 +175,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
-      long correctedSpace = omKeyInfo.getDataSize() * factor -
+      long correctedSpace = omKeyInfo.getReplicatedSize() -
               locationInfoList.size() * scmBlockSize * factor;
       // Subtract the size of blocks to be overwritten.
       if (keyToDelete != null) {
-        correctedSpace -= keyToDelete.getDataSize() *
-            keyToDelete.getReplicationConfig().getRequiredNodes();
+        correctedSpace -= keyToDelete.getReplicatedSize();
       }
       omBucketInfo.incrUsedBytes(correctedSpace);
 

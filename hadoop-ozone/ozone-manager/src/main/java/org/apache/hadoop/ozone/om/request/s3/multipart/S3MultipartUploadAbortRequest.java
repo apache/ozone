@@ -26,6 +26,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -165,14 +166,14 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
       long quotaReleased = 0;
-      int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       Iterator iter =
           multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
       while (iter.hasNext()) {
         Map.Entry entry = (Map.Entry)iter.next();
         PartKeyInfo iterPartKeyInfo = (PartKeyInfo)entry.getValue();
-        quotaReleased +=
-            iterPartKeyInfo.getPartKeyInfo().getDataSize() * keyFactor;
+        quotaReleased += QuotaUtil.getReplicatedSize(
+            iterPartKeyInfo.getPartKeyInfo().getDataSize(),
+            omKeyInfo.getReplicationConfig());
       }
       omBucketInfo.incrUsedBytes(-quotaReleased);
 

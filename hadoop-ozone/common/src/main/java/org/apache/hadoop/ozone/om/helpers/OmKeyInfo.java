@@ -133,6 +133,10 @@ public final class OmKeyInfo extends WithParentObjectId {
     return dataSize;
   }
 
+  public long getReplicatedSize() {
+    return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
+  }
+
   public void setDataSize(long size) {
     this.dataSize = size;
   }
