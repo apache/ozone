@@ -220,7 +220,7 @@ public class TestContainerBalancer {
     containerBalancer.stop();
     ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
     Assert.assertEquals(0, containerBalancer.getUnBalancedNodes().size());
-    Assert.assertEquals(0, metrics.getDatanodesNumUnbalanced());
+    Assert.assertEquals(0, metrics.getNumDatanodesUnbalanced());
   }
 
   /**
@@ -243,9 +243,9 @@ public class TestContainerBalancer {
     ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
     Assert.assertFalse(
         containerBalancer.getCountDatanodesInvolvedPerIteration() > number);
-    Assert.assertTrue(metrics.getDatanodesNumInvolvedInLatestIteration() > 0);
+    Assert.assertTrue(metrics.getNumDatanodesInvolvedInLatestIteration() > 0);
     Assert.assertFalse(
-        metrics.getDatanodesNumInvolvedInLatestIteration() > number);
+        metrics.getNumDatanodesInvolvedInLatestIteration() > number);
     containerBalancer.stop();
   }
 
@@ -512,7 +512,7 @@ public class TestContainerBalancer {
     ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
     Assert.assertEquals(determineExpectedUnBalancedNodes(
             balancerConfiguration.getThreshold()).size(),
-        metrics.getDatanodesNumUnbalanced());
+        metrics.getNumDatanodesUnbalanced());
     Assert.assertTrue(metrics.getDataSizeMovedGBInLatestIteration() <= 6);
     Assert.assertEquals(1, metrics.getNumIterations());
     containerBalancer.stop();

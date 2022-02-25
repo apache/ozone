@@ -42,20 +42,20 @@ public final class ContainerBalancerMetrics {
 
   @Metric(about = "Number of containers that Container Balancer moved" +
       " in the latest iteration.")
-  private MutableCounterLong movedContainersNumInLatestIteration;
+  private MutableCounterLong numMovedContainersInLatestIteration;
 
   @Metric(about = "Number of iterations that Container Balancer has run for.")
   private MutableCounterLong numIterations;
 
   @Metric(about = "Number of datanodes that were involved in balancing in the" +
       " latest iteration.")
-  private MutableCounterLong datanodesNumInvolvedInLatestIteration;
+  private MutableCounterLong numDatanodesInvolvedInLatestIteration;
 
   @Metric(about = "Amount of data in Gigabytes that is causing unbalance.")
   private MutableCounterLong dataSizeUnbalancedGB;
 
   @Metric(about = "Number of unbalanced datanodes.")
-  private MutableCounterLong datanodesNumUnbalanced;
+  private MutableCounterLong numDatanodesUnbalanced;
 
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
@@ -96,17 +96,17 @@ public final class ContainerBalancerMetrics {
    * iteration.
    * @return number of containers
    */
-  public long getMovedContainersNumInLatestIteration() {
-    return movedContainersNumInLatestIteration.value();
+  public long getNumMovedContainersInLatestIteration() {
+    return numMovedContainersInLatestIteration.value();
   }
 
-  public void incrementMovedContainersNumInLatestIteration(long valueToAdd) {
-    this.movedContainersNumInLatestIteration.incr(valueToAdd);
+  public void incrementNumMovedContainersInLatestIteration(long valueToAdd) {
+    this.numMovedContainersInLatestIteration.incr(valueToAdd);
   }
 
-  public void resetMovedContainersNumInLatestIteration() {
-    movedContainersNumInLatestIteration.incr(
-        -getMovedContainersNumInLatestIteration());
+  public void resetNumMovedContainersInLatestIteration() {
+    numMovedContainersInLatestIteration.incr(
+        -getNumMovedContainersInLatestIteration());
   }
 
   /**
@@ -126,17 +126,17 @@ public final class ContainerBalancerMetrics {
    * iteration.
    * @return number of datanodes
    */
-  public long getDatanodesNumInvolvedInLatestIteration() {
-    return datanodesNumInvolvedInLatestIteration.value();
+  public long getNumDatanodesInvolvedInLatestIteration() {
+    return numDatanodesInvolvedInLatestIteration.value();
   }
 
-  public void incrementDatanodesNumInvolvedInLatestIteration(long valueToAdd) {
-    datanodesNumInvolvedInLatestIteration.incr(valueToAdd);
+  public void incrementNumDatanodesInvolvedInLatestIteration(long valueToAdd) {
+    numDatanodesInvolvedInLatestIteration.incr(valueToAdd);
   }
 
-  public void resetDatanodesNumInvolvedInLatestIteration() {
-    datanodesNumInvolvedInLatestIteration.incr(
-        -getDatanodesNumInvolvedInLatestIteration());
+  public void resetNumDatanodesInvolvedInLatestIteration() {
+    numDatanodesInvolvedInLatestIteration.incr(
+        -getNumDatanodesInvolvedInLatestIteration());
   }
 
   /**
@@ -159,15 +159,15 @@ public final class ContainerBalancerMetrics {
    * Gets the number of datanodes that are unbalanced.
    * @return long value
    */
-  public long getDatanodesNumUnbalanced() {
-    return datanodesNumUnbalanced.value();
+  public long getNumDatanodesUnbalanced() {
+    return numDatanodesUnbalanced.value();
   }
 
-  public void incrementDatanodesNumUnbalanced(long valueToAdd) {
-    datanodesNumUnbalanced.incr(valueToAdd);
+  public void incrementNumDatanodesUnbalanced(long valueToAdd) {
+    numDatanodesUnbalanced.incr(valueToAdd);
   }
 
-  public void resetDatanodesNumUnbalanced() {
-    datanodesNumUnbalanced.incr(-getDatanodesNumUnbalanced());
+  public void resetNumDatanodesUnbalanced() {
+    numDatanodesUnbalanced.incr(-getNumDatanodesUnbalanced());
   }
 }

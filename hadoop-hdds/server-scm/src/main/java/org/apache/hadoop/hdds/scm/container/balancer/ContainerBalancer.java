@@ -308,7 +308,7 @@ public class ContainerBalancer {
       }
       if (Double.compare(utilization, upperLimit) > 0) {
         overUtilizedNodes.add(datanodeUsageInfo);
-        metrics.incrementDatanodesNumUnbalanced(1);
+        metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes greater than upper limit in this node
         Long overUtilizedBytes = ratioToBytes(
@@ -319,7 +319,7 @@ public class ContainerBalancer {
         totalOverUtilizedBytes += overUtilizedBytes;
       } else if (Double.compare(utilization, lowerLimit) < 0) {
         underUtilizedNodes.add(datanodeUsageInfo);
-        metrics.incrementDatanodesNumUnbalanced(1);
+        metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes lesser than lower limit in this node
         Long underUtilizedBytes = ratioToBytes(
@@ -442,7 +442,7 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-            metrics.incrementMovedContainersNumInLatestIteration(1);
+            metrics.incrementNumMovedContainersInLatestIteration(1);
             LOG.info("Move completed for container {} to target {}",
                 container.containerID(),
                 moveSelection.getTargetNode().getUuidString());
@@ -467,7 +467,7 @@ public class ContainerBalancer {
     }
     countDatanodesInvolvedPerIteration =
         sourceToTargetMap.size() + selectedTargets.size();
-    metrics.incrementDatanodesNumInvolvedInLatestIteration(
+    metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
     metrics.incrementDataSizeMovedGBInLatestIteration(
         sizeMovedPerIteration / OzoneConsts.GB);
@@ -748,10 +748,10 @@ public class ContainerBalancer {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
-    metrics.resetMovedContainersNumInLatestIteration();
-    metrics.resetDatanodesNumInvolvedInLatestIteration();
+    metrics.resetNumMovedContainersInLatestIteration();
+    metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
-    metrics.resetDatanodesNumUnbalanced();
+    metrics.resetNumDatanodesUnbalanced();
   }
 
   /**
