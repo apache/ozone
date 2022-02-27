@@ -18,10 +18,12 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 
 /**
  * Utility class to write random keys from a limited buffer.
@@ -78,6 +80,22 @@ public class ContentGenerator {
         }
       }
     }
+  }
+
+  /**
+   * Write the required bytes to the output stream.
+   */
+  public void write(OzoneDataStreamOutput out) throws IOException {
+    for (long nrRemaining = keySize;
+         nrRemaining > 0; nrRemaining -= bufferSize) {
+      int curSize = (int) Math.min(bufferSize, nrRemaining);
+      for (int i = 0; i < curSize; i += copyBufferSize) {
+        ByteBuffer bb =
+            ByteBuffer.wrap(buffer, i, Math.min(copyBufferSize, curSize - i));
+        out.write(bb);
+      }
+    }
+    out.close();
   }
 
   @VisibleForTesting
