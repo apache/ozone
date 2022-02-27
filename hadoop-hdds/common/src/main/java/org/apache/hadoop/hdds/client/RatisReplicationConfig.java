@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -62,6 +63,7 @@ public class RatisReplicationConfig implements ReplicatedReplicationConfig {
   }
 
   @Override
+  @JsonIgnore
   public String getReplication() {
     return String.valueOf(replicationFactor);
   }
