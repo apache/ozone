@@ -19,6 +19,8 @@ package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 
@@ -32,6 +34,8 @@ class ByteBufferEncodingState extends EncodingState {
   ByteBuffer[] inputs;
   ByteBuffer[] outputs;
   boolean usingDirectBuffer;
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ByteBufferEncodingState.class);
 
   ByteBufferEncodingState(RawErasureEncoder encoder,
                           ByteBuffer[] inputs, ByteBuffer[] outputs) {
@@ -97,6 +101,9 @@ class ByteBufferEncodingState extends EncodingState {
       }
 
       if (buffer.remaining() != encodeLength) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("buffer remaining is " + buffer.remaining() + " encodelength is " + encodeLength);
+        }
         throw new HadoopIllegalArgumentException(
             "Invalid buffer, not of length " + encodeLength);
       }
