@@ -431,7 +431,7 @@ public class KeyOutputStream extends OutputStream {
 
   // Every container specific exception from datatnode will be seen as
   // StorageContainerException
-  boolean checkIfContainerToExclude(Throwable t) {
+  protected boolean checkIfContainerToExclude(Throwable t) {
     return t instanceof StorageContainerException;
   }
 
