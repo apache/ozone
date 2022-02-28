@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -41,6 +43,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static junit.framework.TestCase.assertEquals;
@@ -230,6 +233,27 @@ public class TestNodeStateManager {
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         newStatus.getOperationalState());
     assertEquals(NodeState.HEALTHY, newStatus.getHealth());
+  }
+
+  @Test
+  public void testContainerCanBeAddedAndRemovedFromDN()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    DatanodeDetails dn = generateDatanode();
+    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+
+    nsm.addContainer(dn.getUuid(), ContainerID.valueOf(1));
+    nsm.addContainer(dn.getUuid(), ContainerID.valueOf(2));
+
+    Set<ContainerID> containerSet = nsm.getContainers(dn.getUuid());
+    assertEquals(2, containerSet.size());
+    Assert.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
+    Assert.assertTrue(containerSet.contains(ContainerID.valueOf(2)));
+
+    nsm.removeContainer(dn.getUuid(), ContainerID.valueOf(2));
+    containerSet = nsm.getContainers(dn.getUuid());
+    assertEquals(1, containerSet.size());
+    Assert.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
+    Assert.assertFalse(containerSet.contains(ContainerID.valueOf(2)));
   }
 
   @Test

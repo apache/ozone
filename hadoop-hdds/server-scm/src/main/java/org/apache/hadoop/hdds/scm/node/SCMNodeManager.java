@@ -972,6 +972,13 @@ public class SCMNodeManager implements NodeManager {
     nodeStateManager.addContainer(datanodeDetails.getUuid(), containerId);
   }
 
+  @Override
+  public void removeContainer(final DatanodeDetails datanodeDetails,
+                           final ContainerID containerId)
+      throws NodeNotFoundException {
+    nodeStateManager.removeContainer(datanodeDetails.getUuid(), containerId);
+  }
+
   /**
    * Update set of containers available on a datanode.
    *
@@ -988,7 +995,9 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Return set of containerIDs available on a datanode.
+   * Return set of containerIDs available on a datanode. This is a copy of the
+   * set which resides inside NodeManager and hence can be modified without
+   * synchronization or side effects.
    *
    * @param datanodeDetails - DatanodeID
    * @return - set of containerIDs
