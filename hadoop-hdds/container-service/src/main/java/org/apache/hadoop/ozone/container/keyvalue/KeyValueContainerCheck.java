@@ -232,7 +232,8 @@ public class KeyValueContainerCheck {
 
     try (ReferenceCountedDB db =
             BlockUtils.getDB(onDiskContainerData, checkConfig);
-        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
+        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
+            onDiskContainerData.getContainerID())) {
 
       while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();

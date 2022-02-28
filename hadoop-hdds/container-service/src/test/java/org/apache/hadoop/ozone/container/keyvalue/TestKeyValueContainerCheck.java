@@ -115,7 +115,7 @@ public class TestKeyValueContainerCheck
     try (ReferenceCountedDB ignored =
             BlockUtils.getDB(containerData, conf);
         BlockIterator<BlockData> kvIter =
-                ignored.getStore().getBlockIterator()) {
+                ignored.getStore().getBlockIterator(containerID)) {
       BlockData block = kvIter.nextBlock();
       assertFalse(block.getChunks().isEmpty());
       ContainerProtos.ChunkInfo c = block.getChunks().get(0);

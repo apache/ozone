@@ -129,7 +129,7 @@ public class TestKeyValueBlockIterator {
     // Default filter used is all unprefixed blocks.
     List<Long> unprefixedBlockIDs = blockIDs.get("");
     try (BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
 
       Iterator<Long> blockIDIter = unprefixedBlockIDs.iterator();
       while (keyValueBlockIterator.hasNext()) {
@@ -161,7 +161,7 @@ public class TestKeyValueBlockIterator {
   public void testKeyValueBlockIteratorWithNextBlock() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
     try (BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
       assertEquals((long)blockIDs.get(0),
               keyValueBlockIterator.nextBlock().getLocalID());
       assertEquals((long)blockIDs.get(1),
@@ -180,7 +180,7 @@ public class TestKeyValueBlockIterator {
   public void testKeyValueBlockIteratorWithHasNext() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
     try (BlockIterator<BlockData> blockIter =
-                db.getStore().getBlockIterator()) {
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
 
       // Even calling multiple times hasNext() should not move entry forward.
       assertTrue(blockIter.hasNext());
@@ -218,7 +218,7 @@ public class TestKeyValueBlockIterator {
     Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
             normalBlocks, deletingBlocks);
     try (BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator(
+                db.getStore().getBlockIterator(CONTAINER_ID,
                         MetadataKeyFilters.getDeletingKeyFilter())) {
       List<Long> deletingBlockIDs =
               blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX);
@@ -239,7 +239,7 @@ public class TestKeyValueBlockIterator {
       Exception {
     createContainerWithBlocks(CONTAINER_ID, 0, 5);
     try (BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
       //As all blocks are deleted blocks, blocks does not match with normal key
       // filter.
       assertFalse(keyValueBlockIterator.hasNext());
@@ -297,7 +297,7 @@ public class TestKeyValueBlockIterator {
   private void testWithFilter(MetadataKeyFilters.KeyPrefixFilter filter,
                               List<Long> expectedIDs) throws Exception {
     try (BlockIterator<BlockData> iterator =
-                db.getStore().getBlockIterator(filter)) {
+                db.getStore().getBlockIterator(CONTAINER_ID, filter)) {
       // Test seek.
       iterator.seekToFirst();
       long firstID = iterator.nextBlock().getLocalID();

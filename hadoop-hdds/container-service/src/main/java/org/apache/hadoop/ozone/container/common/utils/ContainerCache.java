@@ -156,7 +156,7 @@ public final class ContainerCache extends LRUMap {
 
       try {
         long start = Time.monotonicNow();
-        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerID,
+        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
             containerDBPath, schemaVersion, conf, false);
         db = new ReferenceCountedDB(store, containerDBPath);
         metrics.incDbOpenLatency(Time.monotonicNow() - start);

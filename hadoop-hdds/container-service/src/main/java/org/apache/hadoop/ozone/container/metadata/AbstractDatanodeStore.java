@@ -67,7 +67,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
-  private final long containerID;
   private final ColumnFamilyOptions cfOptions;
 
   private static DatanodeDBProfile dbProfile;
@@ -79,7 +78,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
+  protected AbstractDatanodeStore(ConfigurationSource config,
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
 
@@ -92,7 +91,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     cfOptions = dbProfile.getColumnFamilyOptions(config);
 
     this.dbDef = dbDef;
-    this.containerID = containerID;
     this.openReadOnly = openReadOnly;
     start(config);
   }
@@ -178,13 +176,14 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator() {
+  public BlockIterator<BlockData> getBlockIterator(long containerID) {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator());
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator(KeyPrefixFilter filter) {
+  public BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter) {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator(), filter);
   }

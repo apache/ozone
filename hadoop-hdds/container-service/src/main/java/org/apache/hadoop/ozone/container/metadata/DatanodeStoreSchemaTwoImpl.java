@@ -42,10 +42,9 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreSchemaTwoImpl(ConfigurationSource config,
-      long containerID, String dbPath, boolean openReadOnly)
-      throws IOException {
-    super(config, containerID, new DatanodeSchemaTwoDBDefinition(dbPath),
+  public DatanodeStoreSchemaTwoImpl(ConfigurationSource config, String dbPath,
+      boolean openReadOnly) throws IOException {
+    super(config, new DatanodeSchemaTwoDBDefinition(dbPath),
         openReadOnly);
     this.deleteTransactionTable = new DatanodeSchemaTwoDBDefinition(dbPath)
         .getDeleteTransactionsColumnFamily().getTable(getStore());
