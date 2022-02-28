@@ -1951,4 +1951,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     return null;
   }
+
+  /**
+   * For HA only.
+   * @return whether current scm is leader
+   */
+  @Override
+  public boolean isLeader() {
+    return scmContext.isLeader();
+  }
 }
