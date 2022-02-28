@@ -1581,7 +1581,7 @@ public abstract class TestOzoneRpcClientAbstract {
     try (ReferenceCountedDB db = BlockUtils.getDB(containerData,
             cluster.getConf());
          BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+                db.getStore().getBlockIterator(containerID)) {
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
         if (blockData.getBlockID().getLocalID() == localID) {
@@ -1842,7 +1842,7 @@ public abstract class TestOzoneRpcClientAbstract {
     try (ReferenceCountedDB db = BlockUtils.getDB(containerData,
             cluster.getConf());
          BlockIterator<BlockData> keyValueBlockIterator =
-                 db.getStore().getBlockIterator()) {
+                 db.getStore().getBlockIterator(containerID)) {
       // Find the block corresponding to the key we put. We use the localID of
       // the BlockData to identify out key.
       BlockData blockData = null;

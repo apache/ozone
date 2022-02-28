@@ -208,7 +208,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       containerJson.add("dBMetadata", dBMetadata);
 
       // Build aggregate values.
-      JsonObject aggregates = getAggregateValues(store, schemaVersion);
+      JsonObject aggregates = getAggregateValues(store,
+          containerData.getContainerID(), schemaVersion);
       containerJson.add("aggregates", aggregates);
 
       // Build info about chunks directory.
@@ -242,7 +243,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   }
 
   private JsonObject getAggregateValues(DatanodeStore store,
-      String schemaVersion) throws IOException {
+      long containerID, String schemaVersion) throws IOException {
     JsonObject aggregates = new JsonObject();
 
     long usedBytesTotal = 0;
@@ -250,7 +251,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     long pendingDeleteBlockCountTotal = 0;
     // Count normal blocks.
     try (BlockIterator<BlockData> blockIter =
-             store.getBlockIterator(
+             store.getBlockIterator(containerID,
                  MetadataKeyFilters.getUnprefixedKeyFilter())) {
 
       while (blockIter.hasNext()) {
@@ -262,7 +263,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     // Count pending delete blocks.
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
       try (BlockIterator<BlockData> blockIter =
-               store.getBlockIterator(
+               store.getBlockIterator(containerID,
                    MetadataKeyFilters.getDeletingKeyFilter())) {
 
         while (blockIter.hasNext()) {
