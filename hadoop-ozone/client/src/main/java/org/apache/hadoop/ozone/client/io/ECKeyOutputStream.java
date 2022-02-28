@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.io.ByteBufferPool;
@@ -224,11 +225,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
 
     if (hasWriteFailure()) {
+      handleFailedStreams(false);
       return StripeWriteStatus.FAILED;
     }
     currentStreamEntry.executePutBlock(close);
 
     if (hasPutBlockFailure()) {
+      handleFailedStreams(true);
       return StripeWriteStatus.FAILED;
     }
     ECBlockOutputStreamEntry newBlockGroupStreamEntry =
@@ -274,6 +277,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       boolean isLastStripe) throws IOException {
     writeParityCells(parityCellSize);
     if (hasWriteFailure()) {
+      handleFailedStreams(false);
       return StripeWriteStatus.FAILED;
     }
 
@@ -286,6 +290,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         .executePutBlock(isLastStripe);
 
     if (hasPutBlockFailure()) {
+      handleFailedStreams(true);
       return StripeWriteStatus.FAILED;
     }
     ecChunkBufferCache.clear();
@@ -300,34 +305,49 @@ public class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private boolean hasWriteFailure() {
-    List<ECBlockOutputStream> failedStreams =
-        blockOutputStreamEntryPool.getCurrentStreamEntry()
-            .streamsWithWriteFailure();
-    // Since writes are async, let's check the failures once.
-    if (failedStreams.size() > 0) {
-      addToExcludeNodesList(failedStreams);
-      return true;
-    }
-    return false;
+    return !blockOutputStreamEntryPool.getCurrentStreamEntry()
+        .streamsWithWriteFailure().isEmpty();
   }
 
   private boolean hasPutBlockFailure() {
-    List<ECBlockOutputStream> failedStreams =
-        blockOutputStreamEntryPool.getCurrentStreamEntry()
-            .streamsWithPutBlockFailure();
-    // Since writes are async, let's check the failures once.
-    if (failedStreams.size() > 0) {
-      addToExcludeNodesList(failedStreams);
-      return true;
-    }
-    return false;
+    return !blockOutputStreamEntryPool.getCurrentStreamEntry()
+        .streamsWithPutBlockFailure().isEmpty();
   }
 
-  private void addToExcludeNodesList(List<ECBlockOutputStream> failedStreams) {
+  private void handleFailedStreams(boolean forPutBlock) {
+    ECBlockOutputStreamEntry currentStreamEntry =
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    List<ECBlockOutputStream> failedStreams = forPutBlock
+        ? currentStreamEntry.streamsWithPutBlockFailure()
+        : currentStreamEntry.streamsWithWriteFailure();
+
+    // Since writes are async, let's check the failures once.
+    boolean containerToExcludeAll = true;
     for (ECBlockOutputStream failedStream : failedStreams) {
-      blockOutputStreamEntryPool.getExcludeList()
-          .addDatanode(failedStream.getDatanodeDetails());
+      Throwable cause = HddsClientUtils.checkForException(
+          failedStream.getIoException());
+      Preconditions.checkNotNull(cause);
+      if (!checkIfContainerToExclude(cause)) {
+        blockOutputStreamEntryPool.getExcludeList()
+            .addDatanode(failedStream.getDatanodeDetails());
+        containerToExcludeAll = false;
+      }
     }
+
+    // NOTE: For now, this is mainly for ContainerNotOpenException
+    // due to container full, but may also for those cases that
+    // a DN do respond but with one with certain failures.
+    // In such cases we don't treat the replied DNs as failed.
+    if (containerToExcludeAll) {
+      blockOutputStreamEntryPool.getExcludeList()
+          .addPipeline(currentStreamEntry.getPipeline().getId());
+    }
+  }
+
+  @Override
+  protected boolean checkIfContainerToExclude(Throwable t) {
+    return super.checkIfContainerToExclude(t)
+        && t instanceof ContainerNotOpenException;
   }
 
   void writeParityCells(int parityCellSize) throws IOException {
@@ -420,7 +440,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
       blockOutputStreamEntryPool.getExcludeList()
           .addPipeline(streamEntry.getPipeline().getId());
     }
-    // In EC, we will just close the current stream.
     markStreamAsFailed(exception);
   }
 
