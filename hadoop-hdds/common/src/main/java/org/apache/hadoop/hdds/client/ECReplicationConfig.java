@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.EnumSet;
@@ -144,6 +145,7 @@ public class ECReplicationConfig implements ReplicationConfig {
   }
 
   @Override
+  @JsonIgnore
   public String getReplication() {
     return getCodec() + EC_REPLICATION_PARAMS_DELIMITER
         + getData() + EC_REPLICATION_PARAMS_DELIMITER
