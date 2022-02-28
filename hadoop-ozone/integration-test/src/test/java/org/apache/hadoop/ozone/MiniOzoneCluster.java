@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -62,7 +63,7 @@ public interface MiniOzoneCluster {
    * @return MiniOzoneCluster builder
    */
   static Builder newOMHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneOMHAClusterImpl.Builder(conf);
+    return new MiniOzoneHAClusterImpl.Builder(conf);
   }
 
   static Builder newHABuilder(OzoneConfiguration conf) {
@@ -158,6 +159,8 @@ public interface MiniOzoneCluster {
    * @return List of {@link HddsDatanodeService}
    */
   List<HddsDatanodeService> getHddsDatanodes();
+
+  HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
    * Returns a {@link ReconServer} instance.
@@ -341,6 +344,7 @@ public interface MiniOzoneCluster {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      ExitUtils.disableSystemExit();
     }
 
     public Builder setConf(OzoneConfiguration config) {

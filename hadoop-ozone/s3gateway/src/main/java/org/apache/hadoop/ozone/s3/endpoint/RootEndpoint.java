@@ -62,4 +62,9 @@ public class RootEndpoint extends EndpointBase {
 
     return Response.ok(response).build();
   }
+
+  @Override
+  public void init() {
+
+  }
 }

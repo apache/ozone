@@ -18,9 +18,18 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
@@ -99,5 +108,134 @@ public class TestObjectStore {
     bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
     Assert.assertNotEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
+  }
+
+  /**
+   * Ensure Link Buckets have same BucketLayout as source buckets.
+   * @throws Exception
+   */
+  @Test
+  public void testCreateLinkBucketWithBucketLayout() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+
+    String sourceBucket1Name = UUID.randomUUID().toString();
+    BucketLayout sourceBucket1Layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
+
+    String sourceBucket2Name = UUID.randomUUID().toString();
+    BucketLayout sourceBucket2Layout = BucketLayout.OBJECT_STORE;
+
+    String linkBucket1Name = UUID.randomUUID().toString();
+    String linkBucket2Name = UUID.randomUUID().toString();
+    // Chained link bucket
+    String linkBucket3Name = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    // Create source buckets
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setBucketLayout(sourceBucket1Layout);
+    volume.createBucket(sourceBucket1Name, builder.build());
+    builder.setBucketLayout(sourceBucket2Layout);
+    volume.createBucket(sourceBucket2Name, builder.build());
+
+    // Create link buckets
+    createLinkBucket(volume, sourceBucket1Name, linkBucket1Name);
+    createLinkBucket(volume, sourceBucket2Name, linkBucket2Name);
+    // linkBucket3 is chained onto linkBucket1
+    createLinkBucket(volume, linkBucket1Name, linkBucket3Name);
+
+    // Check that Link Buckets' layouts match source bucket layouts
+    OzoneBucket bucket = volume.getBucket(linkBucket1Name);
+    Assert.assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
+
+    bucket = volume.getBucket(linkBucket2Name);
+    Assert.assertEquals(sourceBucket2Layout, bucket.getBucketLayout());
+
+    // linkBucket3 is chained onto linkBucket1, hence its bucket layout matches
+    // linkBucket1's source bucket.
+    bucket = volume.getBucket(linkBucket3Name);
+    Assert.assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
+    Assert.assertEquals(linkBucket1Name, bucket.getSourceBucket());
+  }
+
+  @Test
+  public void testCreateDanglingLinkBucket() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    // Does not exist
+    String sourceBucketName = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    // Dangling link bucket
+    String danglingLinkBucketName = UUID.randomUUID().toString();
+
+    // danglingLinkBucket is a dangling link over a source bucket that doesn't
+    // exist.
+    createLinkBucket(volume, sourceBucketName, danglingLinkBucketName);
+
+    // since sourceBucket does not exist, layout depends on
+    // OZONE_DEFAULT_BUCKET_LAYOUT config.
+    OzoneBucket bucket = volume.getBucket(danglingLinkBucketName);
+    Assert.assertEquals(BucketLayout.fromString(
+            conf.get(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT)),
+        bucket.getBucketLayout());
+    Assert.assertEquals(sourceBucketName, bucket.getSourceBucket());
+  }
+
+  @Test
+  public void testLoopInLinkBuckets() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    String linkBucket1Name = UUID.randomUUID().toString();
+    String linkBucket2Name = UUID.randomUUID().toString();
+    String linkBucket3Name = UUID.randomUUID().toString();
+
+    // Create a loop in the link buckets
+    createLinkBucket(volume, linkBucket1Name, linkBucket2Name);
+    createLinkBucket(volume, linkBucket2Name, linkBucket3Name);
+    createLinkBucket(volume, linkBucket3Name, linkBucket1Name);
+
+    try {
+      volume.getBucket(linkBucket1Name);
+      Assert.fail("Should throw Exception due to loop in Link Buckets");
+    } catch (OMException oe) {
+      // Expected exception
+      Assert.assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+          oe.getResult());
+    }
+  }
+
+  /**
+   * Helper method to create Link Buckets.
+   *
+   * @param sourceVolume Name of source volume for Link Bucket.
+   * @param sourceBucket Name of source bucket for Link Bucket.
+   * @param linkBucket   Name of Link Bucket
+   * @throws IOException
+   */
+  private void createLinkBucket(OzoneVolume sourceVolume, String sourceBucket,
+                                String linkBucket) throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setBucketLayout(BucketLayout.DEFAULT)
+        .setSourceVolume(sourceVolume.getName())
+        .setSourceBucket(sourceBucket);
+    sourceVolume.createBucket(linkBucket, builder.build());
   }
 }

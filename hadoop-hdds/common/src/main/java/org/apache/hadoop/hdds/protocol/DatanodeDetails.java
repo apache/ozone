@@ -713,7 +713,7 @@ public class DatanodeDetails extends NodeImpl implements
      *
      * @return DatanodeDetails.Builder
      */
-    public Builder setPersistedOpState(HddsProtos.NodeOperationalState state){
+    public Builder setPersistedOpState(HddsProtos.NodeOperationalState state) {
       this.persistedOpState = state;
       return this;
     }
@@ -726,7 +726,7 @@ public class DatanodeDetails extends NodeImpl implements
      *
      * @return DatanodeDetails.Builder
      */
-    public Builder setPersistedOpStateExpiry(long expiry){
+    public Builder setPersistedOpStateExpiry(long expiry) {
       this.persistedOpStateExpiryEpochSec = expiry;
       return this;
     }

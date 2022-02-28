@@ -104,7 +104,8 @@ public class TestPipelineStateManagerImpl {
       nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     return Pipeline.newBuilder()
-        .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(type, factor))
+        .setReplicationConfig(
+            ReplicationConfig.fromProtoTypeAndFactor(type, factor))
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.ALLOCATED)
         .setId(PipelineID.randomId())
@@ -213,7 +214,7 @@ public class TestPipelineStateManagerImpl {
         // verify pipelines received
         List<Pipeline> pipelines1 =
             stateManager.getPipelines(
-                ReplicationConfig.fromTypeAndFactor(type, factor));
+                ReplicationConfig.fromProtoTypeAndFactor(type, factor));
         Assert.assertEquals(15, pipelines1.size());
         pipelines1.stream().forEach(p -> {
           Assert.assertEquals(type, p.getType());
@@ -276,7 +277,8 @@ public class TestPipelineStateManagerImpl {
           // verify pipelines received
           List<Pipeline> pipelines1 =
               stateManager.getPipelines(
-                  ReplicationConfig.fromTypeAndFactor(type, factor), state);
+                  ReplicationConfig.fromProtoTypeAndFactor(type, factor),
+                  state);
           Assert.assertEquals(5, pipelines1.size());
           pipelines1.forEach(p -> {
             Assert.assertEquals(type, p.getType());

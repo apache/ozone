@@ -195,7 +195,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
           .setStatus(false).setUnDeletedKeys(unDeletedKeys).build()).build();
-      omClientResponse = new OMKeysDeleteResponse(omResponse.build());
+      omClientResponse =
+          new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
 
     } finally {
       if (acquiredLock) {

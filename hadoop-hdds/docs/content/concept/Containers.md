@@ -29,7 +29,6 @@ Containers are the fundamental replication unit of Ozone/HDDS, they are managed 
 Containers are big binary units (5Gb by default) which can contain multiple blocks:
 
 ![Containers](Containers.png)
-
 Blocks are local information and not managed by SCM. Therefore even if billions of small files are created in the system (which means billions of blocks are created), only of the status of the containers will be reported by the Datanodes and containers will be replicated.
  
 When Ozone Manager requests a new Block allocation from the SCM, SCM will identify the suitable container and generate a block id which contains `ContainerId` + `LocalId`. Client will connect to the Datanode which stores the Container, and datanode can manage the separated block based on the `LocalId`.

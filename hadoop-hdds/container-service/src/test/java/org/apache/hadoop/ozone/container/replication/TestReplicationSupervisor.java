@@ -23,7 +23,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -33,9 +32,9 @@ import java.util.function.Function;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -59,7 +58,7 @@ import static java.util.Collections.emptyList;
 @RunWith(Parameterized.class)
 public class TestReplicationSupervisor {
 
-  private final ContainerReplicator noopReplicator = task -> {};
+  private final ContainerReplicator noopReplicator = task -> { };
   private final ContainerReplicator throwingReplicator = task -> {
     throw new RuntimeException("testing replication failure");
   };
@@ -76,15 +75,15 @@ public class TestReplicationSupervisor {
 
   private ContainerSet set;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestReplicationSupervisor(ChunkLayOutVersion layout) {
+  public TestReplicationSupervisor(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -237,8 +236,7 @@ public class TestReplicationSupervisor {
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
         Mockito.mock(SimpleContainerDownloader.class);
-    CompletableFuture<Path> res = new CompletableFuture<>();
-    res.complete(Paths.get("file:/tmp/no-such-file"));
+    Path res = Paths.get("file:/tmp/no-such-file");
     Mockito.when(
         moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList()))
         .thenReturn(res);

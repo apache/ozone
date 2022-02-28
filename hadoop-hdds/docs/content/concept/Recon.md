@@ -31,8 +31,7 @@ the current state of the cluster through REST based APIs and rich web UI.
 
 ## High Level Design
 
-{{<figure src="/concept/ReconHighLevelDesign.png" width="800px">}}
-
+![Recon High Level Design](ReconHighLevelDesign.png)
 <br/>
 
 On a high level, Recon collects and aggregates metadata from Ozone Manager (OM), 
@@ -50,8 +49,7 @@ the web UI.
 
 ## Recon and Ozone Manager
 
-{{<figure src="/concept/ReconOmDesign.png" width="800px">}}
-
+![Recon OM Design](ReconOmDesign.png)
 <br/>
 
 Recon gets a full snapshot of OM rocks db initially from the leader OM's HTTP 
@@ -68,8 +66,7 @@ further processing by OM db tasks via [Recon Task Framework](#task-framework).
 
 ## Recon and Storage Container Manager
 
-{{<figure src="/concept/ReconScmDesign.png" width="800px">}}
-
+![Recon SCM Design](ReconScmDesign.png)
 <br/>
 
 Recon also acts as a passive SCM for datanodes. When Recon is configured in the

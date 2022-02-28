@@ -219,7 +219,7 @@ public class TestS3MultipartResponse {
         keyName, multipartUploadID);
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos);
+        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos, getBucketLayout());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -272,7 +272,8 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
         multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,
-        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo);
+        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo,
+        getBucketLayout());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -298,7 +299,8 @@ public class TestS3MultipartResponse {
                             .setVolume(volumeName).setKey(keyName)).build();
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
-        multipartKey, multipartOpenKey, omKeyInfo, unUsedParts);
+        multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout());
   }
 
   private String getMultipartKey(long parentID, String keyName,
@@ -312,7 +314,7 @@ public class TestS3MultipartResponse {
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
       OMResponse omResponse) {
     return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
-        omKeyInfo);
+        omKeyInfo, getBucketLayout());
   }
 
   protected S3MultipartUploadAbortResponse getS3MultipartUploadAbortResp(
@@ -320,7 +322,8 @@ public class TestS3MultipartResponse {
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OMResponse omResponse) {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo);
+        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        getBucketLayout());
   }
 
   public BucketLayout getBucketLayout() {

@@ -194,6 +194,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT
       = "300s"; // 300s for default
 
+  public static final String OZONE_BLOCK_DELETING_SERVICE_WORKERS =
+      "ozone.block.deleting.service.workers";
+  public static final int OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT
+      = 10;
+
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
   public static final int OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT
@@ -454,6 +459,18 @@ public final class OzoneConfigKeys {
       "ozone.client.key.latest.version.location";
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
+
+  public static final String OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT =
+      "ozone.client.test.ofs.default.bucket.layout";
+
+  public static final String OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT =
+      "FILE_SYSTEM_OPTIMIZED";
+
+  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY =
+      "ozone.om.client.protocol.version";
+  // The version of the protocol for Client (S3G/OFS) to OM Communication.
+  // The protocol starts at 2.0.0 and a null or empty value for older versions.
+  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION = "2.0.0";
 
   /**
    * There is no need to instantiate this class.

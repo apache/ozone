@@ -484,6 +484,10 @@ public class BlockOutputStream extends OutputStream {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
+      } catch (Throwable e) {
+        String msg = "Failed to flush. error: " + e.getMessage();
+        LOG.error(msg, e);
+        throw e;
       }
     }
   }
@@ -546,6 +550,10 @@ public class BlockOutputStream extends OutputStream {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
+      } catch (Throwable e) {
+        String msg = "Failed to flush. error: " + e.getMessage();
+        LOG.error(msg, e);
+        throw e;
       } finally {
         cleanup(false);
       }
@@ -700,7 +708,7 @@ public class BlockOutputStream extends OutputStream {
       boolean processExecutionException)
       throws IOException {
     LOG.error("Command execution was interrupted.");
-    if(processExecutionException) {
+    if (processExecutionException) {
       handleExecutionException(ex);
     } else {
       throw new IOException(EXCEPTION_MSG + ex.toString(), ex);

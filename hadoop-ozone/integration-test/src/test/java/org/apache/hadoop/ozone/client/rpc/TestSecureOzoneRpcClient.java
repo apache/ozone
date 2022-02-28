@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -118,7 +119,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .setCertificateClient(certificateClientTest)
         .build();
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        60 *60, certificateClientTest.getCertificate().
+        60 * 60, certificateClientTest.getCertificate().
         getSerialNumber().toString());
     secretManager.start(certificateClientTest);
     cluster.getOzoneManager().startSecretManager();
@@ -159,7 +160,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
       }
@@ -167,13 +168,13 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
       byte[] fileContent;
-      try(OzoneInputStream is = bucket.readKey(keyName)) {
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
         is.read(fileContent);
       }
 
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, ReplicationType.STAND_ALONE,
+          keyName, ReplicationType.RATIS,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -202,7 +203,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",
@@ -241,7 +242,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     cluster.getOzoneManager().getMetadataManager().getS3SecretTable().put(
         accessKey, new S3SecretValue(accessKey, secret));
 
-    OMRequest omRequest = OMRequest.newBuilder()
+    OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
         .setVersion(CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
@@ -257,17 +258,49 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     GenericTestUtils.waitFor(() -> cluster.getOzoneManager().isLeaderReady(),
         100, 120000);
     OMResponse omResponse = cluster.getOzoneManager().getOmServerProtocol()
-        .submitRequest(null, omRequest);
+        .submitRequest(null, writeRequest);
 
+    // Verify response.
     Assert.assertTrue(omResponse.getStatus() == Status.OK);
 
+    // Read Request
+    OMRequest readRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
+        .setVersion(CURRENT_VERSION)
+        .setClientId(UUID.randomUUID().toString())
+        .setInfoVolumeRequest(InfoVolumeRequest.newBuilder()
+            .setVolumeName(volumeName).build())
+        .setS3Authentication(S3Authentication.newBuilder()
+            .setAccessId(accessKey)
+            .setSignature(signature).setStringToSign(strToSign))
+        .build();
+
+    omResponse = cluster.getOzoneManager().getOmServerProtocol()
+        .submitRequest(null, readRequest);
+
+    // Verify response.
+    Assert.assertTrue(omResponse.getStatus() == Status.OK);
+
+    VolumeInfo volumeInfo = omResponse.getInfoVolumeResponse().getVolumeInfo();
+    Assert.assertNotNull(volumeInfo);
+    Assert.assertEquals(volumeName, volumeInfo.getVolume());
+    Assert.assertEquals(accessKey, volumeInfo.getAdminName());
+    Assert.assertEquals(accessKey, volumeInfo.getOwnerName());
 
     // Override secret to S3Secret table with some dummy value
     cluster.getOzoneManager().getMetadataManager().getS3SecretTable().put(
         accessKey, new S3SecretValue(accessKey, "dummy"));
+
+    // Write request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()
-        .submitRequest(null, omRequest);
+        .submitRequest(null, writeRequest);
     Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);
+
+  // Read request with invalid credentials.
+    omResponse = cluster.getOzoneManager().getOmServerProtocol()
+        .submitRequest(null, readRequest);
+    Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);
+
 
   }
 
@@ -301,14 +334,15 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   @Test
   @Override
   // Restart DN doesn't work with security enabled.
-  public void testZReadKeyWithUnhealthyContainerReplia() throws Exception {
+  public void testZReadKeyWithUnhealthyContainerReplica() {
   }
+
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
   @AfterClass
   public static void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 

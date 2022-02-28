@@ -21,10 +21,10 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -49,7 +49,7 @@ public class TestS3InitiateMultipartUploadRequest
     String keyName = UUID.randomUUID().toString();
 
     // Add volume and bucket to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
@@ -69,8 +69,9 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNotNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
+    Assert.assertNotNull(omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+        .get(multipartKey));
     Assert.assertNotNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
 
@@ -81,14 +82,14 @@ public class TestS3InitiateMultipartUploadRequest
 
     Assert.assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
-            .getModificationTime(),
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey)
-            .getModificationTime());
+            .getModificationTime(), omMetadataManager
+            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+            .get(multipartKey).getModificationTime());
     Assert.assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
-            .getModificationTime(),
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey)
-            .getCreationTime());
+            .getModificationTime(), omMetadataManager
+            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+            .get(multipartKey).getCreationTime());
 
   }
 
@@ -99,7 +100,7 @@ public class TestS3InitiateMultipartUploadRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(
         volumeName, bucketName, keyName);
@@ -118,8 +119,9 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+        .get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
   }
@@ -147,8 +149,9 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+        .get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
   }

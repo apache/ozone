@@ -399,6 +399,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.block.deleting.service.workers</name>
+    <value>10</value>
+    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <description>Number of workers executed of block deletion service. This
+      configuration should be set to greater than 0.
+    </description>
+  </property>
+  <property>
     <name>ozone.UnsafeByteOperations.enabled</name>
     <value>true</value>
     <tag>OZONE, PERFORMANCE, CLIENT</tag>
@@ -458,6 +466,10 @@
       EXAMPLEOMSERVICEID). The OM service ID should be the value (one of the
       values if there are multiple) set for the parameter ozone.om.service.ids.
 
+      Decommissioned nodes (represented by node Ids in
+      ozone.om.decommissioned.nodes config list) will be ignored and not
+      included in the OM HA setup even if added to this list.
+
       Unique identifiers for each OM Node, delimited by commas. This will be
       used by OzoneManagers in HA setup to determine all the OzoneManagers
       belonging to the same OMservice in the cluster. For example, if you
@@ -465,6 +477,15 @@
       use “om1”, “om2” and "om3" as the individual IDs of the OzoneManagers,
       you would configure a property ozone.om.nodes.omService1, and its value
       "om1,om2,om3".
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.decommissioned.nodes.EXAMPLEOMSERVICEID</name>
+    <value/>
+    <tag>OM, HA</tag>
+    <description>
+      Comma-separated list of OM node Ids which have been decommissioned. OMs
+      present in this list will not be included in the OM HA ring.
     </description>
   </property>
   <property>
@@ -545,20 +566,6 @@
       The actual address the OM web server will bind to using HTTPS.
       If this optional address is set, it overrides only the hostname portion of
       ozone.om.https-address.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OM, PERFORMANCE</tag>
-    <description>
-      The size of OM DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Ozone at scale.
-
-      A large value for this key allows a proportionally larger amount of OM
-      metadata to be cached in memory. This makes OM operations faster.
     </description>
   </property>
   <property>
@@ -723,11 +730,11 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.chunk.layout</name>
+    <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
-      Chunk layout defines how chunks, blocks and containers are stored on disk.
+      Container layout defines how chunks, blocks and containers are stored on disk.
       Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
       block are stored in the same file with FILE_PER_BLOCK.  The default is
       FILE_PER_BLOCK.
@@ -928,18 +935,6 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The port number of the Ozone SCM service.
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>OZONE, PERFORMANCE</tag>
-    <description>SCM keeps track of the Containers in the cluster. This DB holds
-      the container metadata. This value is set to a small value to make the
-      unit
-      testing runs smooth. In production, we recommend a value of 16GB or
-      higher. This allows SCM to avoid disk I/O's while looking up the container
-      location.
     </description>
   </property>
   <property>
@@ -2027,7 +2022,7 @@
   </property>
   <property>
     <name>ozone.scm.ratis.enable</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>Property to enable or disable Ratis server on SCM.
       Please note - this is a temporary property to disable SCM Ratis server.
@@ -2324,6 +2319,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.admin.protocol.max.retries</name>
+    <value>20</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Expert only. The maximum number of retries for Ozone Manager Admin
+      protocol on each OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.admin.protocol.wait.between.retries</name>
+    <value>1000</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Expert only. The time to wait, in milliseconds, between retry attempts
+      for Ozone Manager Admin protocol.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
     <tag>RECON, MANAGEMENT</tag>
@@ -2450,21 +2463,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.container.db.cache.size.mb</name>
-    <value>128</value>
-    <tag>RECON, PERFORMANCE</tag>
-    <description>
-      The size of Recon DB cache in MB that used for caching files.
-      This value is set to an abnormally low value in the default configuration.
-      That is to make unit testing easy. Generally, this value should be set to
-      something like 16GB or more, if you intend to use Recon at scale.
-
-      A large value for this key allows a proportionally larger amount of Recon
-      container DB to be cached in memory. This makes Recon Container-Key
-      operations faster.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.db.dir</name>
     <value/>
     <tag>OZONE, RECON, STORAGE, PERFORMANCE</tag>
@@ -2529,6 +2527,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scm.connection.request.timeout</name>
+    <value>5s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Connection request timeout in milliseconds for HTTP call made by Recon to
+      request SCM DB snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.connection.timeout</name>
+    <value>5s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Connection timeout for HTTP call in milliseconds made by Recon to request
+      SCM snapshot.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
@@ -2559,6 +2575,41 @@
     <tag>OZONE, RECON, OM</tag>
     <description>
       Request to flush the OM DB before taking checkpoint snapshot.
+    </description>
+  </property>
+  <property>
+    <name>recon.om.delta.update.limit</name>
+    <value>2000</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Recon each time get a limited delta updates from OM.
+      The actual fetched data might be larger than this limit.
+    </description>
+  </property>
+  <property>
+    <name>recon.om.delta.update.loop.limit</name>
+    <value>10</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      The sync between Recon and OM consists of several small
+      fetch loops.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.container.threshold</name>
+    <value>100</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Threshold value for the difference in number of containers
+      in SCM and RECON.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.snapshot.enabled</name>
+    <value>false</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      If enabled, SCM DB Snapshot is taken by Recon.
     </description>
   </property>
   <property>
@@ -2767,18 +2818,6 @@
     </description>
   </property>
 
-  <property>
-    <name>ozone.om.metadata.layout</name>
-    <tag>OZONE, OM</tag>
-    <value>SIMPLE</value>
-    <description>
-      This property is used to define the metadata layout of file system
-      paths. If it is configured as PREFIX in combination with
-      ozone.om.enable.filesystem.paths to true then this allows to perform
-      atomic rename and delete of any directory at any level in the namespace.
-      Defaulting to SIMPLE. Supported values: SIMPLE and PREFIX.
-    </description>
-  </property>
   <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
@@ -2990,6 +3029,21 @@
       bucket layout option. Supported values are OBJECT_STORE and FILE_SYSTEM_OPTIMIZED.
       OBJECT_STORE: This layout allows the bucket to behave as a pure object store and will not allow
       interoperability between S3 and FS APIs.
+      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
+      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
+      will create intermediate directories.
+      For testing purposes LEGACY layout is also allowed. LEGACY layout is not recommended and will be removed in the
+      future.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.test.ofs.default.bucket.layout</name>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      This configuration is used for testing purposes. Default bucket layout value when buckets are created using OFS.
+      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.

@@ -20,6 +20,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
   // TODO: based on need can make batchSize configurable.
   private int batchSize = 1000;
   private OzoneFileStatus pathStatus;
+  private boolean checkRecursiveAccess = false;
 
   public OzonePrefixPathImpl(String volumeName, String bucketName,
       String keyPrefix, KeyManager keyManagerImpl) throws IOException {
@@ -65,6 +67,15 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
         throw new OMException(ome.getMessage(), KEY_NOT_FOUND);
       }
       throw ome;
+    }
+
+    // Check if this key is a directory.
+    // NOTE: checkRecursiveAccess is always false for a file keyPrefix.
+    if (pathStatus != null && pathStatus.isDirectory()) {
+      // set recursive access check to true if this directory contains
+      // sub-directories or sub-files.
+      checkRecursiveAccess = OMFileRequest.hasChildren(
+          pathStatus.getKeyInfo(), keyManager.getMetadataManager());
     }
   }
 
@@ -160,5 +171,12 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
       }
       return statuses;
     }
+  }
+
+  /**
+   * @return true if no sub-directories or sub-files exist, false otherwise
+   */
+  public boolean isCheckRecursiveAccess() {
+    return checkRecursiveAccess;
   }
 }

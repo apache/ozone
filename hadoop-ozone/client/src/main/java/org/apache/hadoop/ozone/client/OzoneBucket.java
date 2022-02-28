@@ -140,6 +140,10 @@ public class OzoneBucket extends WithMetadata {
    * Bucket Layout.
    */
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+  /**
+   * Bucket Owner.
+   */
+  private String owner;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ClientProtocol proxy) {
@@ -219,6 +223,22 @@ public class OzoneBucket extends WithMetadata {
         sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
         quotaInNamespace);
     this.bucketLayout = bucketLayout;
+  }
+
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+       String volumeName, String bucketName, StorageType storageType,
+       Boolean versioning, long creationTime, long modificationTime,
+       Map<String, String> metadata, String encryptionKeyName,
+       String sourceVolume, String sourceBucket, long usedBytes,
+       long usedNamespace, long quotaInBytes, long quotaInNamespace,
+       BucketLayout bucketLayout, String owner) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, modificationTime, metadata, encryptionKeyName,
+        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
+        quotaInNamespace, bucketLayout);
+    this.owner = owner;
   }
 
   /**
@@ -383,6 +403,15 @@ public class OzoneBucket extends WithMetadata {
    */
   public long getQuotaInNamespace() {
     return quotaInNamespace;
+  }
+
+  /**
+   * Returns the owner of the Bucket.
+   *
+   * @return owner
+   */
+  public String getOwner() {
+    return owner;
   }
 
   /**
@@ -582,7 +611,7 @@ public class OzoneBucket extends WithMetadata {
    * @return {@code Iterator<OzoneKey>}
    */
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix)
-      throws IOException{
+      throws IOException {
     return listKeys(keyPrefix, null);
   }
 
@@ -601,6 +630,14 @@ public class OzoneBucket extends WithMetadata {
 
     return new KeyIteratorFactory()
         .getKeyIterator(keyPrefix, prevKey, bucketLayout);
+  }
+
+  /**
+   * Checks if the bucket is a Link Bucket.
+   * @return True if bucket is a link, False otherwise.
+   */
+  public boolean isLink() {
+    return sourceVolume != null && sourceBucket != null;
   }
 
   /**
@@ -810,6 +847,7 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  @Deprecated
   public OzoneOutputStream createFile(String keyName, long size,
       ReplicationType type, ReplicationFactor factor, boolean overWrite,
       boolean recursive) throws IOException {
@@ -868,6 +906,17 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Sets/Changes the owner of this Bucket.
+   * @param userName new owner
+   * @throws IOException
+   */
+  public boolean setOwner(String userName) throws IOException {
+    boolean result = proxy.setBucketOwner(volumeName, name, userName);
+    this.owner = userName;
+    return result;
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneKey} list.
    */
   private class KeyIterator implements Iterator<OzoneKey> {
@@ -890,7 +939,7 @@ public class OzoneBucket extends WithMetadata {
      * The returned keys match key prefix.
      * @param keyPrefix
      */
-    KeyIterator(String keyPrefix, String prevKey) throws IOException{
+    KeyIterator(String keyPrefix, String prevKey) throws IOException {
       setKeyPrefix(keyPrefix);
       this.currentValue = null;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
@@ -898,7 +947,7 @@ public class OzoneBucket extends WithMetadata {
 
     @Override
     public boolean hasNext() {
-      if(!currentIterator.hasNext() && currentValue != null) {
+      if (!currentIterator.hasNext() && currentValue != null) {
         try {
           currentIterator =
               getNextListOfKeys(currentValue.getName()).iterator();
@@ -911,7 +960,7 @@ public class OzoneBucket extends WithMetadata {
 
     @Override
     public OzoneKey next() {
-      if(hasNext()) {
+      if (hasNext()) {
         currentValue = currentIterator.next();
         return currentValue;
       }
@@ -959,7 +1008,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * Note: Does not guarantee to return the list of keys in a sorted order.
    */
-  private class KeyIteratorWithFSO extends KeyIterator{
+  private class KeyIteratorWithFSO extends KeyIterator {
 
     private Stack<String> stack;
     private List<OzoneKey> pendingItemsToBeBatched;
@@ -1208,7 +1257,7 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIteratorFactory {
     KeyIterator getKeyIterator(String keyPrefix, String prevKey,
         BucketLayout bType) throws IOException {
-      if (bType.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      if (bType.isFileSystemOptimized()) {
         return new KeyIteratorWithFSO(keyPrefix, prevKey);
       } else {
         return new KeyIterator(keyPrefix, prevKey);
