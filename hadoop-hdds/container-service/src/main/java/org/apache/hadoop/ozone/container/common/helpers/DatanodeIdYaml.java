@@ -106,6 +106,7 @@ public final class DatanodeIdYaml {
 
       datanodeDetails = builder.build();
     }
+
     return datanodeDetails;
   }
 
