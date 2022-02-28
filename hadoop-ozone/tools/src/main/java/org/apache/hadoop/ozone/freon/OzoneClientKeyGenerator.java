@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -28,8 +29,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
@@ -85,17 +84,18 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private String omServiceID;
 
   @Option(names = {"--replication"},
-      description =
-          "Replication configuration of the new key."
-              + "(ONE, THREE) for RATIS or STAND_ALONE, "
-              + "(rs-3-2-1024k, rs-6-3-1024k or rs-10-4-1024k) for EC."
+      description = "Replication level of the new keys. Example: THREE"
+          + " (for RATIS) or ONE (for STAND_ALONE). In case of EC, pass"
+          + " CODEC-DATA-PARITY-CHUNKSIZE, eg rs-3-2-1024k, rs-6-3-1024k,"
+          + " rs-10-4-1024k. Defaults to bucket or cluster config"
   )
   private String replication;
 
   @Option(names = {"--type"},
-      description = "Replication type of the new key. (RATIS, STAND_ALONE, EC)"
+      description = "Replication type of the new key. Supported types are"
+          + " RATIS, STANDALONE, EC. Defaults to bucket or cluster config"
   )
-  private ReplicationType replicationType;
+  private ReplicationType type;
 
   private Timer timer;
 
@@ -119,7 +119,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
           .fromTypeAndFactor(ReplicationType.RATIS, factor);
     } else {
       replicationConfig = OzoneClientUtils
-          .validateAndGetClientReplicationConfig(replicationType, replication,
+          .validateAndGetClientReplicationConfig(type, replication,
               ozoneConfiguration);
     }
 
@@ -140,13 +140,10 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OzoneOutputStream stream = bucket.createKey(key, keySize,
+      try (OutputStream stream = bucket.createKey(key, keySize,
           replicationConfig, metadata)) {
         contentGenerator.write(stream);
-        if (!(stream.getOutputStream() instanceof ECKeyOutputStream)) {
-          // ECKeyOutputStream#flush() is not implemented yet.
-          stream.flush();
-        }
+        stream.flush();
       }
       return null;
     });

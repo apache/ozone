@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.erasurecode.CodecRegistry;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.util.Preconditions;
 import org.junit.Assert;
 
@@ -184,9 +184,8 @@ public final class ECStreamTestUtil {
     for (int i = 0; i < ecConfig.getParity(); i++) {
       parity[i] = ByteBuffer.allocate(cellSize);
     }
-    RawErasureEncoder encoder = CodecRegistry.getInstance()
-        .getCodecFactory(ecConfig.getCodec().toString())
-        .createEncoder(ecConfig);
+    RawErasureEncoder encoder =
+        CodecUtil.createRawEncoderWithFallback(ecConfig);
     encoder.encode(data, parity);
 
     data[0].flip();
@@ -226,23 +225,25 @@ public final class ECStreamTestUtil {
 
     private Pipeline currentPipeline;
 
-    public List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
+    public synchronized
+        List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
       return blockStreams;
     }
 
-    public void setBlockStreamData(List<ByteBuffer> bufs) {
+    public synchronized void setBlockStreamData(List<ByteBuffer> bufs) {
       this.blockStreamData = bufs;
     }
 
-    public void setCurrentPipeline(Pipeline pipeline) {
+    public synchronized void setCurrentPipeline(Pipeline pipeline) {
       this.currentPipeline = pipeline;
     }
 
-    public void setFailIndexes(List<Integer> fail) {
+    public synchronized void setFailIndexes(List<Integer> fail) {
       failIndexes.addAll(fail);
     }
 
-    public BlockExtendedInputStream create(ReplicationConfig repConfig,
+    public synchronized BlockExtendedInputStream create(
+        ReplicationConfig repConfig,
         OmKeyLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
         XceiverClientFactory xceiverFactory,
@@ -326,7 +327,7 @@ public final class ECStreamTestUtil {
 
     @Override
     public long getRemaining() {
-      return data.remaining();
+      return getLength() - getPos();
     }
 
     @Override
@@ -343,7 +344,7 @@ public final class ECStreamTestUtil {
       if (getRemaining() == 0) {
         return EOF;
       }
-      int toRead = Math.min(buf.remaining(), (int)getRemaining());
+      int toRead = (int)Math.min(buf.remaining(), getRemaining());
       for (int i = 0; i < toRead; i++) {
         if (shouldError && data.position() >= shouldErrorPosition) {
           throwError();

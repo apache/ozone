@@ -412,14 +412,14 @@ public class TestECBlockInputStream {
 
     private List<TestBlockInputStream> blockStreams = new ArrayList<>();
 
-    public List<TestBlockInputStream> getBlockStreams() {
+    public synchronized List<TestBlockInputStream> getBlockStreams() {
       return blockStreams;
     }
 
-    public BlockExtendedInputStream create(ReplicationConfig repConfig,
-        OmKeyLocationInfo blockInfo, Pipeline pipeline,
-        Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
-        XceiverClientFactory xceiverFactory,
+    public synchronized BlockExtendedInputStream create(
+        ReplicationConfig repConfig, OmKeyLocationInfo blockInfo,
+        Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
+        boolean verifyChecksum, XceiverClientFactory xceiverFactory,
         Function<BlockID, Pipeline> refreshFunction) {
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),

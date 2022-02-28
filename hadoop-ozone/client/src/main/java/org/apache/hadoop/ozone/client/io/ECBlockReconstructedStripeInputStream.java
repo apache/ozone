@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.erasurecode.CodecRegistry;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureDecoder;
+import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,10 +125,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     super(repConfig, blockInfo, verifyChecksum, xceiverClientFactory,
         refreshFunction, streamFactory);
     this.byteBufferPool = byteBufferPool;
-
-    decoder = CodecRegistry.getInstance()
-        .getCodecFactory(repConfig.getCodec().toString())
-        .createDecoder(repConfig);
+    decoder = CodecUtil.createRawDecoderWithFallback(repConfig);
 
     // The EC decoder needs an array data+parity long, with missing or not
     // needed indexes set to null.

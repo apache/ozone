@@ -57,15 +57,15 @@ public class PutKeyHandler extends KeyHandler {
   private String fileName;
 
   @Option(names = {"-r", "--replication"},
-      description =
-          "Replication configuration of the new key. (this is replication "
-              + "specific. for RATIS/STANDALONE you can use ONE or THREE) "
-              + "Default is specified in the cluster-wide config.")
+      description = "Replication level of the new key. Example: THREE"
+          + " (for RATIS) or ONE (for STAND_ALONE). In case of EC, pass"
+          + " CODEC-DATA-PARITY-CHUNKSIZE, eg rs-3-2-1024k, rs-6-3-1024k,"
+          + " rs-10-4-1024k. Defaults to bucket or cluster config")
   private String replication;
 
   @Option(names = {"-t", "--type"},
-      description = "Replication type of the new key. (use RATIS or " +
-          "STAND_ALONE or EC) Default is specified in the cluster-wide config.")
+      description = "Replication type of the new key. Supported types are"
+          + " RATIS, STANDALONE, EC. Defaults to bucket or cluster config")
   private ReplicationType replicationType;
 
   @Override
