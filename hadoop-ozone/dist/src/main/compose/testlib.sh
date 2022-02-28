@@ -201,6 +201,12 @@ execute_robot_test(){
 
   copy_daemon_logs
 
+  if [[ ${rc} -gt 0 ]] && [[ ${rc} -lt 250 ]]; then
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
+      docker exec -it "${c}" bash -c "jstack \$(jps | grep -v Jps | cut -f1 -d' ')" > ${RESULT_DIR}/${c}.stack
+    done
+  fi
+
   set -e
 
   if [[ ${rc} -gt 0 ]]; then
