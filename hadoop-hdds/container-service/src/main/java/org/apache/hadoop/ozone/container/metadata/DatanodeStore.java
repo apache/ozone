@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -87,8 +87,8 @@ public interface DatanodeStore {
 
   void compactDB() throws IOException;
 
-  BlockIterator<BlockData> getBlockIterator();
+  BlockIterator<BlockData> getBlockIterator(long containerID);
 
-  BlockIterator<BlockData>
-      getBlockIterator(MetadataKeyFilters.KeyPrefixFilter filter);
+  BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter);
 }
