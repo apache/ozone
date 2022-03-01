@@ -63,6 +63,202 @@ jobs:
             # Run all checks
             dev-support/ci/selective_ci_checks.sh
           fi
+  compile:
+    needs:
+      - build-info
+    runs-on: ubuntu-18.04
+    timeout-minutes: 30
+    if: needs.build-info.outputs.needs-build == 'true'
+    strategy:
+      matrix:
+        java: [ 8, 11 ]
+      fail-fast: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Cache for npm dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+      - name: Setup java
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+      - name: Run a full build
+        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
+      - name: Store binaries for tests
+        uses: actions/upload-artifact@v2
+        if: matrix.java == '8'
+        with:
+          name: ozone-bin
+          path: hadoop-ozone/dist/target/ozone*.tar.gz
+          retention-days: 1
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
+  basic:
+    needs:
+      - build-info
+    runs-on: ubuntu-18.04
+    timeout-minutes: 60
+    if: needs.build-info.outputs.needs-basic-checks == 'true'
+    strategy:
+      matrix:
+        check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
+      fail-fast: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+        if: ${{ !contains('author,bats,docs', matrix.check) }}
+      - name: Execute tests
+        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+      - name: Summary of failures
+        run: cat target/${{ matrix.check }}/summary.txt
+        if: ${{ !cancelled() }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.check }}
+          path: target/${{ matrix.check }}
+        continue-on-error: true
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
+  dependency:
+    needs:
+      - build-info
+      - compile
+    runs-on: ubuntu-18.04
+    timeout-minutes: 5
+    if: needs.build-info.outputs.needs-dependency-check == 'true'
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir dist
+          tar  -C dist --strip-components 1 -xzf ozone*.tar.gz
+      - name: Execute tests
+        run: |
+          export OZONE_DIST_DIR=`pwd`/dist
+          ./hadoop-ozone/dev-support/checks/dependency.sh
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: dependency
+          path: target/dependency
+        continue-on-error: true
+  acceptance:
+    needs:
+      - build-info
+      - compile
+    runs-on: ubuntu-18.04
+    timeout-minutes: 150
+    if: needs.build-info.outputs.needs-compose-tests == 'true'
+    strategy:
+      matrix:
+        suite:
+          - secure
+          - unsecure
+          - HA
+          - MR
+          - misc
+      fail-fast: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          sudo chmod -R a+rwX hadoop-ozone/dist/target
+      - name: Execute tests
+        run: |
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/acceptance.sh
+        env:
+          KEEP_IMAGE: false
+          OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
+          OZONE_WITH_COVERAGE: true
+          OZONE_VOLUME_OWNER: 1000
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: acceptance-${{ matrix.suite }}
+          path: target/acceptance
+        continue-on-error: true
+  kubernetes:
+    needs:
+      - build-info
+      - compile
+    runs-on: ubuntu-18.04
+    timeout-minutes: 60
+    if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+      - name: Execute tests
+        run: |
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/kubernetes.sh
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: kubernetes
+          path: target/kubernetes
+        continue-on-error: true
   integration:
     needs:
       - build-info
@@ -101,6 +297,57 @@ jobs:
         with:
           name: it-${{ matrix.profile }}
           path: target/integration
+        continue-on-error: true
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
+  coverage:
+    runs-on: ubuntu-18.04
+    timeout-minutes: 30
+    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
+    needs:
+      - acceptance
+      - basic
+      - integration
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ github.job }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: target/artifacts
+      - name: Untar binaries
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
+      - name: Calculate combined coverage
+        run: ./hadoop-ozone/dev-support/checks/coverage.sh
+      - name: Setup java 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Upload coverage to Sonar
+        run: ./hadoop-ozone/dev-support/checks/sonar.sh
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage
+          path: target/coverage
         continue-on-error: true
       - name: Delete temporary build artifacts before caching
         run: |
