@@ -223,7 +223,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    * Gets the block token that is used to authenticate during the write.
    * @return the block token for writing the data
    */
-  public Token<OzoneBlockTokenIdentifier> getToken() {
+  Token<OzoneBlockTokenIdentifier> getToken() {
     return this.token;
   }
 
@@ -310,7 +310,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     return getPipeline();
   }
 
-  public long getCurrentPosition() {
+  long getCurrentPosition() {
     return this.currentPosition;
   }
 

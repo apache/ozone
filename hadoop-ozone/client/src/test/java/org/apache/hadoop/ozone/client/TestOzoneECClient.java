@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
+import org.apache.hadoop.ozone.client.io.BlockStreamAccessor;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -1048,13 +1049,15 @@ public class TestOzoneECClient {
       ECKeyOutputStream kos) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     for (BlockOutputStreamEntry streamEntry : kos.getStreamEntries()) {
+      BlockStreamAccessor streamAccessor =
+          new BlockStreamAccessor(streamEntry);
       OmKeyLocationInfo info =
           new OmKeyLocationInfo.Builder()
-              .setBlockID(streamEntry.getBlockID())
-              .setLength(streamEntry.getCurrentPosition())
+              .setBlockID(streamAccessor.getStreamBlockID())
+              .setLength(streamAccessor.getStreamCurrentPosition())
               .setOffset(0)
-              .setToken(streamEntry.getToken())
-              .setPipeline(streamEntry.getPipeline())
+              .setToken(streamAccessor.getStreamToken())
+              .setPipeline(streamAccessor.getStreamPipeline())
               .build();
       locationInfoList.add(info);
     }
