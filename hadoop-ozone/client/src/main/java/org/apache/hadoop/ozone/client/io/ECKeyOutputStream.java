@@ -191,14 +191,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
       failedParityStripeChunkLens[i] = parityBuffers[i].limit();
     }
 
-    blockOutputStreamEntryPool.getCurrentStreamEntry().resetToFirstEntry();
     // Rollback the length/offset updated as part of this failed stripe write.
     offset -= failedStripeDataSize;
-    blockOutputStreamEntryPool.getCurrentStreamEntry()
-        .resetToAckedPosition();
 
+    final ECBlockOutputStreamEntry failedStreamEntry =
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    failedStreamEntry.resetToFirstEntry();
+    failedStreamEntry.resetToAckedPosition();
+    // All pre-allocated blocks from the same pipeline
+    // should be dropped to eliminate worthless retries.
+    blockOutputStreamEntryPool.discardPreallocatedBlocks(-1,
+        failedStreamEntry.getPipeline().getId());
     // Let's close the current entry.
-    blockOutputStreamEntryPool.getCurrentStreamEntry().close();
+    failedStreamEntry.close();
 
     // Let's rewrite the last stripe, so that it will be written to new block
     // group.
