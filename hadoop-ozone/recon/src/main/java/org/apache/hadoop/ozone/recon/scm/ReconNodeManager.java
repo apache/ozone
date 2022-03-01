@@ -303,6 +303,13 @@ public class ReconNodeManager extends SCMNodeManager {
 
   @VisibleForTesting
   public long getNodeDBKeyCount() throws IOException {
-    return nodeDB.getEstimatedKeyCount();
+    long nodeCount = 0;
+    TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+        iterator = nodeDB.iterator();
+    while (iterator.hasNext()) {
+      iterator.next();
+      nodeCount++;
+    }
+    return nodeCount;
   }
 }
