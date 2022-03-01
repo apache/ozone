@@ -215,13 +215,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
       if (currentLen > 0) {
         handleOutputStreamWrite(i, currentLen, false);
       }
-      currentStreamEntry.useNextBlockStream();
       totalLenToWrite -= currentLen;
     }
     for (int i = 0; i < (numParityBlks); i++) {
       handleOutputStreamWrite(i + numDataBlks, failedParityStripeChunkLens[i],
           true);
-      currentStreamEntry.useNextBlockStream();
     }
 
     if (hasWriteFailure()) {
@@ -379,14 +377,12 @@ public class ECKeyOutputStream extends KeyOutputStream {
           "When full cell passed, the pos: " + pos
               + " should match to ec chunk size.");
       handleOutputStreamWrite(currIdx, pos, false);
-      blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
     return pos;
   }
 
   private void handleParityWrite(int currIdx, int len) {
     handleOutputStreamWrite(currIdx, len, true);
-    blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
   }
 
   private void handleOutputStreamWrite(int currIdx, int len, boolean isParity) {
@@ -424,8 +420,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       LOG.debug(
           "Exception while writing the cell buffers. The writeLen: " + writeLen
               + ". The block internal index is: "
-              + current
-              .getCurrentStreamIdx(), ioe);
+              + current.getCurrentStreamIdx(), ioe);
       handleException(current, ioe);
     }
     return writeLen;

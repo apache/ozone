@@ -66,6 +66,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   private ECBlockOutputStream[] blockOutputStreams;
   private int currentStreamIdx = 0;
   private long successfulBlkGrpAckedLen;
+  private long position;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   ECBlockOutputStreamEntry(BlockID blockID, String key,
@@ -79,6 +80,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     this.replicationConfig =
         (ECReplicationConfig) pipeline.getReplicationConfig();
     this.length = replicationConfig.getData() * length;
+    this.position = 0;
   }
 
   @Override
@@ -125,11 +127,25 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     return length;
   }
 
+  @Override
+  public void write(int b) throws IOException {
+    write(new byte[]{(byte) b}, 0, 1);
+  }
+
+  @Override
+  public void write(byte[] b, int off, int len) throws IOException {
+    super.write(b, off, len);
+    position += len;
+    if (position % replicationConfig.getEcChunkSize() == 0) {
+      useNextBlockStream();
+    }
+  }
+
   public int getCurrentStreamIdx() {
     return currentStreamIdx;
   }
 
-  public void useNextBlockStream() {
+  private void useNextBlockStream() {
     currentStreamIdx =
         (currentStreamIdx + 1) % replicationConfig.getRequiredNodes();
   }
