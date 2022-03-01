@@ -28,11 +28,16 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
+import org.apache.hadoop.ozone.client.io.BlockStreamAccessor;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
@@ -908,6 +913,109 @@ public class TestOzoneECClient {
     }
   }
 
+  @Test
+  public void testDiscardPreAllocatedBlocksPreventRetryExceeds()
+      throws IOException {
+    close();
+    OzoneConfiguration con = new OzoneConfiguration();
+    int maxRetries = 3;
+    con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        2, StorageUnit.KB);
+    con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES,
+        maxRetries);
+    MultiNodePipelineBlockAllocator blkAllocator =
+        new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
+            15);
+    createNewClient(con, blkAllocator);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    int numStripesBeforeFailure = 1;
+    int numStripesAfterFailure = 1;
+    int numStripesTotal = numStripesBeforeFailure + numStripesAfterFailure;
+    int numExpectedBlockGrps = 2;
+    // fail any DNs to trigger retry
+    int[] nodesIndexesToMarkFailure = {0, 1};
+    long keySize = (long) chunkSize * dataBlocks * numStripesTotal;
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, keySize,
+        new ECReplicationConfig(dataBlocks, parityBlocks,
+            ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      ECKeyOutputStream kos = (ECKeyOutputStream) out.getOutputStream();
+      List<OmKeyLocationInfo> blockInfos = getAllLocationInfoList(kos);
+      Assert.assertEquals(1, blockInfos.size());
+
+      // Mock some pre-allocated blocks to the key,
+      // should be > maxRetries
+      int numPreAllocatedBlocks = maxRetries + 1;
+      BlockID blockID = blockInfos.get(0).getBlockID();
+      Pipeline pipeline = blockInfos.get(0).getPipeline();
+      List<OmKeyLocationInfo> omKeyLocationInfos = new ArrayList<>();
+      for (int i = 0; i < numPreAllocatedBlocks; i++) {
+        BlockID nextBlockID = new BlockID(blockID.getContainerID(),
+            blockID.getLocalID() + i + 1);
+        omKeyLocationInfos.add(new OmKeyLocationInfo.Builder()
+            .setBlockID(nextBlockID)
+            .setPipeline(pipeline)
+            .build());
+      }
+      OmKeyLocationInfoGroup omKeyLocationInfoGroup =
+          new OmKeyLocationInfoGroup(0, omKeyLocationInfos);
+      kos.addPreallocateBlocks(omKeyLocationInfoGroup, 0);
+
+      // Good writes
+      for (int j = 0; j < numStripesBeforeFailure; j++) {
+        for (int i = 0; i < dataBlocks; i++) {
+          out.write(inputChunks[i]);
+        }
+      }
+
+      // Make the writes fail to trigger retry
+      List<DatanodeDetails> failedDNs = new ArrayList<>();
+      List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
+      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
+        failedDNs.add(DatanodeDetails
+            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      }
+      // First let's set storage as bad
+      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+
+      // Writes that will retry due to failed DNs
+      try {
+        for (int j = 0; j < numStripesAfterFailure; j++) {
+          for (int i = 0; i < dataBlocks; i++) {
+            out.write(inputChunks[i]);
+          }
+        }
+      } catch (IOException e) {
+        // If we don't discard pre-allocated blocks,
+        // retries should exceed the maxRetries and write will fail.
+        Assert.fail("Max retries exceeded");
+      }
+    }
+
+    final OzoneKeyDetails key = bucket.getKey(keyName);
+    Assert.assertEquals(numExpectedBlockGrps,
+        key.getOzoneKeyLocations().size());
+
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[chunkSize];
+      for (int i = 0; i < dataBlocks * numStripesTotal; i++) {
+        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+            is.read(fileContent));
+        Assert.assertArrayEquals(
+            "Expected: " + new String(inputChunks[i % dataBlocks], UTF_8)
+                + " \n " + "Actual: " + new String(fileContent, UTF_8),
+            inputChunks[i % dataBlocks], fileContent);
+      }
+    }
+  }
+
   private OzoneBucket writeIntoECKey(byte[] data, String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     return writeIntoECKey(new byte[][] {data}, key, defaultReplicationConfig);
@@ -935,5 +1043,24 @@ public class TestOzoneECClient {
       }
     }
     return bucket;
+  }
+
+  private List<OmKeyLocationInfo> getAllLocationInfoList(
+      ECKeyOutputStream kos) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (BlockOutputStreamEntry streamEntry : kos.getStreamEntries()) {
+      BlockStreamAccessor streamAccessor =
+          new BlockStreamAccessor(streamEntry);
+      OmKeyLocationInfo info =
+          new OmKeyLocationInfo.Builder()
+              .setBlockID(streamAccessor.getStreamBlockID())
+              .setLength(streamAccessor.getStreamCurrentPosition())
+              .setOffset(0)
+              .setToken(streamAccessor.getStreamToken())
+              .setPipeline(streamAccessor.getStreamPipeline())
+              .build();
+      locationInfoList.add(info);
+    }
+    return locationInfoList;
   }
 }
