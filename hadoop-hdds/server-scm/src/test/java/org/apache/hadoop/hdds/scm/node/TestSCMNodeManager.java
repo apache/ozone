@@ -52,7 +52,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -97,10 +97,15 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
-import static org.apache.hadoop.hdds.scm.TestUtils.getRandomPipelineReports;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.*;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getRandomPipelineReports;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -189,7 +194,7 @@ public class TestSCMNodeManager {
 
   SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
-    scm = TestUtils.getScm(config);
+    scm = HddsTestUtils.getScm(config);
     scmContext = new SCMContext.Builder().setIsInSafeMode(true)
         .setLeader(true).setIsPreCheckComplete(true)
         .setSCM(scm).build();
@@ -220,7 +225,7 @@ public class TestSCMNodeManager {
       int registeredNodes = 5;
       // Send some heartbeats from different nodes.
       for (int x = 0; x < registeredNodes; x++) {
-        DatanodeDetails datanodeDetails = TestUtils
+        DatanodeDetails datanodeDetails = HddsTestUtils
             .createRandomDatanodeAndRegister(nodeManager);
         nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       }
@@ -290,15 +295,15 @@ public class TestSCMNodeManager {
     DatanodeDetails details = MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport =
-        TestUtils.createStorageReport(details.getUuid(),
+        HddsTestUtils.createStorageReport(details.getUuid(),
             details.getNetworkFullPath(), Long.MAX_VALUE);
     MetadataStorageReportProto metadataStorageReport =
-        TestUtils.createMetadataStorageReport(details.getNetworkFullPath(),
+        HddsTestUtils.createMetadataStorageReport(details.getNetworkFullPath(),
             Long.MAX_VALUE);
 
     RegisteredCommand cmd = nodeManager.register(
         MockDatanodeDetails.randomDatanodeDetails(),
-        TestUtils.createNodeReport(Arrays.asList(storageReport),
+        HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
             Arrays.asList(metadataStorageReport)),
         getRandomPipelineReports(), layout);
 
@@ -457,7 +462,7 @@ public class TestSCMNodeManager {
       // these pipelines use nodes outside of allowedDNs.
       if (success) {
         for (Pipeline pipeline: pipelines) {
-          for(DatanodeDetails pipelineDN: pipeline.getNodes()) {
+          for (DatanodeDetails pipelineDN: pipeline.getNodes()) {
             // Do not wait for this condition to be true. Disallowed DNs should
             // never be used once we have the expected number of pipelines.
             if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
@@ -510,7 +515,7 @@ public class TestSCMNodeManager {
     conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     SCMNodeManager nodeManager = createNodeManager(conf);
-    DatanodeDetails datanodeDetails = TestUtils
+    DatanodeDetails datanodeDetails = HddsTestUtils
         .createRandomDatanodeAndRegister(nodeManager);
     LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
     LayoutVersionProto layoutInfo = toLayoutVersionProto(
@@ -549,7 +554,7 @@ public class TestSCMNodeManager {
           versionManager.getSoftwareLayoutVersion());
 
       for (int x = 0; x < count; x++) {
-        DatanodeDetails datanodeDetails = TestUtils
+        DatanodeDetails datanodeDetails = HddsTestUtils
             .createRandomDatanodeAndRegister(nodeManager);
         nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       }
@@ -609,7 +614,7 @@ public class TestSCMNodeManager {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      DatanodeDetails dn = TestUtils.createRandomDatanodeAndRegister(
+      DatanodeDetails dn = HddsTestUtils.createRandomDatanodeAndRegister(
           nodeManager);
 
       LayoutVersionManager versionManager =
@@ -677,7 +682,7 @@ public class TestSCMNodeManager {
       List<DatanodeDetails> nodeList = createNodeSet(nodeManager, nodeCount);
 
 
-      DatanodeDetails staleNode = TestUtils.createRandomDatanodeAndRegister(
+      DatanodeDetails staleNode = HddsTestUtils.createRandomDatanodeAndRegister(
           nodeManager);
 
       // Heartbeat once
@@ -781,9 +786,9 @@ public class TestSCMNodeManager {
           versionManager.getMetadataLayoutVersion(),
           versionManager.getSoftwareLayoutVersion());
       DatanodeDetails node1 =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails node2 =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
 
       nodeManager.processHeartbeat(node1, layoutInfo);
       nodeManager.processHeartbeat(node2, layoutInfo);
@@ -857,7 +862,7 @@ public class TestSCMNodeManager {
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails node1 =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(SCMNodeManager.LOG);
       int scmMlv =
@@ -884,7 +889,7 @@ public class TestSCMNodeManager {
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
         SCMContext.emptyContext(), lvm);
     DatanodeDetails node1 =
-        TestUtils.createRandomDatanodeAndRegister(nodeManager);
+        HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
     int scmMlv =
@@ -990,11 +995,11 @@ public class TestSCMNodeManager {
           versionManager.getMetadataLayoutVersion(),
           versionManager.getSoftwareLayoutVersion());
       DatanodeDetails healthyNode =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails staleNode =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails deadNode =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
       nodeManager.processHeartbeat(healthyNode, layoutInfo);
       nodeManager.processHeartbeat(staleNode, layoutInfo);
       nodeManager.processHeartbeat(deadNode, layoutInfo);
@@ -1130,7 +1135,7 @@ public class TestSCMNodeManager {
       count) {
     List<DatanodeDetails> list = new ArrayList<>();
     for (int x = 0; x < count; x++) {
-      DatanodeDetails datanodeDetails = TestUtils
+      DatanodeDetails datanodeDetails = HddsTestUtils
           .createRandomDatanodeAndRegister(nodeManager);
       list.add(datanodeDetails);
     }
@@ -1346,9 +1351,9 @@ public class TestSCMNodeManager {
         UUID dnId = dn.getUuid();
         long free = capacity - used;
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
-        StorageReportProto report = TestUtils
+        StorageReportProto report = HddsTestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.register(dn, TestUtils.createNodeReport(
+        nodeManager.register(dn, HddsTestUtils.createNodeReport(
             Arrays.asList(report), Collections.emptyList()), null);
         nodeManager.processHeartbeat(dn, layoutInfo);
       }
@@ -1396,12 +1401,12 @@ public class TestSCMNodeManager {
       boolean failed = true;
       for (int x = 0; x < volumeCount; x++) {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
-        reports.add(TestUtils
+        reports.add(HddsTestUtils
             .createStorageReport(dnId, storagePath, capacity,
                 used, free, null, failed));
         failed = !failed;
       }
-      nodeManager.register(dn, TestUtils.createNodeReport(reports,
+      nodeManager.register(dn, HddsTestUtils.createNodeReport(reports,
           Collections.emptyList()), null);
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
@@ -1445,7 +1450,7 @@ public class TestSCMNodeManager {
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails datanodeDetails =
-          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
       NodeReportHandler nodeReportHandler = new NodeReportHandler(nodeManager);
       EventPublisher publisher = mock(EventPublisher.class);
       final long capacity = 2000;
@@ -1455,10 +1460,10 @@ public class TestSCMNodeManager {
         long scmUsed = x * usedPerHeartbeat;
         long remaining = capacity - scmUsed;
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
-        StorageReportProto report = TestUtils
+        StorageReportProto report = HddsTestUtils
             .createStorageReport(dnId, storagePath, capacity, scmUsed,
                 remaining, null);
-        NodeReportProto nodeReportProto = TestUtils.createNodeReport(
+        NodeReportProto nodeReportProto = HddsTestUtils.createNodeReport(
             Arrays.asList(report), Collections.emptyList());
         nodeReportHandler.onMessage(
             new NodeReportFromDatanode(datanodeDetails, nodeReportProto),
@@ -1583,16 +1588,16 @@ public class TestSCMNodeManager {
     UUID dnId = datanodeDetails.getUuid();
     String storagePath = testDir.getAbsolutePath() + "/" + dnId;
     StorageReportProto report =
-        TestUtils.createStorageReport(dnId, storagePath, 100, 10, 90, null);
+        HddsTestUtils.createStorageReport(dnId, storagePath, 100, 10, 90, null);
 
     EventQueue eq = new EventQueue();
     try (SCMNodeManager nodemanager = createNodeManager(conf)) {
       eq.addHandler(DATANODE_COMMAND, nodemanager);
 
       nodemanager
-          .register(datanodeDetails, TestUtils.createNodeReport(
+          .register(datanodeDetails, HddsTestUtils.createNodeReport(
               Arrays.asList(report), Collections.emptyList()),
-                  TestUtils.getRandomPipelineReports());
+                  HddsTestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
               new CloseContainerCommand(1L,
@@ -1762,7 +1767,7 @@ public class TestSCMNodeManager {
     final int nodeCount = 6;
     SCMNodeManager nodeManager = createNodeManager(conf);
 
-    for (int i=0; i<nodeCount; i++) {
+    for (int i = 0; i < nodeCount; i++) {
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.randomDatanodeDetails();
       final long capacity = 2000;
@@ -1770,13 +1775,13 @@ public class TestSCMNodeManager {
       final long remaining = 1900;
       UUID dnId = datanodeDetails.getUuid();
       String storagePath = testDir.getAbsolutePath() + "/" + dnId;
-      StorageReportProto report = TestUtils
+      StorageReportProto report = HddsTestUtils
           .createStorageReport(dnId, storagePath, capacity, used,
               remaining, null);
 
-      nodeManager.register(datanodeDetails, TestUtils.createNodeReport(
+      nodeManager.register(datanodeDetails, HddsTestUtils.createNodeReport(
           Arrays.asList(report), Collections.emptyList()),
-          TestUtils.getRandomPipelineReports());
+          HddsTestUtils.getRandomPipelineReports());
 
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
@@ -1784,9 +1789,9 @@ public class TestSCMNodeManager {
           versionManager.getMetadataLayoutVersion(),
           versionManager.getSoftwareLayoutVersion());
       nodeManager.register(datanodeDetails,
-          TestUtils.createNodeReport(Arrays.asList(report),
+          HddsTestUtils.createNodeReport(Arrays.asList(report),
               Collections.emptyList()),
-          TestUtils.getRandomPipelineReports(), layoutInfo);
+          HddsTestUtils.getRandomPipelineReports(), layoutInfo);
       nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       if (i == 5) {
         nodeManager.setNodeOperationalState(datanodeDetails,

@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -290,6 +290,18 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
+  public HddsDatanodeService getHddsDatanode(DatanodeDetails dn)
+      throws IOException {
+    for (HddsDatanodeService service : hddsDatanodes) {
+      if (service.getDatanodeDetails().equals(dn)) {
+        return service;
+      }
+    }
+    throw new IOException(
+        "Not able to find datanode with datanode Id " + dn.getUuid());
+  }
+
+  @Override
   public ReconServer getReconServer() {
     return this.reconServer;
   }
@@ -345,7 +357,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     LOG.info("Restarting SCM in cluster " + this.getClass());
     scm.stop();
     scm.join();
-    scm = TestUtils.getScmSimple(conf);
+    scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
     if (waitForDatanode) {
       waitForClusterToBeReady();
@@ -677,7 +689,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // In this way safemode exit will happen only when atleast we have one
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
-          numOfDatanodes >=3 ? 3 : 1);
+          numOfDatanodes >= 3 ? 3 : 1);
       configureTrace();
     }
 
@@ -703,7 +715,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
-      StorageContainerManager scm = TestUtils.getScmSimple(conf);
+      StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
       HealthyPipelineSafeModeRule rule =
           scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
       if (rule != null) {

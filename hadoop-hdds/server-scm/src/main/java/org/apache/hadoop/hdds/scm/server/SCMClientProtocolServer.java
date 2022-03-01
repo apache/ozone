@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -221,7 +222,7 @@ public class SCMClientProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_CONTAINER, auditMap)
         );
@@ -362,7 +363,7 @@ public class SCMClientProtocolServer implements
    * replication factor.
    */
   private boolean hasRequiredReplicas(ContainerInfo contInfo) {
-    try{
+    try {
       return getScm().getContainerManager()
           .getContainerReplicas(contInfo.containerID())
           .size() >= contInfo.getReplicationConfig().getRequiredNodes();
@@ -457,7 +458,7 @@ public class SCMClientProtocolServer implements
           buildAuditMessageForFailure(SCMAction.LIST_CONTAINER, auditMap, ex));
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.LIST_CONTAINER, auditMap));
       }
@@ -482,7 +483,7 @@ public class SCMClientProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.DELETE_CONTAINER, auditMap)
         );
@@ -642,7 +643,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ScmInfo getScmInfo() throws IOException {
     boolean auditSuccess = true;
-    try{
+    try {
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
@@ -666,7 +667,7 @@ public class SCMClientProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
@@ -730,6 +731,15 @@ public class SCMClientProtocolServer implements
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_STATUS, null));
     return scm.getReplicationManager().isRunning();
+  }
+
+  @Override
+  public ReplicationManagerReport getReplicationManagerReport()
+      throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
+    return scm.getReplicationManager().getContainerReport();
   }
 
   @Override
@@ -926,7 +936,8 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count) throws IOException, IllegalArgumentException{
+      boolean mostUsed, int count)
+      throws IOException, IllegalArgumentException {
 
     // check admin authorisation
     try {

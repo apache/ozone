@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -167,7 +167,7 @@ public class TestPipelineClose {
   public void testPipelineCloseWithPipelineAction() throws Exception {
     List<DatanodeDetails> dns = ratisContainer.getPipeline().getNodes();
     PipelineActionsFromDatanode
-        pipelineActionsFromDatanode = TestUtils
+        pipelineActionsFromDatanode = HddsTestUtils
         .getPipelineActionFromDatanode(dns.get(0),
             ratisContainer.getPipeline().getId());
     // send closing action for pipeline

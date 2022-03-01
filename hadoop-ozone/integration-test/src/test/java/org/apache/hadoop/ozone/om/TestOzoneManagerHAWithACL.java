@@ -184,7 +184,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   public void testAddPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) +"/";
+    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
     OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
         READ, DEFAULT);
 
@@ -201,7 +201,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   public void testRemovePrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) +"/";
+    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
     OzoneAcl userAcl = new OzoneAcl(USER, remoteUserName,
         READ, ACCESS);
     OzoneAcl userAcl1 = new OzoneAcl(USER, "remote",
@@ -237,7 +237,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   public void testSetPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) +"/";
+    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
     OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
         READ, DEFAULT);
 
@@ -304,7 +304,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   }
 
   private void testRemoveAcl(String remoteUserName, OzoneObj ozoneObj,
-      OzoneAcl userAcl) throws Exception{
+      OzoneAcl userAcl) throws Exception {
     ObjectStore objectStore = getObjectStore();
 
     // As by default create will add some default acls in RpcClient.

@@ -216,7 +216,7 @@ public final class HASecurityUtils {
       // Persist scm cert serial ID.
       scmStorageConfig.setScmCertSerialId(subSCMCertHolder.getSerialNumber()
           .toString());
-    } catch (InterruptedException | ExecutionException| IOException |
+    } catch (InterruptedException | ExecutionException | IOException |
         CertificateException  e) {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
       Thread.currentThread().interrupt();

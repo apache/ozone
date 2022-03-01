@@ -235,6 +235,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                     ContainerID containerId) throws NodeNotFoundException;
 
   /**
+   * Removes the given container from the specified datanode.
+   *
+   * @param datanodeDetails - DatanodeDetails
+   * @param containerId - containerID
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  void removeContainer(DatanodeDetails datanodeDetails,
+      ContainerID containerId) throws NodeNotFoundException;
+
+  /**
    * Remaps datanode to containers mapping to the new set of containers.
    * @param datanodeDetails - DatanodeDetails
    * @param containerIds - Set of containerIDs
@@ -324,7 +335,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     return null;
   }
 
-  default HDDSLayoutVersionManager getLayoutVersionManager(){
+  default HDDSLayoutVersionManager getLayoutVersionManager() {
     return null;
   }
 

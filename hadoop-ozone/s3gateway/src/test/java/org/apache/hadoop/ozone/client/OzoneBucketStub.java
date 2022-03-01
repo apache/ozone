@@ -87,7 +87,7 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
-    return createKey(key, size, ReplicationType.STAND_ALONE,
+    return createKey(key, size, ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
   }
 

@@ -41,7 +41,11 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -82,7 +86,7 @@ public class SimpleMockNodeManager implements NodeManager {
    */
   public void setPipelines(DatanodeDetails dd, int count) {
     Set<PipelineID> pipelines = new HashSet<>();
-    for (int i=0; i<count; i++) {
+    for (int i = 0; i < count; i++) {
       pipelines.add(PipelineID.randomId());
     }
     pipelineMap.put(dd.getUuid(), pipelines);
@@ -257,7 +261,10 @@ public class SimpleMockNodeManager implements NodeManager {
       throws NodeNotFoundException {
   }
 
-
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
+  }
 
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {

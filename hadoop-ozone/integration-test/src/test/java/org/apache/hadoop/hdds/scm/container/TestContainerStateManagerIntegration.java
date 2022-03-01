@@ -398,7 +398,7 @@ public class TestContainerStateManagerIntegration {
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());
     Set<ContainerReplica> replicaSet;
-    containerStateManager.getContainerReplicas(containerID.getProtobuf());
+    containerStateManager.getContainerReplicas(containerID);
     Assert.fail();
 
     ContainerWithPipeline container = scm.getClientProtocolServer()
@@ -419,44 +419,44 @@ public class TestContainerStateManagerIntegration {
         .setContainerState(ContainerReplicaProto.State.OPEN)
         .setDatanodeDetails(dn2)
         .build();
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Test 3: Remove one replica node and then test
-    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.removeContainerReplica(id, replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(1, replicaSet.size());
     Assert.assertFalse(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Test 3: Remove second replica node and then test
-    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.removeContainerReplica(id, replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(0, replicaSet.size());
     Assert.assertFalse(replicaSet.contains(replicaOne));
     Assert.assertFalse(replicaSet.contains(replicaTwo));
 
     // Test 4: Re-insert dn1
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(1, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertFalse(replicaSet.contains(replicaTwo));
 
     // Re-insert dn2
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Re-insert dn1
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));

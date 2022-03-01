@@ -28,9 +28,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.helpers.*;
 
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -223,7 +228,7 @@ public class TestBucketManagerImpl {
             .setAdminName("bilbo")
             .setOwnerName("bilbo")
             .build();
-    TestOMRequestUtils.addVolumeToOM(metaMgr, args);
+    OMRequestTestUtils.addVolumeToOM(metaMgr, args);
     // Create bucket
     createBucket(metaMgr, bucketInfo);
     // Check exception thrown when bucket does not exist
@@ -245,7 +250,7 @@ public class TestBucketManagerImpl {
 
   private void createBucket(OMMetadataManager metadataManager,
       OmBucketInfo bucketInfo) throws IOException {
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
   }
 
   @Test

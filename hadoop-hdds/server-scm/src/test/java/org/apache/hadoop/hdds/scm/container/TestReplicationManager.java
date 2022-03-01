@@ -91,8 +91,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
-import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.mockito.Mockito.when;
 
@@ -156,7 +156,7 @@ public class TestReplicationManager {
           List<ContainerInfo> containers = new ArrayList<>();
           for (ContainerID id : ids) {
             containers.add(containerStateManager.getContainer(
-                id.getProtobuf()));
+                id));
           }
           return containers;
         });
@@ -164,13 +164,13 @@ public class TestReplicationManager {
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     Mockito.when(containerManager.getContainerReplicas(
         Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
@@ -289,7 +289,7 @@ public class TestReplicationManager {
     replicas.addAll(getReplicas(id, State.OPEN, datanode));
 
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
+      containerStateManager.updateContainerReplica(id, replica);
     }
 
     final int currentCloseCommandCount = datanodeCommandHandler
@@ -302,7 +302,7 @@ public class TestReplicationManager {
 
     // Update the OPEN to CLOSING
     for (ContainerReplica replica : getReplicas(id, State.CLOSING, datanode)) {
-      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
+      containerStateManager.updateContainerReplica(id, replica);
     }
 
     replicationManager.processAll();
@@ -333,10 +333,10 @@ public class TestReplicationManager {
         id, State.OPEN, 1000L, datanodeDetails.getUuid(), datanodeDetails);
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
+        id, replicaThree);
 
     final int currentCloseCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
@@ -373,10 +373,10 @@ public class TestReplicationManager {
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
+        id, replicaThree);
 
     // All the QUASI_CLOSED replicas have same originNodeId, so the
     // container will not be closed. ReplicationManager should take no action.
@@ -413,10 +413,10 @@ public class TestReplicationManager {
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
+        id, replicaThree);
 
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -434,7 +434,7 @@ public class TestReplicationManager {
         id, State.UNHEALTHY, 1000L, originNodeId,
         replicaOne.getDatanodeDetails());
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), unhealthyReplica);
+        id, unhealthyReplica);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -447,7 +447,7 @@ public class TestReplicationManager {
         replicationManager.getMetrics().getNumDeletionCmdsSent());
 
     // Now we will delete the unhealthy replica from in-memory.
-    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.removeContainerReplica(id, replicaOne);
 
     final long currentBytesToReplicate = replicationManager.getMetrics()
         .getNumReplicationBytesTotal();
@@ -482,7 +482,7 @@ public class TestReplicationManager {
     final ContainerReplica replicatedReplicaOne = getReplicas(
         id, State.CLOSED, 1000L, originNodeId, targetDn);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicatedReplicaOne);
+        id, replicatedReplicaOne);
 
     final long currentReplicationCommandCompleted = replicationManager
         .getMetrics().getNumReplicationCmdsCompleted();
@@ -528,11 +528,11 @@ public class TestReplicationManager {
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
+        id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
 
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -559,16 +559,16 @@ public class TestReplicationManager {
         .get(id).get(0).getDatanode();
     if (targetDn.equals(replicaOne.getDatanodeDetails())) {
       containerStateManager.removeContainerReplica(
-          id.getProtobuf(), replicaOne);
+          id, replicaOne);
     } else if (targetDn.equals(replicaTwo.getDatanodeDetails())) {
       containerStateManager.removeContainerReplica(
-          id.getProtobuf(), replicaTwo);
+          id, replicaTwo);
     } else if (targetDn.equals(replicaThree.getDatanodeDetails())) {
       containerStateManager.removeContainerReplica(
-          id.getProtobuf(), replicaThree);
+          id, replicaThree);
     } else if (targetDn.equals(replicaFour.getDatanodeDetails())) {
       containerStateManager.removeContainerReplica(
-          id.getProtobuf(), replicaFour);
+          id, replicaFour);
     }
 
     final long currentDeleteCommandCompleted = replicationManager.getMetrics()
@@ -616,11 +616,11 @@ public class TestReplicationManager {
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
+        id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
 
     final int currentDeleteCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -648,7 +648,7 @@ public class TestReplicationManager {
     final long currentDeleteCommandCompleted = replicationManager.getMetrics()
         .getNumDeletionCmdsCompleted();
     // Now we remove the replica to simulate deletion complete
-    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaOne);
+    containerStateManager.removeContainerReplica(id, replicaOne);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -683,8 +683,8 @@ public class TestReplicationManager {
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
 
     final int currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
@@ -722,7 +722,7 @@ public class TestReplicationManager {
     final ContainerReplica replicatedReplicaThree = getReplicas(
         id, State.CLOSED, 1000L, originNodeId, targetDn);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicatedReplicaThree);
+        id, replicatedReplicaThree);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -776,8 +776,8 @@ public class TestReplicationManager {
         id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
 
     final int currentReplicateCommandCount = datanodeCommandHandler
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
@@ -804,7 +804,7 @@ public class TestReplicationManager {
         replicateCommand.get().getDatanodeId());
     ContainerReplica newReplica = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, newNode);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), newReplica);
+    containerStateManager.updateContainerReplica(id, newReplica);
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
     Assert.assertEquals(1, report.getStat(LifeCycleState.QUASI_CLOSED));
@@ -836,7 +836,7 @@ public class TestReplicationManager {
     Assert.assertEquals(1, replicationManager.getMetrics()
         .getInflightDeletion());
 
-    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.removeContainerReplica(id, replicaTwo);
 
     final long currentDeleteCommandCompleted = replicationManager.getMetrics()
         .getNumDeletionCmdsCompleted();
@@ -900,7 +900,7 @@ public class TestReplicationManager {
         randomDatanodeDetails());
     containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
+      containerStateManager.updateContainerReplica(id, replica);
     }
 
     final int currentCloseCommandCount = datanodeCommandHandler
@@ -935,7 +935,7 @@ public class TestReplicationManager {
 
     containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
+      containerStateManager.updateContainerReplica(id, replica);
     }
 
     replicationManager.processAll();
@@ -964,7 +964,7 @@ public class TestReplicationManager {
 
     containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
+      containerStateManager.updateContainerReplica(id, replica);
     }
 
     final CloseContainerEventHandler closeContainerHandler =
@@ -996,7 +996,7 @@ public class TestReplicationManager {
 
     containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica : replicas) {
-      containerStateManager.updateContainerReplica(id.getProtobuf(), replica);
+      containerStateManager.updateContainerReplica(id, replica);
     }
 
     replicationManager.processAll();
@@ -1031,10 +1031,10 @@ public class TestReplicationManager {
         id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
+        id, replicaThree);
 
     // Ensure a mis-replicated status is returned for any containers in this
     // test where there are 3 replicas. When there are 2 or 4 replicas
@@ -1116,12 +1116,12 @@ public class TestReplicationManager {
         id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFive);
+        id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.updateContainerReplica(id, replicaFive);
 
     // Ensure a mis-replicated status is returned for any containers in this
     // test where there are exactly 3 replicas checked.
@@ -1168,11 +1168,11 @@ public class TestReplicationManager {
         id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
+        id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
 
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list.size() == 3),
@@ -1214,12 +1214,12 @@ public class TestReplicationManager {
         id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
     containerStateManager.updateContainerReplica(
-        id.getProtobuf(), replicaThree);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFour);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaFive);
+        id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.updateContainerReplica(id, replicaFive);
 
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list != null && list.size() <= 4),
@@ -1431,7 +1431,7 @@ public class TestReplicationManager {
     // for removal
     Set<ContainerReplica> decom =
         containerStateManager.getContainerReplicas(
-            container.containerID().getProtobuf())
+            container.containerID())
         .stream()
         .filter(r -> r.getDatanodeDetails().getPersistedOpState() != IN_SERVICE)
         .collect(Collectors.toSet());
@@ -1496,7 +1496,7 @@ public class TestReplicationManager {
         SCMCommandProto.Type.deleteContainerCommand, dn1.getDatanodeDetails()));
     Assert.assertEquals(1, datanodeCommandHandler.getInvocationCount(
         SCMCommandProto.Type.deleteContainerCommand));
-    containerStateManager.removeContainerReplica(id.getProtobuf(), dn1);
+    containerStateManager.removeContainerReplica(id, dn1);
 
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -1579,10 +1579,10 @@ public class TestReplicationManager {
     //deleteContainerCommand will be sent again
     Assert.assertEquals(2, datanodeCommandHandler.getInvocationCount(
         SCMCommandProto.Type.deleteContainerCommand));
-    containerStateManager.removeContainerReplica(id.getProtobuf(), dn1);
+    containerStateManager.removeContainerReplica(id, dn1);
 
     //replica in src datanode is deleted now
-    containerStateManager.removeContainerReplica(id.getProtobuf(), dn1);
+    containerStateManager.removeContainerReplica(id, dn1);
     replicationManager.processAll();
     eventQueue.processAll(1000);
 
@@ -1630,7 +1630,7 @@ public class TestReplicationManager {
     //now, replication succeeds, but replica in dn2 lost,
     //and there are only tree replicas totally, so rm should
     //not delete the replica on dn1
-    containerStateManager.removeContainerReplica(id.getProtobuf(), dn2);
+    containerStateManager.removeContainerReplica(id, dn2);
     replicationManager.processAll();
     eventQueue.processAll(1000);
 
@@ -1741,7 +1741,7 @@ public class TestReplicationManager {
     containerStateManager.updateContainerState(id.getProtobuf(),
         LifeCycleEvent.FORCE_CLOSE);
     Assert.assertTrue(LifeCycleState.CLOSED ==
-        containerStateManager.getContainer(id.getProtobuf()).getState());
+        containerStateManager.getContainer(id).getState());
 
     //Node is not in healthy state
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
@@ -1805,8 +1805,8 @@ public class TestReplicationManager {
 
     //make the replica num be 2 to test the case
     //that container is in inflightReplication
-    containerStateManager.removeContainerReplica(id.getProtobuf(), dn5);
-    containerStateManager.removeContainerReplica(id.getProtobuf(), dn4);
+    containerStateManager.removeContainerReplica(id, dn5);
+    containerStateManager.removeContainerReplica(id, dn4);
     //replication manager should generate inflightReplication
     replicationManager.processAll();
     //waiting for inflightReplication generation
@@ -1902,7 +1902,7 @@ public class TestReplicationManager {
     final ContainerReplica replica = getReplicas(
         container.containerID(), replicaState, 1000L, originNodeId, dn);
     containerStateManager
-        .updateContainerReplica(container.containerID().getProtobuf(), replica);
+        .updateContainerReplica(container.containerID(), replica);
     return replica;
   }
 

@@ -521,7 +521,7 @@ public final class LambdaTestUtils {
       throws Exception {
     return intercept(clazz, contained,
         "Expecting " + clazz.getName()
-        + (contained != null? (" with text " + contained) : "")
+        + (contained != null ? (" with text " + contained) : "")
         + " but got ",
         () -> {
           eval.call();
@@ -589,7 +589,7 @@ public final class LambdaTestUtils {
       T expected,
       Optional<T> actual) {
     Assert.assertNotNull(message, actual);
-    Assert.assertTrue(message +" -not present", actual.isPresent());
+    Assert.assertTrue(message + " -not present", actual.isPresent());
     Assert.assertEquals(message, expected, actual.get());
   }
 

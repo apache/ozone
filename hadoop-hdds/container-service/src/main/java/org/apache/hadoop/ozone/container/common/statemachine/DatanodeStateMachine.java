@@ -261,7 +261,7 @@ public class DatanodeStateMachine implements Closeable {
   /**
    * Runs the state machine at a fixed frequency.
    */
-  private void start() throws IOException {
+  private void startStateMachineThread() throws IOException {
     long now = 0;
 
     reportManager.init();
@@ -283,7 +283,7 @@ public class DatanodeStateMachine implements Closeable {
         context.execute(executorService, heartbeatFrequency,
             TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
-        // Some one has sent interrupt signal, this could be because
+        // Someone has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
         Thread.currentThread().interrupt();
@@ -293,7 +293,7 @@ public class DatanodeStateMachine implements Closeable {
 
       now = Time.monotonicNow();
       if (now < nextHB.get()) {
-        if(!Thread.interrupted()) {
+        if (!Thread.interrupted()) {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
@@ -379,7 +379,7 @@ public class DatanodeStateMachine implements Closeable {
       connectionManager.close();
     }
 
-    if(container != null) {
+    if (container != null) {
       container.stop();
     }
 
@@ -468,7 +468,7 @@ public class DatanodeStateMachine implements Closeable {
     Runnable startStateMachineTask = () -> {
       try {
         LOG.info("Ozone container server started.");
-        start();
+        startStateMachineThread();
       } catch (Exception ex) {
         LOG.error("Unable to start the DatanodeState Machine", ex);
       }
@@ -637,12 +637,12 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   public StatusAndMessages finalizeUpgrade()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
   }
 
   public StatusAndMessages queryUpgradeStatus()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         true);
   }

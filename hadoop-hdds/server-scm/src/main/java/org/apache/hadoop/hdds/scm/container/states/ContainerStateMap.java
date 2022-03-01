@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.Collections;
 import java.util.Map;
@@ -119,7 +120,7 @@ public class ContainerStateMap {
       ownerMap.insert(info.getOwner(), id);
       repConfigMap.insert(info.getReplicationConfig(), id);
       typeMap.insert(info.getReplicationType(), id);
-      replicaMap.put(id, ConcurrentHashMap.newKeySet());
+      replicaMap.put(id, Collections.emptySet());
 
       // Flush the cache of this container type, will be added later when
       // get container queries are executed.
@@ -147,6 +148,7 @@ public class ContainerStateMap {
       ownerMap.remove(info.getOwner(), id);
       repConfigMap.remove(info.getReplicationConfig(), id);
       typeMap.remove(info.getReplicationType(), id);
+      replicaMap.remove(id);
       // Flush the cache of this container type.
       flushCache(info);
       LOG.trace("Container {} removed from ContainerStateMap.", id);
@@ -173,8 +175,7 @@ public class ContainerStateMap {
   public Set<ContainerReplica> getContainerReplicas(
       final ContainerID containerID) {
     Preconditions.checkNotNull(containerID);
-    final Set<ContainerReplica> replicas = replicaMap.get(containerID);
-    return replicas == null ? null : Collections.unmodifiableSet(replicas);
+    return replicaMap.get(containerID);
   }
 
   /**
@@ -189,9 +190,10 @@ public class ContainerStateMap {
       final ContainerReplica replica) {
     Preconditions.checkNotNull(containerID);
     if (contains(containerID)) {
-      final Set<ContainerReplica> replicas = replicaMap.get(containerID);
-      replicas.remove(replica);
-      replicas.add(replica);
+      final Set<ContainerReplica> newSet = createNewReplicaSet(containerID);
+      newSet.remove(replica);
+      newSet.add(replica);
+      replaceReplicaSet(containerID, newSet);
     }
   }
 
@@ -207,8 +209,20 @@ public class ContainerStateMap {
     Preconditions.checkNotNull(containerID);
     Preconditions.checkNotNull(replica);
     if (contains(containerID)) {
-      replicaMap.get(containerID).remove(replica);
+      final Set<ContainerReplica> newSet = createNewReplicaSet(containerID);
+      newSet.remove(replica);
+      replaceReplicaSet(containerID, newSet);
     }
+  }
+
+  private Set<ContainerReplica> createNewReplicaSet(ContainerID containerID) {
+    Set<ContainerReplica> existingSet = replicaMap.get(containerID);
+    return existingSet == null ? new HashSet<>() : new HashSet<>(existingSet);
+  }
+
+  private void replaceReplicaSet(ContainerID containerID,
+      Set<ContainerReplica> newSet) {
+    replicaMap.put(containerID, Collections.unmodifiableSet(newSet));
   }
 
   /**
@@ -358,7 +372,7 @@ public class ContainerStateMap {
 
     final ContainerQueryKey queryKey =
         new ContainerQueryKey(state, owner, repConfig);
-    if(resultCache.containsKey(queryKey)){
+    if (resultCache.containsKey(queryKey)) {
       return resultCache.get(queryKey);
     }
 

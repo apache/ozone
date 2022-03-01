@@ -97,9 +97,8 @@ public final class ContainerBalancerConfiguration {
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "70m", tags = {
-      ConfigTag.BALANCER}, description = "The interval period between each " +
-      "iteration of Container Balancer.")
+      defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
+      "The interval period between each iteration of Container Balancer.")
   private long balancingInterval = Duration.ofMinutes(70).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
@@ -361,8 +360,8 @@ public final class ContainerBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %d%n" +
-            "%-50s %dGB%n"+
-            "%-50s %dGB%n"+
+            "%-50s %dGB%n" +
+            "%-50s %dGB%n" +
             "%-50s %dGB%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Involve per Iteration(percent)",
         maxDatanodesPercentageToInvolvePerIteration,

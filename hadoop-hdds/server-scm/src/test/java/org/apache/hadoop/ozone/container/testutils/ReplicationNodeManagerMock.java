@@ -183,7 +183,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * @return DatanodeUsageInfo of the specified datanode
    */
   @Override
-  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn){
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
     return null;
   }
 
@@ -282,6 +282,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void addContainer(DatanodeDetails datanodeDetails,
                            ContainerID containerId)
       throws NodeNotFoundException {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
     throw new UnsupportedOperationException("Not yet implemented");
   }
 

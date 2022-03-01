@@ -204,7 +204,7 @@ public class SCMDatanodeProtocolServer implements
           buildAuditMessageForFailure(SCMAction.GET_VERSION, null, ex));
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_VERSION, null));
       }
@@ -249,7 +249,7 @@ public class SCMDatanodeProtocolServer implements
           buildAuditMessageForFailure(SCMAction.REGISTER, auditMap, ex));
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.REGISTER, auditMap));
       }
@@ -284,7 +284,7 @@ public class SCMDatanodeProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.SEND_HEARTBEAT, auditMap)
         );
@@ -330,7 +330,8 @@ public class SCMDatanodeProtocolServer implements
       scm.getScmBlockManager().getDeletedBlockLog().incrementCount(txs);
       return builder
           .setCommandType(deleteBlocksCommand)
-          .setDeleteBlocksCommandProto(((DeleteBlocksCommand) cmd).getProto())
+          .setDeleteBlocksCommandProto(
+              ((DeleteBlocksCommand) cmd).getProto())
           .build();
     case closeContainerCommand:
       return builder
