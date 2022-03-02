@@ -3121,14 +3121,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String userPrincipal = Server.getRemoteUser().getShortUserName();
 
     if (s3Auth != null) {
-      String accessID = s3Auth.getAccessId();
-      // TODO HDDS-6063: Volume lock is needed here along with the other
-      //  multi-tenant read requests.
+      String accessId = s3Auth.getAccessId();
       Optional<String> optionalTenantId =
-          multiTenantManager.getTenantForAccessID(accessID);
+          multiTenantManager.getTenantForAccessID(accessId);
 
       if (optionalTenantId.isPresent()) {
-        String tenantId = optionalTenantId.get();
+        final String tenantId = optionalTenantId.get();
+
         OmDBTenantInfo tenantInfo =
             metadataManager.getTenantStateTable().get(tenantId);
         if (tenantInfo != null) {
@@ -3136,22 +3135,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               .getBucketNamespaceName();
         } else {
           String message = "Expected to find a tenant for access ID " +
-              accessID +
+              accessId +
               " but no tenant was found. Possibly inconsistent OM DB!";
           LOG.error(message);
           throw new OMException(message, ResultCodes.TENANT_NOT_FOUND);
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Get S3 volume request for access ID {} belonging to " +
-                  "tenant {} is directed to the volume {}.", accessID, tenantId,
+                  "tenant {} is directed to the volume {}.", accessId, tenantId,
               s3Volume);
         }
 
-        // Inject user name to the response to be used for KMS on the client
-        userPrincipal = OzoneAclUtils.accessIdToUserPrincipal(accessID);
+        boolean acquiredVolumeLock =
+            getMetadataManager().getLock().acquireWriteLock(
+                VOLUME_LOCK, s3Volume);
+
+        try {
+          // Inject user name to the response to be used for KMS on the client
+          userPrincipal = OzoneAclUtils.accessIdToUserPrincipal(accessId);
+        } finally {
+          if (acquiredVolumeLock) {
+            getMetadataManager().getLock().releaseWriteLock(
+                VOLUME_LOCK, s3Volume);
+          }
+        }
+
       } else if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
-            "requests to default s3 volume {}.", accessID, s3Volume);
+            "requests to default s3 volume {}.", accessId, s3Volume);
       }
     } else if (LOG.isDebugEnabled()) {
       // An old S3 gateway talking to a new OM may not attach the auth info.
