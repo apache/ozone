@@ -1240,12 +1240,12 @@ public class KeyManagerImpl implements KeyManager {
 
       // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
+        if (args.getLatestVersionLocation()) {
+          slimLocationVersion(fileKeyInfo);
+        }
         // If operation is head, do not perform any additional steps
         // As head operation does not need any of those details.
         if (!args.isHeadOp()) {
-          if (args.getLatestVersionLocation()) {
-            slimLocationVersion(fileKeyInfo);
-          }
           // refreshPipeline flag check has been removed as part of
           // https://issues.apache.org/jira/browse/HDDS-3658.
           // Please refer this jira for more details.
