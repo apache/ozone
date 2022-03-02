@@ -89,6 +89,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long streamWindowSize = 64 * 1024 * 1024;
 
+  @Config(key = "datastream.pipeline.mode",
+      defaultValue = "true",
+      description = "Streaming write support both pipeline mode(datanode1->" +
+          "datanode2->datanode3) and star mode(datanode1->datanode2, " +
+          "datanode1->datanode3). By default we use pipeline mode.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPipelineMode = true;
 
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
@@ -383,5 +390,13 @@ public class OzoneClientConfig {
 
   public String getFsDefaultBucketLayout() {
     return fsDefaultBucketLayout;
+  }
+
+  public boolean isDatastreamPipelineMode() {
+    return datastreamPipelineMode;
+  }
+
+  public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
+    this.datastreamPipelineMode = datastreamPipelineMode;
   }
 }
