@@ -137,6 +137,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private XceiverClientMetrics metrics;
   // buffers for which putBlock is yet to be executed
   private List<StreamBuffer> buffersForPutBlock;
+  private boolean isDatastreamPipelineMode;
   /**
    * Creates a new BlockDataStreamOutput.
    *
@@ -154,6 +155,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
+    this.isDatastreamPipelineMode = config.isDatastreamPipelineMode();
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -203,9 +205,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(builder.build(), null);
 
-    return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
-    .stream(message.getContent().asReadOnlyByteBuffer(),
-        getRoutingTable(pipeline));
+    if (isDatastreamPipelineMode) {
+      return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+          .stream(message.getContent().asReadOnlyByteBuffer(),
+              getRoutingTable(pipeline));
+    } else {
+      return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+          .stream(message.getContent().asReadOnlyByteBuffer());
+    }
   }
 
   public RoutingTable getRoutingTable(Pipeline pipeline) {
