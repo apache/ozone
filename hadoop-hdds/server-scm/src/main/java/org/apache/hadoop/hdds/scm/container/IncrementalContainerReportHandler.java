@@ -78,14 +78,20 @@ public class IncrementalContainerReportHandler extends
     synchronized (dd) {
       for (ContainerReplicaProto replicaProto :
           report.getReport().getReportList()) {
+        ContainerID id = ContainerID.valueOf(replicaProto.getContainerID());
+        ContainerInfo container = null;
         try {
-          final ContainerID id = ContainerID.valueOf(
-              replicaProto.getContainerID());
-          if (!replicaProto.getState().equals(
-              ContainerReplicaProto.State.DELETED)) {
-            nodeManager.addContainer(dd, id);
+          try {
+            container = getContainerManager().getContainer(id);
+            // Ensure we reuse the same ContainerID instance in containerInfo
+            id = container.containerID();
+          } finally {
+            if (!replicaProto.getState().equals(
+                ContainerReplicaProto.State.DELETED)) {
+              nodeManager.addContainer(dd, id);
+            }
           }
-          processContainerReplica(dd, replicaProto, publisher);
+          processContainerReplica(dd, container, replicaProto, publisher);
         } catch (ContainerNotFoundException e) {
           success = false;
           LOG.warn("Container {} not found!", replicaProto.getContainerID());

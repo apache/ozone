@@ -179,13 +179,13 @@ public class TestReplicatedFileChecksumHelper {
 
     XceiverClientGrpc xceiverClientGrpc =
         new XceiverClientGrpc(pipeline, conf) {
-      @Override
-      public XceiverClientReply sendCommandAsync(
-          ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) {
-        return buildValidResponse();
-      }
-    };
+          @Override
+          public XceiverClientReply sendCommandAsync(
+              ContainerProtos.ContainerCommandRequestProto request,
+              DatanodeDetails dn) {
+            return buildValidResponse();
+          }
+        };
     XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
     when(factory.acquireClientForReadData(ArgumentMatchers.any())).
         thenReturn(xceiverClientGrpc);

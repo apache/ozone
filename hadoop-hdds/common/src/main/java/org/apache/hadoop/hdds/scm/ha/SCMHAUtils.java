@@ -240,7 +240,7 @@ public final class SCMHAUtils {
   public static boolean isNonRetriableException(Exception e) {
     Throwable t =
         getExceptionForClass(e, StateMachineException.class);
-    return t == null ? false : true;
+    return t != null;
   }
 
   /**
