@@ -264,10 +264,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     if (handleParityWrites(parityCellSize, shouldClose)
         == StripeWriteStatus.FAILED) {
       handleStripeFailure(dataSize, shouldClose);
-    } else {
-      // At this stage stripe write is successful.
-      currentStreamEntry.updateBlockGroupToAckedPosition(
-          currentStreamEntry.getCurrentPosition());
     }
   }
 
@@ -291,6 +287,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
       handleFailedStreams(true);
       return StripeWriteStatus.FAILED;
     }
+    streamEntry.updateBlockGroupToAckedPosition(
+        streamEntry.getCurrentPosition());
     ecChunkBufferCache.clear();
 
     if (streamEntry.getRemaining() <= 0) {
