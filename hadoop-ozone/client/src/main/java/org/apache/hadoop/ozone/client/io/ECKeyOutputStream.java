@@ -261,6 +261,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       // partial stripe must be the last stripe of a block
       shouldClose = true;
     }
+    generateParityCells(parityCellSize);
     if (handleParityWrites(parityCellSize, shouldClose)
         == StripeWriteStatus.FAILED) {
       handleStripeFailure(dataSize, shouldClose);
@@ -346,7 +347,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         && t instanceof ContainerNotOpenException;
   }
 
-  void writeParityCells(int parityCellSize) throws IOException {
+  private void generateParityCells(int parityCellSize) throws IOException {
     final ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
 
@@ -357,12 +358,15 @@ public class ECKeyOutputStream extends KeyOutputStream {
       b.flip();
     }
     encoder.encode(buffers, parityBuffers);
+  }
+
+  private void writeParityCells(int parityCellSize) {
+    // Move the stream entry cursor to parity block index
     blockOutputStreamEntryPool
         .getCurrentStreamEntry().forceToFirstParityBlock();
-    for (int i =
-         numDataBlks; i < (this.numDataBlks + this.numParityBlks); i++) {
-      // Move the stream entry cursor to parity block index
-      handleParityWrite(i, parityCellSize);
+    for (int i = 0; i < numParityBlks; i++) {
+      handleOutputStreamWrite(numDataBlks + i, parityCellSize, true);
+      blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
   }
 
@@ -381,11 +385,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
         encodeAndWriteParityCells((long) ecChunkSize * numDataBlks);
       }
     }
-  }
-
-  private void handleParityWrite(int currIdx, int len) {
-    handleOutputStreamWrite(currIdx, len, true);
-    blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
   }
 
   private void handleOutputStreamWrite(int currIdx, int len, boolean isParity) {
