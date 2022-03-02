@@ -215,7 +215,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         // not kept. Bucket versioning will be effective from the first key
         // creation after the knob turned on.
         RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
-        OmKeyInfo keyToDelete = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+        OmKeyInfo keyToDelete =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
               omMetadataManager, omBucketInfo.getIsVersionEnabled(),
@@ -534,6 +535,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         volume + " bucket: " + bucket + " key: " + keyName;
   }
 
+  @SuppressWarnings("parameternumber")
   private void updateCache(OMMetadataManager omMetadataManager,
       String dbBucketKey, OmBucketInfo omBucketInfo,
       String dbOzoneKey, String dbMultipartOpenKey, String dbMultipartKey,

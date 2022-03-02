@@ -153,7 +153,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // creation after the knob turned on.
       RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
       OmKeyInfo keyToDelete =
-              omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
+          omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             omMetadataManager, omBucketInfo.getIsVersionEnabled(),
@@ -189,7 +189,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-              keysToDelete);
+              oldKeyVersionsToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
