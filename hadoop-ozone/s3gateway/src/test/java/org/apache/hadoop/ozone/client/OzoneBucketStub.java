@@ -32,10 +32,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -62,6 +62,7 @@ public class OzoneBucketStub extends OzoneBucket {
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
+  private ReplicationConfig replicationConfig;
 
   /**
    * Constructs OzoneBucket instance.
@@ -79,10 +80,11 @@ public class OzoneBucketStub extends OzoneBucket {
       long creationTime) {
     super(volumeName,
         bucketName,
-        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
+        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
         storageType,
         versioning,
         creationTime);
+    this.replicationConfig = super.getReplicationConfig();
   }
 
   @Override
@@ -111,6 +113,37 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 new ArrayList<>(), type, metadata, null,
                 factor.getValue()
+            ));
+            super.close();
+          }
+        };
+    return new OzoneOutputStream(byteArrayOutputStream);
+  }
+
+  @Override
+  public OzoneOutputStream createKey(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> metadata)
+      throws IOException {
+    final ReplicationConfig repConfig;
+    if (rConfig == null) {
+      repConfig = getReplicationConfig();
+    } else {
+      repConfig = rConfig;
+    }
+    ReplicationConfig finalReplicationCon = repConfig;
+    ByteArrayOutputStream byteArrayOutputStream =
+        new ByteArrayOutputStream((int) size) {
+          @Override
+          public void close() throws IOException {
+            keyContents.put(key, toByteArray());
+            keyDetails.put(key, new OzoneKeyDetails(
+                getVolumeName(),
+                getName(),
+                key,
+                size,
+                System.currentTimeMillis(),
+                System.currentTimeMillis(),
+                new ArrayList<>(), finalReplicationCon, metadata, null
             ));
             super.close();
           }
@@ -357,5 +390,15 @@ public class OzoneBucketStub extends OzoneBucket {
     public byte[] getContent() {
       return content.clone();
     }
+  }
+
+  @Override
+  public void setReplicationConfig(ReplicationConfig replicationConfig) {
+    this.replicationConfig = replicationConfig;
+  }
+
+  @Override
+  public ReplicationConfig getReplicationConfig() {
+    return this.replicationConfig;
   }
 }
