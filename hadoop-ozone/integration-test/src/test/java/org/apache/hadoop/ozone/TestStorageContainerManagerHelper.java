@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
@@ -102,19 +102,19 @@ public class TestStorageContainerManagerHelper {
   public List<String> getPendingDeletionBlocks(Long containerID)
       throws IOException {
     List<String> pendingDeletionBlocks = Lists.newArrayList();
-    ReferenceCountedDB meta = getContainerMetadata(containerID);
-    KeyPrefixFilter filter =
-        new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);
+    try (DBHandle meta = getContainerMetadata(containerID)) {
+      KeyPrefixFilter filter =
+          new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);
 
-    List<? extends Table.KeyValue<String, BlockData>> kvs =
-        meta.getStore().getBlockDataTable()
-        .getRangeKVs(null, Integer.MAX_VALUE, filter);
+      List<? extends Table.KeyValue<String, BlockData>> kvs =
+          meta.getStore().getBlockDataTable()
+              .getRangeKVs(null, Integer.MAX_VALUE, filter);
 
-    for (Table.KeyValue<String, BlockData> entry : kvs) {
-      pendingDeletionBlocks
-              .add(entry.getKey().replace(OzoneConsts.DELETING_KEY_PREFIX, ""));
+      for (Table.KeyValue<String, BlockData> entry : kvs) {
+        pendingDeletionBlocks
+            .add(entry.getKey().replace(OzoneConsts.DELETING_KEY_PREFIX, ""));
+      }
     }
-    meta.close();
     return pendingDeletionBlocks;
   }
 
@@ -129,44 +129,44 @@ public class TestStorageContainerManagerHelper {
 
   public List<Long> getAllBlocks(Long containeID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
-    ReferenceCountedDB meta = getContainerMetadata(containeID);
+    try (DBHandle meta = getContainerMetadata(containeID)) {
 
-    List<? extends Table.KeyValue<String, BlockData>> kvs =
+      List<? extends Table.KeyValue<String, BlockData>> kvs =
           meta.getStore().getBlockDataTable()
-          .getRangeKVs(null, Integer.MAX_VALUE,
-          MetadataKeyFilters.getUnprefixedKeyFilter());
+              .getRangeKVs(null, Integer.MAX_VALUE,
+                  MetadataKeyFilters.getUnprefixedKeyFilter());
 
-    for (Table.KeyValue<String, BlockData> entry : kvs) {
-      allBlocks.add(Long.valueOf(entry.getKey()));
+      for (Table.KeyValue<String, BlockData> entry : kvs) {
+        allBlocks.add(Long.valueOf(entry.getKey()));
+      }
     }
-    meta.close();
     return allBlocks;
   }
 
   public boolean verifyBlocksWithTxnTable(Map<Long, List<Long>> containerBlocks)
       throws IOException {
     for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
-      ReferenceCountedDB meta = getContainerMetadata(entry.getKey());
-      DatanodeStore ds = meta.getStore();
-      DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-          (DatanodeStoreSchemaTwoImpl) ds;
-      List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
-          txnsInTxnTable = dnStoreTwoImpl.getDeleteTransactionTable()
-          .getRangeKVs(null, Integer.MAX_VALUE, null);
-      List<Long> conID = new ArrayList<>();
-      for (Table.KeyValue<Long, DeletedBlocksTransaction> txn :
-          txnsInTxnTable) {
-        conID.addAll(txn.getValue().getLocalIDList());
+      try (DBHandle meta = getContainerMetadata(entry.getKey())) {
+        DatanodeStore ds = meta.getStore();
+        DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
+            (DatanodeStoreSchemaTwoImpl) ds;
+        List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+            txnsInTxnTable = dnStoreTwoImpl.getDeleteTransactionTable()
+            .getRangeKVs(null, Integer.MAX_VALUE, null);
+        List<Long> conID = new ArrayList<>();
+        for (Table.KeyValue<Long, DeletedBlocksTransaction> txn :
+            txnsInTxnTable) {
+          conID.addAll(txn.getValue().getLocalIDList());
+        }
+        if (!conID.equals(containerBlocks.get(entry.getKey()))) {
+          return false;
+        }
       }
-      if (!conID.equals(containerBlocks.get(entry.getKey()))) {
-        return false;
-      }
-      meta.close();
     }
     return true;
   }
 
-  private ReferenceCountedDB getContainerMetadata(Long containerID)
+  private DBHandle getContainerMetadata(Long containerID)
       throws IOException {
     ContainerWithPipeline containerWithPipeline = cluster
         .getStorageContainerManager().getClientProtocolServer()

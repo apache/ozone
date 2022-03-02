@@ -25,8 +25,8 @@ import com.google.gson.JsonPrimitive;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.log4j.PatternLayout;
@@ -290,7 +290,7 @@ public class TestKeyValueContainerMetadataInspector
 
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
       long blockCount, long byteCount) throws Exception {
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData, getConf())) {
+    try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
       // Don't care about in memory state. Just change the DB values.
       metadataTable.put(OzoneConsts.BLOCK_COUNT, blockCount);
@@ -300,7 +300,7 @@ public class TestKeyValueContainerMetadataInspector
 
   public void checkDBBlockAndByteCounts(KeyValueContainerData containerData,
       long expectedBlockCount, long expectedBytesUsed) throws Exception {
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData, getConf())) {
+    try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
       long bytesUsed = metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED);
