@@ -203,7 +203,7 @@ execute_robot_test(){
 
   if [[ ${rc} -gt 0 ]] && [[ ${rc} -lt 250 ]]; then
     for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
-      docker exec -it "${c}" bash -c "jstack \$(jps | grep -v Jps | cut -f1 -d' ')" > ${RESULT_DIR}/${c}.stack
+      docker exec "${c}" bash -c "jstack \$(jps | grep -v Jps | cut -f1 -d' ')" > ${RESULT_DIR}/${c}.stack
     done
   fi
 
