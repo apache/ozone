@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -41,7 +42,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -249,7 +249,7 @@ public class TestCloseContainerByPipeline {
     List<DatanodeDetails> datanodes = pipeline.getNodes();
     Assert.assertEquals(3, datanodes.size());
 
-    List<ReferenceCountedDB> metadataStores = new ArrayList<>(datanodes.size());
+    List<DBHandle> metadataStores = new ArrayList<>(datanodes.size());
     for (DatanodeDetails details : datanodes) {
       Assert.assertFalse(isContainerClosed(cluster, containerID, details));
       //send the order to close the container
@@ -263,7 +263,7 @@ public class TestCloseContainerByPipeline {
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
           .getContainer(containerID);
-      try (ReferenceCountedDB store = BlockUtils.getDB(
+      try (DBHandle store = BlockUtils.getDB(
           (KeyValueContainerData) dnContainer.getContainerData(), conf)) {
         metadataStores.add(store);
       }

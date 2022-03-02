@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -53,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -332,8 +332,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     if (!isTxnIdValid(containerId, containerData, delTX)) {
       return;
     }
-    try (ReferenceCountedDB containerDB = BlockUtils
-        .getDB(containerData, conf)) {
+    try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       DatanodeStore ds = containerDB.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
           (DatanodeStoreSchemaTwoImpl) ds;
@@ -358,8 +357,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       return;
     }
     int newDeletionBlocks = 0;
-    try (ReferenceCountedDB containerDB = BlockUtils
-        .getDB(containerData, conf)) {
+    try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
           containerDB.getStore().getBlockDataTable();
       Table<String, ChunkInfoList> deletedBlocksTable =
@@ -412,7 +410,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
   private void updateMetaData(KeyValueContainerData containerData,
       DeletedBlocksTransaction delTX, int newDeletionBlocks,
-      ReferenceCountedDB containerDB, BatchOperation batchOperation)
+      DBHandle containerDB, BatchOperation batchOperation)
       throws IOException {
     if (newDeletionBlocks > 0) {
       // Finally commit the DB counters.

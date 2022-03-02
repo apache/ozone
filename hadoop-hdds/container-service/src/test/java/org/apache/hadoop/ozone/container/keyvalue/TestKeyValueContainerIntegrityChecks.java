@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -36,7 +37,6 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.runners.Parameterized;
@@ -140,7 +140,7 @@ public class TestKeyValueContainerIntegrityChecks {
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
         UUID.randomUUID().toString());
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
+    try (DBHandle metadataStore = BlockUtils.getDB(containerData,
         conf)) {
       assertNotNull(containerData.getChunksPath());
       File chunksPath = new File(containerData.getChunksPath());

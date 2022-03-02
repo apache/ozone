@@ -48,9 +48,9 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -278,7 +278,7 @@ public class BlockDeletingService extends BackgroundService {
       File dataDir = new File(containerData.getChunksPath());
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
-      try (ReferenceCountedDB meta = BlockUtils.getDB(containerData, conf)) {
+      try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
         if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
           crr = deleteViaSchema1(meta, container, dataDir, startTime);
         } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
@@ -304,7 +304,7 @@ public class BlockDeletingService extends BackgroundService {
     }
 
     public ContainerBackgroundTaskResult deleteViaSchema1(
-        ReferenceCountedDB meta, Container container, File dataDir,
+        DBHandle meta, Container container, File dataDir,
         long startTime) throws IOException {
       ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
       if (!checkDataDir(dataDir)) {
@@ -394,7 +394,7 @@ public class BlockDeletingService extends BackgroundService {
     }
 
     public ContainerBackgroundTaskResult deleteViaSchema2(
-        ReferenceCountedDB meta, Container container, File dataDir,
+        DBHandle meta, Container container, File dataDir,
         long startTime) throws IOException {
       ContainerBackgroundTaskResult crr = new ContainerBackgroundTaskResult();
       if (!checkDataDir(dataDir)) {

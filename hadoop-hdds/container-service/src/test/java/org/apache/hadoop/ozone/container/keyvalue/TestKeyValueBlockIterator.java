@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -75,7 +75,7 @@ public class TestKeyValueBlockIterator {
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
-  private ReferenceCountedDB db;
+  private DBHandle db;
   private final ContainerLayoutVersion layout;
 
   public TestKeyValueBlockIterator(ContainerLayoutVersion layout) {
@@ -372,8 +372,7 @@ public class TestKeyValueBlockIterator {
             Map<String, Integer> prefixCounts) throws Exception {
     // Create required block data.
     Map<String, List<Long>> blockIDs = new HashMap<>();
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
-        conf)) {
+    try (DBHandle metadataStore = BlockUtils.getDB(containerData, conf)) {
 
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);

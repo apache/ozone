@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
@@ -286,9 +286,10 @@ public class KeyValueContainerData extends ContainerData {
    * @param db - Reference to container DB.
    * @param batchOperation - Batch Operation to batch DB operations.
    * @param deletedBlockCount - Number of blocks deleted.
+   * @param releasedBytes - Number of bytes released.
    * @throws IOException
    */
-  public void updateAndCommitDBCounters(ReferenceCountedDB db,
+  public void updateAndCommitDBCounters(DBHandle db,
       BatchOperation batchOperation, int deletedBlockCount,
       long releasedBytes) throws IOException {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
