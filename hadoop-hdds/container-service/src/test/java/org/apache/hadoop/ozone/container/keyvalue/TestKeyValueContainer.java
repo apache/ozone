@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -46,7 +47,6 @@ import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -321,7 +321,7 @@ public class TestKeyValueContainer {
    * Add some keys to the container.
    */
   private void populate(long numberOfKeysToWrite) throws IOException {
-    try (ReferenceCountedDB metadataStore =
+    try (DBHandle metadataStore =
         BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       Table<String, BlockData> blockDataTable =
               metadataStore.getStore().getBlockDataTable();
@@ -505,14 +505,13 @@ public class TestKeyValueContainer {
 
   @Test
   public void testContainerRocksDB()
-      throws StorageContainerException, RocksDBException {
+      throws IOException, RocksDBException {
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    try (ReferenceCountedDB db =
-        BlockUtils.getDB(keyValueContainerData, CONF)) {
+    try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
       long defaultCacheSize = 64 * OzoneConsts.MB;
       long cacheSize = Long.parseLong(store
@@ -565,7 +564,7 @@ public class TestKeyValueContainer {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     DatanodeDBProfile outProfile1;
-    try (ReferenceCountedDB db1 =
+    try (DBHandle db1 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       DatanodeStore store1 = db1.getStore();
       Assert.assertTrue(store1 instanceof AbstractDatanodeStore);
@@ -585,7 +584,7 @@ public class TestKeyValueContainer {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     DatanodeDBProfile outProfile2;
-    try (ReferenceCountedDB db2 =
+    try (DBHandle db2 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), otherConf)) {
       DatanodeStore store2 = db2.getStore();
       Assert.assertTrue(store2 instanceof AbstractDatanodeStore);

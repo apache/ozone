@@ -31,8 +31,8 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -124,7 +124,7 @@ public class TestContainerReader {
 
   private void markBlocksForDelete(KeyValueContainer keyValueContainer,
       boolean setMetaData, List<Long> blockNames, int count) throws Exception {
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
+    try (DBHandle metadataStore = BlockUtils.getDB(keyValueContainer
         .getContainerData(), conf)) {
 
       for (int i = 0; i < count; i++) {
@@ -154,7 +154,7 @@ public class TestContainerReader {
     long containerId = keyValueContainer.getContainerData().getContainerID();
 
     List<Long> blkNames = new ArrayList<>();
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
+    try (DBHandle metadataStore = BlockUtils.getDB(keyValueContainer
         .getContainerData(), conf)) {
 
       for (int i = 0; i < blockCount; i++) {

@@ -49,8 +49,8 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -441,7 +441,7 @@ public class TestBlockDeletion {
       ContainerSet dnContainerSet =
           datanode.getDatanodeStateMachine().getContainer().getContainerSet();
       OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
-        try (ReferenceCountedDB db = BlockUtils.getDB(
+        try (DBHandle db = BlockUtils.getDB(
             (KeyValueContainerData) dnContainerSet
                 .getContainer(blockID.getContainerID()).getContainerData(),
             conf)) {
@@ -458,7 +458,7 @@ public class TestBlockDeletion {
       ContainerSet dnContainerSet =
           datanode.getDatanodeStateMachine().getContainer().getContainerSet();
       OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
-        try (ReferenceCountedDB db = BlockUtils.getDB(
+        try (DBHandle db = BlockUtils.getDB(
             (KeyValueContainerData) dnContainerSet
                 .getContainer(blockID.getContainerID()).getContainerData(),
             conf)) {
