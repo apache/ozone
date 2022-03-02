@@ -219,7 +219,8 @@ create_stack_dumps() {
   local c name pid
   for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
     while read -r pid name; do
-      docker exec "${c}" bash -c "jstack $pid" > ${RESULT_DIR}/${c}_${name}.stack
+      echo "jstack $pid > ${RESULT_DIR}/${c}_${name}.stack"
+      docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${name}.stack"
     done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
   done
 }
