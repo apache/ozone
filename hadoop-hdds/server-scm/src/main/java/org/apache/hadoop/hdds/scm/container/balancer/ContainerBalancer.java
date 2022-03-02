@@ -740,7 +740,8 @@ public class ContainerBalancer implements SCMService {
   }
 
   /**
-   * Starts Container Balancer as a new thread.
+   * Starts Container Balancer after checking its state and validating
+   * configurations.
    * @throws RuntimeException if ContainerBalancer is not in a start-appropriate
    * state or {@link ContainerBalancerConfiguration} config file is
    * incorrectly configured
@@ -764,13 +765,13 @@ public class ContainerBalancer implements SCMService {
     }
   }
 
+  /**
+   * Starts a new balancing thread asynchronously.
+   */
   private void startBalancer() {
     lock.lock();
     try {
-      setBalancerRunning(true);
-      /*
-      Start a new balancing thread async and respond to cli as soon as possible
-       */
+      balancerRunning = true;
       currentBalancingThread = new Thread(this::balance);
       currentBalancingThread.setName("ContainerBalancer");
       currentBalancingThread.setDaemon(true);
@@ -830,7 +831,7 @@ public class ContainerBalancer implements SCMService {
         LOG.info("Container Balancer is not running.");
         return;
       }
-      setBalancerRunning(false);
+      balancerRunning = false;
     } finally {
       lock.unlock();
     }
@@ -955,15 +956,6 @@ public class ContainerBalancer implements SCMService {
    */
   public boolean isBalancerRunning() {
     return balancerRunning;
-  }
-
-  private void setBalancerRunning(boolean value) {
-    lock.lock();
-    try {
-      balancerRunning = value;
-    } finally {
-      lock.unlock();
-    }
   }
 
   int getCountDatanodesInvolvedPerIteration() {
