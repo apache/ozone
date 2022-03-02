@@ -228,21 +228,22 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           usedBytesDiff -= keyToDelete.getDataSize() * numCopy;
         }
 
+        String dbBucketKey = null;
         if (usedBytesDiff != 0) {
           omBucketInfo.incrUsedBytes(usedBytesDiff);
+          dbBucketKey = omMetadataManager.getBucketKey(
+              omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
         } else {
           // If no bucket size changed, prevent from updating bucket object
           omBucketInfo = null;
         }
 
-        String dbBucketKey = omMetadataManager.getBucketKey(
-            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
         updateCache(omMetadataManager, dbBucketKey, omBucketInfo, dbOzoneKey,
             dbMultipartOpenKey, multipartKey, omKeyInfo, trxnLogIndex);
 
         if (oldKeyVersionsToDelete != null) {
           OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
-                  oldKeyVersionsToDelete, trxnLogIndex);
+              oldKeyVersionsToDelete, trxnLogIndex);
         }
 
         omResponse.setCompleteMultiPartUploadResponse(
