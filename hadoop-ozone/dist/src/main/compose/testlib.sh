@@ -214,7 +214,7 @@ execute_robot_test(){
 copy_daemon_logs() {
   local c f
   for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
-    for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
+    for f in $(docker exec "${c}" ls -1 /var/log/hadoop 2> /dev/null | grep -F -e '.out' -e audit); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done
   done
@@ -320,13 +320,12 @@ copy_results() {
   local result_dir="${test_dir}/result"
   local test_dir_name=$(basename ${test_dir})
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}"/*.xml
+    rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
-  cp "${result_dir}"/docker-*.log "${all_result_dir}"/
-  if [[ -n "$(find "${result_dir}" -name "*.out")" ]]; then
-    cp "${result_dir}"/*.out* "${all_result_dir}"/
-  fi
+  mkdir -p "${all_result_dir}"/"${test_dir_name}"
+  mv -v "${result_dir}"/* "${all_result_dir}"/"${test_dir_name}"/
 }
 
 run_test_script() {
