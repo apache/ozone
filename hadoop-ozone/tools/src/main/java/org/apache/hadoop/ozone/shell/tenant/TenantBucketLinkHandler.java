@@ -30,7 +30,7 @@ import picocli.CommandLine.Parameters;
 import java.io.IOException;
 
 /**
- * ozone tenant bucketlink.
+ * ozone tenant linkbucket.
  *
  * Note: Currently this command is exactly the same as `ozone sh bucket link`.
  * We might expand this to add more functionality in the future, and different
