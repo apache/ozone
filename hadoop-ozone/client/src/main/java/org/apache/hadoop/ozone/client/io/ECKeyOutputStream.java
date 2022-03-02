@@ -175,15 +175,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
   private StripeWriteStatus rewriteStripeToNewBlockGroup(
       long failedStripeDataSize, boolean close) throws IOException {
     int[] failedDataStripeChunkLens = new int[numDataBlks];
-    int[] failedParityStripeChunkLens = new int[numParityBlks];
     final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
     for (int i = 0; i < numDataBlks; i++) {
       failedDataStripeChunkLens[i] = dataBuffers[i].limit();
     }
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
-    for (int i = 0; i < numParityBlks; i++) {
-      failedParityStripeChunkLens[i] = parityBuffers[i].limit();
-    }
 
     // Rollback the length/offset updated as part of this failed stripe write.
     offset -= failedStripeDataSize;
@@ -217,37 +213,8 @@ public class ECKeyOutputStream extends KeyOutputStream {
       currentStreamEntry.useNextBlockStream();
       totalLenToWrite -= currentLen;
     }
-    for (int i = 0; i < (numParityBlks); i++) {
-      handleOutputStreamWrite(i + numDataBlks, failedParityStripeChunkLens[i],
-          true);
-      currentStreamEntry.useNextBlockStream();
-    }
-
-    if (hasWriteFailure()) {
-      handleFailedStreams(false);
-      return StripeWriteStatus.FAILED;
-    }
-    currentStreamEntry.executePutBlock(close);
-
-    if (hasPutBlockFailure()) {
-      handleFailedStreams(true);
-      return StripeWriteStatus.FAILED;
-    }
-    ECBlockOutputStreamEntry newBlockGroupStreamEntry =
-        blockOutputStreamEntryPool.getCurrentStreamEntry();
-    newBlockGroupStreamEntry
-        .updateBlockGroupToAckedPosition(failedStripeDataSize);
-    ecChunkBufferCache.clear();
-
-    if (newBlockGroupStreamEntry.getRemaining() <= 0) {
-      // In most cases this should not happen except in the case stripe size and
-      // block size same.
-      newBlockGroupStreamEntry.close();
-    } else {
-      newBlockGroupStreamEntry.resetToFirstEntry();
-    }
-
-    return StripeWriteStatus.SUCCESS;
+    // Parity cells all have same length, and there is no padding to exclude
+    return handleParityWrites(parityBuffers[0].limit(), close);
   }
 
   private void encodeAndWriteParityCells(long dataSize)
