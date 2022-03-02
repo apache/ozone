@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
@@ -240,25 +241,24 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     return StripeWriteStatus.SUCCESS;
   }
 
-  private void checkAndWriteParityCells(int lastDataBuffPos)
-      throws IOException {
-    // Check data blocks finished
-    // If index > numDataBlks
+  private void encodeAndWriteParityCells() throws IOException {
+    final long dataSize = ecChunkBufferCache.getDataSize();
+    final int parityCellSize = (int) Math.min(dataSize, ecChunkSize);
     ECBlockOutputStreamEntry currentStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
-    int currentStreamIdx = currentStreamEntry.getCurrentStreamIdx();
-    if (currentStreamIdx == numDataBlks && lastDataBuffPos == ecChunkSize) {
-      //Lets encode and write
-      boolean shouldClose = currentStreamEntry.getRemaining() <= 0;
-      if (handleParityWrites(ecChunkSize, shouldClose)
-          == StripeWriteStatus.FAILED) {
-        handleStripeFailure(numDataBlks * ecChunkSize, shouldClose);
-      } else {
-        // At this stage stripe write is successful.
-        currentStreamEntry.updateBlockGroupToAckedPosition(
-            currentStreamEntry.getCurrentPosition());
-      }
-
+    boolean shouldClose = currentStreamEntry.getRemaining() <= 0;
+    if (isPartialStripe(dataSize)) {
+      addPadding(parityCellSize);
+      // partial stripe must be the last stripe of a block
+      shouldClose = true;
+    }
+    if (handleParityWrites(parityCellSize, shouldClose)
+        == StripeWriteStatus.FAILED) {
+      handleStripeFailure(dataSize, shouldClose);
+    } else {
+      // At this stage stripe write is successful.
+      currentStreamEntry.updateBlockGroupToAckedPosition(
+          currentStreamEntry.getCurrentPosition());
     }
   }
 
@@ -377,7 +377,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       // if this is last data cell in the stripe,
       // compute and write the parity cells
       if (currIdx == numDataBlks - 1) {
-        checkAndWriteParityCells(pos);
+        encodeAndWriteParityCells();
       }
     }
     return writeLen;
@@ -492,7 +492,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      final long lastStripeSize = getCurrentDataStripeSize();
+      final long lastStripeSize = ecChunkBufferCache.getDataSize();
       if (isPartialStripe(lastStripeSize)) {
         ByteBuffer bytesToWrite =
             ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
@@ -511,19 +511,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
           }
         }
 
-        final int parityCellSize =
-            (int) (lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize);
-        addPadding(parityCellSize);
-        if (handleParityWrites(parityCellSize, true)
-            == StripeWriteStatus.FAILED) {
-          handleStripeFailure(lastStripeSize, true);
-        } else {
-          blockOutputStreamEntryPool.getCurrentStreamEntry()
-              .updateBlockGroupToAckedPosition(
-                  blockOutputStreamEntryPool.getCurrentStreamEntry()
-                      .getCurrentPosition());
-        }
-
+        encodeAndWriteParityCells();
       }
 
       closeCurrentStreamEntry();
@@ -574,15 +562,6 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private boolean isPartialStripe(long stripeSize) {
     return stripeSize > 0 && stripeSize < (numDataBlks * ecChunkSize);
-  }
-
-  private long getCurrentDataStripeSize() {
-    final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
-    long lastStripeSize = 0;
-    for (int i = 0; i < numDataBlks; i++) {
-      lastStripeSize += dataBuffers[i].position();
-    }
-    return lastStripeSize;
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
@@ -664,6 +643,13 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
     private ByteBuffer[] getParityBuffers() {
       return parityBuffers;
+    }
+
+    private long getDataSize() {
+      return Arrays.stream(dataBuffers)
+          .mapToInt(Buffer::position)
+          .asLongStream()
+          .sum();
     }
 
     private int addToDataBuffer(int i, byte[] b, int off, int len) {
