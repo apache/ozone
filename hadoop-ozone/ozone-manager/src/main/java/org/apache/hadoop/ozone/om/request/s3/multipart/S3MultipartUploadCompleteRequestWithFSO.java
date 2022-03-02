@@ -153,23 +153,11 @@ public class S3MultipartUploadCompleteRequestWithFSO
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
       List<OmKeyInfo> unUsedParts, OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete) {
+      RepeatedOmKeyInfo oldKeyVersionsToDelete) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, keysToDelete);
-  }
-
-  private long getParentId(OMMetadataManager omMetadataManager,
-      String volumeName, String bucketName, String keyName) throws IOException {
-
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    return OMFileRequest
-        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
+        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete);
   }
 
   @Override

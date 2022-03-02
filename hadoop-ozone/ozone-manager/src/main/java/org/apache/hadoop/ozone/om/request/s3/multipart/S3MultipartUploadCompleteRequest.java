@@ -214,23 +214,32 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         // creation and key commit, old versions will be just overwritten and
         // not kept. Bucket versioning will be effective from the first key
         // creation after the knob turned on.
-        RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbOzoneKey,
+        RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
             omMetadataManager, omBucketInfo.getIsVersionEnabled(),
             trxnLogIndex, ozoneManager.isRatisEnabled());
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+        long usedBytesDiff = 0;
         if (keyToDelete != null) {
           long numCopy = keyToDelete.getReplicationConfig().getRequiredNodes();
-          long oldKeySize = keyToDelete.getDataSize() * numCopy;
-          omBucketInfo.incrUsedBytes(-oldKeySize);
+          usedBytesDiff -= keyToDelete.getDataSize() * numCopy;
         }
 
-        updateCache(omMetadataManager, dbOzoneKey, dbMultipartOpenKey,
-            multipartKey, omKeyInfo, trxnLogIndex);
+        if (usedBytesDiff != 0) {
+          omBucketInfo.incrUsedBytes(usedBytesDiff);
+        } else {
+          // If no bucket size changed, prevent from updating bucket object
+          omBucketInfo = null;
+        }
 
-        if (keysToDelete != null) {
+        String dbBucketKey = omMetadataManager.getBucketKey(
+            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
+        updateCache(omMetadataManager, dbBucketKey, omBucketInfo, dbOzoneKey,
+            dbMultipartOpenKey, multipartKey, omKeyInfo, trxnLogIndex);
+
+        if (oldKeyVersionsToDelete != null) {
           OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
-                  keysToDelete, trxnLogIndex);
+                  oldKeyVersionsToDelete, trxnLogIndex);
         }
 
         omResponse.setCompleteMultiPartUploadResponse(
@@ -242,7 +251,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
         omClientResponse =
             getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
-                omKeyInfo, unUsedParts, omBucketInfo, keysToDelete);
+                omKeyInfo, unUsedParts, omBucketInfo, oldKeyVersionsToDelete);
 
         result = Result.SUCCESS;
       } else {
@@ -280,11 +289,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected OMClientResponse getOmClientResponse(String multipartKey,
       OMResponse.Builder omResponse, String dbMultipartOpenKey,
       OmKeyInfo omKeyInfo,  List<OmKeyInfo> unUsedParts,
-      OmBucketInfo omBucketInfo, RepeatedOmKeyInfo keysToDelete) {
+      OmBucketInfo omBucketInfo, RepeatedOmKeyInfo oldKeyVersionsToDelete) {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, keysToDelete);
+        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete);
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
@@ -524,11 +533,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   private void updateCache(OMMetadataManager omMetadataManager,
+      String dbBucketKey, OmBucketInfo omBucketInfo,
       String dbOzoneKey, String dbMultipartOpenKey, String dbMultipartKey,
       OmKeyInfo omKeyInfo, long transactionLogIndex) {
     // Update cache.
     // 1. Add key entry to key table.
     // 2. Delete multipartKey entry from openKeyTable and multipartInfo table.
+    // 3. If the bucket size has changed (omBucketInfo is not null),
+    //    update bucket cache
     addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
         transactionLogIndex);
 
@@ -538,6 +550,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(dbMultipartKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
+
+    if (omKeyInfo != null) {
+      omMetadataManager.getBucketTable().addCacheEntry(
+              new CacheKey<>(dbBucketKey),
+              new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+    }
   }
 
   public static S3MultipartUploadCompleteRequest getInstance(KeyArgs keyArgs,

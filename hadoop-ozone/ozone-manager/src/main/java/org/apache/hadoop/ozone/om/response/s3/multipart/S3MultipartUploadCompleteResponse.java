@@ -55,7 +55,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private OmKeyInfo omKeyInfo;
   private List<OmKeyInfo> partsUnusedList;
   private OmBucketInfo omBucketInfo;
-  private RepeatedOmKeyInfo keysToDelete;
+  private RepeatedOmKeyInfo keyVersionsToDelete;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponse(
@@ -66,14 +66,14 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
       @Nonnull List<OmKeyInfo> unUsedParts,
       @Nonnull BucketLayout bucketLayout,
       @Nonnull OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete) {
+      RepeatedOmKeyInfo keyVersionsToDelete) {
     super(omResponse, bucketLayout);
     this.partsUnusedList = unUsedParts;
     this.multipartKey = multipartKey;
     this.multipartOpenKey = multipartOpenKey;
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
-    this.keysToDelete = keysToDelete;
+    this.keyVersionsToDelete = keyVersionsToDelete;
   }
 
   /**
@@ -102,23 +102,26 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
     // 3. Delete unused parts
     if (!partsUnusedList.isEmpty()) {
       // Add unused parts to deleted key table.
-      if (keysToDelete == null) {
-        keysToDelete = new RepeatedOmKeyInfo(partsUnusedList);
+      if (keyVersionsToDelete == null) {
+        keyVersionsToDelete = new RepeatedOmKeyInfo(partsUnusedList);
       } else {
         for (OmKeyInfo unusedParts : partsUnusedList) {
-          keysToDelete.addOmKeyInfo(unusedParts);
+          keyVersionsToDelete.addOmKeyInfo(unusedParts);
         }
       }
     }
-    if (keysToDelete != null) {
+    if (keyVersionsToDelete != null) {
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          ozoneKey, keysToDelete);
+          ozoneKey, keyVersionsToDelete);
     }
 
-    // update bucket usedBytes.
-    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-            omBucketInfo.getBucketName()), omBucketInfo);
+
+    // update bucket usedBytes, only when total bucket size has changed due to .
+    if (omBucketInfo != null) {
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+              omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+                      omBucketInfo.getBucketName()), omBucketInfo);
+    }
   }
 
   protected String addToKeyTable(OMMetadataManager omMetadataManager,
