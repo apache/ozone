@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -158,7 +159,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
@@ -223,7 +223,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(ClientVersion.latest().version())
         .setClientId(clientID);
   }
 
@@ -707,7 +707,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
-            .map(info -> info.getProtobuf(CURRENT_VERSION))
+            .map(info -> info.getProtobuf(ClientVersion.latest().version()))
             .collect(Collectors.toList()));
 
     if (args.getReplicationConfig() != null) {
@@ -988,7 +988,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(omKeyArgs.getDataSize())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
-            .map(info -> info.getProtobuf(CURRENT_VERSION))
+            .map(info -> info.getProtobuf(ClientVersion.latest().version()))
             .collect(Collectors.toList()));
     multipartCommitUploadPartRequest.setClientID(clientId);
     multipartCommitUploadPartRequest.setKeyArgs(keyArgs.build());

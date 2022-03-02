@@ -20,19 +20,34 @@ package org.apache.hadoop.ozone;
 /**
  * Versioning for protocol clients.
  */
-public final class ClientVersions {
+public enum ClientVersion {
 
   // old client, doesn't even send version number in requests
-  public static final int DEFAULT_VERSION = 0;
+  DEFAULT_VERSION(0, "Initial version"),
 
   // DatanodeDetails#getFromProtobuf handles unknown types of ports
-  public static final int VERSION_HANDLES_UNKNOWN_DN_PORTS = 1;
+  VERSION_HANDLES_UNKNOWN_DN_PORTS(1,
+      "Client version that handles the REPLICATION port in DatanodeDetails.");
 
-  // this should always point to the latest version
-  public static final int CURRENT_VERSION = VERSION_HANDLES_UNKNOWN_DN_PORTS;
+  private int version;
+  private String description;
 
-  private ClientVersions() {
-    // no instances
+  ClientVersion(int version, String description) {
+    this.version = version;
+    this.description = description;
+  }
+
+  public int version() {
+    return version;
+  }
+
+  public String description() {
+    return description;
+  }
+
+  public static ClientVersion latest() {
+    ClientVersion[] versions = ClientVersion.values();
+    return versions[versions.length - 1];
   }
 
 }

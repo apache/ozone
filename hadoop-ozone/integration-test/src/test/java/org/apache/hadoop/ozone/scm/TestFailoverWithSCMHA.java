@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.ozone.test.GenericTestUtils;
@@ -39,7 +40,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.event.Level;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 import java.io.IOException;
 import java.util.Map;
@@ -163,7 +163,8 @@ public class TestFailoverWithSCMHA {
     //inflight move after failover, so no need to create container and datanode,
     //just mock them bypassing all the pre checks.
     scm.getReplicationManager().getMoveScheduler().startMove(id.getProtobuf(),
-        (new MoveDataNodePair(dn1, dn2)).getProtobufMessage(CURRENT_VERSION));
+        (new MoveDataNodePair(dn1, dn2))
+            .getProtobufMessage(ClientVersion.latest().version()));
 
     SCMBlockLocationFailoverProxyProvider failoverProxyProvider =
         new SCMBlockLocationFailoverProxyProvider(conf);

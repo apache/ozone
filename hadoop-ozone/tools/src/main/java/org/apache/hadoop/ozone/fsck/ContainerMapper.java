@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.fsck;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -35,7 +36,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 
@@ -95,7 +95,8 @@ public class ContainerMapper {
             Table.KeyValue<String, OmKeyInfo> keyValue =
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
-            byte[] value = omKeyInfo.getProtobuf(true, CURRENT_VERSION)
+            byte[] value = omKeyInfo
+                .getProtobuf(true, ClientVersion.latest().version())
                 .toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));

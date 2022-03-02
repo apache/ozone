@@ -25,8 +25,8 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.V0_PORTS;
-import static org.apache.hadoop.ozone.ClientVersions.DEFAULT_VERSION;
-import static org.apache.hadoop.ozone.ClientVersions.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -40,11 +40,12 @@ public class TestDatanodeDetails {
   public void protoIncludesNewPortsOnlyForV1() {
     DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();
 
-    HddsProtos.DatanodeDetailsProto proto = subject.toProto(DEFAULT_VERSION);
+    HddsProtos.DatanodeDetailsProto proto =
+        subject.toProto(DEFAULT_VERSION.version());
     assertPorts(proto, V0_PORTS);
 
-    HddsProtos.DatanodeDetailsProto protoV1 = subject.toProto(
-        VERSION_HANDLES_UNKNOWN_DN_PORTS);
+    HddsProtos.DatanodeDetailsProto protoV1 =
+        subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.version());
     assertPorts(protoV1, ALL_PORTS);
   }
 

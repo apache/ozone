@@ -20,16 +20,30 @@ package org.apache.hadoop.hdds;
 /**
  * Versioning for datanode.
  */
-public final class DatanodeVersions {
+public enum DatanodeVersion {
 
-  public static final int DEFAULT_VERSION = 0;
+  DEFAULT_VERSION(0, "Initial version"),
 
-  public static final int SEPARATE_RATIS_PORTS_AVAILABLE = 1;
+  SEPARATE_RATIS_PORTS_AVAILABLE(1, "Version with separated Ratis port.");
 
-  // this should always point to the latest version
-  public static final int CURRENT_VERSION = SEPARATE_RATIS_PORTS_AVAILABLE;
+  private final int version;
+  private final String description;
 
-  private DatanodeVersions() {
-    // no instances
+  DatanodeVersion(int version, String description) {
+    this.version = version;
+    this.description = description;
+  }
+
+  public int version() {
+    return version;
+  }
+
+  public String description() {
+    return description;
+  }
+
+  public static DatanodeVersion latest() {
+    DatanodeVersion[] versions = DatanodeVersion.values();
+    return versions[versions.length - 1];
   }
 }

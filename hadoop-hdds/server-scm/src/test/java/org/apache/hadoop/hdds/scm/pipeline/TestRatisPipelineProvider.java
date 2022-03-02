@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -125,14 +125,14 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.latest().version());
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(RatisReplicationConfig
         .getInstance(factor));
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.latest().version());
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
@@ -177,7 +177,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.latest().version());
     stateManager.addPipeline(pipelineProto);
 
     factor = HddsProtos.ReplicationFactor.ONE;
@@ -186,7 +186,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.latest().version());
     stateManager.addPipeline(pipelineProto1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
@@ -264,7 +264,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.latest().version());
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
 
@@ -326,7 +326,7 @@ public class TestRatisPipelineProvider {
         .setId(PipelineID.randomId())
         .build();
     HddsProtos.Pipeline pipelineProto = openPipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.latest().version());
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);
