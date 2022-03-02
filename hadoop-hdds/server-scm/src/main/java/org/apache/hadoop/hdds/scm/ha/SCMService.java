@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
+
 /**
  * Interface for background services in SCM, including ReplicationManager,
  * SCMBlockDeletingService and BackgroundPipelineCreator.
@@ -65,8 +67,12 @@ public interface SCMService {
 
   /**
    * starts the SCM service.
+   * @throws RuntimeException Currently, {@link ContainerBalancer#start()}
+   * throws runtime exceptions.
    */
-  void start();
+  //TODO This should ideally throw checked exceptions and will need
+  // refactoring later.
+  void start() throws RuntimeException;
 
   /**
    * stops the SCM service.

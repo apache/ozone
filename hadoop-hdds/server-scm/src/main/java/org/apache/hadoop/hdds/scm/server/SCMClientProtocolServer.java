@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -830,16 +831,18 @@ public class SCMClientProtocolServer implements
       cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
     }
 
-
-    boolean isStartedSuccessfully = scm.getContainerBalancer().start(cbc);
-    if (isStartedSuccessfully) {
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.START_CONTAINER_BALANCER, null));
-    } else {
-      AUDIT.logWriteFailure(buildAuditMessageForSuccess(
-          SCMAction.START_CONTAINER_BALANCER, null));
+    ContainerBalancer containerBalancer = scm.getContainerBalancer();
+    containerBalancer.setConfig(cbc);
+    try {
+      containerBalancer.start();
+    } catch (RuntimeException exception) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.START_CONTAINER_BALANCER, null, exception));
+      return false;
     }
-    return isStartedSuccessfully;
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.START_CONTAINER_BALANCER, null));
+    return true;
   }
 
   @Override

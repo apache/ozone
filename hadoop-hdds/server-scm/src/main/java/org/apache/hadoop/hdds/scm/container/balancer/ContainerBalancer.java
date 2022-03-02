@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -58,7 +59,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
  */
-public class ContainerBalancer {
+public class ContainerBalancer implements SCMService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
@@ -140,39 +141,6 @@ public class ContainerBalancer {
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
-  }
-
-  /**
-   * Starts ContainerBalancer. Current implementation is incomplete.
-   *
-   * @param balancerConfiguration Configuration values.
-   */
-  public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
-    lock.lock();
-    try {
-      if (balancerRunning || currentBalancingThread != null) {
-        LOG.error("Container Balancer is already running.");
-        return false;
-      }
-
-      this.config = balancerConfiguration;
-      if (!validateConfiguration(config)) {
-        return false;
-      }
-      ozoneConfiguration.setFromObject(balancerConfiguration);
-      balancerRunning = true;
-      LOG.info("Starting Container Balancer...{}", this);
-
-      //we should start a new balancer thread async
-      //and response to cli as soon as possible
-      currentBalancingThread = new Thread(this::balance);
-      currentBalancingThread.setName("ContainerBalancer");
-      currentBalancingThread.setDaemon(true);
-      currentBalancingThread.start();
-    } finally {
-      lock.unlock();
-    }
-    return true;
   }
 
   /**
@@ -741,17 +709,128 @@ public class ContainerBalancer {
   }
 
   /**
+   * Receives a notification for raft or safe mode related status changes.
+   * Stops ContainerBalancer if it's running and the current SCM becomes a
+   * follower or is in safe mode.
+   */
+  @Override
+  public void notifyStatusChanged() {
+    if (!checkLeaderAndSafeMode()) {
+      if (isBalancerRunning()) {
+        stopBalancer();
+      }
+    }
+  }
+
+  /**
+   * No use of this method, currently.
+   * @return true
+   */
+  @Override
+  public boolean shouldRun() {
+    return true;
+  }
+
+  /**
+   * @return Name of this service.
+   */
+  @Override
+  public String getServiceName() {
+    return ContainerBalancer.class.getSimpleName();
+  }
+
+  /**
+   * Starts Container Balancer as a new thread.
+   * @throws RuntimeException if ContainerBalancer is not in a start-appropriate
+   * state or {@link ContainerBalancerConfiguration} config file is
+   * incorrectly configured
+   */
+  @Override
+  public void start() throws RuntimeException {
+    lock.lock();
+    try {
+      if (!canRun()) {
+        LOG.warn("Cannot start ContainerBalancer in the current state.");
+        throw new RuntimeException("Cannot start ContainerBalancer");
+      }
+      if (!validateConfiguration(this.config)) {
+        LOG.warn("Cannot start ContainerBalancer. " +
+            "ContainerBalancerConfiguration is incorrectly configured.");
+        throw new RuntimeException("Cannot start ContainerBalancer");
+      }
+      startBalancer();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void startBalancer() {
+    lock.lock();
+    try {
+      setBalancerRunning(true);
+      /*
+      Start a new balancing thread async and respond to cli as soon as possible
+       */
+      currentBalancingThread = new Thread(this::balance);
+      currentBalancingThread.setName("ContainerBalancer");
+      currentBalancingThread.setDaemon(true);
+      currentBalancingThread.start();
+    } finally {
+      lock.unlock();
+    }
+    LOG.info("Starting Container Balancer... {}", this);
+  }
+
+  private boolean canRun() {
+    if (!checkLeaderAndSafeMode()) {
+      return false;
+    }
+    lock.lock();
+    try {
+      if (isBalancerRunning() || currentBalancingThread != null) {
+        LOG.warn("Cannot run ContainerBalancer because it's already running");
+        return false;
+      }
+    } finally {
+      lock.unlock();
+    }
+    return true;
+  }
+
+  /**
+   * Used to check if SCM is leader ready and not in safe mode.
+   * @return true if SCM is leader ready and not in safe mode, false otherwise
+   */
+  private boolean checkLeaderAndSafeMode() {
+    if (!scmContext.isLeaderReady()) {
+      LOG.warn("Cannot run ContainerBalancer because SCM is not leader " +
+          "ready");
+      return false;
+    }
+    if (scmContext.isInSafeMode()) {
+      LOG.warn("Cannot run ContainerBalancer because SCM is in safe mode");
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Stops ContainerBalancer.
    */
+  @Override
   public void stop() {
+    stopBalancer();
+  }
+
+  private void stopBalancer() {
     lock.lock();
     try {
       // we should stop the balancer thread gracefully
-      if (!balancerRunning) {
+      if (!isBalancerRunning()) {
         LOG.info("Container Balancer is not running.");
         return;
       }
-      balancerRunning = false;
+      setBalancerRunning(false);
     } finally {
       lock.unlock();
     }
@@ -818,6 +897,15 @@ public class ContainerBalancer {
   }
 
   /**
+   * Sets the configuration that ContainerBalancer will use. This should be
+   * set before starting balancer.
+   * @param config ContainerBalancerConfiguration
+   */
+  public void setConfig(ContainerBalancerConfiguration config) {
+    this.config = config;
+  }
+
+  /**
    * Gets the list of unBalanced nodes, that is, the over and under utilized
    * nodes in the cluster.
    *
@@ -867,6 +955,15 @@ public class ContainerBalancer {
    */
   public boolean isBalancerRunning() {
     return balancerRunning;
+  }
+
+  private void setBalancerRunning(boolean value) {
+    lock.lock();
+    try {
+      balancerRunning = value;
+    } finally {
+      lock.unlock();
+    }
   }
 
   int getCountDatanodesInvolvedPerIteration() {
