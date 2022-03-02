@@ -216,11 +216,11 @@ execute_robot_test(){
 
 ## @description Create stack dump of each java process in each container
 create_stack_dumps() {
-  local c name pid
+  local c pid procname
   for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
-    while read -r pid name; do
-      echo "jstack $pid > ${RESULT_DIR}/${c}_${name}.stack"
-      docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${name}.stack"
+    while read -r pid procname; do
+      echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
+      docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
     done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
   done
 }
