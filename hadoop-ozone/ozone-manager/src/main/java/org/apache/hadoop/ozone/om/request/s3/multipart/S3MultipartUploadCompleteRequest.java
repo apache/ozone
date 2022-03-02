@@ -556,7 +556,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         new CacheKey<>(dbMultipartKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
 
-    if (omKeyInfo != null) {
+    if (omBucketInfo != null) {
       omMetadataManager.getBucketTable().addCacheEntry(
               new CacheKey<>(dbBucketKey),
               new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
