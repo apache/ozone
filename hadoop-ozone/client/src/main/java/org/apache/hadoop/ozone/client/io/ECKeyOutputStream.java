@@ -250,14 +250,20 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return StripeWriteStatus.SUCCESS;
   }
 
-  private void encodeAndWriteParityCells()
+  private void encodeAndWriteParityCells(long dataSize)
       throws IOException {
     ECBlockOutputStreamEntry currentStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     boolean shouldClose = currentStreamEntry.getRemaining() <= 0;
-    if (handleParityWrites(ecChunkSize, shouldClose)
+    final int parityCellSize = (int) Math.min(dataSize, ecChunkSize);
+    if (isPartialStripe(dataSize)) {
+      addPadding(parityCellSize);
+      // partial stripe must be the last stripe of a block
+      shouldClose = true;
+    }
+    if (handleParityWrites(parityCellSize, shouldClose)
         == StripeWriteStatus.FAILED) {
-      handleStripeFailure(numDataBlks * ecChunkSize, shouldClose);
+      handleStripeFailure(dataSize, shouldClose);
     } else {
       // At this stage stripe write is successful.
       currentStreamEntry.updateBlockGroupToAckedPosition(
@@ -374,7 +380,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       // if this is last data cell in the stripe,
       // compute and write the parity cells
       if (currIdx == numDataBlks - 1) {
-        encodeAndWriteParityCells();
+        encodeAndWriteParityCells((long) ecChunkSize * numDataBlks);
       }
     }
   }
@@ -507,19 +513,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
           }
         }
 
-        final int parityCellSize =
-            (int) (lastStripeSize < ecChunkSize ? lastStripeSize : ecChunkSize);
-        addPadding(parityCellSize);
-        if (handleParityWrites(parityCellSize, true)
-            == StripeWriteStatus.FAILED) {
-          handleStripeFailure(lastStripeSize, true);
-        } else {
-          blockOutputStreamEntryPool.getCurrentStreamEntry()
-              .updateBlockGroupToAckedPosition(
-                  blockOutputStreamEntryPool.getCurrentStreamEntry()
-                      .getCurrentPosition());
-        }
-
+        encodeAndWriteParityCells(lastStripeSize);
       }
 
       closeCurrentStreamEntry();
