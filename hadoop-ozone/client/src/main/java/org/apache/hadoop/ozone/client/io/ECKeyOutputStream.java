@@ -179,7 +179,6 @@ public class ECKeyOutputStream extends KeyOutputStream {
     for (int i = 0; i < numDataBlks; i++) {
       failedDataStripeChunkLens[i] = dataBuffers[i].limit();
     }
-    final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
 
     // Rollback the length/offset updated as part of this failed stripe write.
     offset -= failedStripeDataSize;
@@ -213,8 +212,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
       currentStreamEntry.useNextBlockStream();
       totalLenToWrite -= currentLen;
     }
-    // Parity cells all have same length, and there is no padding to exclude
-    return handleParityWrites(parityBuffers[0].limit(), close);
+    return handleParityWrites(close);
   }
 
   private void encodeAndWriteParityCells(long dataSize)
@@ -229,15 +227,15 @@ public class ECKeyOutputStream extends KeyOutputStream {
       shouldClose = true;
     }
     generateParityCells(parityCellSize);
-    if (handleParityWrites(parityCellSize, shouldClose)
+    if (handleParityWrites(shouldClose)
         == StripeWriteStatus.FAILED) {
       handleStripeFailure(dataSize, shouldClose);
     }
   }
 
-  private StripeWriteStatus handleParityWrites(int parityCellSize,
-      boolean isLastStripe) throws IOException {
-    writeParityCells(parityCellSize);
+  private StripeWriteStatus handleParityWrites(boolean isLastStripe)
+      throws IOException {
+    writeParityCells();
     if (hasWriteFailure()) {
       handleFailedStreams(false);
       return StripeWriteStatus.FAILED;
@@ -327,12 +325,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
     encoder.encode(buffers, parityBuffers);
   }
 
-  private void writeParityCells(int parityCellSize) {
+  private void writeParityCells() {
     // Move the stream entry cursor to parity block index
     blockOutputStreamEntryPool
         .getCurrentStreamEntry().forceToFirstParityBlock();
+    ByteBuffer[] parityCells = ecChunkBufferCache.getParityBuffers();
     for (int i = 0; i < numParityBlks; i++) {
-      handleOutputStreamWrite(numDataBlks + i, parityCellSize, true);
+      handleOutputStreamWrite(numDataBlks + i, parityCells[i].limit(), true);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
   }
