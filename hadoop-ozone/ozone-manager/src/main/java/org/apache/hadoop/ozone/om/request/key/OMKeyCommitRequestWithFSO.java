@@ -151,11 +151,14 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
-      RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbFileKey,
-              omMetadataManager, omBucketInfo.getIsVersionEnabled(),
-              trxnLogIndex, ozoneManager.isRatisEnabled());
+      RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
       OmKeyInfo keyToDelete =
               omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
+      if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
+            omMetadataManager, omBucketInfo.getIsVersionEnabled(),
+            trxnLogIndex, ozoneManager.isRatisEnabled());
+      }
 
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -164,9 +167,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
               omKeyInfo, fileName, trxnLogIndex);
 
-      if (keysToDelete != null) {
+      if (oldKeyVersionsToDelete != null) {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbFileKey,
-                keysToDelete, trxnLogIndex);
+                oldKeyVersionsToDelete, trxnLogIndex);
       }
 
       long scmBlockSize = ozoneManager.getScmBlockSize();

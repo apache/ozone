@@ -214,12 +214,14 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
-      RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbOzoneKey,
-          omMetadataManager, omBucketInfo.getIsVersionEnabled(), trxnLogIndex,
-          ozoneManager.isRatisEnabled());
+      RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
       OmKeyInfo keyToDelete =
-              omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
-
+          omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+      if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
+            omMetadataManager, omBucketInfo.getIsVersionEnabled(),
+            trxnLogIndex, ozoneManager.isRatisEnabled());
+      }
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKey),
@@ -229,9 +231,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           new CacheKey<>(dbOzoneKey),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
-      if (keysToDelete != null) {
+      if (oldKeyVersionsToDelete != null) {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
-                keysToDelete, trxnLogIndex);
+            oldKeyVersionsToDelete, trxnLogIndex);
       }
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
@@ -253,7 +255,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          keysToDelete);
+          oldKeyVersionsToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
