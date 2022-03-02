@@ -150,23 +150,14 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         || ((off + len) < 0)) {
       throw new IndexOutOfBoundsException();
     }
-    int rem = len;
-    while (rem > 0) {
-      try {
-        blockOutputStreamEntryPool.allocateBlockIfNeeded();
-        int currentStreamIdx = blockOutputStreamEntryPool
-            .getCurrentStreamEntry().getCurrentStreamIdx();
-        int bufferRem =
-            ecChunkBufferCache.dataBuffers[currentStreamIdx].remaining();
-        int writeLen = Math.min(rem, Math.min(bufferRem, ecChunkSize));
-        int pos = handleDataWrite(currentStreamIdx, b, off, writeLen);
-        checkAndWriteParityCells(pos);
-        rem -= writeLen;
-        off += writeLen;
-      } catch (Exception e) {
-        markStreamClosed();
-        throw new IOException(e.getMessage());
+    try {
+      int i = 0;
+      while (i + off < len) {
+        i += handleWrite(b, off + i, len - i);
       }
+    } catch (Exception e) {
+      markStreamClosed();
+      throw new IOException(e.getMessage());
     }
     writeOffset += len;
   }
@@ -368,13 +359,28 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private int handleDataWrite(int currIdx, byte[] b, int off, int len) {
-    int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, len);
+  private int handleWrite(byte[] b, int off, int len) throws IOException {
+
+    blockOutputStreamEntryPool.allocateBlockIfNeeded();
+
+    int currIdx = blockOutputStreamEntryPool
+        .getCurrentStreamEntry().getCurrentStreamIdx();
+    int bufferRem = ecChunkBufferCache.dataBuffers[currIdx].remaining();
+    final int writeLen = Math.min(len, Math.min(bufferRem, ecChunkSize));
+    int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, writeLen);
+
+    // if this cell is full, send data to the OutputStream
     if (pos == ecChunkSize) {
       handleOutputStreamWrite(currIdx, pos, false);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
+
+      // if this is last data cell in the stripe,
+      // compute and write the parity cells
+      if (currIdx == numDataBlks - 1) {
+        checkAndWriteParityCells(pos);
+      }
     }
-    return pos;
+    return writeLen;
   }
 
   private void handleParityWrite(int currIdx, int len) {
