@@ -161,8 +161,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
         int bufferRem =
             ecChunkBufferCache.dataBuffers[currentStreamIdx].remaining();
         int writeLen = Math.min(rem, Math.min(bufferRem, ecChunkSize));
-        int pos = handleDataWrite(currentStreamIdx, b, off, writeLen);
-        checkAndWriteParityCells(pos);
+        handleDataWrite(currentStreamIdx, b, off, writeLen);
         rem -= writeLen;
         off += writeLen;
       } catch (Exception e) {
@@ -370,13 +369,16 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private int handleDataWrite(int currIdx, byte[] b, int off, int len) {
+  private void handleDataWrite(int currIdx, byte[] b, int off, int len)
+      throws IOException {
     int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, len);
+
+    // if this cell is full, send data to the OutputStream
     if (pos == ecChunkSize) {
       handleOutputStreamWrite(currIdx, pos, false);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
-    return pos;
+    checkAndWriteParityCells(pos);
   }
 
   private void handleParityWrite(int currIdx, int len) {
