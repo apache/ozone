@@ -1,6 +1,6 @@
 ---
 title: "Setup"
-weight: 1
+weight: 2
 menu:
    main:
       parent: "S3 Multi-Tenancy"
@@ -30,11 +30,11 @@ Steps to enable S3 Multi-Tenancy feature in Ozone clusters.
 
 ### Secure the cluster
 
-Follow [this guide](< ref "security/SecureOzone.md" >) to Kerberize (secure) the cluster if the cluster is not Kerberized yet.
+Follow [this guide]({{< ref "security/SecureOzone.md" >}}) to Kerberize (secure) the cluster if the cluster is not Kerberized yet.
 
 ### Set up S3 Gateway
 
-Follow [this guide](< ref "interface/S3.md" >) the cluster to set up at least one S3 Gateway if the cluster doesn't have a S3 Gateway yet.
+Follow [this guide]({{< ref "interface/S3.md" >}}) the cluster to set up at least one S3 Gateway if the cluster doesn't have a S3 Gateway yet.
 
 ### Set up Apache Ranger
 
@@ -60,7 +60,7 @@ Then simply add the following configs to `ozone-site.xml`:
 
 Finally restart all OzoneManagers to apply the new configs.
 
-Now you can follow the [Multi-Tenancy CLI command guide]({{< ref "interface/S3-Tenant.md" >}}) to try the commands. 
+Now you can follow the [Multi-Tenancy CLI command]({{< ref "feature/S3-Tenant-Commands.md" >}}) guide to try the commands. 
 
 
 ## Try in a Docker Compose cluster (For developers)

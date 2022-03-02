@@ -36,8 +36,7 @@ import java.io.IOException;
  * We might expand this to add more functionality in the future, and different
  * ObjectStore API(s) would be used by then.
  */
-@CommandLine.Command(name = "bucketlink",
-    aliases = {"linkbucket"},
+@CommandLine.Command(name = "linkbucket",
     description = "Create a symlink to another bucket")
 public class TenantBucketLinkHandler extends TenantHandler {
 

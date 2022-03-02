@@ -1,8 +1,9 @@
 ---
 title: "Tenant commands"
+weight: 3
 menu:
    main:
-      parent: "Command Line Interface"
+      parent: "S3 Multi-Tenancy"
 summary: Ozone subcommands for S3 tenant management
 ---
 <!---
@@ -225,7 +226,32 @@ VOLUME_IS_REFERENCED Volume reference count is not zero (1). Ozone features are 
 ```
 
 
-## Bonus: Accessing a bucket in a tenant volume via S3 Gateway using S3 API
+## Creating bucket links
+
+Bucket links can be used to allow access to buckets outside of the tenant volume.
+
+Bucket (sym)links are a special type of bucket that points to other buckets in the same Ozone cluster. It is similar to POSIX symbolic links.
+
+An example to create a bucket link:
+
+```shell
+$ ozone tenant linkbucket /vol1/bucket1 /tenantone/linked-bucket1
+```
+
+The command above creates a bucket symlink `linked-bucket1` in volume `tenantone`, which points to `bucket1` in `vol1`.
+
+As long as the user running this command has the permission to create a bucket in the target volume `tenantone`, the command will succeed.
+
+- The link bucket command itself does not check for permission to access the source volume and bucket.
+- The link bucket command will not even check if the source volume and bucket exists.
+- Permission check will be performed when the bucket symlink is actually accessed.
+  - In order to grant a user in tenant `tenantone` access the bucket, a new policy should be added by a Ranger admin that allow that user intended permissions (`READ, WRITE, LIST, CREATE, DELETE, ...`) to the source bucket `bucket1` in volume `vol1`.
+- At the moment, `ozone tenant linkbucket` command is equivalent to `ozone sh bucket link` command (see **Expose any volume** section in [S3 protocol]({{< ref "S3.md" >}})).
+
+
+## Example: Accessing a bucket in a tenant volume via S3 Gateway using S3 API
+
+Here is an example of accessing the bucket using AWS CLI in the Docker Compose cluster, with tenant `tenantone` created and `testuser` assigned to the tenant.
 
 ### Configure AWS CLI
 
@@ -259,8 +285,7 @@ bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-buckets
 }
 ```
 
-If aws cli reports `AccessDenied`, check if the user associated with the Access ID has the permission to access the volume.
-In the Docker Compose dev cluster, one workaround is to set the volume owner to `testuser` to gain full access (because `OzoneNativeAuthorizer` grants the volume owner all permission):
+In the Docker Compose cluster, the AWS CLI might report `AccessDenied` because it uses a mocked Ranger endpoint (which can't be used to perform authorization). A production Ranger setup uses [`RangerOzoneAuthorizer`](https://github.com/apache/ranger/blob/master/plugin-ozone/src/main/java/org/apache/ranger/authorization/ozone/authorizer/RangerOzoneAuthorizer.java) in OM for authorization while the `ozonesecure` Docker Compose cluster still uses `OzoneNativeAuthorizer`. So a workaround is to set the volume owner to `testuser` to gain full access, as `OzoneNativeAuthorizer` grants the volume owner full permission:
 
 ```shell
 ozone sh volume update tenantone --user=testuser
