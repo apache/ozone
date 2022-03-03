@@ -244,7 +244,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-        .setVersion(ClientVersion.latest().version())
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
         .setCreateVolumeRequest(CreateVolumeRequest.newBuilder().
             setVolumeInfo(VolumeInfo.newBuilder().setVolume(volumeName)
@@ -266,7 +266,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     // Read Request
     OMRequest readRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
-        .setVersion(ClientVersion.latest().version())
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
         .setInfoVolumeRequest(InfoVolumeRequest.newBuilder()
             .setVolumeName(volumeName).build())

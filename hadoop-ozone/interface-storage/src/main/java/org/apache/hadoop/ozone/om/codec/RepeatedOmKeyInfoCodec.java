@@ -46,8 +46,8 @@ public class RepeatedOmKeyInfoCodec implements Codec<RepeatedOmKeyInfo> {
       throws IOException {
     Preconditions.checkNotNull(object,
         "Null object can't be converted to byte array.");
-    return object.getProto(ignorePipeline,
-        ClientVersion.latest().version()).toByteArray();
+    return object.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION)
+        .toByteArray();
   }
 
   @Override

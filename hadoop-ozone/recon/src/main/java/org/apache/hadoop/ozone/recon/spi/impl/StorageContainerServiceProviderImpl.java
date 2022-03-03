@@ -147,7 +147,7 @@ public class StorageContainerServiceProviderImpl
   @Override
   public List<HddsProtos.Node> getNodes() throws IOException {
     return scmClient.queryNode(null, null, HddsProtos.QueryScope.CLUSTER,
-        "", ClientVersion.latest().version());
+        "", ClientVersion.CURRENT_VERSION);
   }
 
   @Override

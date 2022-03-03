@@ -238,14 +238,14 @@ public class DirectoryDeletingService extends BackgroundService {
     }
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
-          purgeFile.getProtobuf(true, ClientVersion.latest().version()));
+          purgeFile.getProtobuf(true, ClientVersion.CURRENT_VERSION));
     }
 
     // Add these directories to deletedDirTable, so that its sub-paths will be
     // traversed in next iteration to ensure cleanup all sub-children.
     for (OmKeyInfo dir : markDirsAsDeleted) {
       purgePathsRequest.addMarkDeletedSubDirs(
-          dir.getProtobuf(ClientVersion.latest().version()));
+          dir.getProtobuf(ClientVersion.CURRENT_VERSION));
     }
 
     OzoneManagerProtocolProtos.OMRequest omRequest =

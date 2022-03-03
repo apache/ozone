@@ -36,7 +36,7 @@ public class PipelineCodec implements Codec<Pipeline> {
   @Override
   public byte[] toPersistedFormat(Pipeline object) throws IOException {
     return object
-        .getProtobufMessage(ClientVersion.latest().version()).toByteArray();
+        .getProtobufMessage(ClientVersion.CURRENT_VERSION).toByteArray();
   }
 
   @Override

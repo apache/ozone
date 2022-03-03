@@ -226,7 +226,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
-      datanodeDetails.setCurrentVersion(DatanodeVersion.latest().version());
+      datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -461,8 +461,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // is started.
       DatanodeDetails details = DatanodeDetails.newBuilder()
           .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersion.latest().version());
-      details.setCurrentVersion(DatanodeVersion.latest().version());
+      details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
+      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       return details;
     }
   }

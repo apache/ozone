@@ -68,7 +68,7 @@ public final class MockPipelineManager implements PipelineManager {
         .build();
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.latest().version()));
+        ClientVersion.CURRENT_VERSION));
     return pipeline;
   }
 

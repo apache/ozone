@@ -164,7 +164,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
     acquireWriteLock();
     try {
       getStateManager().addPipeline(
-          pipeline.getProtobufMessage(ClientVersion.latest().version()));
+          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
     } finally {
       releaseWriteLock();
     }

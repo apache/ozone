@@ -53,8 +53,8 @@ public class OmKeyInfoCodec implements Codec<OmKeyInfo> {
   public byte[] toPersistedFormat(OmKeyInfo object) throws IOException {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.getProtobuf(ignorePipeline,
-        ClientVersion.latest().version()).toByteArray();
+    return object.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION)
+        .toByteArray();
   }
 
   @Override

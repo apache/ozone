@@ -373,7 +373,7 @@ public class DatanodeDetails extends NodeImpl implements
    */
   @JsonIgnore
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(ClientVersion.latest().version());
+    return toProto(ClientVersion.CURRENT_VERSION);
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
@@ -545,7 +545,7 @@ public class DatanodeDetails extends NodeImpl implements
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
-    private int currentVersion = DatanodeVersion.latest().version();
+    private int currentVersion = ClientVersion.CURRENT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use

@@ -155,7 +155,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     try {
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
-          .setVersion(ClientVersion.latest().version())
+          .setVersion(ClientVersion.CURRENT_VERSION)
           .setTraceID(TracingUtil.exportCurrentSpan());
       builderConsumer.accept(builder);
       ScmContainerLocationRequest wrapper = builder.build();

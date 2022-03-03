@@ -125,14 +125,14 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(RatisReplicationConfig
         .getInstance(factor));
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
@@ -177,7 +177,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
 
     factor = HddsProtos.ReplicationFactor.ONE;
@@ -186,7 +186,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
@@ -264,7 +264,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
 
@@ -326,7 +326,7 @@ public class TestRatisPipelineProvider {
         .setId(PipelineID.randomId())
         .build();
     HddsProtos.Pipeline pipelineProto = openPipeline.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);

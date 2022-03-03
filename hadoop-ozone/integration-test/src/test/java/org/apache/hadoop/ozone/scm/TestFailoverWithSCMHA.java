@@ -164,7 +164,7 @@ public class TestFailoverWithSCMHA {
     //just mock them bypassing all the pre checks.
     scm.getReplicationManager().getMoveScheduler().startMove(id.getProtobuf(),
         (new MoveDataNodePair(dn1, dn2))
-            .getProtobufMessage(ClientVersion.latest().version()));
+            .getProtobufMessage(ClientVersion.CURRENT_VERSION));
 
     SCMBlockLocationFailoverProxyProvider failoverProxyProvider =
         new SCMBlockLocationFailoverProxyProvider(conf);

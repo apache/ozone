@@ -893,7 +893,7 @@ public class ReplicationManager implements SCMService {
 
       try {
         moveScheduler.startMove(cid.getProtobuf(),
-            mp.getProtobufMessage(ClientVersion.latest().version()));
+            mp.getProtobufMessage(ClientVersion.CURRENT_VERSION));
       } catch (IOException e) {
         LOG.warn("Exception while starting move {}", cid);
         ret.complete(MoveResult.FAIL_CAN_NOT_RECORD_TO_DB);

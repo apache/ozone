@@ -34,7 +34,7 @@ public class MoveDataNodePairCodec implements Codec<MoveDataNodePair> {
   public byte[] toPersistedFormat(MoveDataNodePair mdnp)
       throws IOException {
     return mdnp
-        .getProtobufMessage(ClientVersion.latest().version()).toByteArray();
+        .getProtobufMessage(ClientVersion.CURRENT_VERSION).toByteArray();
   }
 
   @Override

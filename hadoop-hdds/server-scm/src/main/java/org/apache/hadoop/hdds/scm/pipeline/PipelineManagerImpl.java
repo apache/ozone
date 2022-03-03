@@ -169,7 +169,7 @@ public class PipelineManagerImpl implements PipelineManager {
     try {
       Pipeline pipeline = pipelineFactory.create(replicationConfig);
       stateManager.addPipeline(pipeline.getProtobufMessage(
-          ClientVersion.latest().version()));
+          ClientVersion.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {

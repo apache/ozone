@@ -223,7 +223,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(ClientVersion.latest().version())
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(clientID);
   }
 
@@ -707,7 +707,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
-            .map(info -> info.getProtobuf(ClientVersion.latest().version()))
+            .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
             .collect(Collectors.toList()));
 
     if (args.getReplicationConfig() != null) {
@@ -988,7 +988,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(omKeyArgs.getDataSize())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
-            .map(info -> info.getProtobuf(ClientVersion.latest().version()))
+            .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
             .collect(Collectors.toList()));
     multipartCommitUploadPartRequest.setClientID(clientId);
     multipartCommitUploadPartRequest.setKeyArgs(keyArgs.build());

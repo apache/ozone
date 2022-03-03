@@ -95,7 +95,7 @@ public class TestOmLDBCli {
       String key = "key" + (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
       byte[] arr = value
-          .getProtobuf(ClientVersion.latest().version()).toByteArray();
+          .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
       keyTable.put(key.getBytes(UTF_8), arr);
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());

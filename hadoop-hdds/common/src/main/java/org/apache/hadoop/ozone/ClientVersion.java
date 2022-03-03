@@ -29,6 +29,9 @@ public enum ClientVersion {
   VERSION_HANDLES_UNKNOWN_DN_PORTS(1,
       "Client version that handles the REPLICATION port in DatanodeDetails.");
 
+  public static final ClientVersion CURRENT = latest();
+  public static final int CURRENT_VERSION = CURRENT.version;
+
   private final int version;
   private final String description;
 
@@ -45,7 +48,7 @@ public enum ClientVersion {
     return description;
   }
 
-  public static ClientVersion latest() {
+  private static ClientVersion latest() {
     ClientVersion[] versions = ClientVersion.values();
     return versions[versions.length - 1];
   }

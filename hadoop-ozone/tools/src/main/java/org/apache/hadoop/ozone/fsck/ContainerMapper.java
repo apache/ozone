@@ -96,7 +96,7 @@ public class ContainerMapper {
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
             byte[] value = omKeyInfo
-                .getProtobuf(true, ClientVersion.latest().version())
+                .getProtobuf(true, ClientVersion.CURRENT_VERSION)
                 .toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));

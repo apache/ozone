@@ -103,7 +103,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   private SCMBlockLocationRequest.Builder createSCMBlockRequest(Type cmdType) {
     return SCMBlockLocationRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(ClientVersion.latest().version())
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setTraceID(TracingUtil.exportCurrentSpan());
   }
 

@@ -276,7 +276,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName, ClientVersion.latest().version());
+        queryScope, poolName, ClientVersion.CURRENT_VERSION);
   }
 
   @Override

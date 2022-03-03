@@ -92,7 +92,7 @@ public class TestSimplePipelineProvider {
     Pipeline pipeline =
         provider.create(StandaloneReplicationConfig.getInstance(factor));
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
@@ -106,7 +106,7 @@ public class TestSimplePipelineProvider {
     Pipeline pipeline1 =
         provider.create(StandaloneReplicationConfig.getInstance(factor));
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.latest().version());
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto1);
     Assert.assertEquals(pipeline1.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);

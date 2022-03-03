@@ -289,7 +289,7 @@ public class TestPipelinePlacementPolicy {
             .setNodes(nodes)
             .build();
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-            ClientVersion.latest().version());
+            ClientVersion.CURRENT_VERSION);
         nodeManager.addPipeline(pipeline);
         stateManager.addPipeline(pipelineProto);
       } catch (SCMException e) {

@@ -26,6 +26,9 @@ public enum DatanodeVersion {
 
   SEPARATE_RATIS_PORTS_AVAILABLE(1, "Version with separated Ratis port.");
 
+  public static final DatanodeVersion CURRENT = latest();
+  public static final int CURRENT_VERSION = CURRENT.version;
+
   private final int version;
   private final String description;
 
@@ -42,7 +45,7 @@ public enum DatanodeVersion {
     return description;
   }
 
-  public static DatanodeVersion latest() {
+  private static DatanodeVersion latest() {
     DatanodeVersion[] versions = DatanodeVersion.values();
     return versions[versions.length - 1];
   }

@@ -59,7 +59,7 @@ public class TestOmKeyInfo {
         .build();
 
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
-        key.getProtobuf(ClientVersion.latest().version()));
+        key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
     Assert.assertEquals(key, keyAfterSerialization);
   }
