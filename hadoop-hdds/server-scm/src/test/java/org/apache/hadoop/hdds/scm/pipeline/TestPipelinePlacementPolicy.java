@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -51,7 +52,6 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
-import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -70,6 +70,10 @@ import java.io.IOException;
 
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -426,7 +430,8 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
-  public void testHeavyNodeShouldBeExcluded() throws SCMException {
+  public void testHeavyNodeShouldBeExcludedWithMinorityHeavy()
+      throws IOException {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
@@ -443,6 +448,31 @@ public class TestPipelinePlacementPolicy {
     // make sure pipeline placement policy won't select duplicated NODES.
     Assert.assertTrue(checkDuplicateNodesUUID(pickedNodes1));
 
+    // majority of healthy NODES are heavily engaged in pipelines.
+    int majorityHeavy = healthyNodes.size() / 2 + 2;
+    insertHeavyNodesIntoNodeManager(healthyNodes, majorityHeavy);
+    boolean thrown = false;
+    List<DatanodeDetails> pickedNodes2 = null;
+    try {
+      pickedNodes2 = placementPolicy.chooseDatanodes(
+          new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
+          new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
+          nodesRequired, 0, 0);
+    } catch (SCMException e) {
+      Assert.assertFalse(thrown);
+      thrown = true;
+    }
+    // NODES should NOT be sufficient and exception should be thrown.
+    Assert.assertNull(pickedNodes2);
+    Assert.assertTrue(thrown);
+  }
+
+  @Test
+  public void testHeavyNodeShouldBeExcludedWithMajorityHeavy()
+      throws IOException {
+    List<DatanodeDetails> healthyNodes =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
     // majority of healthy NODES are heavily engaged in pipelines.
     int majorityHeavy = healthyNodes.size() / 2 + 2;
     insertHeavyNodesIntoNodeManager(healthyNodes, majorityHeavy);
@@ -628,7 +658,7 @@ public class TestPipelinePlacementPolicy {
   }
 
   private void insertHeavyNodesIntoNodeManager(
-      List<DatanodeDetails> nodes, int heavyNodeCount) throws SCMException {
+      List<DatanodeDetails> nodes, int heavyNodeCount) throws IOException {
     if (nodes == null) {
       throw new SCMException("",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -639,17 +669,106 @@ public class TestPipelinePlacementPolicy {
             ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
             ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) + 1;
 
-    Node2PipelineMap mockMap = new Node2PipelineMap();
     for (DatanodeDetails node : nodes) {
-      // mock heavy node
       if (heavyNodeCount > 0) {
-        mockMap.insertNewDatanode(
-            node.getUuid(), mockPipelineIDs(considerHeavyCount));
+        int pipelineCount = 0;
+        List<DatanodeDetails> dnList = new ArrayList<>();
+        dnList.add(node);
+        dnList.add(MockDatanodeDetails.randomDatanodeDetails());
+        dnList.add(MockDatanodeDetails.randomDatanodeDetails());
+        Pipeline pipeline;
+        HddsProtos.Pipeline pipelineProto;
+
+        while (pipelineCount < considerHeavyCount) {
+          pipeline = Pipeline.newBuilder()
+              .setId(PipelineID.randomId())
+              .setState(Pipeline.PipelineState.OPEN)
+              .setReplicationConfig(ReplicationConfig
+                  .fromProtoTypeAndFactor(RATIS, THREE))
+              .setNodes(dnList)
+              .build();
+
+          pipelineProto = pipeline.getProtobufMessage(
+              ClientVersions.CURRENT_VERSION);
+          nodeManager.addPipeline(pipeline);
+          stateManager.addPipeline(pipelineProto);
+          pipelineCount++;
+        }
         heavyNodeCount--;
-      } else {
-        mockMap.insertNewDatanode(node.getUuid(), mockPipelineIDs(1));
       }
     }
-    nodeManager.setNode2PipelineMap(mockMap);
+  }
+
+  @Test
+  public void testCurrentRatisThreePipelineCountWith2RatisThreePipeline()
+      throws IOException {
+    List<DatanodeDetails> healthyNodes = nodeManager
+        .getNodes(NodeStatus.inServiceHealthy());
+    int pipelineCount;
+
+    List<DatanodeDetails> standaloneOneDn = new ArrayList<>();
+    standaloneOneDn.add(healthyNodes.get(0));
+    createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
+
+    pipelineCount
+        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(0));
+    assertEquals(pipelineCount, 0);
+
+    List<DatanodeDetails> ratisOneDn = new ArrayList<>();
+    ratisOneDn.add(healthyNodes.get(1));
+    createPipelineWithReplicationConfig(ratisOneDn, RATIS, ONE);
+
+    pipelineCount
+        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+    assertEquals(pipelineCount, 0);
+
+    List<DatanodeDetails> ratisThreeDn = new ArrayList<>();
+    ratisThreeDn.add(healthyNodes.get(2));
+    ratisThreeDn.add(healthyNodes.get(3));
+    ratisThreeDn.add(healthyNodes.get(4));
+    createPipelineWithReplicationConfig(ratisThreeDn, RATIS, THREE);
+
+    pipelineCount
+        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(2));
+    assertEquals(pipelineCount, 1);
+
+    standaloneOneDn = new ArrayList<>();
+    standaloneOneDn.add(healthyNodes.get(1));
+    createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
+
+    pipelineCount
+        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+    assertEquals(pipelineCount, 0);
+
+    ratisThreeDn = new ArrayList<>();
+    ratisThreeDn.add(healthyNodes.get(1));
+    ratisThreeDn.add(healthyNodes.get(3));
+    ratisThreeDn.add(healthyNodes.get(4));
+    createPipelineWithReplicationConfig(ratisThreeDn, RATIS, THREE);
+    createPipelineWithReplicationConfig(ratisThreeDn, RATIS, THREE);
+
+    pipelineCount
+        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+    assertEquals(pipelineCount, 2);
+  }
+
+  private void createPipelineWithReplicationConfig(List<DatanodeDetails> dnList,
+                                                   HddsProtos.ReplicationType
+                                                       replicationType,
+                                                   ReplicationFactor
+                                                       replicationFactor)
+      throws IOException {
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(Pipeline.PipelineState.OPEN)
+        .setReplicationConfig(ReplicationConfig
+            .fromProtoTypeAndFactor(replicationType, replicationFactor))
+        .setNodes(dnList)
+        .build();
+
+    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+        ClientVersions.CURRENT_VERSION);
+    nodeManager.addPipeline(pipeline);
+    stateManager.addPipeline(pipelineProto);
   }
 }
