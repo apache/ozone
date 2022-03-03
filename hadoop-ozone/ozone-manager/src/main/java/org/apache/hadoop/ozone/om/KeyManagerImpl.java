@@ -1295,18 +1295,21 @@ public class KeyManagerImpl implements KeyManager {
 
     if (fileStatus != null) {
       // if the key is a file then do refresh pipeline info in OM by asking SCM
-      if (fileStatus.isFile() && !args.isHeadOp()) {
+      if (fileStatus.isFile()) {
         OmKeyInfo fileKeyInfo = fileStatus.getKeyInfo();
         if (args.getLatestVersionLocation()) {
           slimLocationVersion(fileKeyInfo);
         }
-        // refreshPipeline flag check has been removed as part of
-        // https://issues.apache.org/jira/browse/HDDS-3658.
-        // Please refer this jira for more details.
-        refresh(fileKeyInfo);
 
-        if (args.getSortDatanodes()) {
-          sortDatanodes(clientAddress, fileKeyInfo);
+        if (!args.isHeadOp()) {
+          // refreshPipeline flag check has been removed as part of
+          // https://issues.apache.org/jira/browse/HDDS-3658.
+          // Please refer this jira for more details.
+          refresh(fileKeyInfo);
+
+          if (args.getSortDatanodes()) {
+            sortDatanodes(clientAddress, fileKeyInfo);
+          }
         }
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       } else {
