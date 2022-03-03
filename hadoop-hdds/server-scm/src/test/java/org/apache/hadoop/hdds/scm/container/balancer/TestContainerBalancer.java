@@ -54,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -225,15 +226,12 @@ public class TestContainerBalancer {
     balancerConfiguration.setThreshold(99.99);
     containerBalancer.start(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(100);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(100);
 
     containerBalancer.stop();
+    ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
     Assert.assertEquals(0, containerBalancer.getUnBalancedNodes().size());
+    Assert.assertEquals(0, metrics.getNumDatanodesUnbalanced());
   }
 
   /**
@@ -250,16 +248,15 @@ public class TestContainerBalancer {
     balancerConfiguration.setIterations(1);
     containerBalancer.start(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
+    int number = percent * numberOfNodes / 100;
+    ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
     Assert.assertFalse(
-        containerBalancer.getCountDatanodesInvolvedPerIteration() >
-            (percent * numberOfNodes / 100));
+        containerBalancer.getCountDatanodesInvolvedPerIteration() > number);
+    Assert.assertTrue(metrics.getNumDatanodesInvolvedInLatestIteration() > 0);
+    Assert.assertFalse(
+        metrics.getNumDatanodesInvolvedInLatestIteration() > number);
     containerBalancer.stop();
   }
 
@@ -316,16 +313,16 @@ public class TestContainerBalancer {
     balancerConfiguration.setIterations(1);
     containerBalancer.start(balancerConfiguration);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
+    sleepWhileBalancing(500);
 
     // balancer should not have moved more size than the limit
     Assert.assertFalse(containerBalancer.getSizeMovedPerIteration() >
         10 * OzoneConsts.GB);
+
+    long size =
+        containerBalancer.getMetrics().getDataSizeMovedGBInLatestIteration();
+    Assert.assertTrue(size > 0);
+    Assert.assertFalse(size > 10);
     containerBalancer.stop();
   }
 
@@ -511,29 +508,25 @@ public class TestContainerBalancer {
 
   @Test
   public void testMetrics() {
+    conf.set("hdds.datanode.du.refresh.period", "1ms");
+    balancerConfiguration.setBalancingInterval(Duration.ofMillis(2));
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(6 * OzoneConsts.GB);
+    // deliberately set max size per iteration to a low value, 6GB
+    balancerConfiguration.setMaxSizeToMovePerIteration(6 * OzoneConsts.GB);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     containerBalancer.start(balancerConfiguration);
+    sleepWhileBalancing(500);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(500);
-    } catch (InterruptedException e) { }
-
-    containerBalancer.stop();
     ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
     Assert.assertEquals(determineExpectedUnBalancedNodes(
             balancerConfiguration.getThreshold()).size(),
-        metrics.getDatanodesNumToBalance());
-    Assert.assertEquals(ContainerBalancer.ratioToPercent(
-            nodeUtilizations.get(nodeUtilizations.size() - 1)),
-        metrics.getMaxDatanodeUtilizedPercentage());
+        metrics.getNumDatanodesUnbalanced());
+    Assert.assertTrue(metrics.getDataSizeMovedGBInLatestIteration() <= 6);
+    Assert.assertEquals(1, metrics.getNumIterations());
+    containerBalancer.stop();
   }
 
   /**
