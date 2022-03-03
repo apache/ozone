@@ -168,6 +168,28 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return pipelineID;
   }
 
+  /**
+   * Returns the usedBytes for the container. The value returned is derived
+   * from the replicas reported from the datanodes for the container.
+   *
+   * The size of a container can change over time. For an open container we
+   * assume the size of the container will grow, and hence the value will be
+   * the maximum of the values reported from its replicas.
+   *
+   * A closed container can only reduce in size as its blocks are removed. For
+   * a closed container, the value will be the minimum of the values reported
+   * from its replicas.
+   *
+   * An EC container, is made from a group data and parity containers where the
+   * first data and all parity containers should be the same size. The other
+   * data containers can be smaller or the same size. When calculating the EC
+   * container size, we use the min / max of the first data and parity
+   * containers,ignoring the others. For EC containers, this value actually
+   * represents the size of the largest container in the container group, rather
+   * than the total space used by all containers in the group.
+   *
+   * @return bytes used in the container.
+   */
   public long getUsedBytes() {
     return usedBytes;
   }
