@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 
 /**
  * Container balancer is a service in SCM to move containers between over- and
@@ -108,35 +112,24 @@ public class ContainerBalancer {
    * new ContainerBalancerConfiguration and ContainerBalancerMetrics.
    * Container Balancer does not start on construction.
    *
-   * @param nodeManager        NodeManager
-   * @param containerManager   ContainerManager
-   * @param replicationManager ReplicationManager
-   * @param ozoneConfiguration OzoneConfiguration
+   * @param scm the storage container manager
    */
-  public ContainerBalancer(
-      NodeManager nodeManager,
-      ContainerManager containerManager,
-      ReplicationManager replicationManager,
-      OzoneConfiguration ozoneConfiguration,
-      final SCMContext scmContext,
-      NetworkTopology networkTopology,
-      PlacementPolicy placementPolicy) {
-    this.nodeManager = nodeManager;
-    this.containerManager = containerManager;
-    this.replicationManager = replicationManager;
-    this.ozoneConfiguration = ozoneConfiguration;
-    this.config = ozoneConfiguration.
-        getObject(ContainerBalancerConfiguration.class);
+  public ContainerBalancer(StorageContainerManager scm) {
+    this.nodeManager = scm.getScmNodeManager();
+    this.containerManager = scm.getContainerManager();
+    this.replicationManager = scm.getReplicationManager();
+    this.ozoneConfiguration = scm.getConfiguration();
+    this.config = ozoneConfiguration.getObject(
+        ContainerBalancerConfiguration.class);
     this.metrics = ContainerBalancerMetrics.create();
-    this.scmContext = scmContext;
-
+    this.scmContext = scm.getScmContext();
     this.selectedContainers = new HashSet<>();
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
     this.unBalancedNodes = new ArrayList<>();
-    this.placementPolicy = placementPolicy;
-    this.networkTopology = networkTopology;
+    this.placementPolicy = scm.getContainerPlacementPolicy();
+    this.networkTopology = scm.getClusterMap();
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
@@ -184,7 +177,37 @@ public class ContainerBalancer {
       //run balancer infinitely
       this.iterations = Integer.MAX_VALUE;
     }
+
     for (int i = 0; i < iterations && balancerRunning; i++) {
+      if (config.getTriggerDuEnable()) {
+        // before starting a new iteration, we trigger all the datanode
+        // to run `du`. this is an aggressive action, with which we can
+        // get more precise usage info of all datanodes before moving.
+        // this is helpful for container balancer to make more appropriate
+        // decisions. this will increase the disk io load of data nodes, so
+        // please enable it with caution.
+        nodeManager.refreshAllHealthyDnUsageInfo();
+        synchronized (this) {
+          try {
+            long nodeReportInterval =
+                ozoneConfiguration.getTimeDuration(HDDS_NODE_REPORT_INTERVAL,
+                HDDS_NODE_REPORT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+            // one for sending command , one for running du, and one for
+            // reporting back make it like this for now, a more suitable
+            // value. can be set in the future if needed
+            wait(3 * nodeReportInterval);
+          } catch (InterruptedException e) {
+            LOG.info("Container Balancer was interrupted while waiting for" +
+                "datanodes refreshing volume usage info");
+            Thread.currentThread().interrupt();
+            return;
+          }
+        }
+        if (!isBalancerRunning()) {
+          return;
+        }
+      }
+
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
         stop();
