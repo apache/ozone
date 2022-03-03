@@ -54,12 +54,12 @@ public final class S3Utils {
    * This API used to resolve the client side configuration preference for file
    * system layer implementations.
    *
-   * @param s3StorageTypeHeader                - s3 user passed storage type
-   *                                          header.
+   * @param s3StorageTypeHeader        - s3 user passed storage type
+   *                                   header.
    * @param clientConfiguredReplConfig - Client side configured replication
    *                                   config.
    * @param bucketReplConfig           - server side bucket default replication
-   *                                  config.
+   *                                   config.
    * @return client resolved replication config.
    */
   public static ReplicationConfig resolveS3ClientSideReplicationConfig(
@@ -80,7 +80,7 @@ public final class S3Utils {
 
     // if bucket replication config configured with EC, we will give high
     // preference to server side bucket defaults.
-    // Why we give high prefernce to EC is, there is no way for file system
+    // Why we give high preference to EC is, there is no way for file system
     // interfaces to pass EC replication. So, if one configures EC at bucket,
     // we consider EC to take preference. in short, keys created from file
     // system under EC bucket will always be EC'd.
