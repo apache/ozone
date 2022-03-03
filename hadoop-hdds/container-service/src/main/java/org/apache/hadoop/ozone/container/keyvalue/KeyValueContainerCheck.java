@@ -230,13 +230,13 @@ public class KeyValueContainerCheck {
 
     ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
 
-    try(ReferenceCountedDB db =
+    try (ReferenceCountedDB db =
             BlockUtils.getDB(onDiskContainerData, checkConfig);
         BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
 
-      while(kvIter.hasNext()) {
+      while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
-        for(ContainerProtos.ChunkInfo chunk : block.getChunks()) {
+        for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
           File chunkFile = layout.getChunkFile(onDiskContainerData,
               block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
 

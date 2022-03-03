@@ -319,6 +319,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volumeName);
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
+    auditMap.put(OzoneConsts.BUCKET_LAYOUT, String.valueOf(this.bucketLayout));
     auditMap.put(OzoneConsts.GDPR_FLAG,
         this.metadata.get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.ACLS,

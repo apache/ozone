@@ -84,6 +84,13 @@ public interface ContainerManager extends Closeable {
   List<ContainerInfo> getContainers(LifeCycleState state);
 
   /**
+   * Returns the size of containers which are in the specified state.
+   *
+   * @return size of containers.
+   */
+  int getContainerStateCount(LifeCycleState state);
+
+  /**
    * Returns true if the container exist, false otherwise.
    * @param id Container ID
    * @return true if container exist, else false

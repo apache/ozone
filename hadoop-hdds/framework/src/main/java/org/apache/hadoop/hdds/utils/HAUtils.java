@@ -419,7 +419,7 @@ public final class HAUtils {
           return getCAListWithRetry(() -> waitForCACerts(
               scmSecurityProtocolClient::listCACertificate,
               expectedCount), waitDuration);
-        } else{
+        } else {
           return scmSecurityProtocolClient.listCACertificate();
         }
       }

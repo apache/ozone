@@ -103,7 +103,7 @@ public class TestBlockManager {
   public ExpectedException thrown = ExpectedException.none();
 
   @Rule
-  public TemporaryFolder folder= new TemporaryFolder();
+  public TemporaryFolder folder = new TemporaryFolder();
   private SCMMetadataStore scmMetadataStore;
   private ReplicationConfig replicationConfig;
 
@@ -452,7 +452,7 @@ public class TestBlockManager {
       // the pipeline per raft log disk config is set to 1 by default
       int numContainers = (int)Math.ceil((double)
               (numContainerPerOwnerInPipeline *
-                  numContainerPerOwnerInPipeline)/numMetaDataVolumes);
+                  numContainerPerOwnerInPipeline) / numMetaDataVolumes);
       Assert.assertTrue(numContainers == pipelineManager.
           getNumberOfContainers(pipeline.getId()));
       Assert.assertTrue(

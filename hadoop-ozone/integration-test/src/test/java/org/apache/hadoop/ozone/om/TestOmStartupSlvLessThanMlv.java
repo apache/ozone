@@ -70,7 +70,7 @@ public class TestOmStartupSlvLessThanMlv {
     try {
       clusterBuilder.build();
       Assert.fail("Expected OMException due to incorrect MLV on OM creation.");
-    } catch(OMException e) {
+    } catch (OMException e) {
       String expectedMessage = String.format("Cannot initialize " +
               "VersionManager. Metadata layout version (%s) > software layout" +
               " version (%s)", mlv, largestSlv);

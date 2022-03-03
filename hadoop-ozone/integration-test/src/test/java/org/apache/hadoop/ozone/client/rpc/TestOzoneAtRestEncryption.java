@@ -178,7 +178,7 @@ public class TestOzoneAtRestEncryption {
    */
   @AfterClass
   public static void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
@@ -251,7 +251,7 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try(OzoneInputStream is = bucket.readKey(keyName)) {
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
@@ -267,7 +267,7 @@ public class TestOzoneAtRestEncryption {
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
-      String bucketName) throws Exception{
+      String bucketName) throws Exception {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
@@ -333,7 +333,7 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try(OzoneInputStream is = bucket.readKey(keyName)) {
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
@@ -475,8 +475,9 @@ public class TestOzoneAtRestEncryption {
       // Adding a random int with a cap at 8K (the default crypto buffer
       // size) to get parts whose last byte does not coincide with crypto
       // buffer boundary.
-      byte[] data = generateRandomData((MPU_PART_MIN_SIZE * i) +
-          RANDOM.nextInt(DEFAULT_CRYPTO_BUFFER_SIZE));
+      int partSize = (MPU_PART_MIN_SIZE * i) +
+          RANDOM.nextInt(DEFAULT_CRYPTO_BUFFER_SIZE - 1) + 1;
+      byte[] data = generateRandomData(partSize);
       String partName = uploadPart(bucket, keyName, uploadID, i, data);
       partsMap.put(i, partName);
       partsData.add(data);
@@ -495,10 +496,20 @@ public class TestOzoneAtRestEncryption {
     // Complete MPU
     completeMultipartUpload(bucket, keyName, uploadID, partsMap);
 
+    // Create an input stream to read the data
+    OzoneInputStream inputStream = bucket.readKey(keyName);
+    Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
+
+    // Test complete read
+    byte[] completeRead = new byte[keySize];
+    int bytesRead = inputStream.read(completeRead, 0, keySize);
+    Assert.assertEquals(bytesRead, keySize);
+    Assert.assertArrayEquals(inputData, completeRead);
+
     // Read different data lengths and starting from different offsets and
     // verify the data matches.
     Random random = new Random();
-    int randomSize = random.nextInt(keySize/2);
+    int randomSize = random.nextInt(keySize / 2);
     int randomOffset = random.nextInt(keySize - randomSize);
 
     int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
@@ -510,12 +521,6 @@ public class TestOzoneAtRestEncryption {
         BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
         keySize - 1, randomOffset};
 
-    // Create an input stream to read the data
-    OzoneInputStream inputStream = bucket.readKey(keyName);
-    Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
-    MultipartCryptoKeyInputStream cryptoInputStream =
-        (MultipartCryptoKeyInputStream) inputStream;
-
     for (int readDataLen : readDataSizes) {
       for (int readFromPosition : readFromPositions) {
         // Check that offset + buffer size does not exceed the key size
@@ -524,10 +529,13 @@ public class TestOzoneAtRestEncryption {
         }
 
         byte[] readData = new byte[readDataLen];
-        cryptoInputStream.seek(readFromPosition);
-        inputStream.read(readData, 0, readDataLen);
+        inputStream.seek(readFromPosition);
+        int actualReadLen = inputStream.read(readData, 0, readDataLen);
 
         assertReadContent(inputData, readData, readFromPosition);
+        Assert.assertEquals(readFromPosition + readDataLen,
+            inputStream.getPos());
+        Assert.assertEquals(readDataLen, actualReadLen);
       }
     }
   }

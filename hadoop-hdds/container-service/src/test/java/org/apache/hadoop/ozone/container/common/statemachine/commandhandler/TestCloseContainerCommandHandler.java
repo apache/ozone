@@ -214,7 +214,7 @@ public class TestCloseContainerCommandHandler {
     } catch (IOException e) {
 
       GenericTestUtils.assertExceptionContains("The Container " +
-                      "is not found. ContainerID: "+containerID, e);
+                      "is not found. ContainerID: " + containerID, e);
     }
   }
 
@@ -227,7 +227,7 @@ public class TestCloseContainerCommandHandler {
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("The Container is in " +
               "the MissingContainerSet hence we can't close it. " +
-              "ContainerID: "+containerID, e);
+              "ContainerID: " + containerID, e);
     }
   }
 

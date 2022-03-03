@@ -157,7 +157,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(300);;
+  public Timeout globalTimeout = Timeout.seconds(300);
 
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
@@ -191,7 +191,7 @@ public class TestRootedOzoneFileSystem {
     conf = new OzoneConfiguration();
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
-    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL/2);
+    conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     if (isBucketFSOptimized) {
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -546,7 +546,7 @@ public class TestRootedOzoneFileSystem {
     Path root = new Path("/" + volumeName + "/" + bucketName);
     Set<String> paths = new TreeSet<>();
     int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
-    for(int i = 0; i < numDirs; i++) {
+    for (int i = 0; i < numDirs; i++) {
       Path p = new Path(root, String.valueOf(i));
       fs.mkdirs(p);
       paths.add(p.getName());
@@ -557,12 +557,12 @@ public class TestRootedOzoneFileSystem {
         "Total directories listed do not match the existing directories",
         numDirs, fileStatuses.length);
 
-    for (int i=0; i < numDirs; i++) {
+    for (int i = 0; i < numDirs; i++) {
       Assert.assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
     }
 
     // Cleanup
-    for(int i = 0; i < numDirs; i++) {
+    for (int i = 0; i < numDirs; i++) {
       Path p = new Path(root, String.valueOf(i));
       fs.delete(p, true);
     }
@@ -1362,7 +1362,7 @@ public class TestRootedOzoneFileSystem {
 
 
     // Wait until the TrashEmptier purges the keys
-    GenericTestUtils.waitFor(()-> {
+    GenericTestUtils.waitFor(() -> {
       try {
         return !ofs.exists(trashPath) && !ofs.exists(trashPath2);
       } catch (IOException e) {
@@ -1372,7 +1372,7 @@ public class TestRootedOzoneFileSystem {
       }
     }, 1000, 180000);
 
-    if (isBucketFSOptimized){
+    if (isBucketFSOptimized) {
       Assert.assertTrue(getOMMetrics()
           .getNumTrashAtomicDirRenames() > prevNumTrashAtomicDirRenames);
     } else {
@@ -1385,10 +1385,10 @@ public class TestRootedOzoneFileSystem {
     }
 
     // wait for deletion of checkpoint dir
-    GenericTestUtils.waitFor(()-> {
+    GenericTestUtils.waitFor(() -> {
       try {
-        return ofs.listStatus(userTrash).length==0 &&
-            ofs.listStatus(userTrash2).length==0;
+        return ofs.listStatus(userTrash).length == 0 &&
+            ofs.listStatus(userTrash2).length == 0;
       } catch (IOException e) {
         LOG.error("Delete from Trash Failed", e);
         Assert.fail("Delete from Trash Failed");
@@ -1397,7 +1397,7 @@ public class TestRootedOzoneFileSystem {
     }, 1000, 120000);
 
     // This condition should succeed once the checkpoint directory is deleted
-    if(isBucketFSOptimized){
+    if (isBucketFSOptimized) {
       GenericTestUtils.waitFor(
           () -> getOMMetrics().getNumTrashAtomicDirDeletes() >
               prevNumTrashAtomicDirDeletes, 100, 180000);
@@ -1444,7 +1444,7 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testRenameFile() throws Exception {
     final String dir = "/dir" + new Random().nextInt(1000);
-    Path dirPath = new Path(getBucketPath() +dir);
+    Path dirPath = new Path(getBucketPath() + dir);
     getFs().mkdirs(dirPath);
 
     Path file1Source = new Path(getBucketPath() + dir
@@ -1466,7 +1466,7 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testRenameFileToDir() throws Exception {
     final String dir = "/dir" + new Random().nextInt(1000);
-    Path dirPath = new Path(getBucketPath() +dir);
+    Path dirPath = new Path(getBucketPath() + dir);
     getFs().mkdirs(dirPath);
 
     Path file1Destin = new Path(getBucketPath() + dir  + "/file1");
@@ -1531,11 +1531,11 @@ public class TestRootedOzoneFileSystem {
     final Path sourceRoot = new Path(getBucketPath() + root);
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
     //  rename should fail and return false
-    try{
+    try {
       getFs().rename(sourceRoot, subDir1);
       fail("Should throw exception : Cannot rename a directory to" +
           " its own subdirectory");
-    } catch (IllegalArgumentException e){
+    } catch (IllegalArgumentException e) {
       //expected
     }
   }
@@ -1560,7 +1560,7 @@ public class TestRootedOzoneFileSystem {
     try {
       getFs().rename(dir2SourcePath, destinPath);
       fail("Should fail as parent of dst does not exist!");
-    } catch (FileNotFoundException fnfe){
+    } catch (FileNotFoundException fnfe) {
       //expected
     }
     // (b) parent of dst is a file. /root_dir/file1/c
@@ -1568,10 +1568,10 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(getFs(), filePath);
     Path newDestinPath = new Path(filePath, "c");
     // rename shouldthrow exception
-    try{
+    try {
       getFs().rename(dir2SourcePath, newDestinPath);
       fail("Should fail as parent of dst is a file!");
-    } catch (IOException e){
+    } catch (IOException e) {
       //expected
     }
   }

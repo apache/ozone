@@ -264,6 +264,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           dbUpdatesWrapper.getData().get(i)));
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
+    builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
     return builder.build();
   }
 

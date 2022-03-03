@@ -278,7 +278,7 @@ public class TestOmMetadataManager {
     // volumeB with prefixBucketNameWithHadoopOwner.
     startBucket = null;
     TreeSet<String> expectedBuckets = new TreeSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
 
       omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
           startBucket, prefixBucketNameWithHadoopOwner, 10);
@@ -341,7 +341,7 @@ public class TestOmMetadataManager {
     TreeSet<String> keysASet = new TreeSet<>();
     TreeSet<String> keysBSet = new TreeSet<>();
     TreeSet<String> keysCSet = new TreeSet<>();
-    for (int i=1; i<= 100; i++) {
+    for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
         keysASet.add(
             prefixKeyA + i);
@@ -357,7 +357,7 @@ public class TestOmMetadataManager {
 
     TreeSet<String> keysAVolumeBSet = new TreeSet<>();
     TreeSet<String> keysBVolumeBSet = new TreeSet<>();
-    for (int i=1; i<= 100; i++) {
+    for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
         keysAVolumeBSet.add(
             prefixKeyA + i);
@@ -422,7 +422,7 @@ public class TestOmMetadataManager {
     // volumeB/ozoneBucket with "key-a".
     startKey = null;
     TreeSet<String> expectedKeys = new TreeSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
           startKey, prefixKeyB, 10);
@@ -472,7 +472,7 @@ public class TestOmMetadataManager {
     TreeSet<String> deleteKeySet = new TreeSet<>();
 
 
-    for (int i=1; i<= 100; i++) {
+    for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
         keysASet.add(
             prefixKeyA + i);
@@ -510,7 +510,7 @@ public class TestOmMetadataManager {
     // Now get key count by 10.
     String startKey = null;
     expectedKeys = new TreeSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
           startKey, prefixKeyA, 10);
@@ -618,7 +618,7 @@ public class TestOmMetadataManager {
   private void addKeysToOM(String volumeName, String bucketName,
       String keyName, int i) throws Exception {
 
-    if (i%2== 0) {
+    if (i % 2 == 0) {
       OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
           1000L, HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.ONE, omMetadataManager);

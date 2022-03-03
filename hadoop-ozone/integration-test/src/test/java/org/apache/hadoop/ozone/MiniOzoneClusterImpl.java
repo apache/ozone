@@ -290,6 +290,18 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
+  public HddsDatanodeService getHddsDatanode(DatanodeDetails dn)
+      throws IOException {
+    for (HddsDatanodeService service : hddsDatanodes) {
+      if (service.getDatanodeDetails().equals(dn)) {
+        return service;
+      }
+    }
+    throw new IOException(
+        "Not able to find datanode with datanode Id " + dn.getUuid());
+  }
+
+  @Override
   public ReconServer getReconServer() {
     return this.reconServer;
   }
@@ -677,7 +689,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // In this way safemode exit will happen only when atleast we have one
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
-          numOfDatanodes >=3 ? 3 : 1);
+          numOfDatanodes >= 3 ? 3 : 1);
       configureTrace();
     }
 

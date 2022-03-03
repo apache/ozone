@@ -208,7 +208,7 @@ public class TestKeyManagerUnit {
 
     initMultipartUpload(writeClient, volume, bucket, "dir/ozonekey2");
 
-    OmMultipartInfo omMultipartInfo3 =addinitMultipartUploadToCache(volume,
+    OmMultipartInfo omMultipartInfo3 = addinitMultipartUploadToCache(volume,
         bucket, "dir/ozonekey3");
 
     OmMultipartInfo omMultipartInfo4 = initMultipartUpload(writeClient,

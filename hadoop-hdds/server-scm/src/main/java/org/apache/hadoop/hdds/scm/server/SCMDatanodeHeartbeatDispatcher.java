@@ -255,6 +255,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
         ContainerReportsProto report) {
       super(datanodeDetails, report);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return this.getDatanodeDetails().getUuid().hashCode();
+    }
   }
 
   /**
@@ -267,6 +277,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
         DatanodeDetails datanodeDetails,
         IncrementalContainerReportProto report) {
       super(datanodeDetails, report);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return this.getDatanodeDetails().getUuid().hashCode();
     }
   }
 
