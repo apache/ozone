@@ -53,7 +53,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 
-import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -90,6 +89,9 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
@@ -178,8 +180,14 @@ public class ObjectEndpoint extends EndpointBase {
 
       // Normal put object
       OzoneBucket bucket = getBucket(bucketName);
-      ReplicationConfig clientConfiguredReplicationConfig = OzoneClientUtils
-          .getClientConfiguredReplicationConfig(ozoneConfiguration);
+      ReplicationConfig clientConfiguredReplicationConfig = null;
+      String replication = ozoneConfiguration.get(OZONE_REPLICATION);
+      if (replication != null) {
+        clientConfiguredReplicationConfig = ReplicationConfig.parse(
+            ReplicationType.valueOf(ozoneConfiguration
+                .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
+            replication, ozoneConfiguration);
+      }
       ReplicationConfig replicationConfig = S3Utils
           .resolveS3ClientSideReplicationConfig(storageType,
               clientConfiguredReplicationConfig, bucket.getReplicationConfig());
