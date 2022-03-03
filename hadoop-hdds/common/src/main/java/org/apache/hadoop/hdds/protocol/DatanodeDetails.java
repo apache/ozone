@@ -545,7 +545,7 @@ public class DatanodeDetails extends NodeImpl implements
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
-    private int currentVersion = ClientVersion.CURRENT_VERSION;
+    private int currentVersion = DatanodeVersion.CURRENT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use
