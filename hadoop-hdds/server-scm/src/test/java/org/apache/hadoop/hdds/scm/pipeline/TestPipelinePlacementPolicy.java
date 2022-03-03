@@ -700,12 +700,13 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
-  public void testCurrentRatisThreePipelineCountWith2RatisThreePipeline()
+  public void testCurrentRatisThreePipelineCount()
       throws IOException {
     List<DatanodeDetails> healthyNodes = nodeManager
         .getNodes(NodeStatus.inServiceHealthy());
     int pipelineCount;
 
+    // Check datanode with one STANDALONE/ONE pipeline
     List<DatanodeDetails> standaloneOneDn = new ArrayList<>();
     standaloneOneDn.add(healthyNodes.get(0));
     createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
@@ -714,6 +715,7 @@ public class TestPipelinePlacementPolicy {
         = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(0));
     assertEquals(pipelineCount, 0);
 
+    // Check datanode with one RATIS/ONE pipeline
     List<DatanodeDetails> ratisOneDn = new ArrayList<>();
     ratisOneDn.add(healthyNodes.get(1));
     createPipelineWithReplicationConfig(ratisOneDn, RATIS, ONE);
@@ -722,6 +724,7 @@ public class TestPipelinePlacementPolicy {
         = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
     assertEquals(pipelineCount, 0);
 
+    // Check datanode with one RATIS/THREE pipeline
     List<DatanodeDetails> ratisThreeDn = new ArrayList<>();
     ratisThreeDn.add(healthyNodes.get(2));
     ratisThreeDn.add(healthyNodes.get(3));
@@ -732,6 +735,7 @@ public class TestPipelinePlacementPolicy {
         = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(2));
     assertEquals(pipelineCount, 1);
 
+    // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline
     standaloneOneDn = new ArrayList<>();
     standaloneOneDn.add(healthyNodes.get(1));
     createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
@@ -740,6 +744,8 @@ public class TestPipelinePlacementPolicy {
         = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
     assertEquals(pipelineCount, 0);
 
+    // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline and
+    // two RATIS/THREE pipelines
     ratisThreeDn = new ArrayList<>();
     ratisThreeDn.add(healthyNodes.get(1));
     ratisThreeDn.add(healthyNodes.get(3));
