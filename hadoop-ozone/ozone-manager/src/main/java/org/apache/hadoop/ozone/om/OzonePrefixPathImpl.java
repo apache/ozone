@@ -57,6 +57,7 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
         .setBucketName(bucketName)
         .setKeyName(keyPrefix)
         .setRefreshPipeline(false)
+        .setHeadOp(true)
         .build();
     try {
       pathStatus = keyManager.getFileStatus(omKeyArgs);
@@ -158,6 +159,7 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
           .setBucketName(bucketName)
           .setKeyName(keyPrefix)
           .setRefreshPipeline(false)
+          .setHeadOp(true)
           .build();
 
       List<OzoneFileStatus> statuses = keyManager.listStatus(omKeyArgs, false,
