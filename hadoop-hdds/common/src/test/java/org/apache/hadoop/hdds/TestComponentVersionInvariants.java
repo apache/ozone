@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds;
 
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.assertj.core.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,7 +35,7 @@ public class TestComponentVersionInvariants {
 
   @Parameterized.Parameters
   public static Object[][] values() {
-    Object[][] values = new Object[2][];
+    Object[][] values = new Object[3][];
     values[0] =
         Arrays.array(
             DatanodeVersion.values(),
@@ -45,6 +46,11 @@ public class TestComponentVersionInvariants {
             ClientVersion.values(),
             ClientVersion.DEFAULT_VERSION,
             ClientVersion.FUTURE_VERSION);
+    values[2] =
+        Arrays.array(
+            OzoneManagerVersion.values(),
+            OzoneManagerVersion.DEFAULT_VERSION,
+            OzoneManagerVersion.FUTURE_VERSION);
     return values;
   }
 
