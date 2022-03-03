@@ -268,7 +268,7 @@ public class TestPermissionCheck {
   public void testPutKey() throws IOException {
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket)
-        .createKey(anyString(), anyLong(), any(), any(), any());
+        .createKey(anyString(), anyLong(), any(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
