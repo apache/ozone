@@ -108,7 +108,7 @@ public class TestOmBlockVersioning {
         .setDataSize(1000)
         .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())
-        .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .build();
 
     // 1st update, version 0

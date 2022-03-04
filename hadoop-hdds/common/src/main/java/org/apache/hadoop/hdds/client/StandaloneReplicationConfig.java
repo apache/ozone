@@ -30,7 +30,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 /**
  * Replication configuration for STANDALONE replication.
  */
-public class StandaloneReplicationConfig implements
+public final class StandaloneReplicationConfig implements
     ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
@@ -59,7 +59,11 @@ public class StandaloneReplicationConfig implements
     return new StandaloneReplicationConfig(factor);
   }
 
-  public StandaloneReplicationConfig(ReplicationFactor replicationFactor) {
+  /**
+   * Use the static getInstance method instead of the private constructor.
+   * @param replicationFactor
+   */
+  private StandaloneReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
   }
 

@@ -172,8 +172,8 @@ public class TestOzoneNativeAuthorizer {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(keyName)
-        .setReplicationConfig(
-            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setReplicationConfig(StandaloneReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(0)
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))

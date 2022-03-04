@@ -361,16 +361,16 @@ public class TestBucketManagerImpl {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_one")
-            .setReplicationConfig(
-                    new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            .setReplicationConfig(StandaloneReplicationConfig
+                .getInstance(ReplicationFactor.ONE))
             .build());
     metaMgr.getKeyTable(getBucketLayout()).put("/sampleVol/bucketOne/key_two",
         new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_two")
-            .setReplicationConfig(
-                        new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            .setReplicationConfig(StandaloneReplicationConfig
+                .getInstance(ReplicationFactor.ONE))
             .build());
     try {
       bucketManager.deleteBucket("sampleVol", "bucketOne");

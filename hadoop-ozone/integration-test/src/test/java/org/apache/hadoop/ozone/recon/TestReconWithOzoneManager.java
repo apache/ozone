@@ -405,7 +405,7 @@ public class TestReconWithOzoneManager {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationConfig(new StandaloneReplicationConfig(
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());

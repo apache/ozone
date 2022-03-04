@@ -38,8 +38,8 @@ public class TestReplicationConfigValidator {
 
     validator.validate(RatisReplicationConfig.getInstance(THREE));
     validator.validate(RatisReplicationConfig.getInstance(ONE));
-    validator.validate(new StandaloneReplicationConfig(THREE));
-    validator.validate(new StandaloneReplicationConfig(ONE));
+    validator.validate(StandaloneReplicationConfig.getInstance(THREE));
+    validator.validate(StandaloneReplicationConfig.getInstance(ONE));
 
   }
 
@@ -52,7 +52,7 @@ public class TestReplicationConfigValidator {
         config.getObject(ReplicationConfigValidator.class);
 
     validator.validate(RatisReplicationConfig.getInstance(THREE));
-    validator.validate(new StandaloneReplicationConfig(ONE));
+    validator.validate(StandaloneReplicationConfig.getInstance(ONE));
 
   }
 

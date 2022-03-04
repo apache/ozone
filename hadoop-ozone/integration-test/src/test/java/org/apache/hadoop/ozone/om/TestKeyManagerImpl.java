@@ -1514,7 +1514,7 @@ public class TestKeyManagerImpl {
         .setBucketName(bucketName)
         .setDataSize(0)
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ONE))
+            StandaloneReplicationConfig.getInstance(ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .setVolumeName(VOLUME_NAME);

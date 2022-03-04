@@ -30,7 +30,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 /**
  * Replication configuration for EC replication.
  */
-public class RatisReplicationConfig implements ReplicatedReplicationConfig {
+public final class RatisReplicationConfig
+    implements ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
   private static final ReplicationType REPLICATION_TYPE = ReplicationType.RATIS;

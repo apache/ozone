@@ -482,7 +482,7 @@ public class TestDeletedBlockLog {
     List<DatanodeDetails> dns = Collections.singletonList(dd);
     Pipeline pipeline = Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setState(Pipeline.PipelineState.OPEN)
             .setId(PipelineID.randomId())
             .setNodes(dns)

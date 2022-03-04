@@ -76,10 +76,10 @@ public class TestContainerStateManager {
     pipelineManager = Mockito.mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
-            .setReplicationConfig(new StandaloneReplicationConfig(
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 ReplicationFactor.THREE))
             .setNodes(new ArrayList<>()).build();
-    when(pipelineManager.createPipeline(new StandaloneReplicationConfig(
+    when(pipelineManager.createPipeline(StandaloneReplicationConfig.getInstance(
         ReplicationFactor.THREE))).thenReturn(pipeline);
     when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
         .thenReturn(true);
