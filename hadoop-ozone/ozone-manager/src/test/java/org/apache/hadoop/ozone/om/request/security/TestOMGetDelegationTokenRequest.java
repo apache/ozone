@@ -22,6 +22,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import com.google.common.base.Optional;
 import java.util.UUID;
+
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -62,6 +65,8 @@ public class TestOMGetDelegationTokenRequest extends
   public void setupGetDelegationToken() {
     secretManager = Mockito.mock(OzoneDelegationTokenSecretManager.class);
     when(ozoneManager.getDelegationTokenMgr()).thenReturn(secretManager);
+    when(ozoneManager.getAuditLogger()).thenReturn(new AuditLogger(
+        AuditLoggerType.OMLOGGER));
 
     setupToken();
     setupRequest();
