@@ -646,7 +646,7 @@ public class TestContainerReportHandler {
     Map<Integer, DatanodeDetails> dns = new HashMap<>();
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-    for (int i = 1; i <= repConfig.getData(); i++) {
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
       dns.put(i, nodeIterator.next());
     }
     final ContainerReplicaProto.State replicaState
@@ -722,7 +722,7 @@ public class TestContainerReportHandler {
     Map<Integer, DatanodeDetails> dns = new HashMap<>();
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-    for (int i = 1; i <= repConfig.getData(); i++) {
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
       dns.put(i, nodeIterator.next());
     }
     final ContainerReplicaProto.State replicaState
