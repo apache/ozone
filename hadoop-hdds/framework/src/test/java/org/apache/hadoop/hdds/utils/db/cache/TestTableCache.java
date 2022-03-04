@@ -119,7 +119,7 @@ public class TestTableCache {
               new CacheValue<>(Optional.of(Integer.toString(i)), i));
     }
 
-    // EpochEntry should be like (long, (key1, key2, ...))
+    // Epoch entries should be like (long, (key1, key2, ...))
     // (0, (0A, 0B))  (1, (1A, 1B))  (2, (2A, 1B))
     Assert.assertEquals(3, tableCache.getEpochEntries().size());
     Assert.assertEquals(2, tableCache.getEpochEntries().get(0L).size());
