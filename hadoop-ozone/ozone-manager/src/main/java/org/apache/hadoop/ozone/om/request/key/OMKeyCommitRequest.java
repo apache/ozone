@@ -219,7 +219,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
-            omMetadataManager, omBucketInfo.getIsVersionEnabled(),
+            keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
       }
       // Add to cache of open key table and key table.

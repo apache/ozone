@@ -156,7 +156,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
-            omMetadataManager, omBucketInfo.getIsVersionEnabled(),
+            keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
       }
 

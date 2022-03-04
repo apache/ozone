@@ -778,27 +778,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
    *
    * @param dbOzoneKey key to point to an object in RocksDB
    * @param omMetadataManager
-   * @param isVersionEnabled
    * @param trxnLogIndex
    * @param isRatisEnabled
    * @return Old keys eligible for deletion.
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      String dbOzoneKey, OMMetadataManager omMetadataManager,
-      boolean isVersionEnabled, long trxnLogIndex,
+      String dbOzoneKey, OmKeyInfo keyToDelete,
+      OMMetadataManager omMetadataManager, long trxnLogIndex,
       boolean isRatisEnabled) throws IOException {
-    if (isVersionEnabled) {
-      // Nothing to clean up in case versioning is on.
-      return null;
-    }
+
     // Past keys that was deleted but still in deleted table,
     // waiting for deletion service.
     RepeatedOmKeyInfo keysToDelete =
         omMetadataManager.getDeletedTable().get(dbOzoneKey);
-    // Current key to be overwritten
-    OmKeyInfo keyToDelete =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
 
     if (keyToDelete != null) {
       keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,

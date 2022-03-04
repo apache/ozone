@@ -219,7 +219,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
-              omMetadataManager, omBucketInfo.getIsVersionEnabled(),
+              keyToDelete, omMetadataManager,
               trxnLogIndex, ozoneManager.isRatisEnabled());
         }
         long usedBytesDiff = 0;
