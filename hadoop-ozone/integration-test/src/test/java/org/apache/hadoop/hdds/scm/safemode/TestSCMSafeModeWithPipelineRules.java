@@ -99,7 +99,7 @@ public class TestSCMSafeModeWithPipelineRules {
 
     pipelineManager = cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelineList =
-        pipelineManager.getPipelines(new RatisReplicationConfig(
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
 
 
@@ -193,7 +193,8 @@ public class TestSCMSafeModeWithPipelineRules {
   private void waitForRatis3NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }
@@ -201,7 +202,7 @@ public class TestSCMSafeModeWithPipelineRules {
   private void waitForRatis1NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.ONE),
+        .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
             Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }

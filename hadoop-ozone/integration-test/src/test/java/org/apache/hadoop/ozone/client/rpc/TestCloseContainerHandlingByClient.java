@@ -143,7 +143,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -212,7 +212,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -273,7 +273,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -318,7 +318,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -381,7 +381,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -416,7 +416,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();

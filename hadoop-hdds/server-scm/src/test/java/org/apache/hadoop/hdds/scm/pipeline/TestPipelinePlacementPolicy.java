@@ -280,7 +280,7 @@ public class TestPipelinePlacementPolicy {
         Pipeline pipeline = Pipeline.newBuilder()
             .setId(PipelineID.randomId())
             .setState(Pipeline.PipelineState.ALLOCATED)
-            .setReplicationConfig(new RatisReplicationConfig(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                 ReplicationFactor.THREE))
             .setNodes(nodes)
             .build();
@@ -305,7 +305,8 @@ public class TestPipelinePlacementPolicy {
     // Should max out pipeline usage.
     Assert.assertEquals(maxPipelineCount,
         stateManager
-            .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+            .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
             .size());
   }
 

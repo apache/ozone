@@ -57,7 +57,11 @@ public class RatisReplicationConfig implements ReplicatedReplicationConfig {
     return new RatisReplicationConfig(factor);
   }
 
-  public RatisReplicationConfig(ReplicationFactor replicationFactor) {
+  /**
+   * Use the static getInstance method rather than the private constructor.
+   * @param replicationFactor
+   */
+  private RatisReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
   }
 

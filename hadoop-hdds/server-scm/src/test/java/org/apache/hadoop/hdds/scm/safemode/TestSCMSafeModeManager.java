@@ -358,7 +358,7 @@ public class TestSCMSafeModeManager {
     for (int i = 0; i < pipelineCount; i++) {
       // Create pipeline
       Pipeline pipeline = pipelineManager.createPipeline(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
 
       pipelineManager.openPipeline(pipeline.getId());
@@ -610,7 +610,7 @@ public class TestSCMSafeModeManager {
           mockRatisProvider);
 
       Pipeline pipeline = pipelineManager.createPipeline(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
 
       pipeline = pipelineManager.getPipeline(pipeline.getId());
@@ -710,11 +710,11 @@ public class TestSCMSafeModeManager {
     Pipeline pipeline;
     try {
       pipeline = pipelineManager.createPipeline(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
     } catch (SCMException ex) {
       pipeline = pipelineManager.getPipelines(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE)).get(0);
     }
 

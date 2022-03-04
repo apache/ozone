@@ -78,7 +78,7 @@ public class TestRatisPipelineLeader {
   @Test(timeout = 120000)
   public void testLeaderIdUsedOnFirstCall() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines(new RatisReplicationConfig(
+        .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
     Assert.assertFalse(pipelines.isEmpty());
     Pipeline ratisPipeline = pipelines.iterator().next();
@@ -110,7 +110,7 @@ public class TestRatisPipelineLeader {
   @Test(timeout = 120000)
   public void testLeaderIdAfterLeaderChange() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines(new RatisReplicationConfig(
+        .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
     Assert.assertFalse(pipelines.isEmpty());
     Pipeline ratisPipeline = pipelines.iterator().next();

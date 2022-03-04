@@ -164,7 +164,7 @@ public class TestDeletedBlockLog {
     final ContainerInfo container =
         new ContainerInfo.Builder()
             .setContainerID(cid)
-            .setReplicationConfig(new RatisReplicationConfig(THREE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
             .setState(HddsProtos.LifeCycleState.CLOSED)
             .setOwner("TestDeletedBlockLog")
             .setPipelineID(PipelineID.randomId())
