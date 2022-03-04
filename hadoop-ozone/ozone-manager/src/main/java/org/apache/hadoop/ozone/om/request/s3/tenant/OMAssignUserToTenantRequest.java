@@ -144,6 +144,16 @@ public class OMAssignUserToTenantRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_NAME);
     }
 
+    // HDDS-6366: Disallow specifying custom accessId.
+    final String expectedAccessId = ozoneManager.getMultiTenantManager()
+        .getDefaultAccessId(tenantName, tenantUsername);
+    if (!accessId.equals(expectedAccessId)) {
+      throw new OMException("Invalid accessId '" + accessId + "'. "
+          + "Specifying a custom access ID disallowed. "
+          + "Expected accessId to be assigned is '" + expectedAccessId + "'",
+          OMException.ResultCodes.INVALID_ACCESSID);
+    }
+
     // Check accessId validity.
     if (accessId.contains(SERIALIZATION_SPLIT_KEY)) {
       throw new OMException("Invalid accessId '" + accessId +

@@ -145,6 +145,14 @@ public interface OMMultiTenantManager {
   String getUserNameGivenAccessId(String accessId);
 
   /**
+   * Get the default Access ID string given tenant name and user name.
+   * @param tenantId tenant name
+   * @param userPrincipal user name
+   * @return access ID in the form of tenantName$username
+   */
+  String getDefaultAccessId(String tenantId, String userPrincipal);
+
+  /**
    * Given a user, return their S3-Secret Key.
    * @param accessID
    * @return S3 secret Key

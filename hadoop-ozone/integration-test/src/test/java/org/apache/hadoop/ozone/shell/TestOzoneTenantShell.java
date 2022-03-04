@@ -558,10 +558,17 @@ public class TestOzoneTenantShell {
         "user", "assign", "bob", "--tenant=research",
         "--accessId=research$bob42"});
     checkOutput(out, "", false);
+    // HDDS-6366: Disallow specifying custom accessId.
+    checkOutput(err, "Failed to assign 'bob' to 'research': "
+        + "Invalid accessId 'research$bob42'. "
+        + "Specifying a custom access ID disallowed. "
+        + "Expected accessId to be assigned is 'research$bob'\n", true);
+    /*  Once HDDS-6366 is lifted, the following check should be used instead
     checkOutput(err, "Failed to assign 'bob' to 'research': "
         + "The same user is not allowed to be assigned to the same tenant "
         + "more than once. User 'bob' is already assigned to tenant 'research' "
         + "with accessId 'research$bob'.\n", true);
+    */
 
     executeHA(tenantShell, new String[] {"list"});
     checkOutput(out, "dev\nfinance\nresearch\n", true);

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESSID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
@@ -353,6 +354,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       controlPathLock.readLock().unlock();
     }
     return null;
+  }
+
+  public String getDefaultAccessId(String tenantId, String userPrincipal) {
+    return tenantId + TENANT_NAME_USER_NAME_DELIMITER + userPrincipal;
   }
 
   @Override
