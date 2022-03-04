@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputSt
 import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -38,6 +39,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateParity;
@@ -55,6 +58,8 @@ public class TestECBlockReconstructedStripeInputStream {
   private ThreadLocalRandom random = ThreadLocalRandom.current();
   private SplittableRandom dataGen;
   private ByteBufferPool bufferPool = new ElasticByteBufferPool();
+  private ExecutorService ecReconstructExecutor =
+      Executors.newFixedThreadPool(5);
 
   @Before
   public void setup() {
@@ -64,6 +69,11 @@ public class TestECBlockReconstructedStripeInputStream {
 
     randomSeed = random.nextLong();
     dataGen = new SplittableRandom(randomSeed);
+  }
+
+  @After
+  public void teardown() {
+    ecReconstructExecutor.shutdownNow();
   }
 
   @Test
@@ -624,7 +634,7 @@ public class TestECBlockReconstructedStripeInputStream {
   private ECBlockReconstructedStripeInputStream createInputStream(
       OmKeyLocationInfo keyInfo) {
     return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
-        null, null, streamFactory, bufferPool);
+        null, null, streamFactory, bufferPool, ecReconstructExecutor);
   }
 
   private List<Integer> indexesToList(int... indexes) {

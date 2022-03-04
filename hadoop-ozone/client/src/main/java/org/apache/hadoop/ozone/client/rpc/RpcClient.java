@@ -37,10 +37,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -181,6 +184,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
+  private ExecutorService ecReconstructExecutor;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -295,7 +299,7 @@ public class RpcClient implements ClientProtocol {
         }).build();
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
-        .getInstance(byteBufferPool);
+        .getInstance(byteBufferPool, this::getECReconstructExecutor);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -1147,6 +1151,10 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
+    if (ecReconstructExecutor != null) {
+      ecReconstructExecutor.shutdownNow();
+      ecReconstructExecutor = null;
+    }
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
     keyProviderCache.cleanUp();
@@ -1706,5 +1714,20 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setOwnerName(owner);
     return ozoneManagerClient.setBucketOwner(builder.build());
+  }
+
+  public ExecutorService getECReconstructExecutor() {
+    if (ecReconstructExecutor == null) {
+      synchronized (this) {
+        if (ecReconstructExecutor == null) {
+          ecReconstructExecutor = Executors.newFixedThreadPool(
+              clientConfig.getEcReconstructStripeReadPoolSize(),
+              new ThreadFactoryBuilder()
+                  .setNameFormat("ec-reconstruct-reader-TID-%d")
+                  .build());
+        }
+      }
+    }
+    return ecReconstructExecutor;
   }
 }

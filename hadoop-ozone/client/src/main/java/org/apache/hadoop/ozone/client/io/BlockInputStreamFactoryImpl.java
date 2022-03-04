@@ -31,7 +31,10 @@ import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Factory class to create various BlockStream instances.
@@ -41,17 +44,22 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
   private ECBlockInputStreamFactory ecBlockStreamFactory;
 
   public static BlockInputStreamFactory getInstance(
-      ByteBufferPool byteBufferPool) {
-    return new BlockInputStreamFactoryImpl(byteBufferPool);
+      ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    return new BlockInputStreamFactoryImpl(byteBufferPool,
+        ecReconstructExecutorSupplier);
   }
 
   public BlockInputStreamFactoryImpl() {
-    this(new ElasticByteBufferPool());
+    this(new ElasticByteBufferPool(),
+        () -> Executors.newSingleThreadExecutor());
   }
 
-  public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool) {
+  public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
     this.ecBlockStreamFactory =
-        ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool);
+        ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool,
+            ecReconstructExecutorSupplier);
   }
 
   /**

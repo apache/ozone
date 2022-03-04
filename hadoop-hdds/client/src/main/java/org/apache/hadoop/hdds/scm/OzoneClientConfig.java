@@ -151,6 +151,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
 
+  @Config(key = "ec.reconstruct.stripe.read.pool.size",
+      defaultValue = "14",
+      description = "Thread pool size for parallelly read" +
+          " available ec chunks to reconstruct the whole stripe.",
+      tags = ConfigTag.CLIENT)
+  private int ecReconstructStripeReadPoolSize = 14;
+
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -287,5 +294,13 @@ public class OzoneClientConfig {
       return ChecksumCombineMode.valueOf(
           ChecksumCombineMode.COMPOSITE_CRC.name());
     }
+  }
+
+  public void setEcReconstructStripeReadPoolSize(int poolSize) {
+    this.ecReconstructStripeReadPoolSize = poolSize;
+  }
+
+  public int getEcReconstructStripeReadPoolSize() {
+    return ecReconstructStripeReadPoolSize;
   }
 }
