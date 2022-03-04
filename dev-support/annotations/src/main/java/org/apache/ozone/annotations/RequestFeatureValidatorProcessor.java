@@ -38,6 +38,18 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 
+/**
+ * This class is an annotation processor that is hooked into the java compiler
+ * and is used to validate the RequestFeatureValidator annotations in the
+ * codebase, to ensure that the annotated methods have the proper signature and
+ * return type.
+ *
+ * The module is compiled in a different execution via Maven before anything
+ * else is compiled, and then javac picks this class up as an annotation
+ * processor from the classpath via a ServiceLoader, based on the
+ * META-INF/services/javax.annotation.processing.Processor file in the module's
+ * resources folder.
+ */
 @SupportedAnnotationTypes(
     "org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
@@ -101,8 +113,8 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   }
 
   private void processElements(Set<? extends Element> annotatedElements) {
-    for(Element elem : annotatedElements) {
-      for (AnnotationMirror methodAnnotation : elem.getAnnotationMirrors()){
+    for (Element elem : annotatedElements) {
+      for (AnnotationMirror methodAnnotation : elem.getAnnotationMirrors()) {
         validateAnnotatedMethod(elem, methodAnnotation);
       }
     }
@@ -150,7 +162,7 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
       List<? extends TypeMirror> paramTypes,
       int index, String validationContextClassName,
       String errorLastParamHasToBeValidationContext) {
-    if (paramTypes.size() >= index+1 && 
+    if (paramTypes.size() >= index + 1 &&
         !paramTypes.get(index).toString().equals(validationContextClassName)) {
       emitErrorMsg(errorLastParamHasToBeValidationContext);
     }
@@ -205,7 +217,7 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     String procPhase = visit(entry, new ProcessingPhaseVisitor());
     if (procPhase.equals(PROCESSING_PHASE_PRE_PROCESS)) {
       return true;
-    } else if (procPhase.equals(PROCESSING_PHASE_POST_PROCESS)){
+    } else if (procPhase.equals(PROCESSING_PHASE_POST_PROCESS)) {
       return false;
     }
     return false;
@@ -263,9 +275,9 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     public String visitEnumConstant(VariableElement c, Void unused) {
       if (c.getSimpleName().contentEquals(PROCESSING_PHASE_PRE_PROCESS)) {
         return PROCESSING_PHASE_PRE_PROCESS;
-      } else
-        if (c.getSimpleName().contentEquals(PROCESSING_PHASE_POST_PROCESS)) {
-          return PROCESSING_PHASE_POST_PROCESS;
+      }
+      if (c.getSimpleName().contentEquals(PROCESSING_PHASE_POST_PROCESS)) {
+        return PROCESSING_PHASE_POST_PROCESS;
       }
       throw new IllegalStateException(ERROR_NO_PROCESSING_PHASE_DEFINED);
     }

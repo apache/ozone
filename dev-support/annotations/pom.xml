@@ -31,6 +31,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <spotbugs.version>3.1.12</spotbugs.version>
+    <maven-checkstyle-plugin.version>3.1.0</maven-checkstyle-plugin.version>
+    <checkstyle.version>8.29</checkstyle.version>
   </properties>
 
   <dependencies>
@@ -45,8 +47,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <build>
     <plugins>
       <!--
-       | It is required to add spotbugs dependency here, so that CI can check
-       | this package properly and does not fail the findbugs check.
+       | As this pom is not a child of the main ozone pom.xml, if we want
+       | findbugs and checkstyle to be running for the module, the plugins
+       | have to be defined here.
       -->
       <plugin>
         <groupId>com.github.spotbugs</groupId>
@@ -56,6 +59,25 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <maxHeap>1024</maxHeap>
           <xmlOutput>true</xmlOutput>
           <includeTests>true</includeTests>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${maven-checkstyle-plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>${checkstyle.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <configLocation>../../hadoop-hdds/dev-support/checkstyle/checkstyle.xml</configLocation>
+          <suppressionsLocation>../../hadoop-hdds/dev-support/checkstyle/suppressions.xml</suppressionsLocation>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+          <failOnViolation>false</failOnViolation>
+          <outputFile>${project.build.directory}/test/checkstyle-errors.xml</outputFile>
         </configuration>
       </plugin>
       <!--

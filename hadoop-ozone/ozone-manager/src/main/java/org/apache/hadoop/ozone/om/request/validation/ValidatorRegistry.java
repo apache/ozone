@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -30,10 +29,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
+import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
 
 /**
  * Registry that loads and stores the request validators to be applied by
@@ -41,8 +42,8 @@ import java.util.Set;
  */
 public class ValidatorRegistry {
 
-  private final EnumMap<
-      ValidationCondition, EnumMap<Type, Pair<List<Method>, List<Method>>>>
+  private final EnumMap<ValidationCondition,
+      EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>>
       validators = new EnumMap<>(ValidationCondition.class);
 
   /**
@@ -119,26 +120,23 @@ public class ValidatorRegistry {
       Type requestType,
       RequestProcessingPhase phase) {
 
-
-    EnumMap<Type, Pair<List<Method>, List<Method>>> requestTypeMap =
-        validators.get(condition);
+    EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
+        requestTypeMap = validators.get(condition);
     if (requestTypeMap == null || requestTypeMap.isEmpty()) {
       return Collections.emptyList();
     }
 
-    Pair<List<Method>, List<Method>> phases = requestTypeMap.get(requestType);
-    if (phases == null ||
-        (phases.getLeft().isEmpty() && phases.getRight().isEmpty())) {
+    EnumMap<RequestProcessingPhase, List<Method>> phases =
+        requestTypeMap.get(requestType);
+    if (phases == null) {
       return Collections.emptyList();
     }
 
-    List<Method> returnValue = new LinkedList<>();
-    if (phase.equals(RequestProcessingPhase.PRE_PROCESS)) {
-      returnValue.addAll(phases.getLeft());
-    } else if (phase.equals(RequestProcessingPhase.POST_PROCESS)) {
-      returnValue.addAll(phases.getRight());
+    List<Method> validatorsForPhase = phases.get(phase);
+    if (validatorsForPhase == null) {
+      return Collections.emptyList();
     }
-    return returnValue;
+    return validatorsForPhase;
   }
 
   /**
@@ -158,21 +156,27 @@ public class ValidatorRegistry {
       m.setAccessible(true);
 
       for (ValidationCondition condition : descriptor.conditions()) {
-        EnumMap<Type, Pair<List<Method>, List<Method>>> requestTypeMap =
-            getAndInitialize(condition, newTypeMap(), validators);
-        Pair<List<Method>, List<Method>> phases = getAndInitialize(
-            descriptor.requestType(), newListPair(), requestTypeMap);
+        EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
+            requestTypeMap = getAndInitialize(
+                condition, newTypeMap(), validators);
+        EnumMap<RequestProcessingPhase, List<Method>> phases = getAndInitialize(
+            descriptor.requestType(), newPhaseMap(), requestTypeMap);
         if (isPreProcessValidator(descriptor)) {
-          phases.getLeft().add(m);
+          getAndInitialize(PRE_PROCESS, new ArrayList<>(), phases).add(m);
         } else if (isPostProcessValidator(descriptor)) {
-          phases.getRight().add(m);
+          getAndInitialize(POST_PROCESS, new ArrayList<>(), phases).add(m);
         }
       }
     }
   }
 
-  private EnumMap<Type, Pair<List<Method>, List<Method>>> newTypeMap() {
+  private EnumMap<Type,
+      EnumMap<RequestProcessingPhase, List<Method>>> newTypeMap() {
     return new EnumMap<>(Type.class);
+  }
+
+  private EnumMap<RequestProcessingPhase, List<Method>> newPhaseMap() {
+    return new EnumMap<>(RequestProcessingPhase.class);
   }
 
   private <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
@@ -186,16 +190,12 @@ public class ValidatorRegistry {
 
   private boolean isPreProcessValidator(RequestFeatureValidator descriptor) {
     return descriptor.processingPhase()
-        .equals(RequestProcessingPhase.PRE_PROCESS);
+        .equals(PRE_PROCESS);
   }
 
   private boolean isPostProcessValidator(RequestFeatureValidator descriptor) {
     return descriptor.processingPhase()
-        .equals(RequestProcessingPhase.POST_PROCESS);
-  }
-
-  private Pair<List<Method>, List<Method>> newListPair() {
-    return Pair.of(new ArrayList<>(), new ArrayList<>());
+        .equals(POST_PROCESS);
   }
 
 }

@@ -29,9 +29,7 @@ import java.util.List;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.CLUSTER_NEEDS_FINALIZATION;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.NEWER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.UNCONDITIONAL;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
@@ -110,7 +108,7 @@ public final class GeneralValidatorsForTesting {
     return resp;
   }
 
-  @RequestFeatureValidator(
+/*  @RequestFeatureValidator(
       conditions = { NEWER_CLIENT_REQUESTS },
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
@@ -128,7 +126,7 @@ public final class GeneralValidatorsForTesting {
       OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("newClientPostProcessCreateKeyValidator");
     return resp;
-  }
+  }*/
 
   @RequestFeatureValidator(
       conditions = { OLDER_CLIENT_REQUESTS },
@@ -150,7 +148,7 @@ public final class GeneralValidatorsForTesting {
     return resp;
   }
 
-  @RequestFeatureValidator(
+/*  @RequestFeatureValidator(
       conditions = { UNCONDITIONAL },
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
@@ -168,7 +166,7 @@ public final class GeneralValidatorsForTesting {
       OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("unconditionalPostProcessCreateKeyValidator");
     return resp;
-  }
+  }*/
 
   @RequestFeatureValidator(
       conditions = { CLUSTER_NEEDS_FINALIZATION, OLDER_CLIENT_REQUESTS },
@@ -181,8 +179,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { OLDER_CLIENT_REQUESTS, UNCONDITIONAL,
-          CLUSTER_NEEDS_FINALIZATION },
+      conditions = { OLDER_CLIENT_REQUESTS, CLUSTER_NEEDS_FINALIZATION },
       processingPhase = POST_PROCESS,
       requestType = CreateVolume)
   public static OMResponse multiPurposePostProcessCreateVolumeValidator(
@@ -192,17 +189,17 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = { NEWER_CLIENT_REQUESTS },
+      conditions = { OLDER_CLIENT_REQUESTS },
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
-  public static OMResponse newClientPostProcessCreateKeyValidator2(
+  public static OMResponse oldClientPostProcessCreateKeyValidator2(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
-    fireValidationEvent("newClientPostProcessCreateKeyValidator2");
+    fireValidationEvent("oldClientPostProcessCreateKeyValidator2");
     return resp;
   }
 
   @RequestFeatureValidator(
-      conditions = {UNCONDITIONAL},
+      conditions = {OLDER_CLIENT_REQUESTS},
       processingPhase = PRE_PROCESS,
       requestType = DeleteKeys
   )
@@ -216,7 +213,7 @@ public final class GeneralValidatorsForTesting {
   }
 
   @RequestFeatureValidator(
-      conditions = {UNCONDITIONAL},
+      conditions = {OLDER_CLIENT_REQUESTS},
       processingPhase = POST_PROCESS,
       requestType = DeleteKeys
   )

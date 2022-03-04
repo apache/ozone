@@ -34,9 +34,7 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.CLUSTER_NEEDS_FINALIZATION;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.NEWER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.UNCONDITIONAL;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.startValidatorTest;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.finishValidatorTest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
@@ -103,7 +101,7 @@ public class TestValidatorRegistry {
     assertEquals(expectedMethodName, validators.get(0).getName());
   }
 
-  @Test
+/*  @Test
   public void testRegistryHasTheNewClientPreProcessCreateKeyValidator()
       throws MalformedURLException {
     Collection<URL> urls = ClasspathHelper.forPackage(PACKAGE);
@@ -135,7 +133,7 @@ public class TestValidatorRegistry {
         methodNames.contains("newClientPostProcessCreateKeyValidator"));
     assertTrue(
         methodNames.contains("newClientPostProcessCreateKeyValidator2"));
-  }
+  }*/
 
   @Test
   public void testRegistryHasTheOldClientPreProcessCreateKeyValidator() {
@@ -144,9 +142,11 @@ public class TestValidatorRegistry {
         registry.validationsFor(
             asList(OLDER_CLIENT_REQUESTS), CreateKey, PRE_PROCESS);
 
-    assertEquals(1, validators.size());
-    String expectedMethodName = "oldClientPreProcessCreateKeyValidator";
-    assertEquals(expectedMethodName, validators.get(0).getName());
+    assertEquals(2, validators.size());
+    List<String> methodNames =
+        validators.stream().map(Method::getName).collect(Collectors.toList());
+    assertTrue(methodNames.contains("oldClientPreProcessCreateKeyValidator"));
+    assertTrue(methodNames.contains("oldClientPreProcessCreateKeyValidator2"));
   }
 
   @Test
@@ -156,12 +156,14 @@ public class TestValidatorRegistry {
         registry.validationsFor(
             asList(OLDER_CLIENT_REQUESTS), CreateKey, POST_PROCESS);
 
-    assertEquals(1, validators.size());
-    String expectedMethodName = "oldClientPostProcessCreateKeyValidator";
-    assertEquals(expectedMethodName, validators.get(0).getName());
+    assertEquals(2, validators.size());
+    List<String> methodNames =
+        validators.stream().map(Method::getName).collect(Collectors.toList());
+    assertTrue(methodNames.contains("oldClientPostProcessCreateKeyValidator"));
+    assertTrue(methodNames.contains("oldClientPostProcessCreateKeyValidator2"));
   }
 
-  @Test
+/*  @Test
   public void testRegistryHasTheUnconditionalPreProcessCreateKeyValidator() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
@@ -183,7 +185,7 @@ public class TestValidatorRegistry {
     assertEquals(1, validators.size());
     String expectedMethodName = "unconditionalPostProcessCreateKeyValidator";
     assertEquals(expectedMethodName, validators.get(0).getName());
-  }
+  }*/
 
   @Test
   public void testRegistryHasTheMultiPurposePreProcessCreateVolumeValidator() {
@@ -211,17 +213,17 @@ public class TestValidatorRegistry {
     List<Method> oldClientValidators =
         registry.validationsFor(
             asList(OLDER_CLIENT_REQUESTS), CreateVolume, POST_PROCESS);
-    List<Method> unconditionalValidators =
-        registry.validationsFor(
-            asList(UNCONDITIONAL), CreateVolume, POST_PROCESS);
+//    List<Method> unconditionalValidators =
+//        registry.validationsFor(
+//            asList(UNCONDITIONAL), CreateVolume, POST_PROCESS);
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, oldClientValidators.size());
-    assertEquals(1, unconditionalValidators.size());
+//    assertEquals(1, unconditionalValidators.size());
     String expectedMethodName = "multiPurposePostProcessCreateVolumeValidator";
     assertEquals(expectedMethodName, preFinalizeValidators.get(0).getName());
     assertEquals(expectedMethodName, oldClientValidators.get(0).getName());
-    assertEquals(expectedMethodName, unconditionalValidators.get(0).getName());
+//  assertEquals(expectedMethodName, unconditionalValidators.get(0).getName());
   }
 
   @Test
@@ -229,7 +231,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
     List<Method> validators =
         registry.validationsFor(
-            asList(CLUSTER_NEEDS_FINALIZATION, NEWER_CLIENT_REQUESTS),
+            asList(CLUSTER_NEEDS_FINALIZATION, OLDER_CLIENT_REQUESTS),
             CreateKey, POST_PROCESS);
 
     assertEquals(3, validators.size());
@@ -238,9 +240,9 @@ public class TestValidatorRegistry {
     assertTrue(
         methodNames.contains("preFinalizePostProcessCreateKeyValidator"));
     assertTrue(
-        methodNames.contains("newClientPostProcessCreateKeyValidator"));
+        methodNames.contains("oldClientPostProcessCreateKeyValidator"));
     assertTrue(
-        methodNames.contains("newClientPostProcessCreateKeyValidator2"));
+        methodNames.contains("oldClientPostProcessCreateKeyValidator2"));
   }
 
   @Test
@@ -248,7 +250,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE_WO_VALIDATORS);
 
     assertTrue(registry.validationsFor(
-        asList(UNCONDITIONAL), CreateKey, PRE_PROCESS).isEmpty());
+        asList(OLDER_CLIENT_REQUESTS), CreateKey, PRE_PROCESS).isEmpty());
   }
 
   @Test
@@ -262,7 +264,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(urlsToUse);
 
     assertTrue(registry.validationsFor(
-        asList(UNCONDITIONAL), CreateKey, PRE_PROCESS).isEmpty());
+        asList(CLUSTER_NEEDS_FINALIZATION), CreateKey, PRE_PROCESS).isEmpty());
   }
 
   @Test
@@ -270,7 +272,7 @@ public class TestValidatorRegistry {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
 
     assertTrue(registry.validationsFor(
-        asList(UNCONDITIONAL), CreateDirectory, null).isEmpty());
+        asList(OLDER_CLIENT_REQUESTS), CreateDirectory, null).isEmpty());
   }
 
 }

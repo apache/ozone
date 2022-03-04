@@ -237,8 +237,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
+    <!--
+     | Keep this in sync with the version used in
+     | /dev-support/annotatons/pom.xml
+     -->
     <maven-checkstyle-plugin.version>3.1.2</maven-checkstyle-plugin.version>
     <maven-site-plugin.version>3.9.1</maven-site-plugin.version>
+    <!--
+     | Keep this in sync with the version used in
+     | /dev-support/annotatons/pom.xml
+     -->
     <checkstyle.version>9.3</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
     <aws-java-sdk.version>1.12.124</aws-java-sdk.version>

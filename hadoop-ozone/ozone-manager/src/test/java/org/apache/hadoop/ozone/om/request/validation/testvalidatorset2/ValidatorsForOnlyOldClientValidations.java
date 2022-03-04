@@ -21,22 +21,22 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.NEWER_CLIENT_REQUESTS;
+import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 
 /**
  * Separate validator methods for a few specific tests that covers cases where
  * there are almost no validators added.
  */
-public final class ValidatorsForOnlyNewClientValidations {
+public final class ValidatorsForOnlyOldClientValidations {
 
-  private ValidatorsForOnlyNewClientValidations() { }
+  private ValidatorsForOnlyOldClientValidations() { }
 
   @RequestFeatureValidator(
-      conditions = { NEWER_CLIENT_REQUESTS },
+      conditions = { OLDER_CLIENT_REQUESTS },
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
-  public static OMRequest newClientPostProcessCreateKeyValidator2(
+  public static OMRequest oldClientPreProcessCreateKeyValidator2(
       OMRequest req, ValidationContext ctx) {
     return req;
   }
