@@ -325,6 +325,8 @@ message SCMCommandProto {
   optional SetNodeOperationalStateCommandProto setNodeOperationalStateCommandProto = 9;
   optional FinalizeNewLayoutVersionCommandProto
   finalizeNewLayoutVersionCommandProto = 10;
+  optional RefreshVolumeUsageCommandProto refreshVolumeUsageCommandProto = 11;
+
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
@@ -416,6 +418,13 @@ This command asks the datanode to close a pipeline.
 message ClosePipelineCommandProto {
   required PipelineID pipelineID = 1;
   required int64 cmdId = 2;
+}
+
+/**
+This command asks the datanode to refresh disk usage immediately.
+*/
+message RefreshVolumeUsageCommandProto {
+  required int64 cmdId = 1;
 }
 
 message SetNodeOperationalStateCommandProto {

@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
@@ -284,8 +285,7 @@ public class HeartbeatEndpointTask
             .equalsIgnoreCase(datanodeDetails.getUuid()),
         "Unexpected datanode ID in the response.");
     // Verify the response is indeed for this datanode.
-    for (SCMCommandProto commandResponseProto : response
-        .getCommandsList()) {
+    for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
       switch (commandResponseProto.getCommandType()) {
       case reregisterCommand:
         if (rpcEndpoint.getState() == EndPointStates.HEARTBEAT) {
@@ -414,6 +414,15 @@ public class HeartbeatEndpointTask
               finalizeNewLayoutVersionCommand.getId());
         }
         this.context.addCommand(finalizeNewLayoutVersionCommand);
+        break;
+      case refreshVolumeUsageInfo:
+        RefreshVolumeUsageCommand refreshVolumeUsageCommand =
+            RefreshVolumeUsageCommand.getFromProtobuf(
+            commandResponseProto.getRefreshVolumeUsageCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          refreshVolumeUsageCommand.setTerm(commandResponseProto.getTerm());
+        }
+        this.context.addCommand(refreshVolumeUsageCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "
