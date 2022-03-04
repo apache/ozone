@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserInfo;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
 
 /**
  * Interface for OM Requests to convert to audit objects.
@@ -52,6 +54,14 @@ public interface RequestAuditor {
    * @return auditMap.
    */
   Map<String, String> buildVolumeAuditMap(String volume);
+
+  /**
+   * Build auditMap with specified Delegation Token.
+   *
+   * @param token Delegation token.
+   * @return auditMap.
+   */
+  Map<String, String> buildTokenAuditMap(Token<OzoneTokenIdentifier> token);
 
   /**
    * Build auditMap for KeyArgs.

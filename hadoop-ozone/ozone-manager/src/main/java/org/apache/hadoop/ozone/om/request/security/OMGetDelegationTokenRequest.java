@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.request.security;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -42,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Handle GetDelegationToken Request.
@@ -140,7 +143,13 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     Token<OzoneTokenIdentifier> ozoneTokenIdentifierToken =
         OMPBHelper.convertToDelegationToken(tokenProto);
 
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    Map<String, String> auditMap =
+        buildTokenAuditMap(ozoneTokenIdentifierToken);
+
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    IOException exception = null;
 
     try {
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
@@ -166,12 +175,17 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     } catch (IOException ex) {
       LOG.error("Error in Updating DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
+      exception = ex;
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
     }
+
+    auditLog(auditLogger,
+        buildAuditMessage(OMAction.GET_DELEGATION_TOKEN, auditMap, exception,
+            getOmRequest().getUserInfo()));
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Updated delegation token in-memory map: {}",

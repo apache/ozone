@@ -19,7 +19,10 @@
 package org.apache.hadoop.ozone.om.request.security;
 
 import java.io.IOException;
+import java.util.Map;
 
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,6 +114,10 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
         OMPBHelper.convertToDelegationToken(updateRenewDelegationTokenRequest
             .getRenewDelegationTokenRequest().getToken());
 
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    Map<String, String> auditMap =
+        buildTokenAuditMap(ozoneTokenIdentifierToken);
+
     long renewTime = updateRenewDelegationTokenRequest
         .getRenewDelegationTokenResponse().getResponse().getNewExpiryTime();
 
@@ -119,6 +126,8 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
+    IOException exception = null;
+
     try {
 
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
@@ -142,12 +151,17 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     } catch (IOException ex) {
       LOG.error("Error in Updating Renew DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
+      exception = ex;
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
     }
+
+    auditLog(auditLogger,
+        buildAuditMessage(OMAction.GET_DELEGATION_TOKEN, auditMap, exception,
+            getOmRequest().getUserInfo()));
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Updated renew delegation token in-memory map: {} with expiry" +
