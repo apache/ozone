@@ -47,7 +47,13 @@ File upload and directory list
                         Should not contain        ${result}         dir1
                         Should contain            ${result}         file
 
+List buckets with empty access id
+                        Execute                    aws configure set aws_access_key_id ''
+    ${result} =         Execute AWSS3APICli and checkrc         list-buckets    255
+                        Should contain            ${result}         The authorization header you provided is invalid
+
 File upload with special chars
+    Run Keyword         Setup s3 tests
                         Execute                   date > /tmp/testfile
     ${result} =         Execute AWSS3Cli          cp /tmp/testfile s3://${BUCKET}/specialchars/a+b
                         Should contain            ${result}         upload
