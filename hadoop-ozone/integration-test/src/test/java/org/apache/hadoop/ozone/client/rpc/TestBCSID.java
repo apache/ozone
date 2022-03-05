@@ -131,7 +131,8 @@ public class TestBCSID {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setKeyName("ratis")
         .setRefreshPipeline(true)
         .build();

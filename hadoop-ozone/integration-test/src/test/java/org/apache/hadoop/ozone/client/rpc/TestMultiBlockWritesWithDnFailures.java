@@ -178,7 +178,8 @@ public class TestMultiBlockWritesWithDnFailures {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -230,7 +231,8 @@ public class TestMultiBlockWritesWithDnFailures {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();

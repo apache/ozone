@@ -90,11 +90,13 @@ public class TestSCMInstallSnapshot {
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(THREE), "Owner1").getPipelineID());
+            RatisReplicationConfig.getInstance(THREE), "Owner1")
+            .getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     Pipeline ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(ONE), "Owner2").getPipelineID());
+            RatisReplicationConfig.getInstance(ONE), "Owner2")
+            .getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
         .setRpcAddress(new InetSocketAddress("0.0.0.0", 0))

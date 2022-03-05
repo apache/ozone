@@ -448,7 +448,8 @@ public class TestSCMNodeManager {
         .map(DatanodeDetails::getUuidString)
         .collect(Collectors.toSet());
 
-    RatisReplicationConfig replConfig = new RatisReplicationConfig(factor);
+    RatisReplicationConfig replConfig = RatisReplicationConfig
+        .getInstance(factor);
 
     // Wait for the expected number of pipelines using allowed DNs.
     GenericTestUtils.waitFor(() -> {

@@ -106,7 +106,7 @@ public class TestContainerPlacement {
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager = new MockPipelineManager(dbStore,
         scmhaManager, nodeManager);
-    pipelineManager.createPipeline(new RatisReplicationConfig(
+    pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE));
   }
 

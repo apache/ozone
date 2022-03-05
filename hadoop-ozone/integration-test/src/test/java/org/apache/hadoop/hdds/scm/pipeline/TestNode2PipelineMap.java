@@ -74,7 +74,7 @@ public class TestNode2PipelineMap {
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));

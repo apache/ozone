@@ -144,7 +144,7 @@ public class TestOpenContainerCount {
       ContainerInfo containerInfo = new ContainerInfo.Builder()
               .setContainerID(i)
               .setReplicationConfig(
-                      new RatisReplicationConfig(ReplicationFactor.ONE))
+                      RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
               .setState(LifeCycleState.OPEN)
               .setOwner("test")
               .setPipelineID(pipeline.getId())
@@ -162,7 +162,7 @@ public class TestOpenContainerCount {
       ContainerInfo containerInfo = new ContainerInfo.Builder()
               .setContainerID(i)
               .setReplicationConfig(
-                      new RatisReplicationConfig(ReplicationFactor.ONE))
+                      RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
               .setState(LifeCycleState.OPEN)
               .setOwner("test")
               .setPipelineID(pipeline2.getId())
@@ -365,7 +365,7 @@ public class TestOpenContainerCount {
       ContainerInfo closedContainer = new ContainerInfo.Builder()
               .setContainerID(containerID)
               .setReplicationConfig(
-                      new RatisReplicationConfig(ReplicationFactor.ONE))
+                      RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
               .setState(LifeCycleState.CLOSED)
               .setOwner("test")
               .setPipelineID(pipeline.getId())
@@ -379,7 +379,7 @@ public class TestOpenContainerCount {
       ContainerInfo closedContainer = new ContainerInfo.Builder()
               .setContainerID(containerID)
               .setReplicationConfig(
-                      new RatisReplicationConfig(ReplicationFactor.ONE))
+                      RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
               .setState(LifeCycleState.CLOSED)
               .setOwner("test")
               .setPipelineID(pipeline2.getId())
