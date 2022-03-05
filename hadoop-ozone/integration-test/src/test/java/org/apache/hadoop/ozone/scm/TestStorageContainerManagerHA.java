@@ -170,7 +170,7 @@ public class TestStorageContainerManagerHA {
     is.close();
     final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setKeyName(keyName)
         .setRefreshPipeline(true).build();

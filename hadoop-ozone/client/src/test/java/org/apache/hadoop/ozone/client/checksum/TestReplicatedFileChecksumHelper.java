@@ -131,7 +131,7 @@ public class TestReplicatedFileChecksumHelper {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setFileEncryptionInfo(null)
         .setAcls(null)
@@ -172,7 +172,8 @@ public class TestReplicatedFileChecksumHelper {
     pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.CLOSED)
         .setNodes(dns)
         .build();
@@ -213,7 +214,7 @@ public class TestReplicatedFileChecksumHelper {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setFileEncryptionInfo(null)
         .setAcls(null)

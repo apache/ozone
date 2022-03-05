@@ -733,8 +733,8 @@ public class TestContainerBalancer {
   private ContainerInfo createContainer(long id, int multiple) {
     return new ContainerInfo.Builder()
         .setContainerID(id)
-        .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setReplicationConfig(RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.CLOSED)
         .setOwner("TestContainerBalancer")
         .setUsedBytes(OzoneConsts.GB * multiple)

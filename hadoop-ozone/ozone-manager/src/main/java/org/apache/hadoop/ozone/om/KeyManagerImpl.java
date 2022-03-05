@@ -1350,7 +1350,8 @@ public class KeyManagerImpl implements KeyManager {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.ONE))
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(ReplicationFactor.ONE))
         .setFileEncryptionInfo(encInfo)
         .setAcls(acls)
         .build();

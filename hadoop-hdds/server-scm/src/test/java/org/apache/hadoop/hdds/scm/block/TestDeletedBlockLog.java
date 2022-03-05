@@ -164,7 +164,7 @@ public class TestDeletedBlockLog {
     final ContainerInfo container =
         new ContainerInfo.Builder()
             .setContainerID(cid)
-            .setReplicationConfig(new RatisReplicationConfig(THREE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
             .setState(HddsProtos.LifeCycleState.CLOSED)
             .setOwner("TestDeletedBlockLog")
             .setPipelineID(PipelineID.randomId())
@@ -482,7 +482,7 @@ public class TestDeletedBlockLog {
     List<DatanodeDetails> dns = Collections.singletonList(dd);
     Pipeline pipeline = Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setState(Pipeline.PipelineState.OPEN)
             .setId(PipelineID.randomId())
             .setNodes(dns)
