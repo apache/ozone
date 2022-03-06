@@ -166,7 +166,7 @@ public class TestCloseContainerEventHandler {
   @Test
   public void testCloseContainerEventWithValidContainers() throws IOException {
     ContainerInfo container = containerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE), OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     DatanodeDetails datanode = pipelineManager
@@ -185,7 +185,7 @@ public class TestCloseContainerEventHandler {
     GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     ContainerInfo container = containerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     int[] closeCount = new int[3];

@@ -214,7 +214,8 @@ public class TestFailureHandlingByClientFlushDelay {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();

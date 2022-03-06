@@ -378,8 +378,8 @@ public class OzoneManagerServiceProviderImpl
     long inLoopLatestSequenceNumber;
     while (loopCount < deltaUpdateLoopLimit &&
         deltaUpdateCnt >= deltaUpdateLimit) {
-      innerGetAndApplyDeltaUpdatesFromOM(inLoopStartSequenceNumber,
-          omdbUpdatesHandler);
+      innerGetAndApplyDeltaUpdatesFromOM(
+          inLoopStartSequenceNumber, omdbUpdatesHandler);
       inLoopLatestSequenceNumber = getCurrentOMDBSequenceNumber();
       deltaUpdateCnt = inLoopLatestSequenceNumber - inLoopStartSequenceNumber;
       inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
@@ -408,7 +408,9 @@ public class OzoneManagerServiceProviderImpl
         .build();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
     int numUpdates = 0;
+    long latestSequenceNumberOfOM = -1L;
     if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
+      latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       RocksDB rocksDB = rocksDBStore.getDb();
       numUpdates = dbUpdates.getData().size();
@@ -427,8 +429,12 @@ public class OzoneManagerServiceProviderImpl
         }
       }
     }
-    LOG.info("Number of updates received from OM : {}, SequenceNumber diff: {}",
-        numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber);
+    long lag = latestSequenceNumberOfOM == -1 ? 0 :
+        latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();
+    metrics.setSequenceNumberLag(lag);
+    LOG.info("Number of updates received from OM : {}, " +
+            "SequenceNumber diff: {}, SequenceNumber Lag from OM {}.",
+        numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag);
   }
 
   /**
