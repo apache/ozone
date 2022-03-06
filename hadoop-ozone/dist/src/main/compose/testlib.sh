@@ -201,7 +201,7 @@ execute_robot_test(){
 
   copy_daemon_logs
 
-  if [[ ${rc} -gt 0 ]] && [[ ${rc} -lt 250 ]]; then
+  if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
     create_stack_dumps
   fi
 
