@@ -1,10 +1,11 @@
 ---
 title: "Access Control"
-weight: 1
+weight: 13
 menu:
    main:
       parent: "S3 Multi-Tenancy"
 summary: Access Control with Ranger in Ozone Multi-Tenancy
+hideFromSectionPage: true
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -35,7 +36,7 @@ Ranger admin is responsible for manually adding new policies to grant or deny an
 - Allow all users in a tenant read-only access to a bucket.
   - Corresponding Ranger policy Allow Condition: `Roles = tenantName-UserRole, Permissions = READ,LIST`
 
-It is recommended to add new policies instead of editing the default tenant policies. If one has to, **DO NOT** remove the **Policy Label** on those default tenant policies.
+It is recommended to add new policies instead of editing the default tenant policies created by Ozone. **DO NOT** remove the **Policy Label** on those default tenant policies, or else the Ozone Manager might fail to sync with Ranger for those policies.
 
 ### Ranger Roles
 
@@ -53,7 +54,7 @@ We leverage Ranger roles mainly for the advantage of easier user management in a
     - Role admins in a Ranger role has the permission to edit that Ranger role.
 3. And because `tenantName-AdminRole` is the "Role Admin" of `tenantName-UserRole`, whichever user in the `tenantName-AdminRole` automatically has the permission to add new users to the tenant, meaning all tenant admins (whether delegated or not) has the permission to assign and revoke users in this tenant.
 
-- **DO NOT** manually edit any Ranger roles created by the CLI. Any changes to them will be overwritten by the Ranger sync thread.
+- **DO NOT** manually edit any Ranger roles created by Ozone. Any changes to them will be overwritten by the Ozone Manager's Ranger sync thread. Changes in tenant membership should be done using [Multi-Tenancy CLI commands]({{< ref "feature/S3-Tenant-Commands.md" >}}).
 
 
 ### Ranger Sync
@@ -63,4 +64,5 @@ A Ranger Sync thread has been implemented to keep the Ranger policy and role sta
 The Ranger Sync thread does the following:
 1. Cleans up any default tenant policies if a tenant is already deleted.
 2. Checks if default tenant roles are out-of-sync (could be caused by OM crash during user assign/revoke operation). Overwrites them if this is the case.
-
+3. Performs all Ranger update (write) operations queued by Ozone tenant commands from the last sync, if any.
+   - This implies there will be a delay before Ranger policies and roles are updated for any tenant write operations (tenant create/delete, tenant user assign/revoke/assignadmin/revokeadmin, etc.). 

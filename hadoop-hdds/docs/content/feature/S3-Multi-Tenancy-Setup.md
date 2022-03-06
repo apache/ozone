@@ -1,10 +1,11 @@
 ---
 title: "Setup"
-weight: 2
+weight: 11
 menu:
    main:
       parent: "S3 Multi-Tenancy"
 summary: Preparing Ozone clusters to enable Multi-Tenancy feature
+hideFromSectionPage: true
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more

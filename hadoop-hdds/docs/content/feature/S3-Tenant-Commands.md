@@ -1,10 +1,11 @@
 ---
 title: "Tenant commands"
-weight: 3
+weight: 12
 menu:
    main:
       parent: "S3 Multi-Tenancy"
 summary: Ozone subcommands for S3 tenant management
+hideFromSectionPage: true
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more

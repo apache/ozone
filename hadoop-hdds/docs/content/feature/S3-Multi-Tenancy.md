@@ -1,5 +1,6 @@
 ---
 title: "S3 Multi-Tenancy"
+weight: 10
 menu:
    main:
       parent: Features
