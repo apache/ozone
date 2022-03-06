@@ -201,6 +201,10 @@ execute_robot_test(){
 
   copy_daemon_logs
 
+  if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
+    create_stack_dumps
+  fi
+
   set -e
 
   if [[ ${rc} -gt 0 ]]; then
@@ -208,6 +212,17 @@ execute_robot_test(){
   fi
 
   return ${rc}
+}
+
+## @description Create stack dump of each java process in each container
+create_stack_dumps() {
+  local c pid procname
+  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
+    while read -r pid procname; do
+      echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
+      docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
+    done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
+  done
 }
 
 ## @description Copy any 'out' files for daemon processes to the result dir
