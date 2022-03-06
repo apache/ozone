@@ -552,8 +552,15 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Assigned 'bob' to 'research' with accessId"
         + " 'research$bob'.\n", true);
 
-    // Attempt to assign the user to the same tenant under another accessId,
-    //  should fail.
+    // Attempt to assign the user to the tenant again
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob", "--tenant=research",
+        "--accessId=research$bob"});
+    checkOutput(out, "", false);
+    checkOutput(err, "Failed to assign 'bob' to 'research': "
+        + "accessId 'research$bob' already exists!\n", true);
+
+    // Attempt to assign the user to the tenant with a custom accessId
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
         "--accessId=research$bob42"});
