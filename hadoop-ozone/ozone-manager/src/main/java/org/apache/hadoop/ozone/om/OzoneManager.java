@@ -3131,13 +3131,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OmDBTenantInfo tenantInfo =
             metadataManager.getTenantStateTable().get(tenantId);
         if (tenantInfo != null) {
-          s3Volume = metadataManager.getTenantStateTable().get(tenantId)
-              .getBucketNamespaceName();
+          s3Volume = tenantInfo.getBucketNamespaceName();
         } else {
-          String message = "Expected to find a tenant for access ID " +
-              accessId +
-              " but no tenant was found. Possibly inconsistent OM DB!";
-          LOG.error(message);
+          String message = "Unable to find tenant '" + tenantId
+              + "' details for access ID " + accessId
+              + ". The tenant might have been removed during this operation, "
+              + "or the OM DB is inconsistent";
+          LOG.warn(message);
           throw new OMException(message, ResultCodes.TENANT_NOT_FOUND);
         }
         if (LOG.isDebugEnabled()) {
@@ -3147,7 +3147,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
 
         boolean acquiredVolumeLock =
-            getMetadataManager().getLock().acquireWriteLock(
+            getMetadataManager().getLock().acquireReadLock(
                 VOLUME_LOCK, s3Volume);
 
         try {
@@ -3155,7 +3155,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           userPrincipal = OzoneAclUtils.accessIdToUserPrincipal(accessId);
         } finally {
           if (acquiredVolumeLock) {
-            getMetadataManager().getLock().releaseWriteLock(
+            getMetadataManager().getLock().releaseReadLock(
                 VOLUME_LOCK, s3Volume);
           }
         }
