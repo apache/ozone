@@ -46,13 +46,14 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String replicationType;
 
-  @CommandLine.Option(names = {"-r", "--replication"},
+  @CommandLine.Option(
+      names = {"-r", "--replication", "-ffc", "--filterByFactor"},
       description = "Filter listed pipelines by replication, eg ONE, THREE or "
       + "for EC rs-3-2-1024k",
       defaultValue = "")
   private String replication;
 
-  @CommandLine.Option(names = {"-s", "--state"},
+  @CommandLine.Option(names = {"-s", "--state", "-fst", "--filterByState"},
       description = "Filter listed pipelines by State, eg OPEN, CLOSED",
       defaultValue = "")
   private String state;
