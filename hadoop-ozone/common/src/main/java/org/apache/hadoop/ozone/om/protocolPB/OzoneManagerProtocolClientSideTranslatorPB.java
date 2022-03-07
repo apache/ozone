@@ -976,7 +976,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public void createTenant(OmTenantArgs omTenantArgs) throws IOException {
     final CreateTenantRequest request = CreateTenantRequest.newBuilder()
-        .setTenantName(omTenantArgs.getTenantId())
+        .setTenantId(omTenantArgs.getTenantId())
         .setVolumeName(omTenantArgs.getVolumeName())
         // TODO: Add more args like policy names later
         .build();
@@ -1012,8 +1012,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final TenantAssignUserAccessIdRequest request =
         TenantAssignUserAccessIdRequest.newBuilder()
-        .setTenantUsername(username)
-        .setTenantName(tenantId)
+        .setUserPrincipal(username)
+        .setTenantId(tenantId)
         .setAccessId(accessId)
         .build();
     final OMRequest omRequest = createOMRequest(Type.TenantAssignUserAccessId)
@@ -1048,15 +1048,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public void tenantAssignAdmin(String accessId, String tenantName,
+  public void tenantAssignAdmin(String accessId, String tenantId,
       boolean delegated) throws IOException {
 
     final TenantAssignAdminRequest.Builder requestBuilder =
         TenantAssignAdminRequest.newBuilder()
         .setAccessId(accessId)
         .setDelegated(delegated);
-    if (tenantName != null) {
-      requestBuilder.setTenantName(tenantName);
+    if (tenantId != null) {
+      requestBuilder.setTenantId(tenantId);
     }
     final TenantAssignAdminRequest request = requestBuilder.build();
     final OMRequest omRequest = createOMRequest(Type.TenantAssignAdmin)
@@ -1070,14 +1070,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public void tenantRevokeAdmin(String accessId, String tenantName)
+  public void tenantRevokeAdmin(String accessId, String tenantId)
       throws IOException {
 
     final TenantRevokeAdminRequest.Builder requestBuilder =
         TenantRevokeAdminRequest.newBuilder()
             .setAccessId(accessId);
-    if (tenantName != null) {
-      requestBuilder.setTenantName(tenantName);
+    if (tenantId != null) {
+      requestBuilder.setTenantId(tenantId);
     }
     final TenantRevokeAdminRequest request = requestBuilder.build();
     final OMRequest omRequest = createOMRequest(Type.TenantRevokeAdmin)
@@ -1109,10 +1109,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public TenantUserList listUsersInTenant(String tenantName, String prefix)
+  public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
     TenantListUserRequest.Builder builder =
-        TenantListUserRequest.newBuilder().setTenantName(tenantName);
+        TenantListUserRequest.newBuilder().setTenantId(tenantId);
     if (prefix != null) {
       builder.setPrefix(prefix);
     }

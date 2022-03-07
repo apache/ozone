@@ -408,12 +408,12 @@ enum Status {
 
     TENANT_NOT_FOUND = 75;
     TENANT_ALREADY_EXISTS = 76;
-    INVALID_TENANT_NAME = 77;
+    INVALID_TENANT_ID = 77;
 
-    ACCESSID_NOT_FOUND = 78;
-    TENANT_USER_ACCESSID_ALREADY_EXISTS = 79;
-    INVALID_TENANT_USER_NAME = 80;
-    INVALID_ACCESSID = 81;
+    ACCESS_ID_NOT_FOUND = 78;
+    TENANT_USER_ACCESS_ID_ALREADY_EXISTS = 79;
+    INVALID_TENANT_USERNAME = 80;
+    INVALID_ACCESS_ID = 81;
     TENANT_AUTHORIZER_ERROR = 82;
 
     VOLUME_IS_REFERENCED = 83;
@@ -1383,12 +1383,12 @@ message CancelDelegationTokenResponseProto {
 }
 
 message S3Secret {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     required string awsSecret = 2;
 }
 
 message GetS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     optional bool createIfNotExist = 2;
 }
 
@@ -1407,7 +1407,7 @@ message SetS3SecretResponse {
 }
 
 message TenantInfo {
-    optional string tenantName = 1;
+    optional string tenantId = 1;
     optional string bucketNamespaceName = 2;
     optional string accountNamespaceName = 3;
     optional string userPolicyGroupName = 4;
@@ -1415,7 +1415,7 @@ message TenantInfo {
 }
 
 message TenantUserAccessId {
-    optional string user = 1;
+    optional string userPrincipal = 1;
     optional string accessId = 2;
     optional bool isAdmin = 3;
     optional bool isDelegatedAdmin = 4;
@@ -1427,8 +1427,7 @@ message ListTenantRequest {
 }
 
 message ListTenantResponse {
-    optional bool success = 1;  // TODO: Remove this field
-    repeated TenantInfo tenantInfo = 2;
+    repeated TenantInfo tenantInfo = 1;
 }
 
 message TenantGetUserInfoRequest {
@@ -1436,19 +1435,17 @@ message TenantGetUserInfoRequest {
 }
 
 message TenantListUserRequest {
-    optional string tenantName = 1;
+    optional string tenantId = 1;
     optional string prefix = 2;
 }
 
 message TenantGetUserInfoResponse {
-    optional bool success = 1;  // TODO: Remove this field
-    optional TenantUserInfo tenantUserInfo = 2;
+    optional TenantUserInfo tenantUserInfo = 1;
 }
 
 message TenantListUserResponse {
-    optional bool success = 1;  // TODO: Remove this field
-    optional string tenantName = 2;
-    repeated TenantUserAccessId userAccessIdInfo = 3;
+    optional string tenantId = 1;
+    repeated TenantUserAccessId userAccessIdInfo = 2;
 }
 
 message TenantUserInfo {
@@ -1458,7 +1455,7 @@ message TenantUserInfo {
 
 message TenantAccessIdInfo {
     optional string accessId = 1;
-    optional string tenantName = 2;
+    optional string tenantId = 2;
     optional bool isAdmin = 3;
     optional bool isDelegatedAdmin = 4;
 }
@@ -1469,11 +1466,11 @@ message LayoutVersion {
 }
 
 message RevokeS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
 }
 
 message CreateTenantRequest {
-    optional string tenantName = 1;
+    optional string tenantId = 1;  // Tenant name
     optional string tenantDefaultPolicyName = 2;
     optional string volumeName = 3;
 }
@@ -1483,25 +1480,25 @@ message DeleteTenantRequest {
 }
 
 message TenantAssignUserAccessIdRequest {
-    optional string tenantUsername = 1;
-    optional string tenantName = 2;
+    optional string userPrincipal = 1;
+    optional string tenantId = 2;
     optional string accessId = 3;
 }
 
 message TenantRevokeUserAccessIdRequest {
     optional string accessId = 1;
-    optional string tenantName = 2;
+    optional string tenantId = 2;
 }
 
 message TenantAssignAdminRequest {
     optional string accessId = 1;
-    optional string tenantName = 2;
+    optional string tenantId = 2;
     optional bool delegated = 3;
 }
 
 message TenantRevokeAdminRequest {
     optional string accessId = 1;
-    optional string tenantName = 2;
+    optional string tenantId = 2;
 }
 
 message GetS3VolumeContextRequest {
@@ -1509,7 +1506,7 @@ message GetS3VolumeContextRequest {
 }
 
 message CreateTenantResponse {
-    optional bool success = 1;  // TODO: Remove this field
+
 }
 
 message DeleteTenantResponse {
@@ -1518,20 +1515,19 @@ message DeleteTenantResponse {
 }
 
 message TenantAssignUserAccessIdResponse {
-    optional bool success = 1;  // TODO: Remove this field
-    optional S3Secret s3Secret = 2;
+    optional S3Secret s3Secret = 1;
 }
 
 message TenantRevokeUserAccessIdResponse {
-    optional bool success = 1;  // TODO: Remove this field
+
 }
 
 message TenantAssignAdminResponse {
-    optional bool success = 1;  // TODO: Remove this field
+
 }
 
 message TenantRevokeAdminResponse {
-    optional bool success = 1;  // TODO: Remove this field
+
 }
 
 message OmDBAccessInfo {
@@ -1552,7 +1548,7 @@ message GetS3VolumeContextResponse {
   OM's.
 */
 message UpdateGetS3SecretRequest {
-    required string kerberosID = 1;
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
     required string awsSecret = 2;
 }
 

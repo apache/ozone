@@ -49,7 +49,7 @@ public class TenantUserList {
   }
 
   public static TenantUserList fromProtobuf(TenantListUserResponse response) {
-    return new TenantUserList(response.getTenantName(),
+    return new TenantUserList(response.getTenantId(),
         response.getUserAccessIdInfoList());
   }
 

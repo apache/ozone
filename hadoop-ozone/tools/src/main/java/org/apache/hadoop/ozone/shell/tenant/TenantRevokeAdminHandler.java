@@ -44,13 +44,15 @@ public class TenantRevokeAdminHandler extends TenantHandler {
       description = "Tenant name")
   private String tenantId;
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
 
     for (final String accessId : accessIds) {
       try {
-        // TODO: Make tenantRevokeAdmin return accessId, tenantName, user later.
+        // TODO: Make tenantRevokeAdmin return accessId, tenantId, user later.
         objStore.tenantRevokeAdmin(accessId, tenantId);
         err().println("Revoked admin role of '" + accessId +
             (tenantId != null ? "' from tenant '" + tenantId + "'" : ""));

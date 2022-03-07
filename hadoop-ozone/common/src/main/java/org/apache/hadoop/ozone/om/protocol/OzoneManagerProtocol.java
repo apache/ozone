@@ -605,13 +605,13 @@ public interface OzoneManagerProtocol
   /**
    * Assign user to a tenant.
    * @param username user name to be assigned.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param accessId access ID.
    * @return S3SecretValue
    * @throws IOException
    */
   default S3SecretValue tenantAssignUserAccessId(String username,
-                                                 String tenantName,
+                                                 String tenantId,
                                                  String accessId)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
@@ -633,12 +633,12 @@ public interface OzoneManagerProtocol
   /**
    * Assign admin role to a user identified by an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param delegated true if making delegated admin.
    * @throws IOException
    */
   default void tenantAssignAdmin(String accessId,
-                                 String tenantName,
+                                 String tenantId,
                                  boolean delegated)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
@@ -648,11 +648,11 @@ public interface OzoneManagerProtocol
   /**
    * Revoke admin role of an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
   default void tenantRevokeAdmin(String accessId,
-                                 String tenantName) throws IOException {
+                                 String tenantId) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
   }
@@ -666,7 +666,7 @@ public interface OzoneManagerProtocol
   TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException;
 
-  TenantUserList listUsersInTenant(String tenantName, String prefix)
+  TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException;
 
   /**

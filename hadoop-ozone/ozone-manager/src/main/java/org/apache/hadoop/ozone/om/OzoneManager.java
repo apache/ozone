@@ -146,6 +146,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -253,6 +254,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -2962,19 +2964,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw omEx;
     }
 
+    final Table<String, OmDBTenantInfo> tenantStateTable =
+        metadataManager.getTenantStateTable();
+
+    // Won't iterate cache here, mainly because we can't acquire a read lock
+    // for cache iteration: no tenant is specified, hence no volume name to
+    // acquire VOLUME_LOCK on. There could be a few millis delay before entries
+    // are flushed to the table. This should be acceptable for a list tenant
+    // request.
+
+    final TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
+        iterator = tenantStateTable.iterator();
+
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
 
-    // TODO: Iterate cache first. See KeyManagerImpl#listStatus
-
-    TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
-        iterator = metadataManager.getTenantStateTable().iterator();
-
+    // Iterate table
     while (iterator.hasNext()) {
       final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
+      final String tenantId = dbEntry.getKey();
       final OmDBTenantInfo omDBTenantInfo = dbEntry.getValue();
-      assert (dbEntry.getKey().equals(omDBTenantInfo.getTenantId()));
+      assert (tenantId.equals(omDBTenantInfo.getTenantId()));
       tenantInfoList.add(TenantInfo.newBuilder()
-          .setTenantName(omDBTenantInfo.getTenantId())
+          .setTenantId(omDBTenantInfo.getTenantId())
           .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
           .setAccountNamespaceName(omDBTenantInfo.getAccountNamespaceName())
           .setUserPolicyGroupName(omDBTenantInfo.getUserPolicyGroupName())
@@ -3000,7 +3011,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final List<TenantAccessIdInfo> accessIdInfoList = new ArrayList<>();
 
-    // Retrieve a list of accessIds associates to this user principal
+    // Won't iterate cache here for a similar reason as in OM#listTenant
+    //  tenantGetUserInfo lists all accessIds assigned to a user across
+    //  multiple tenants.
+
+    // Retrieve the list of accessIds associated to this user principal
     final OmDBKerberosPrincipalInfo kerberosPrincipalInfo =
         metadataManager.getPrincipalToAccessIdsTable().get(userPrincipal);
     if (kerberosPrincipalInfo == null) {
@@ -3015,17 +3030,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       try {
         final OmDBAccessIdInfo accessIdInfo =
             metadataManager.getTenantAccessIdTable().get(accessId);
-        // Sanity check
         if (accessIdInfo == null) {
-          LOG.error("Potential metadata error. Unexpected null accessIdInfo: "
-              + "entry for accessId '{}' doesn't exist in TenantAccessIdTable",
-              accessId);
-          throw new NullPointerException("accessIdInfo is null");
+          // As we are not acquiring a lock, the accessId entry might have been
+          //  removed from the TenantAccessIdTable already.
+          //  Log a warning (shouldn't happen very often) and move on.
+          LOG.warn("Expected accessId '{}' not found in TenantAccessIdTable. "
+                  + "Might have been removed already.", accessId);
+          return;
         }
         assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
         accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
             .setAccessId(accessId)
-            .setTenantName(accessIdInfo.getTenantId())
+            .setTenantId(accessIdInfo.getTenantId())
             .setIsAdmin(accessIdInfo.getIsAdmin())
             .setIsDelegatedAdmin(accessIdInfo.getIsDelegatedAdmin())
             .build());
@@ -3054,9 +3070,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
+    if (!multiTenantManager.tenantExists(tenantId)) {
+      // Throw exception to the client, which will handle this gracefully
+      throw new OMException("Tenant '" + tenantId + "' not found",
+          TENANT_NOT_FOUND);
+    }
+
+    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
+            getMetadataManager(), tenantId);
+    // TODO: Maybe use multiTenantManager.getTenantInfo(tenantId)
+    //  .getTenantBucketNameSpace() after refactoring
+
     final Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.TENANT, tenantId);
+    auditMap.put(OzoneConsts.VOLUME, volumeName);
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
+
+    boolean lockAcquired =
+        metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
     try {
       String userName = getRemoteUser().getUserName();
       if (!multiTenantManager.isTenantAdmin(userName, tenantId)
@@ -3064,7 +3095,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw new IOException("Only tenant and ozone admins can access this " +
             "API. '" + userName + "' is not an admin.");
       }
-
       final TenantUserList userList =
           multiTenantManager.listUsersInTenant(tenantId, prefix);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -3074,6 +3104,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           OMAction.TENANT_LIST_USER, auditMap, ex));
       throw ex;
+    } finally {
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+      }
     }
   }
 
@@ -3087,37 +3121,48 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String userPrincipal = Server.getRemoteUser().getShortUserName();
 
     if (s3Auth != null) {
-      String accessID = s3Auth.getAccessId();
-      // TODO HDDS-6063: Volume lock is needed here along with the other
-      //  multi-tenant read requests.
+      String accessId = s3Auth.getAccessId();
       Optional<String> optionalTenantId =
-          multiTenantManager.getTenantForAccessID(accessID);
+          multiTenantManager.getTenantForAccessID(accessId);
 
       if (optionalTenantId.isPresent()) {
-        String tenantId = optionalTenantId.get();
+        final String tenantId = optionalTenantId.get();
+
         OmDBTenantInfo tenantInfo =
             metadataManager.getTenantStateTable().get(tenantId);
         if (tenantInfo != null) {
-          s3Volume = metadataManager.getTenantStateTable().get(tenantId)
-              .getBucketNamespaceName();
+          s3Volume = tenantInfo.getBucketNamespaceName();
         } else {
-          String message = "Expected to find a tenant for access ID " +
-              accessID +
-              " but no tenant was found. Possibly inconsistent OM DB!";
-          LOG.error(message);
+          String message = "Unable to find tenant '" + tenantId
+              + "' details for access ID " + accessId
+              + ". The tenant might have been removed during this operation, "
+              + "or the OM DB is inconsistent";
+          LOG.warn(message);
           throw new OMException(message, ResultCodes.TENANT_NOT_FOUND);
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Get S3 volume request for access ID {} belonging to " +
-                  "tenant {} is directed to the volume {}.", accessID, tenantId,
+                  "tenant {} is directed to the volume {}.", accessId, tenantId,
               s3Volume);
         }
 
-        // Inject user name to the response to be used for KMS on the client
-        userPrincipal = OzoneAclUtils.accessIdToUserPrincipal(accessID);
+        boolean acquiredVolumeLock =
+            getMetadataManager().getLock().acquireReadLock(
+                VOLUME_LOCK, s3Volume);
+
+        try {
+          // Inject user name to the response to be used for KMS on the client
+          userPrincipal = OzoneAclUtils.accessIdToUserPrincipal(accessId);
+        } finally {
+          if (acquiredVolumeLock) {
+            getMetadataManager().getLock().releaseReadLock(
+                VOLUME_LOCK, s3Volume);
+          }
+        }
+
       } else if (LOG.isDebugEnabled()) {
         LOG.debug("No tenant found for access ID {}. Directing " +
-            "requests to default s3 volume {}.", accessID, s3Volume);
+            "requests to default s3 volume {}.", accessId, s3Volume);
       }
     } else if (LOG.isDebugEnabled()) {
       // An old S3 gateway talking to a new OM may not attach the auth info.

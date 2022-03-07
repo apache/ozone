@@ -95,7 +95,7 @@ public class TestOMMultiTenantManagerImpl {
     assertEquals(2, userAccessIds.size());
 
     for (TenantUserAccessId userAccessId : userAccessIds) {
-      String user = userAccessId.getUser();
+      String user = userAccessId.getUserPrincipal();
       if (user.equals("user1")) {
         assertEquals("accessId1", userAccessId.getAccessId());
       } else if (user.equals("seed-user1")) {

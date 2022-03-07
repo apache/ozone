@@ -39,6 +39,8 @@ public class TenantRevokeUserAccessIdHandler extends TenantHandler {
   @CommandLine.Parameters(description = "List of user accessIds", arity = "1..")
   private List<String> accessIds = new ArrayList<>();
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();

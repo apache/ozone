@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
 
+import java.util.Objects;
+
 /**
  * This class is used for storing Ozone tenant info.
  */
-public final class OmDBTenantInfo {
+public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
   /**
    * Name of the tenant.
    */
@@ -67,6 +69,33 @@ public final class OmDBTenantInfo {
     accountNamespaceName = tInfo[2];
     userPolicyGroupName = tInfo[3];
     bucketPolicyGroupName = tInfo[4];
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    OmDBTenantInfo that = (OmDBTenantInfo) o;
+    return Objects.equals(tenantId, that.tenantId)
+        && Objects.equals(bucketNamespaceName, that.bucketNamespaceName)
+        && Objects.equals(accountNamespaceName, that.accountNamespaceName)
+        && Objects.equals(userPolicyGroupName, that.userPolicyGroupName)
+        && Objects.equals(bucketPolicyGroupName, that.bucketPolicyGroupName);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(tenantId, bucketNamespaceName, accountNamespaceName,
+        userPolicyGroupName, bucketPolicyGroupName);
+  }
+
+  @Override
+  public int compareTo(OmDBTenantInfo o) {
+    return this.getTenantId().compareTo(o.getTenantId());
   }
 
   public String getTenantId() {
