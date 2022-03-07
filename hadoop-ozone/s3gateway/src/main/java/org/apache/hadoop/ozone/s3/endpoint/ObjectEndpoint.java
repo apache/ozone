@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -77,6 +78,7 @@ import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 
@@ -87,6 +89,9 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
@@ -173,32 +178,34 @@ public class ObjectEndpoint extends EndpointBase {
       String copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
-      S3StorageType s3StorageType;
-      boolean storageTypeDefault;
-      if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
-        storageTypeDefault = true;
-      } else {
-        s3StorageType = toS3StorageType(storageType);
-        storageTypeDefault = false;
+      // Normal put object
+      OzoneBucket bucket = getBucket(bucketName);
+      ReplicationConfig clientConfiguredReplicationConfig = null;
+      String replication = ozoneConfiguration.get(OZONE_REPLICATION);
+      if (replication != null) {
+        clientConfiguredReplicationConfig = ReplicationConfig.parse(
+            ReplicationType.valueOf(ozoneConfiguration
+                .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
+            replication, ozoneConfiguration);
       }
-      ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      ReplicationConfig replicationConfig = S3Utils
+          .resolveS3ClientSideReplicationConfig(storageType,
+              clientConfiguredReplicationConfig, bucket.getReplicationConfig());
+      boolean storageTypeDefault = false;
+      if (storageType == null || storageType.equals("")) {
+        storageTypeDefault = true;
+      }
 
       if (copyHeader != null) {
         //Copy object, as copy source available.
         CopyObjectResponse copyObjectResponse = copyObject(
-            copyHeader, bucketName, keyPath, replicationType,
-            replicationFactor, storageTypeDefault);
+            copyHeader, bucket, keyPath, replicationConfig, storageTypeDefault);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
 
-      // Normal put object
-      OzoneBucket bucket = getBucket(bucketName);
-
-      output = bucket.createKey(keyPath, length, replicationType,
-          replicationFactor, new HashMap<>());
+      output =
+          bucket.createKey(keyPath, length, replicationConfig, new HashMap<>());
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
@@ -473,7 +480,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (storageType == null || storageType.equals("")) {
         s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
       } else {
-        s3StorageType = toS3StorageType(storageType);
+        s3StorageType = S3Utils.toS3StorageType(storageType);
       }
       ReplicationType replicationType = s3StorageType.getType();
       ReplicationFactor replicationFactor = s3StorageType.getFactor();
@@ -720,10 +727,9 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private CopyObjectResponse copyObject(String copyHeader,
-                                        String destBucket,
+                                        OzoneBucket destBucket,
                                         String destkey,
-                                        ReplicationType replicationType,
-                                        ReplicationFactor replicationFactor,
+                                        ReplicationConfig replicationConfig,
                                         boolean storageTypeDefault)
       throws OS3Exception, IOException {
 
@@ -737,7 +743,8 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       // Checking whether we trying to copying to it self.
 
-      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)) {
+      if (sourceBucket.equals(destBucket.getName()) && sourceKey
+          .equals(destkey)) {
         // When copying to same storage type when storage type is provided,
         // we should not throw exception, as aws cli checks if any of the
         // options like storage type are provided or not when source and
@@ -763,15 +770,15 @@ public class ObjectEndpoint extends EndpointBase {
 
 
       OzoneBucket sourceOzoneBucket = getBucket(sourceBucket);
-      OzoneBucket destOzoneBucket = getBucket(destBucket);
+      OzoneBucket destOzoneBucket = destBucket;
 
       OzoneKeyDetails sourceKeyDetails = sourceOzoneBucket.getKey(sourceKey);
       long sourceKeyLen = sourceKeyDetails.getDataSize();
 
       sourceInputStream = sourceOzoneBucket.readKey(sourceKey);
 
-      destOutputStream = destOzoneBucket.createKey(destkey, sourceKeyLen,
-          replicationType, replicationFactor, new HashMap<>());
+      destOutputStream = destOzoneBucket
+          .createKey(destkey, sourceKeyLen, replicationConfig, new HashMap<>());
 
       IOUtils.copy(sourceInputStream, destOutputStream);
 
@@ -835,15 +842,6 @@ public class ObjectEndpoint extends EndpointBase {
       OS3Exception ex = newError(INVALID_ARGUMENT, header, e);
       ex.setErrorMessage("Copy Source header could not be url-decoded");
       throw ex;
-    }
-  }
-
-  private static S3StorageType toS3StorageType(String storageType)
-      throws OS3Exception {
-    try {
-      return S3StorageType.valueOf(storageType);
-    } catch (IllegalArgumentException ex) {
-      throw newError(INVALID_ARGUMENT, storageType, ex);
     }
   }
 

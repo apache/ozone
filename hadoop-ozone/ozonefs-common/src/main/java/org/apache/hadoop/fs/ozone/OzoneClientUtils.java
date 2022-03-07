@@ -144,7 +144,7 @@ public final class OzoneClientUtils {
     return clientDeterminedReplConfig;
   }
 
-  static ReplicationConfig getClientConfiguredReplicationConfig(
+  public static ReplicationConfig getClientConfiguredReplicationConfig(
       ConfigurationSource config) {
     String replication = config.get(OZONE_REPLICATION);
     if (replication == null) {
