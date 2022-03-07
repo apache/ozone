@@ -102,9 +102,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   }
 
   private boolean isNonClosedRatisThreePipeline(Pipeline p) {
-    return p.getType() == RATIS
-        && RatisReplicationConfig.hasFactor(p.getReplicationConfig(),
-                ReplicationFactor.THREE)
+    return p.getReplicationConfig()
+        .equals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         && !p.isClosed();
   }
 
