@@ -58,7 +58,7 @@ public class TestMultiTenantVolume {
   private static final String TENANT_NAME = "tenant";
   private static final String USER_PRINCIPAL = "username";
   private static final String BUCKET_NAME = "bucket";
-  private static final String ACCESS_ID = UUID.randomUUID().toString();
+  private static final String ACCESS_ID = "tenant$username";
 
   @BeforeClass
   public static void initClusterProvider() throws Exception {
