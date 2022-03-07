@@ -184,7 +184,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
-  private ExecutorService ecReconstructExecutor;
+  private volatile ExecutorService ecReconstructExecutor;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -1717,17 +1717,22 @@ public class RpcClient implements ClientProtocol {
   }
 
   public ExecutorService getECReconstructExecutor() {
-    if (ecReconstructExecutor == null) {
+    // local ref to a volatile to ensure access
+    // to a completed initialized object
+    ExecutorService executor = ecReconstructExecutor;
+    if (executor == null) {
       synchronized (this) {
-        if (ecReconstructExecutor == null) {
+        executor = ecReconstructExecutor;
+        if (executor == null) {
           ecReconstructExecutor = Executors.newFixedThreadPool(
               clientConfig.getEcReconstructStripeReadPoolSize(),
               new ThreadFactoryBuilder()
                   .setNameFormat("ec-reconstruct-reader-TID-%d")
                   .build());
+          executor = ecReconstructExecutor;
         }
       }
     }
-    return ecReconstructExecutor;
+    return executor;
   }
 }
