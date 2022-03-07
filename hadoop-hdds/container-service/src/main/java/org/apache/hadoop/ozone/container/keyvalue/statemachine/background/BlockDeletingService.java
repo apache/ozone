@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -315,7 +314,7 @@ public class BlockDeletingService extends BackgroundService {
             meta.getStore().getBlockDataTable();
 
         // # of blocks to delete is throttled
-        KeyPrefixFilter filter = MetadataKeyFilters.getDeletingKeyFilter();
+        KeyPrefixFilter filter = containerData.getDeletingBlockKeyFilter();
         List<? extends Table.KeyValue<String, BlockData>> toDeleteBlocks =
             blockDataTable
                 .getSequentialRangeKVs(null, (int) blocksToDelete, filter);
@@ -487,13 +486,13 @@ public class BlockDeletingService extends BackgroundService {
       long bytesReleased = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
         for (Long blkLong : entry.getLocalIDList()) {
-          String blk = blkLong.toString();
+          String blk = containerData.blockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
-          LOG.debug("Deleting block {}", blk);
+          LOG.debug("Deleting block {}", blkLong);
           if (blkInfo == null) {
             LOG.warn("Missing delete block(Container = " +
                 container.getContainerData().getContainerID() + ", Block = " +
-                blk);
+                blkLong);
             continue;
           }
           try {
@@ -501,9 +500,9 @@ public class BlockDeletingService extends BackgroundService {
             blocksDeleted++;
             bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
           } catch (InvalidProtocolBufferException e) {
-            LOG.error("Failed to parse block info for block {}", blk, e);
+            LOG.error("Failed to parse block info for block {}", blkLong, e);
           } catch (IOException e) {
-            LOG.error("Failed to delete files for block {}", blk, e);
+            LOG.error("Failed to delete files for block {}", blkLong, e);
           }
         }
       }

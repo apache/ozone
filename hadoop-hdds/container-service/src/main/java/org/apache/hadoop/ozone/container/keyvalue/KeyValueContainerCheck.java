@@ -232,7 +232,8 @@ public class KeyValueContainerCheck {
 
     try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
         BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
-            onDiskContainerData.getContainerID())) {
+            onDiskContainerData.getContainerID(),
+            onDiskContainerData.getUnprefixedKeyFilter())) {
 
       while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
@@ -242,11 +243,11 @@ public class KeyValueContainerCheck {
 
           if (!chunkFile.exists()) {
             // concurrent mutation in Block DB? lookup the block again.
-            String localBlockID =
-                    Long.toString(block.getBlockID().getLocalID());
+            String blockKey =
+                onDiskContainerData.blockKey(block.getBlockID().getLocalID());
             BlockData bdata = db.getStore()
                     .getBlockDataTable()
-                    .get(localBlockID);
+                    .get(blockKey);
             if (bdata != null) {
               throw new IOException("Missing chunk file "
                   + chunkFile.getAbsolutePath());

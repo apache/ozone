@@ -275,7 +275,8 @@ public class TestFailureHandlingByClient {
             .getContainer(containerId1)).getContainerData();
     try (DBHandle containerDb1 = BlockUtils.getDB(containerData1, conf)) {
       BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
-          Long.toString(locationList.get(0).getBlockID().getLocalID()));
+          containerData1.blockKey(locationList.get(0).getBlockID()
+              .getLocalID()));
       // The first Block could have 1 or 2 chunkSize of data
       int block1NumChunks = blockData1.getChunks().size();
       Assert.assertTrue(block1NumChunks >= 1);
@@ -293,7 +294,8 @@ public class TestFailureHandlingByClient {
             .getContainer(containerId2)).getContainerData();
     try (DBHandle containerDb2 = BlockUtils.getDB(containerData2, conf)) {
       BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
-          Long.toString(locationList.get(1).getBlockID().getLocalID()));
+          containerData2.blockKey(locationList.get(1).getBlockID()
+              .getLocalID()));
       // The second Block should have 0.5 chunkSize of data
       Assert.assertEquals(block2ExpectedChunkCount,
           blockData2.getChunks().size());

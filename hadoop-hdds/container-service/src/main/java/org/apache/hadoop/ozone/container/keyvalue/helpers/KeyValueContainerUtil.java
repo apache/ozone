@@ -207,14 +207,14 @@ public final class KeyValueContainerUtil {
 
       // Set pending deleted block count.
       Long pendingDeleteBlockCount =
-          metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
+          metadataTable.get(kvContainerData.pendingDeleteBlockCountKey());
       if (pendingDeleteBlockCount != null) {
         kvContainerData.incrPendingDeletionBlocks(
                 pendingDeleteBlockCount);
       } else {
         // Set pending deleted block count.
         MetadataKeyFilters.KeyPrefixFilter filter =
-                MetadataKeyFilters.getDeletingKeyFilter();
+                kvContainerData.getDeletingBlockKeyFilter();
         int numPendingDeletionBlocks =
             store.getBlockDataTable()
             .getSequentialRangeKVs(null, Integer.MAX_VALUE, filter)
@@ -224,15 +224,14 @@ public final class KeyValueContainerUtil {
 
       // Set delete transaction id.
       Long delTxnId =
-          metadataTable.get(OzoneConsts.DELETE_TRANSACTION_KEY);
+          metadataTable.get(kvContainerData.latestDeleteTxnKey());
       if (delTxnId != null) {
         kvContainerData
             .updateDeleteTransactionId(delTxnId);
       }
 
       // Set BlockCommitSequenceId.
-      Long bcsId = metadataTable.get(
-          OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID);
+      Long bcsId = metadataTable.get(kvContainerData.bcsIdKey());
       if (bcsId != null) {
         kvContainerData
             .updateBlockCommitSequenceId(bcsId);
@@ -241,14 +240,14 @@ public final class KeyValueContainerUtil {
       // Set bytes used.
       // commitSpace for Open Containers relies on usedBytes
       Long bytesUsed =
-          metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED);
+          metadataTable.get(kvContainerData.bytesUsedKey());
       if (bytesUsed != null) {
         isBlockMetadataSet = true;
         kvContainerData.setBytesUsed(bytesUsed);
       }
 
       // Set block count.
-      Long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
+      Long blockCount = metadataTable.get(kvContainerData.blockCountKey());
       if (blockCount != null) {
         isBlockMetadataSet = true;
         kvContainerData.setBlockCount(blockCount);
@@ -301,7 +300,7 @@ public final class KeyValueContainerUtil {
 
     try (BlockIterator<BlockData> blockIter =
              store.getBlockIterator(kvData.getContainerID(),
-                 MetadataKeyFilters.getUnprefixedKeyFilter())) {
+                 kvData.getUnprefixedKeyFilter())) {
 
       while (blockIter.hasNext()) {
         blockCount++;
@@ -316,7 +315,7 @@ public final class KeyValueContainerUtil {
     // Count all deleting blocks.
     try (BlockIterator<BlockData> blockIter =
              store.getBlockIterator(kvData.getContainerID(),
-                 MetadataKeyFilters.getDeletingKeyFilter())) {
+                 kvData.getDeletingBlockKeyFilter())) {
 
       while (blockIter.hasNext()) {
         blockCount++;

@@ -27,10 +27,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -117,17 +115,18 @@ public class BlockManagerImpl implements BlockManager {
         "operation.");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
         "cannot be negative");
+
+    KeyValueContainerData containerData = container.getContainerData();
+
     // We are not locking the key manager since LevelDb serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
-    try (DBHandle db = BlockUtils.
-        getDB(container.getContainerData(), config)) {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
 
       long bcsId = data.getBlockCommitSequenceId();
-      long containerBCSId = container.
-          getContainerData().getBlockCommitSequenceId();
+      long containerBCSId = containerData.getBlockCommitSequenceId();
 
       // default blockCommitSequenceId for any block is 0. It the putBlock
       // request is not coming via Ratis(for test scenarios), it will be 0.
@@ -160,7 +159,7 @@ public class BlockManagerImpl implements BlockManager {
         // If block exists in cache, blockCount should not be incremented.
         if (!isBlockInCache) {
           if (db.getStore().getBlockDataTable().get(
-              Long.toString(localID)) == null) {
+              containerData.blockKey(localID)) == null) {
             // Block does not exist in DB => blockCount needs to be
             // incremented when the block is added into DB.
             incrBlockCount = true;
@@ -168,10 +167,10 @@ public class BlockManagerImpl implements BlockManager {
         }
 
         db.getStore().getBlockDataTable().putWithBatch(
-            batch, Long.toString(localID), data);
+            batch, containerData.blockKey(localID), data);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
-              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
+              batch, containerData.bcsIdKey(), bcsId);
         }
 
         // Set Bytes used, this bytes used will be updated for every write and
@@ -181,14 +180,14 @@ public class BlockManagerImpl implements BlockManager {
         // is only used to compute the bytes used. This is done to keep the
         // current behavior and avoid DB write during write chunk operation.
         db.getStore().getMetadataTable().putWithBatch(
-            batch, OzoneConsts.CONTAINER_BYTES_USED,
-            container.getContainerData().getBytesUsed());
+            batch, containerData.bytesUsedKey(),
+            containerData.getBytesUsed());
 
         // Set Block Count for a container.
         if (incrBlockCount) {
           db.getStore().getMetadataTable().putWithBatch(
-              batch, OzoneConsts.BLOCK_COUNT,
-              container.getContainerData().getBlockCount() + 1);
+              batch, containerData.blockCountKey(),
+              containerData.getBlockCount() + 1);
         }
 
         db.getStore().getBatchHandler().commitBatchOperation(batch);
@@ -201,7 +200,7 @@ public class BlockManagerImpl implements BlockManager {
       // Increment block count and add block to pendingPutBlockCache
       // in-memory after the DB update.
       if (incrBlockCount) {
-        container.getContainerData().incrBlockCount();
+        containerData.incrBlockCount();
       }
 
       // If the Block is not in PendingPutBlockCache (and it is not endOfBlock),
@@ -247,7 +246,7 @@ public class BlockManagerImpl implements BlockManager {
     if (containerBCSId < bcsId) {
       throw new StorageContainerException(
           "Unable to find the block with bcsID " + bcsId + " .Container "
-              + container.getContainerData().getContainerID() + " bcsId is "
+              + containerData.getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
     }
 
@@ -255,7 +254,7 @@ public class BlockManagerImpl implements BlockManager {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      BlockData blockData = getBlockByID(db, blockID);
+      BlockData blockData = getBlockByID(db, blockID, containerData);
       long id = blockData.getBlockID().getBlockCommitSequenceId();
       if (id < bcsId) {
         throw new StorageContainerException(
@@ -283,7 +282,7 @@ public class BlockManagerImpl implements BlockManager {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      BlockData blockData = getBlockByID(db, blockID);
+      BlockData blockData = getBlockByID(db, blockID, containerData);
       return blockData.getSize();
     }
   }
@@ -328,10 +327,11 @@ public class BlockManagerImpl implements BlockManager {
           (KeyValueContainerData) container.getContainerData();
       try (DBHandle db = BlockUtils.getDB(cData, config)) {
         result = new ArrayList<>();
+        String startKey = cData.blockKey(startLocalID);
         List<? extends Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
-                .getSequentialRangeKVs(Long.toString(startLocalID), count,
-                    MetadataKeyFilters.getUnprefixedKeyFilter());
+                .getSequentialRangeKVs(startKey, count,
+                    cData.getUnprefixedKeyFilter());
         for (Table.KeyValue<String, BlockData> entry : range) {
           BlockData data = new BlockData(entry.getValue().getBlockID());
           result.add(data);
@@ -351,9 +351,9 @@ public class BlockManagerImpl implements BlockManager {
     BlockUtils.shutdownCache(ContainerCache.getInstance(config));
   }
 
-  private BlockData getBlockByID(DBHandle db, BlockID blockID)
-      throws IOException {
-    String blockKey = Long.toString(blockID.getLocalID());
+  private BlockData getBlockByID(DBHandle db, BlockID blockID,
+      KeyValueContainerData containerData) throws IOException {
+    String blockKey = containerData.blockKey(blockID.getLocalID());
 
     BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
     if (blockData == null) {

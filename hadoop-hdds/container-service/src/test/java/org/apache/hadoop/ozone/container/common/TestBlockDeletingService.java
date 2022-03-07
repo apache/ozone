@@ -39,11 +39,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -239,8 +237,7 @@ public class TestBlockDeletingService {
     try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
       for (int j = 0; j < numOfBlocksPerContainer; j++) {
         blockID = ContainerTestHelper.getTestBlockID(containerID);
-        String deleteStateName =
-            OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+        String deleteStateName = data.deletingBlockKey(blockID.getLocalID());
         BlockData kd = new BlockData(blockID);
         List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
         putChunksInBlock(numOfChunksPerBlock, j, chunks, buffer, chunkManager,
@@ -271,13 +268,13 @@ public class TestBlockDeletingService {
       putChunksInBlock(numOfChunksPerBlock, i, chunks, buffer, chunkManager,
           container, blockID);
       kd.setChunks(chunks);
-      String bID = null;
       try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
-        bID = blockID.getLocalID() + "";
-        metadata.getStore().getBlockDataTable().put(bID, kd);
+        String blockKey = data.blockKey(blockID.getLocalID());
+        metadata.getStore().getBlockDataTable().put(blockKey, kd);
       } catch (IOException exception) {
         LOG.info("Exception = " + exception);
-        LOG.warn("Failed to put block: " + bID + " in BlockDataTable.");
+        LOG.warn("Failed to put block: " + blockID.getLocalID()
+            + " in BlockDataTable.");
       }
       container.getContainerData().incrPendingDeletionBlocks(1);
 
@@ -348,12 +345,12 @@ public class TestBlockDeletingService {
       container.getContainerData().setBlockCount(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
-          .put(OzoneConsts.BLOCK_COUNT, (long) numOfBlocksPerContainer);
+          .put(data.blockCountKey(), (long) numOfBlocksPerContainer);
       metadata.getStore().getMetadataTable()
-          .put(OzoneConsts.CONTAINER_BYTES_USED,
+          .put(data.bytesUsedKey(),
               chunkLength * numOfChunksPerBlock * numOfBlocksPerContainer);
       metadata.getStore().getMetadataTable()
-          .put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+          .put(data.pendingDeleteBlockCountKey(),
               (long) numOfBlocksPerContainer);
     } catch (IOException exception) {
       LOG.warn("Meta Data update was not successful for container: "
@@ -379,7 +376,7 @@ public class TestBlockDeletingService {
       KeyValueContainerData data) throws IOException {
     if (data.getSchemaVersion().equals(SCHEMA_V1)) {
       return meta.getStore().getBlockDataTable()
-          .getRangeKVs(null, 100, MetadataKeyFilters.getDeletingKeyFilter())
+          .getRangeKVs(null, 100, data.getDeletingBlockKeyFilter())
           .size();
     } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
       int pendingBlocks = 0;
@@ -425,11 +422,10 @@ public class TestBlockDeletingService {
     // Ensure 1 container was created
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, 1, containerData);
-    KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
     Assert.assertEquals(1, containerData.size());
+    KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
 
-    try (DBHandle meta = BlockUtils.getDB(
-        (KeyValueContainerData) containerData.get(0), conf)) {
+    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       Map<Long, Container<?>> containerMap = containerSet.getContainerMapCopy();
       // NOTE: this test assumes that all the container is KetValueContainer and
       // have DeleteTransactionId in KetValueContainerData. If other
@@ -447,7 +443,7 @@ public class TestBlockDeletingService {
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
       Assert.assertEquals(3, getUnderDeletionBlocksCount(meta, data));
       Assert.assertEquals(3, meta.getStore().getMetadataTable()
-          .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
+          .get(data.pendingDeleteBlockCountKey()).longValue());
 
       // Container contains 3 blocks. So, space used by the container
       // should be greater than zero.
@@ -474,9 +470,9 @@ public class TestBlockDeletingService {
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
       Assert.assertEquals(0, meta.getStore().getMetadataTable()
-          .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
+          .get(data.pendingDeleteBlockCountKey()).longValue());
       Assert.assertEquals(0,
-          meta.getStore().getMetadataTable().get(OzoneConsts.BLOCK_COUNT)
+          meta.getStore().getMetadataTable().get(data.blockCountKey())
               .longValue());
     }
 

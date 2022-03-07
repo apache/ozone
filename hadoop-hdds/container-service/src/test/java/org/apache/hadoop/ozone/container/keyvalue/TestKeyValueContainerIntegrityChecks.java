@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -166,10 +165,10 @@ public class TestKeyValueContainerIntegrityChecks {
         blockData.setChunks(chunkList);
 
         // normal key
-        String key = Long.toString(blockID.getLocalID());
+        String key = containerData.blockKey(blockID.getLocalID());
         if (i >= normalBlocks) {
           // deleted key
-          key = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+          key = containerData.deletingBlockKey(blockID.getLocalID());
         }
         metadataStore.getStore().getBlockDataTable().put(key, blockData);
       }

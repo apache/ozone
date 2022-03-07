@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -439,12 +438,11 @@ public class TestBlockDeletion {
       ContainerSet dnContainerSet =
           datanode.getDatanodeStateMachine().getContainer().getContainerSet();
       OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
-        try (DBHandle db = BlockUtils.getDB(
-            (KeyValueContainerData) dnContainerSet
-                .getContainer(blockID.getContainerID()).getContainerData(),
-            conf)) {
+        KeyValueContainerData cData = (KeyValueContainerData) dnContainerSet
+            .getContainer(blockID.getContainerID()).getContainerData();
+        try (DBHandle db = BlockUtils.getDB(cData, conf)) {
           Assert.assertNotNull(db.getStore().getBlockDataTable()
-              .get(Long.toString(blockID.getLocalID())));
+              .get(cData.blockKey(blockID.getLocalID())));
         }
       }, omKeyLocationInfoGroups);
     }
@@ -456,19 +454,18 @@ public class TestBlockDeletion {
       ContainerSet dnContainerSet =
           datanode.getDatanodeStateMachine().getContainer().getContainerSet();
       OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
-        try (DBHandle db = BlockUtils.getDB(
-            (KeyValueContainerData) dnContainerSet
-                .getContainer(blockID.getContainerID()).getContainerData(),
-            conf)) {
+        KeyValueContainerData cData = (KeyValueContainerData) dnContainerSet
+            .getContainer(blockID.getContainerID()).getContainerData();
+        try (DBHandle db = BlockUtils.getDB(cData, conf)) {
           Table<String, BlockData> blockDataTable =
               db.getStore().getBlockDataTable();
 
-          String blockIDString = Long.toString(blockID.getLocalID());
+          String blockKey = cData.blockKey(blockID.getLocalID());
 
-          BlockData blockData = blockDataTable.get(blockIDString);
+          BlockData blockData = blockDataTable.get(blockKey);
           Assert.assertNull(blockData);
 
-          String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockIDString;
+          String deletingKey = cData.deletingBlockKey(blockID.getLocalID());
           Assert.assertNull(blockDataTable.get(deletingKey));
         }
         containerIdsWithDeletedBlocks.add(blockID.getContainerID());
