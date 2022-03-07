@@ -31,6 +31,8 @@ import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -58,6 +60,10 @@ import static org.apache.ratis.util.Preconditions.assertInstanceOf;
  * is derived from the original EC pipeline.
  */
 public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECBlockOutputStreamEntry.class);
+
   private final ECReplicationConfig replicationConfig;
   private final long length;
 
@@ -330,11 +336,19 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       ECBlockOutputStream outputStream,
       CompletableFuture<ContainerProtos.
           ContainerCommandResponseProto> chunkWriteResponseFuture) {
+
+    if (chunkWriteResponseFuture == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Failed to reap response from datanode {}",
+            outputStream.getDatanodeDetails());
+      }
+      return true;
+    }
+
     ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto
         = null;
     try {
-      containerCommandResponseProto = chunkWriteResponseFuture != null ?
-          chunkWriteResponseFuture.get() : null;
+      containerCommandResponseProto = chunkWriteResponseFuture.get();
     } catch (InterruptedException e) {
       outputStream.setIoException(e);
       Thread.currentThread().interrupt();
