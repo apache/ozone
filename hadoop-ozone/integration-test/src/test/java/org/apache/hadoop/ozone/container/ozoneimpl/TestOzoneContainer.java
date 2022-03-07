@@ -55,7 +55,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
  * Tests ozone containers.
  */
 @EnableRuleMigrationSupport
-@Flaky
+@Flaky("HDDS-2263")
 @Timeout(300)
 public class TestOzoneContainer {
 

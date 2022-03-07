@@ -54,7 +54,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Tests for ContainerStateManager.
  */
-@Flaky
+@Flaky("HDDS-1159")
 public class TestContainerStateManagerIntegration {
 
   private static final Logger LOG =

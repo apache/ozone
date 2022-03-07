@@ -63,7 +63,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 /**
  * Test container closing.
  */
-@Flaky
+@Flaky("HDDS-3263")
 public class TestCloseContainerByPipeline {
 
   private static MiniOzoneCluster cluster;
