@@ -425,7 +425,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    *
    * @param opState The operation state of the node
    * @param nodeState The health of the node
-   * @param clientVersion
    * @return List of Datanodes.
    */
   @Override
@@ -874,7 +873,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
+      String ipaddress, String uuid, int clientVersion) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
@@ -900,7 +899,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count) throws IOException {
+      boolean mostUsed, int count, int clientVersion) throws IOException {
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
             .setMostUsed(mostUsed)
