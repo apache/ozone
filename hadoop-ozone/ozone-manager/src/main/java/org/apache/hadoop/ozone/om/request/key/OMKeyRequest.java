@@ -777,6 +777,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * Prepare key for deletion service on overwrite.
    *
    * @param dbOzoneKey key to point to an object in RocksDB
+   * @param keyToDelete OmKeyInfo of a key to be in deleteTable
    * @param omMetadataManager
    * @param trxnLogIndex
    * @param isRatisEnabled
@@ -784,7 +785,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      String dbOzoneKey, OmKeyInfo keyToDelete,
+      @Nonnull String dbOzoneKey, @Nonnull OmKeyInfo keyToDelete,
       OMMetadataManager omMetadataManager, long trxnLogIndex,
       boolean isRatisEnabled) throws IOException {
 
@@ -793,10 +794,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     RepeatedOmKeyInfo keysToDelete =
         omMetadataManager.getDeletedTable().get(dbOzoneKey);
 
-    if (keyToDelete != null) {
-      keysToDelete = OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+    return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
           trxnLogIndex, isRatisEnabled);
-    }
-    return keysToDelete;
   }
 }

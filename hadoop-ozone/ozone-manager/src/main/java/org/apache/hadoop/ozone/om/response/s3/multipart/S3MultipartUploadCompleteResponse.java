@@ -115,8 +115,8 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
           ozoneKey, keyVersionsToDelete);
     }
 
-
-    // update bucket usedBytes, only when total bucket size has changed due to .
+    // update bucket usedBytes, only when total bucket size has changed
+    // due to unused parts cleanup or an overwritten version.
     if (omBucketInfo != null) {
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,
               omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
