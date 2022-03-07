@@ -34,7 +34,8 @@ import picocli.CommandLine;
  * Command to list users in a tenant along with corresponding accessId.
  */
 @CommandLine.Command(name = "list",
-    description = "List Tenant Users")
+    aliases = {"ls"},
+    description = "List users in a tenant")
 public class TenantListUsersHandler extends S3Handler {
 
   @CommandLine.Spec
@@ -48,6 +49,8 @@ public class TenantListUsersHandler extends S3Handler {
       description = "Filter users with this prefix.")
   private String prefix;
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
@@ -60,7 +63,7 @@ public class TenantListUsersHandler extends S3Handler {
       TenantUserList usersInTenant =
           objStore.listUsersInTenant(tenantId, prefix);
       for (TenantUserAccessId accessIdInfo : usersInTenant.getUserAccessIds()) {
-        out().println("- User '" + accessIdInfo.getUser() +
+        out().println("- User '" + accessIdInfo.getUserPrincipal() +
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
       }
     } catch (IOException e) {

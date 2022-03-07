@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
@@ -62,7 +62,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -89,10 +89,10 @@ public class TestS3GetSecretRequest {
 
   // Multi-tenant related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
-  private static final String TENANT_NAME = "finance";
+  private static final String TENANT_ID = "finance";
   private static final String USER_BOB = "bob@EXAMPLE.COM";
   private static final String ACCESS_ID_BOB =
-      TENANT_NAME + TENANT_NAME_USER_NAME_DELIMITER + USER_BOB;
+      TENANT_ID + TENANT_ID_USERNAME_DELIMITER + USER_BOB;
 
   private UserGroupInformation ugiAlice;
 
@@ -137,7 +137,7 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
-    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_NAME))
+    when(omMultiTenantManager.createTenantAccessInAuthorizer(TENANT_ID))
         .thenReturn(tenant);
   }
 
@@ -154,7 +154,7 @@ public class TestS3GetSecretRequest {
         .setCmdType(Type.CreateTenant)
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
-                .setTenantName(tenantNameStr)
+                .setTenantId(tenantNameStr)
                 .setVolumeName(tenantNameStr)
                 .build()
         ).build();
@@ -168,8 +168,8 @@ public class TestS3GetSecretRequest {
         .setCmdType(Type.TenantAssignUserAccessId)
         .setTenantAssignUserAccessIdRequest(
             TenantAssignUserAccessIdRequest.newBuilder()
-                .setTenantName(tenantNameStr)
-                .setTenantUsername(userPrincipalStr)
+                .setTenantId(tenantNameStr)
+                .setUserPrincipal(userPrincipalStr)
                 .setAccessId(accessIdStr)
                 .build()
         ).build();
@@ -340,7 +340,7 @@ public class TestS3GetSecretRequest {
     OMTenantCreateRequest omTenantCreateRequest =
         new OMTenantCreateRequest(
             new OMTenantCreateRequest(
-                createTenantRequest(TENANT_NAME)
+                createTenantRequest(TENANT_ID)
             ).preExecute(ozoneManager)
         );
     // Run validateAndUpdateCache
@@ -353,7 +353,7 @@ public class TestS3GetSecretRequest {
         (OMTenantCreateResponse) omClientResponse;
     // Check response
     Assert.assertTrue(omTenantCreateResponse.getOMResponse().getSuccess());
-    Assert.assertEquals(TENANT_NAME,
+    Assert.assertEquals(TENANT_ID,
         omTenantCreateResponse.getOmDBTenantInfo().getTenantId());
 
 
@@ -362,20 +362,20 @@ public class TestS3GetSecretRequest {
 
     // Additional mock setup needed for pass accessId check
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
-    when(omMultiTenantManager.getDefaultAccessId(TENANT_NAME, USER_BOB))
+    when(omMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB))
         .thenReturn(ACCESS_ID_BOB);
 
     // Run preExecute
-    OMAssignUserToTenantRequest omAssignUserToTenantRequest =
-        new OMAssignUserToTenantRequest(
-            new OMAssignUserToTenantRequest(
-                assignUserToTenantRequest(TENANT_NAME, USER_BOB, ACCESS_ID_BOB)
+    OMTenantAssignUserAccessIdRequest omTenantAssignUserAccessIdRequest =
+        new OMTenantAssignUserAccessIdRequest(
+            new OMTenantAssignUserAccessIdRequest(
+                assignUserToTenantRequest(TENANT_ID, USER_BOB, ACCESS_ID_BOB)
             ).preExecute(ozoneManager)
         );
 
     // Run validateAndUpdateCache
     omClientResponse =
-        omAssignUserToTenantRequest.validateAndUpdateCache(ozoneManager,
+        omTenantAssignUserAccessIdRequest.validateAndUpdateCache(ozoneManager,
             txLogIndex, ozoneManagerDoubleBufferHelper);
 
     // Check response type and cast
@@ -389,7 +389,7 @@ public class TestS3GetSecretRequest {
     Assert.assertTrue(omTenantAssignUserAccessIdResponse.getOMResponse()
         .getSuccess());
     Assert.assertTrue(omTenantAssignUserAccessIdResponse.getOMResponse()
-        .getTenantAssignUserAccessIdResponse().getSuccess());
+        .hasTenantAssignUserAccessIdResponse());
     final OmDBAccessIdInfo omDBAccessIdInfo =
         omTenantAssignUserAccessIdResponse.getOmDBAccessIdInfo();
     Assert.assertNotNull(omDBAccessIdInfo);

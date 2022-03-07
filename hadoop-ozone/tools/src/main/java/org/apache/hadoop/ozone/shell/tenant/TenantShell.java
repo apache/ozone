@@ -30,7 +30,6 @@ import java.util.function.Supplier;
     description = "Shell for multi-tenant specific operations",
     subcommands = {
         TenantCreateHandler.class,
-        TenantModifyHandler.class,
         TenantDeleteHandler.class,
         TenantListHandler.class,
         TenantUserCommands.class,

@@ -558,7 +558,7 @@ public interface ClientProtocol {
    * Returns S3 Secret given kerberos user.
    * Will generate a secret access key for the accessId (=kerberosID)
    * if it doesn't exist.
-   * @param kerberosID
+   * @param kerberosID Access ID
    * @return S3SecretValue
    * @throws IOException
    */

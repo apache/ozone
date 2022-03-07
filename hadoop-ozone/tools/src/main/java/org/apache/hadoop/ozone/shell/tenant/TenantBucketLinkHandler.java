@@ -30,14 +30,13 @@ import picocli.CommandLine.Parameters;
 import java.io.IOException;
 
 /**
- * ozone tenant bucket-link.
+ * ozone tenant linkbucket.
  *
  * Note: Currently this command is exactly the same as `ozone sh bucket link`.
  * We might expand this to add more functionality in the future, and different
  * ObjectStore API(s) would be used by then.
  */
-@CommandLine.Command(name = "bucket-link",
-    aliases = {"link-bucket", "bucketlink", "linkbucket"},
+@CommandLine.Command(name = "linkbucket",
     description = "Create a symlink to another bucket")
 public class TenantBucketLinkHandler extends TenantHandler {
 
@@ -50,6 +49,8 @@ public class TenantBucketLinkHandler extends TenantHandler {
       description = "Address of the link bucket",
       converter = BucketUri.class)
   private OzoneAddress target;
+
+  // TODO: HDDS-6340. Add an option to print JSON result
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)

@@ -214,10 +214,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     if (exception == null) {
       LOG.info("Deleted tenant '{}' and volume '{}'", tenantId, volumeName);
-      // TODO: omMetrics.decNumTenants()
+      // TODO: HDDS-6375: omMetrics.decNumTenants()
     } else {
       LOG.error("Failed to delete tenant '{}'", tenantId, exception);
-      // TODO: omMetrics.incNumTenantDeleteFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantDeleteFails()
     }
     return omClientResponse;
   }

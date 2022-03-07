@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TENANT_NAME_USER_NAME_DELIMITER;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESSID;
+import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantInfo;
-import org.apache.hadoop.ozone.om.multitenant.DefaultOzoneS3Tenant;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
@@ -164,7 +164,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   public Tenant createTenantAccessInAuthorizer(String tenantID)
       throws IOException {
 
-    Tenant tenant = new DefaultOzoneS3Tenant(tenantID);
+    Tenant tenant = new OzoneTenant(tenantID);
     try {
       controlPathLock.writeLock().lock();
 
@@ -260,35 +260,35 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    *      these control path operations.
    *
    * @param principal
-   * @param tenantName
-   * @param accessID
+   * @param tenantId
+   * @param accessId
    * @return Tenant, or null on error
    * @throws IOException
    */
   @Override
   public String assignUserToTenant(BasicUserPrincipal principal,
-                                 String tenantName,
-                                 String accessID) throws IOException {
+                                 String tenantId,
+                                 String accessId) throws IOException {
     ImmutablePair<String, String> userAccessIdPair =
-        new ImmutablePair<>(principal.getName(), accessID);
+        new ImmutablePair<>(principal.getName(), accessId);
     try {
       controlPathLock.writeLock().lock();
 
       LOG.info("Adding user '{}' to tenant '{}' in-memory state.",
-          principal.getName(), tenantName);
+          principal.getName(), tenantId);
       CachedTenantInfo cachedTenantInfo =
-          tenantCache.getOrDefault(tenantName,
-              new CachedTenantInfo(tenantName));
+          tenantCache.getOrDefault(tenantId,
+              new CachedTenantInfo(tenantId));
       cachedTenantInfo.getTenantUsers().add(userAccessIdPair);
 
       final OzoneTenantRolePrincipal roleTenantAllUsers =
-          OzoneTenantRolePrincipal.getUserRole(tenantName);
+          OzoneTenantRolePrincipal.getUserRole(tenantId);
       String roleJsonStr = authorizer.getRole(roleTenantAllUsers);
       String roleId = authorizer.assignUser(principal, roleJsonStr, false);
       return roleId;
     } catch (Exception e) {
-      revokeUserAccessId(accessID);
-      tenantCache.get(tenantName).getTenantUsers().remove(userAccessIdPair);
+      revokeUserAccessId(accessId);
+      tenantCache.get(tenantId).getTenantUsers().remove(userAccessIdPair);
       throw new OMException(e.getMessage(), TENANT_AUTHORIZER_ERROR);
     } finally {
       controlPathLock.writeLock().unlock();
@@ -302,14 +302,14 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessID);
       if (omDBAccessIdInfo == null) {
-        throw new OMException(INVALID_ACCESSID);
+        throw new OMException(INVALID_ACCESS_ID);
       }
-      String tenantName = omDBAccessIdInfo.getTenantId();
-      if (tenantName == null) {
+      String tenantId = omDBAccessIdInfo.getTenantId();
+      if (tenantId == null) {
         LOG.error("Tenant doesn't exist");
         return;
       }
-      tenantCache.get(tenantName).getTenantUsers()
+      tenantCache.get(tenantId).getTenantUsers()
           .remove(new ImmutablePair<>(omDBAccessIdInfo.getUserPrincipal(),
               accessID));
       // TODO: Determine how to replace this code.
@@ -324,11 +324,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   /**
    * {@inheritDoc}
    */
-  public void removeUserAccessIdFromCache(String accessID, String userPrincipal,
-                                          String tenantName) {
+  public void removeUserAccessIdFromCache(String accessId, String userPrincipal,
+                                          String tenantId) {
     try {
-      tenantCache.get(tenantName).getTenantUsers().remove(
-          new ImmutablePair<>(userPrincipal, accessID));
+      tenantCache.get(tenantId).getTenantUsers().remove(
+          new ImmutablePair<>(userPrincipal, accessId));
     } catch (NullPointerException e) {
       // tenantCache is somehow empty. Ignore for now.
       // But how?
@@ -357,7 +357,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   public String getDefaultAccessId(String tenantId, String userPrincipal) {
-    return tenantId + TENANT_NAME_USER_NAME_DELIMITER + userPrincipal;
+    return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrincipal;
   }
 
   @Override
@@ -379,8 +379,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public boolean isTenantAdmin(String user, String tenantName) {
+  public boolean isTenantAdmin(String user, String tenantId) {
     return true;
+  }
+
+  @Override
+  public boolean tenantExists(String tenantId) throws IOException {
+    return omMetadataManager.getTenantStateTable().isExist(tenantId);
   }
 
   @Override
@@ -404,7 +409,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         .forEach(
             k -> userAccessIds.add(
                 TenantUserAccessId.newBuilder()
-                    .setUser(k.getKey())
+                    .setUserPrincipal(k.getKey())
                     .setAccessId(k.getValue())
                     .build()));
     return new TenantUserList(tenantID, userAccessIds);
@@ -436,7 +441,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       Optional<String> optionalTenant = getTenantForAccessID(accessID);
       if (!optionalTenant.isPresent()) {
         throw new OMException("No tenant found for access ID " + accessID,
-            INVALID_ACCESSID);
+            INVALID_ACCESS_ID);
       }
       final String tenantId = optionalTenant.get();
 

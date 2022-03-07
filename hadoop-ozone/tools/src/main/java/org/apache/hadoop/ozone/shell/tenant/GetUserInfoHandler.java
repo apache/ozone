@@ -42,6 +42,8 @@ public class GetUserInfoHandler extends TenantHandler {
   @CommandLine.Parameters(description = "List of user principal(s)")
   private List<String> userPrincipals = new ArrayList<>();
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   private boolean isEmptyList(List<String> list) {
     return list == null || list.size() == 0;
   }
@@ -78,7 +80,7 @@ public class GetUserInfoHandler extends TenantHandler {
             adminInfoString = "";
           }
           out().format("- Tenant '%s'%s with accessId '%s'%n",
-              accessIdInfo.getTenantName(), adminInfoString,
+              accessIdInfo.getTenantId(), adminInfoString,
               accessIdInfo.getAccessId());
         }
 

@@ -308,6 +308,9 @@ public final class OMConfigKeys {
       OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
   public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_USER =
       "ozone.om.ranger.https.admin.api.user";
+  // TODO: Note this should be removed once Ranger Java Client is in place.
+  //  And Ranger SPNEGO auth (ranger.spnego.kerberos.principal ?) should be used
+  //  instead. Or keep this solely for dev testing. See HDDS-5836.
   public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD =
       "ozone.om.ranger.https.admin.api.passwd";
   public static final String OZONE_RANGER_HTTPS_ADDRESS_KEY =

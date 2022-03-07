@@ -47,6 +47,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
@@ -76,33 +78,33 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         getOmRequest().getTenantAssignAdminRequest();
 
     final String accessId = request.getAccessId();
-    String tenantName = request.getTenantName();
+    String tenantId = request.getTenantId();
 
-    // If tenantName is not provided, figure it out from the table
-    if (StringUtils.isEmpty(tenantName)) {
-      tenantName = OMTenantRequestHelper.getTenantNameFromAccessId(
+    // If tenantId (tenant name) is not provided, infer it from the accessId
+    if (StringUtils.isEmpty(tenantId)) {
+      tenantId = OMTenantRequestHelper.getTenantIdFromAccessId(
           ozoneManager.getMetadataManager(), accessId);
-      assert (tenantName != null);
+      assert (tenantId != null);
     }
 
-    // Caller should be an Ozone admin or this tenant's delegated admin
-    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantName);
+    checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
 
-    // TODO: Check tenant existence?
+    // Caller should be an Ozone admin or this tenant's delegated admin
+    checkTenantAdmin(ozoneManager, tenantId);
 
     OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
       throw new OMException("accessId '" + accessId + "' not found.",
-          OMException.ResultCodes.ACCESSID_NOT_FOUND);
+          OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
     }
 
     // Check if accessId is assigned to the tenant
-    if (!accessIdInfo.getTenantId().equals(tenantName)) {
+    if (!accessIdInfo.getTenantId().equals(tenantId)) {
       throw new OMException("accessId '" + accessId +
-          "' must be assigned to tenant '" + tenantName + "' first.",
-          OMException.ResultCodes.INVALID_TENANT_NAME);
+          "' must be assigned to tenant '" + tenantId + "' first.",
+          OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
     final boolean delegated;
@@ -120,7 +122,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         .setTenantAssignAdminRequest(
             TenantAssignAdminRequest.newBuilder()
                 .setAccessId(accessId)
-                .setTenantName(tenantName)
+                .setTenantId(tenantId)
                 .setDelegated(delegated)
                 .build())
         .setCmdType(getOmRequest().getCmdType())
@@ -162,7 +164,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     final TenantAssignAdminRequest request =
         getOmRequest().getTenantAssignAdminRequest();
     final String accessId = request.getAccessId();
-    final String tenantId = request.getTenantName();
+    final String tenantId = request.getTenantId();
     final boolean delegated = request.getDelegated();
 
     boolean acquiredVolumeLock = false;
@@ -207,7 +209,8 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
 //          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
       omResponse.setTenantAssignAdminResponse(
-          TenantAssignAdminResponse.newBuilder().setSuccess(true).build());
+          TenantAssignAdminResponse.newBuilder()
+              .build());
       omClientResponse = new OMTenantAssignAdminResponse(omResponse.build(),
           accessId, newOmDBAccessIdInfo);
 
@@ -215,9 +218,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       // Error handling
       handleRequestFailure(ozoneManager);
       exception = ex;
-      // Set success flag to false
-      omResponse.setTenantAssignAdminResponse(
-          TenantAssignAdminResponse.newBuilder().setSuccess(false).build());
+      // Prepare omClientResponse
       omClientResponse = new OMTenantAssignAdminResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
@@ -240,12 +241,12 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Assigned admin to accessId '{}' in tenant '{}', "
               + "delegated: {}", accessId, tenantId, delegated);
-      // TODO: omMetrics.incNumTenantAssignAdmin()
+      // TODO: HDDS-6375: omMetrics.incNumTenantAssignAdmin()
     } else {
       LOG.error("Failed to assign admin to accessId '{}' in tenant '{}', "
               + "delegated: {}: {}",
           accessId, tenantId, delegated, exception.getMessage());
-      // TODO: omMetrics.incNumTenantAssignAdminFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantAssignAdminFails()
     }
     return omClientResponse;
   }

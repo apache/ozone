@@ -51,6 +51,6 @@ public final class OzoneTenantRolePrincipal implements Principal {
 
   @Override
   public String getName() {
-    return tenantID + OzoneConsts.TENANT_NAME_ROLE_DELIMITER + roleName;
+    return tenantID + OzoneConsts.TENANT_ID_ROLE_DELIMITER + roleName;
   }
 }
