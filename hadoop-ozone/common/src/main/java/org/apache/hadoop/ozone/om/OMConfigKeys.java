@@ -292,8 +292,9 @@ public final class OMConfigKeys {
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
 
-  public static final String OZONE_OM_MAX_PENDING_REQ_COUNT =
-      "ozone.om.max.pending.req.count";
-  public static final int OZONE_OM_MAX_PENDING_REQ_COUNT_DEFAULT = 10000;
+  public static final String OZONE_OM_UNFLUSHED_TRANSACTION_MAX_SIZE =
+      "ozone.om.unflushed.transactions.max.size";
+  public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_SIZE_DEFAULT
+      = 10000;
 
 }

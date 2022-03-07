@@ -1601,7 +1601,7 @@
   </property>
 
   <property>
-    <name>ozone.om.max.pending.req.count</name>
+    <name>ozone.om.unflushed.transactions.max.size</name>
     <value>10000</value>
     <tag>OZONE, OM</tag>
     <description>the pending requests here are those requests that have been applied

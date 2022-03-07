@@ -104,7 +104,7 @@ public final class OzoneManagerDoubleBuffer {
 
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
-  private final Semaphore availPendingRequestNum;
+  private final Semaphore unFlushedTransctions;
 
   /**
    * function which will get term associated with the transaction index.
@@ -122,7 +122,7 @@ public final class OzoneManagerDoubleBuffer {
     private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
     private Function<Long, Long> indexToTerm = null;
-    private Semaphore availPendingRequestNum;
+    private int maxUnFlushedTransctions = 0;
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -150,8 +150,8 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    public Builder setAvailPendingRequestNum(Semaphore pendingReqNum) {
-      this.availPendingRequestNum = pendingReqNum;
+    public Builder setMaxUnFlushedTransctions(int maxUnFlushedTransctionSize) {
+      this.maxUnFlushedTransctions = maxUnFlushedTransctionSize;
       return this;
     }
 
@@ -161,18 +161,19 @@ public final class OzoneManagerDoubleBuffer {
                 "OzoneManagerRatisSnapshot should not be null");
         Preconditions.checkNotNull(indexToTerm, "When ratis is enabled " +
             "indexToTerm should not be null");
-        Preconditions.checkNotNull(availPendingRequestNum,
-            "when ratis is enable, availPendingRequestNum should not be null");
+        Preconditions.checkState(maxUnFlushedTransctions > 0L,
+            "when ratis is enable, maxUnFlushedTransctions " +
+                "should be bigger than 0");
       }
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, availPendingRequestNum);
+          isTracingEnabled, indexToTerm, maxUnFlushedTransctions);
     }
   }
 
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
-      Function<Long, Long> indexToTerm, Semaphore availPendingRequestNum) {
+      Function<Long, Long> indexToTerm, int maxUnFlushedTransctions) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
 
@@ -185,7 +186,7 @@ public final class OzoneManagerDoubleBuffer {
       this.currentFutureQueue = null;
       this.readyFutureQueue = null;
     }
-    this.availPendingRequestNum = availPendingRequestNum;
+    this.unFlushedTransctions = new Semaphore(maxUnFlushedTransctions);
     this.omMetadataManager = omMetadataManager;
     this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
     this.ozoneManagerDoubleBufferMetrics =
@@ -198,6 +199,21 @@ public final class OzoneManagerDoubleBuffer {
     daemon.setName("OMDoubleBufferFlushThread");
     daemon.start();
 
+  }
+
+  /**
+   * Acquires the given number of permits from unFlushedTransctions,
+   * blocking until all are available, or the thread is interrupted.
+   */
+  public void acquireUnFlushedTransctions(int n) throws InterruptedException {
+    unFlushedTransctions.acquire(n);
+  }
+  /**
+   *Releases the given number of permits,
+   *returning them to the unFlushedTransctions.
+   */
+  public void releaseUnFlushedTransctions(int n) {
+    unFlushedTransctions.release(n);
   }
 
   // TODO: pass the trace id further down and trace all methods of DBStore.
@@ -345,8 +361,9 @@ public final class OzoneManagerDoubleBuffer {
           cleanupCache(cleanupEpochs);
 
           readyBuffer.clear();
+
           if (isRatisEnabled) {
-            availPendingRequestNum.release(flushedTransactionsSize);
+            releaseUnFlushedTransctions(flushedTransactionsSize);
           }
 
           // update the last updated index in OzoneManagerStateMachine.

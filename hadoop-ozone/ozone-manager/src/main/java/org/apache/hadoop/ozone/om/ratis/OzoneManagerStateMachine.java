@@ -29,7 +29,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -94,7 +93,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
-  private final Semaphore availPendingRequestNum;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -115,10 +113,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
-    int maxPendingReqCount = ozoneManager.getConfiguration()
-        .getInt(OMConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT,
-            OMConfigKeys.OZONE_OM_MAX_PENDING_REQ_COUNT_DEFAULT);
-    this.availPendingRequestNum = new Semaphore(maxPendingReqCount);
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
 
@@ -318,7 +312,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
 
       //if there are too many pending requests, wait for doubleBuffer flushing
-      availPendingRequestNum.acquire();
+      ozoneManagerDoubleBuffer.acquireUnFlushedTransctions(1);
 
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);
@@ -407,10 +401,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+    int maxUnflushedTransactionSize = ozoneManager.getConfiguration()
+        .getInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_SIZE,
+            OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_SIZE_DEFAULT);
     return new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
-        .setAvailPendingRequestNum(availPendingRequestNum)
+        .setMaxUnFlushedTransctions(maxUnflushedTransactionSize)
         .setIndexToTerm(this::getTermForIndex)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
