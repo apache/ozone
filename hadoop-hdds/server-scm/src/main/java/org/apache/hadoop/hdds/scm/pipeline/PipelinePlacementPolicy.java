@@ -39,8 +39,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-
 /**
  * Pipeline placement policy that choose datanodes based on load balancing
  * and network topology to supply pipeline creation.
