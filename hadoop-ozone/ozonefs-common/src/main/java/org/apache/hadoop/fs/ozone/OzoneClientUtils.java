@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
@@ -98,48 +97,37 @@ public final class OzoneClientUtils {
       ReplicationConfig bucketReplConfig, OzoneConfiguration config) {
     ReplicationConfig clientDeterminedReplConfig = null;
 
-    boolean isECBucket = bucketReplConfig != null && bucketReplConfig
-        .getReplicationType() == HddsProtos.ReplicationType.EC;
+    // If client replication config is present, always use client config.
+    // Otherwise, pass null to the server and let server decide.
+    // ReplicationConfig priority: client > bucket > cluster.
 
-    // if bucket replication config configured with EC, we will give high
-    // preference to server side bucket defaults.
-    // Why we give high prefernce to EC is, there is no way for file system
-    // interfaces to pass EC replication. So, if one configures EC at bucket,
-    // we consider EC to take preference. in short, keys created from file
-    // system under EC bucket will always be EC'd.
-    if (isECBucket) {
-      // if bucket is EC, don't bother client provided configs, let's pass
-      // bucket config.
-      clientDeterminedReplConfig = bucketReplConfig;
-    } else {
-      // Let's validate the client side available replication configs.
-      boolean isReplicationInSupportedList =
-          (replication == ReplicationFactor.ONE
-              .getValue() || replication == ReplicationFactor.THREE.getValue());
-      if (isReplicationInSupportedList) {
-        if (clientConfiguredReplConfig != null) {
-          // Uses the replication(short value) passed from file system API and
-          // construct replication config object.
-          // In case if client explicitely configured EC in configurations, we
-          // always take EC as priority as EC replication can't be expressed in
-          // filesystem API.
-          clientDeterminedReplConfig = ReplicationConfig
-              .adjustReplication(clientConfiguredReplConfig, replication,
-                  config);
-        } else {
-          // In file system layers, replication parameter always passed.
-          // so, to respect the API provided replication value, we take RATIS as
-          // default type.
-          clientDeterminedReplConfig = ReplicationConfig
-              .parse(ReplicationType.RATIS, Short.toString(replication),
-                  config);
-        }
+    // Let's validate the client side available replication configs.
+    boolean isReplicationInSupportedList =
+        (replication == ReplicationFactor.ONE
+            .getValue() || replication == ReplicationFactor.THREE.getValue());
+    if (isReplicationInSupportedList) {
+      if (clientConfiguredReplConfig != null) {
+        // Uses the replication(short value) passed from file system API and
+        // construct replication config object.
+        // In case if client explicitely configured EC in configurations, we
+        // always take EC as priority as EC replication can't be expressed in
+        // filesystem API.
+        clientDeterminedReplConfig = ReplicationConfig
+            .adjustReplication(clientConfiguredReplConfig, replication,
+                config);
       } else {
-        // API passed replication number is not in supported replication list.
-        // So, let's use whatever available in client side configured.
-        // By default it will be null, so server will use server defaults.
-        clientDeterminedReplConfig = clientConfiguredReplConfig;
+        // In file system layers, replication parameter always passed.
+        // so, to respect the API provided replication value, we take RATIS as
+        // default type.
+        clientDeterminedReplConfig = ReplicationConfig
+            .parse(ReplicationType.RATIS, Short.toString(replication),
+                config);
       }
+    } else {
+      // API passed replication number is not in supported replication list.
+      // So, let's use whatever available in client side configured.
+      // By default it will be null, so server will use server defaults.
+      clientDeterminedReplConfig = clientConfiguredReplConfig;
     }
     return clientDeterminedReplConfig;
   }

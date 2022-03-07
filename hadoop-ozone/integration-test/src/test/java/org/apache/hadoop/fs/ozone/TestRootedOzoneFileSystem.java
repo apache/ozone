@@ -1633,7 +1633,7 @@ public class TestRootedOzoneFileSystem {
     // Bucket has default EC and client has default RATIS.
     // In this case, it should inherit from bucket
     try (OzoneFSOutputStream file = adapter
-        .createFile(vol + "/" + buck + "/test", (short) 3, true, false)) {
+        .createFile(vol + "/" + buck + "/test", (short) 0, true, false)) {
       file.write(new byte[1024]);
     }
     OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test");
