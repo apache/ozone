@@ -34,7 +34,8 @@ import picocli.CommandLine;
  * Command to list users in a tenant along with corresponding accessId.
  */
 @CommandLine.Command(name = "list",
-    description = "List Tenant Users")
+    aliases = {"ls"},
+    description = "List users in a tenant")
 public class TenantListUsersHandler extends S3Handler {
 
   @CommandLine.Spec

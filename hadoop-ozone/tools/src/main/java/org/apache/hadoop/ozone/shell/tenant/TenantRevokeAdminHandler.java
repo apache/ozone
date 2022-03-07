@@ -55,10 +55,10 @@ public class TenantRevokeAdminHandler extends TenantHandler {
         // TODO: Make tenantRevokeAdmin return accessId, tenantId, user later.
         objStore.tenantRevokeAdmin(accessId, tenantId);
         err().println("Revoked admin role of '" + accessId +
-            (tenantId != null ? "' from tenant '" + tenantId + "'" : ""));
+            (tenantId != null ? "' from tenant '" + tenantId : "") + "'.");
       } catch (IOException e) {
         err().println("Failed to revoke admin role of '" + accessId +
-            (tenantId != null ? "' from tenant '" + tenantId + "'" : "") +
+            (tenantId != null ? "' from tenant '" + tenantId : "") + "'" +
             ": " + e.getMessage());
         if (e instanceof OMException) {
           final OMException omEx = (OMException) e;
