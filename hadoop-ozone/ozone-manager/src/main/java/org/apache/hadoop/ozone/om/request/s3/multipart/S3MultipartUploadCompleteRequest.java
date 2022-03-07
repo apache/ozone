@@ -66,6 +66,8 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -538,7 +540,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   @SuppressWarnings("parameternumber")
   private void updateCache(OMMetadataManager omMetadataManager,
-      String dbBucketKey, OmBucketInfo omBucketInfo,
+      String dbBucketKey, @Nullable OmBucketInfo omBucketInfo,
       String dbOzoneKey, String dbMultipartOpenKey, String dbMultipartKey,
       OmKeyInfo omKeyInfo, long transactionLogIndex) {
     // Update cache.
@@ -556,10 +558,13 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         new CacheKey<>(dbMultipartKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
 
+    // Here, omBucketInfo can be null if its size has not changed. No need to
+    // update the bucket info unless its size has changed. We never want to
+    // delete the bucket info here, but just avoiding unnecessary update.
     if (omBucketInfo != null) {
       omMetadataManager.getBucketTable().addCacheEntry(
-              new CacheKey<>(dbBucketKey),
-              new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          new CacheKey<>(dbBucketKey),
+          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
     }
   }
 
