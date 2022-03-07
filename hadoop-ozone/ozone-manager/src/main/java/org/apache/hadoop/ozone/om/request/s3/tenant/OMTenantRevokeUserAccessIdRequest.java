@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -27,6 +28,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -37,6 +39,7 @@ import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantRevokeUserAccessIdR
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest.Builder;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdResponse;
 import org.slf4j.Logger;
@@ -48,6 +51,8 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
+import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
@@ -55,7 +60,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
 
   - preExecute
     - Check accessId existence
-    - Get tenantName from accessId
+    - Get tenantId (tenant name) from accessId
     - Check caller Ozone admin or tenant admin privilege
     - Throw if accessId is a tenant admin
     - Call Authorizer
@@ -82,47 +87,47 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
     final String accessId = request.getAccessId();
 
-    // As of now, OMTenantRevokeUserAccessIdRequest does not get tenantName
-    //  from the client, we just get it from the OM DB table. Uncomment
-    //  below if we want the request to be similar to OMTenantRevokeAdminRequest
-//    String tenantName = request.getTenantName();
-//    if (tenantName == null) {
-//    }
-
     final OMMetadataManager omMetadataManager =
         ozoneManager.getMetadataManager();
     final OmDBAccessIdInfo accessIdInfo = omMetadataManager
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
-      // Note: This potentially leaks which accessIds exists in OM.
       throw new OMException("accessId '" + accessId + "' doesn't exist",
-          OMException.ResultCodes.ACCESSID_NOT_FOUND);
+          ResultCodes.ACCESS_ID_NOT_FOUND);
     }
 
-    final String tenantName = accessIdInfo.getTenantId();
-    assert (tenantName != null);
-    assert (tenantName.length() > 0);
+    // If tenantId is not specified, we can infer it from the accessId
+    String tenantId = request.getTenantId();
+    if (StringUtils.isEmpty(tenantId)) {
+      tenantId = OMTenantRequestHelper.getTenantIdFromAccessId(
+          ozoneManager.getMetadataManager(), accessId);
+      assert (tenantId != null);
+    }
+
+    // Sanity check
+    checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
 
     // Caller should be an Ozone admin or this tenant's delegated admin
-    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantName);
+    checkTenantAdmin(ozoneManager, tenantId);
 
     if (accessIdInfo.getIsAdmin()) {
-      throw new OMException("accessId '" + accessId + "' is tenant admin of '" +
-          tenantName + "'. Revoke admin first.",
-          OMException.ResultCodes.PERMISSION_DENIED);
+      throw new OMException("accessId '" + accessId + "' is a tenant admin of "
+          + "tenant'" + tenantId + "'. Please revoke its tenant admin "
+          + "privilege before revoking the accessId.",
+          ResultCodes.PERMISSION_DENIED);
     }
 
     // Call OMMTM to revoke user access to tenant
-    // TODO: DOUBLE CHECK destroyUser() behavior
+    // TODO: Check destroyUser() behavior
     ozoneManager.getMultiTenantManager().revokeUserAccessId(accessId);
 
-    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
+    final Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
         .setTenantRevokeUserAccessIdRequest(
             TenantRevokeUserAccessIdRequest.newBuilder()
                 .setAccessId(accessId)
-                .setTenantName(tenantName)
+                .setTenantId(tenantId)
                 .build())
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId());
@@ -149,7 +154,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     final TenantRevokeUserAccessIdRequest request =
         getOmRequest().getTenantRevokeUserAccessIdRequest();
     final String accessId = request.getAccessId();
-    final String tenantId = request.getTenantName();
+    final String tenantId = request.getTenantId();
 
     boolean acquiredS3SecretLock = false;
     boolean acquiredVolumeLock = false;
@@ -209,17 +214,13 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(
-          TenantRevokeUserAccessIdResponse.newBuilder().setSuccess(true).build()
-      );
+          TenantRevokeUserAccessIdResponse.newBuilder()
+              .build());
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           omResponse.build(), accessId, userPrincipal, principalInfo);
     } catch (IOException ex) {
-      // Error handling: do nothing to Authorizer here?
       exception = ex;
-      // Set response success flag to false
-      omResponse.setTenantRevokeUserAccessIdResponse(
-          TenantRevokeUserAccessIdResponse.newBuilder()
-              .setSuccess(false).build());
+      // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
@@ -247,11 +248,11 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked user '{}' accessId '{}' to tenant '{}'",
           userPrincipal, accessId, tenantId);
-      // TODO: omMetrics.incNumTenantRevokeUser()
+      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUser()
     } else {
       LOG.error("Failed to revoke user '{}' accessId '{}' to tenant '{}': {}",
           userPrincipal, accessId, tenantId, exception.getMessage());
-      // TODO: omMetrics.incNumTenantRevokeUserFails()
+      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUserFails()
     }
     return omClientResponse;
   }

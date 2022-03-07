@@ -36,6 +36,8 @@ public abstract class TenantHandler extends Handler {
           " cluster")
   private String omServiceID;
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   public String getOmServiceID() {
     return omServiceID;
   }

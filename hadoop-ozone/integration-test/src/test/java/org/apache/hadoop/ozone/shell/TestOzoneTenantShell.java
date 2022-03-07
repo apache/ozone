@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerRangerPlugin;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMAssignUserToTenantRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -66,6 +66,9 @@ import static org.junit.Assert.fail;
 
 /**
  * Integration test for Ozone tenant shell command. HA enabled.
+ *
+ * TODO: HDDS-6338. Add a Kerberized version of this
+ * TODO: HDDS-6336. Add a mock Ranger server to test Ranger HTTP endpoint calls
  */
 public class TestOzoneTenantShell {
 
@@ -185,9 +188,10 @@ public class TestOzoneTenantShell {
     GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
     // Enable debug logging for interested classes
     GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMAssignUserToTenantRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(MultiTenantAccessAuthorizerRangerPlugin.LOG,
-        Level.DEBUG);
+    GenericTestUtils.setLogLevel(
+        OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(
+        MultiTenantAccessAuthorizerRangerPlugin.LOG, Level.DEBUG);
   }
 
   @After
@@ -667,7 +671,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "list", "--tenant=unknown"});
     checkOutput(err, "Failed to Get Users in tenant 'unknown': " +
-        "Tenant 'unknown' not found!\n", true);
+        "Tenant 'unknown' not found\n", true);
 
     // Clean up
     executeHA(tenantShell, new String[] {

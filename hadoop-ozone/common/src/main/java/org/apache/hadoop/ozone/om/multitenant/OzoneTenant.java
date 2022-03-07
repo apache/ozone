@@ -24,16 +24,16 @@ import org.apache.hadoop.ozone.om.multitenant.impl.AccountNameSpaceImpl;
 import org.apache.hadoop.ozone.om.multitenant.impl.SingleVolumeTenantNamespace;
 
 /**
- * Implements Tenant.
+ * In-memory tenant info. For DB state, see OmDBTenantInfo.
  */
-public class DefaultOzoneS3Tenant implements Tenant {
+public class OzoneTenant implements Tenant {
   private final String tenantID;
   private List<String> tenantRoleIds;
   private List<AccessPolicy> accessPolicies;
   private final AccountNameSpace accountNameSpace;
   private final BucketNameSpace bucketNameSpace;
 
-  public DefaultOzoneS3Tenant(String id) {
+  public OzoneTenant(String id) {
     tenantID = id;
     accessPolicies = new ArrayList<>();
     tenantRoleIds = new ArrayList<>();

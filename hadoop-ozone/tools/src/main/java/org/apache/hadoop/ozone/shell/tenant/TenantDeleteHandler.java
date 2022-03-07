@@ -35,6 +35,8 @@ public class TenantDeleteHandler extends TenantHandler {
   @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
   private String tenantId;
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
