@@ -117,7 +117,7 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -3016,7 +3016,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     //  multiple tenants.
 
     // Retrieve the list of accessIds associated to this user principal
-    final OmDBKerberosPrincipalInfo kerberosPrincipalInfo =
+    final OmDBUserPrincipalInfo kerberosPrincipalInfo =
         metadataManager.getPrincipalToAccessIdsTable().get(userPrincipal);
     if (kerberosPrincipalInfo == null) {
       return null;
@@ -3830,7 +3830,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     try {
-      final OmDBKerberosPrincipalInfo principalInfo =
+      final OmDBUserPrincipalInfo principalInfo =
           getMetadataManager().getPrincipalToAccessIdsTable().get(username);
 
       if (principalInfo == null) {

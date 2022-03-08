@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -89,8 +89,8 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
              Example of accessId: finance$bob@EXAMPLE.COM
       - Value: OmDBAccessIdInfo. Has tenantId, kerberosPrincipal, sharedSecret.
     - New entry or update existing entry in principalToAccessIdsTable:
-      - Key: Kerberos principal of the user.
-      - Value: OmDBKerberosPrincipalInfo. Has accessIds.
+      - Key: User principal. Usually the short name of the Kerberos principal.
+      - Value: OmDBUserPrincipalInfo. Has accessIds.
     - Release VOLUME_LOCK write lock
  */
 
@@ -253,7 +253,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
             OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
-      OmDBKerberosPrincipalInfo principalInfo = omMetadataManager
+      OmDBUserPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
       // Reject if the user is already assigned to the tenant
       if (principalInfo != null) {
@@ -294,7 +294,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
       // Add to principalToAccessIdsTable
       if (principalInfo == null) {
-        principalInfo = new OmDBKerberosPrincipalInfo.Builder()
+        principalInfo = new OmDBUserPrincipalInfo.Builder()
             .setAccessIds(new TreeSet<>(Collections.singleton(accessId)))
             .build();
       } else {

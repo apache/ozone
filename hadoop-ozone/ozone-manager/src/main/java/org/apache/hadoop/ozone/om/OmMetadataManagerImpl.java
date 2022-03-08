@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBAccessIdInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBKerberosPrincipalInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBUserPrincipalInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
@@ -65,7 +65,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -139,7 +139,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
    * |----------------------------------------------------------------------|
-   * | principalToAccessIdsTable | Principal -> OmDBKerberosPrincipalInfo   |
+   * | principalToAccessIdsTable | Principal -> OmDBUserPrincipalInfo       |
    * |----------------------------------------------------------------------|
    * | tenantStateTable          | tenantId -> OmDBTenantInfo               |
    * |----------------------------------------------------------------------|
@@ -468,8 +468,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
         .addCodec(OmDBTenantInfo.class, new OmDBTenantInfoCodec())
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
-        .addCodec(OmDBKerberosPrincipalInfo.class,
-            new OmDBKerberosPrincipalInfoCodec());
+        .addCodec(OmDBUserPrincipalInfo.class,
+            new OmDBUserPrincipalInfoCodec());
   }
 
   /**
@@ -551,10 +551,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         String.class, OmDBAccessIdInfo.class);
     checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE);
 
-    // User principal -> OmDBKerberosPrincipalInfo (A list of accessIds)
+    // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
     principalToAccessIdsTable = this.store.getTable(
         PRINCIPAL_TO_ACCESS_IDS_TABLE,
-        String.class, OmDBKerberosPrincipalInfo.class);
+        String.class, OmDBUserPrincipalInfo.class);
     checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE);
 
     // tenant name -> tenant (tenant states)
@@ -1310,7 +1310,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmDBKerberosPrincipalInfo>
+  public Table<String, OmDBUserPrincipalInfo>
       getPrincipalToAccessIdsTable() {
     return principalToAccessIdsTable;
   }

@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -49,7 +49,7 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
   private S3SecretValue s3SecretValue;
   private String principal, accessId;
   private OmDBAccessIdInfo omDBAccessIdInfo;
-  private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
+  private OmDBUserPrincipalInfo omDBUserPrincipalInfo;
 
   @SuppressWarnings("checkstyle:parameternumber")
   public OMTenantAssignUserAccessIdResponse(@Nonnull OMResponse omResponse,
@@ -57,14 +57,14 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
       @Nonnull String principal,
       @Nonnull String accessId,
       @Nonnull OmDBAccessIdInfo omDBAccessIdInfo,
-      @Nonnull OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo
+      @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo
   ) {
     super(omResponse);
     this.s3SecretValue = s3SecretValue;
     this.principal = principal;
     this.accessId = accessId;
     this.omDBAccessIdInfo = omDBAccessIdInfo;
-    this.omDBKerberosPrincipalInfo = omDBKerberosPrincipalInfo;
+    this.omDBUserPrincipalInfo = omDBUserPrincipalInfo;
   }
 
   /**
@@ -90,7 +90,7 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
     omMetadataManager.getTenantAccessIdTable().putWithBatch(
         batchOperation, accessId, omDBAccessIdInfo);
     omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
-        batchOperation, principal, omDBKerberosPrincipalInfo);
+        batchOperation, principal, omDBUserPrincipalInfo);
   }
 
   @VisibleForTesting

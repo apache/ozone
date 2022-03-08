@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,32 +28,32 @@ import java.io.IOException;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Codec to encode OmDBKerberosPrincipalInfo as byte array.
+ * Codec to encode OmDBUserPrincipalInfo as byte array.
  */
-public class OmDBKerberosPrincipalInfoCodec
-    implements Codec<OmDBKerberosPrincipalInfo> {
+public class OmDBUserPrincipalInfoCodec
+    implements Codec<OmDBUserPrincipalInfo> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmDBKerberosPrincipalInfoCodec.class);
+      LoggerFactory.getLogger(OmDBUserPrincipalInfoCodec.class);
 
   @Override
-  public byte[] toPersistedFormat(OmDBKerberosPrincipalInfo object)
+  public byte[] toPersistedFormat(OmDBUserPrincipalInfo object)
       throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
     return object.getProtobuf().toByteArray();
   }
 
   @Override
-  public OmDBKerberosPrincipalInfo fromPersistedFormat(byte[] rawData)
+  public OmDBUserPrincipalInfo fromPersistedFormat(byte[] rawData)
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OmDBKerberosPrincipalInfo.getFromProtobuf(
+    return OmDBUserPrincipalInfo.getFromProtobuf(
         OzoneManagerProtocolProtos.TenantUserPrincipalInfo.parseFrom(rawData));
   }
 
   @Override
-  public OmDBKerberosPrincipalInfo copyObject(
-      OmDBKerberosPrincipalInfo object) {
+  public OmDBUserPrincipalInfo copyObject(
+      OmDBUserPrincipalInfo object) {
     // Note: Not really a "copy". See OMTransactionInfoCodec
     return object;
   }

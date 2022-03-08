@@ -28,14 +28,14 @@ import java.util.Set;
  * For now this only stores a list of accessIds associates with the user
  * principal.
  */
-public final class OmDBKerberosPrincipalInfo {
+public final class OmDBUserPrincipalInfo {
 
   /**
    * A set of accessIds.
    */
   private final Set<String> accessIds;
 
-  public OmDBKerberosPrincipalInfo(Set<String> accessIds) {
+  public OmDBUserPrincipalInfo(Set<String> accessIds) {
     this.accessIds = new HashSet<>(accessIds);
   }
 
@@ -56,7 +56,7 @@ public final class OmDBKerberosPrincipalInfo {
   }
 
   /**
-   * Convert OmDBKerberosPrincipalInfo to protobuf to be persisted to DB.
+   * Convert OmDBUserPrincipalInfo to protobuf to be persisted to DB.
    */
   public OzoneManagerProtocolProtos.TenantUserPrincipalInfo getProtobuf() {
     return OzoneManagerProtocolProtos.TenantUserPrincipalInfo.newBuilder()
@@ -65,9 +65,9 @@ public final class OmDBKerberosPrincipalInfo {
   }
 
   /**
-   * Convert protobuf to OmDBKerberosPrincipalInfo.
+   * Convert protobuf to OmDBUserPrincipalInfo.
    */
-  public static OmDBKerberosPrincipalInfo getFromProtobuf(
+  public static OmDBUserPrincipalInfo getFromProtobuf(
       OzoneManagerProtocolProtos.TenantUserPrincipalInfo proto) {
     return new Builder()
         .setAccessIds(new HashSet<>(proto.getAccessIdsList()))
@@ -75,7 +75,7 @@ public final class OmDBKerberosPrincipalInfo {
   }
 
   /**
-   * Builder for OmDBKerberosPrincipalInfo.
+   * Builder for OmDBUserPrincipalInfo.
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
@@ -86,8 +86,8 @@ public final class OmDBKerberosPrincipalInfo {
       return this;
     }
 
-    public OmDBKerberosPrincipalInfo build() {
-      return new OmDBKerberosPrincipalInfo(accessIds);
+    public OmDBUserPrincipalInfo build() {
+      return new OmDBUserPrincipalInfo(accessIds);
     }
   }
 }

@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.tenant;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -44,18 +44,18 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_
 public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
 
   private String principal, accessId;
-  private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
+  private OmDBUserPrincipalInfo omDBUserPrincipalInfo;
 
   @SuppressWarnings("checkstyle:parameternumber")
   public OMTenantRevokeUserAccessIdResponse(@Nonnull OMResponse omResponse,
       @Nonnull String accessId,
       @Nonnull String principal,
-      @Nonnull OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo
+      @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo
   ) {
     super(omResponse);
     this.principal = principal;
     this.accessId = accessId;
-    this.omDBKerberosPrincipalInfo = omDBKerberosPrincipalInfo;
+    this.omDBUserPrincipalInfo = omDBUserPrincipalInfo;
   }
 
   /**
@@ -81,9 +81,9 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
     omMetadataManager.getTenantAccessIdTable().deleteWithBatch(
         batchOperation, accessId);
 
-    if (omDBKerberosPrincipalInfo.getAccessIds().size() > 0) {
+    if (omDBUserPrincipalInfo.getAccessIds().size() > 0) {
       omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
-          batchOperation, principal, omDBKerberosPrincipalInfo);
+          batchOperation, principal, omDBUserPrincipalInfo);
     } else {
       // Remove entry from DB if accessId set is empty
       omMetadataManager.getPrincipalToAccessIdsTable().deleteWithBatch(

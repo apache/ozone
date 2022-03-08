@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -361,7 +361,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
 
-  Table<String, OmDBKerberosPrincipalInfo> getPrincipalToAccessIdsTable();
+  Table<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTable();
 
   Table<String, OmDBTenantInfo> getTenantStateTable();
 
