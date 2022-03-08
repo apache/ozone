@@ -17,10 +17,21 @@
  */
 package org.apache.hadoop.hdds;
 
+/**
+ * Base class for component version enums.
+ */
 public interface ComponentVersion {
 
+  /**
+   * Returns the version number the component version enum value has assigned.
+   * @return the version number the component version enum value has assigned.
+   */
   int version();
 
+  /**
+   * Returns the description of the version enum value.
+   * @return the description of the version enum value.
+   */
   String description();
 
   /**
