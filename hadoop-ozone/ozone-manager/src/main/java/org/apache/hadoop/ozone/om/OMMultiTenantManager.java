@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.auth.BasicUserPrincipal;
 
 /**
@@ -177,12 +178,15 @@ public interface OMMultiTenantManager {
   void deactivateUser(String accessID) throws IOException;
 
   /**
-   * Check if a user is a tenant Admin.
-   * @param user user name.
-   * @param tenantId tenant name.
-   * @return
+   * Returns true if user is the tenant's admin or Ozone admin, false otherwise.
+   * @param callerUgi caller's UserGroupInformation
+   * @param tenantId tenant name
+   * @param delegated if set to true, checks if the user is a delegated tenant
+   *                  admin; if set to false, checks if the user is a tenant
+   *                  admin, delegated or not
    */
-  boolean isTenantAdmin(String user, String tenantId);
+  boolean isTenantAdmin(UserGroupInformation callerUgi, String tenantId,
+      Boolean delegated);
 
   /**
    * Check if a tenant exists.

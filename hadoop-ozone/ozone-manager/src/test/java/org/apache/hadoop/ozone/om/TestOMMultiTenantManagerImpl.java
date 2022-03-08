@@ -41,6 +41,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 /**
  * Tests for Multi Tenant Manager APIs.
@@ -77,7 +78,11 @@ public class TestOMMultiTenantManagerImpl {
         new OmDBAccessIdInfo(tenantName, "seed-user1", false, false,
             OzoneConsts.TENANT_ROLE_USER));
 
-    tenantManager = new OMMultiTenantManagerImpl(omMetadataManager, conf);
+    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+    Mockito.when(ozoneManager.getMetadataManager())
+        .thenReturn(omMetadataManager);
+
+    tenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
     assertEquals(1, tenantManager.getTenantCache().size());
     assertEquals(1,
         tenantManager.getTenantCache().get(tenantName).getTenantUsers().size());

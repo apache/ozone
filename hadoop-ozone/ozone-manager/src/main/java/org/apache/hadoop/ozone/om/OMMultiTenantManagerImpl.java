@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
@@ -68,6 +69,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantU
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,25 +91,27 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       "ozone.om.tenant.dev.skip.ranger";
 
   private MultiTenantAccessAuthorizer authorizer;
+  private final OzoneManager ozoneManager;
   private final OMMetadataManager omMetadataManager;
   private final OzoneConfiguration conf;
   private final ReentrantReadWriteLock controlPathLock;
   private final Map<String, CachedTenantInfo> tenantCache;
 
-  OMMultiTenantManagerImpl(OMMetadataManager mgr, OzoneConfiguration conf)
+  OMMultiTenantManagerImpl(OzoneManager ozoneManager, OzoneConfiguration conf)
       throws IOException {
     this.conf = conf;
-    controlPathLock = new ReentrantReadWriteLock();
-    omMetadataManager = mgr;
-    tenantCache = new ConcurrentHashMap<>();
+    this.controlPathLock = new ReentrantReadWriteLock();
+    this.ozoneManager = ozoneManager;
+    this.omMetadataManager = ozoneManager.getMetadataManager();
+    this.tenantCache = new ConcurrentHashMap<>();
     boolean devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER,
         false);
     if (devSkipRanger) {
-      authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
+      this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
     } else {
-      authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
+      this.authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
     }
-    authorizer.init(conf);
+    this.authorizer.init(conf);
     loadUsersFromDB();
   }
 
@@ -378,9 +382,60 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   }
 
-  @Override
-  public boolean isTenantAdmin(String user, String tenantId) {
-    return true;
+  /**
+   * {@inheritDoc}
+   */
+  public boolean isTenantAdmin(UserGroupInformation callerUgi,
+      String tenantId, Boolean delegated) {
+    if (callerUgi == null) {
+      return false;
+    } else {
+      return isTenantAdmin(
+              callerUgi.getShortUserName(), tenantId, delegated)
+          || isTenantAdmin(
+              callerUgi.getUserName(), tenantId, delegated)
+          || ozoneManager.isAdmin(callerUgi.getShortUserName())
+          || ozoneManager.isAdmin(callerUgi.getUserName());
+    }
+  }
+
+  /**
+   * Internal isTenantAdmin method that takes a username String instead of UGI.
+   */
+  private boolean isTenantAdmin(String username, String tenantId,
+      Boolean delegated) {
+    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantId)) {
+      return false;
+    }
+
+    try {
+      final OmDBUserPrincipalInfo principalInfo =
+          omMetadataManager.getPrincipalToAccessIdsTable().get(username);
+
+      if (principalInfo == null) {
+        // The user is not assigned to any tenant
+        return false;
+      }
+
+      // Find accessId assigned to the specified tenant
+      for (final String accessId : principalInfo.getAccessIds()) {
+        final OmDBAccessIdInfo accessIdInfo =
+            omMetadataManager.getTenantAccessIdTable().get(accessId);
+        if (tenantId.equals(accessIdInfo.getTenantId())) {
+          if (!delegated) {
+            return accessIdInfo.getIsAdmin();
+          } else {
+            return accessIdInfo.getIsAdmin()
+                && accessIdInfo.getIsDelegatedAdmin();
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Error while retrieving value for key '" + username
+          + "' in PrincipalToAccessIdsTable");
+    }
+
+    return false;
   }
 
   @Override

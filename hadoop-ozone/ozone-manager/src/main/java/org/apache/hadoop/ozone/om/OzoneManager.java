@@ -650,8 +650,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
-    multiTenantManager = new OMMultiTenantManagerImpl(metadataManager,
-        configuration);
+    multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
     OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
@@ -3089,11 +3088,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean lockAcquired =
         metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
     try {
-      String userName = getRemoteUser().getUserName();
-      if (!multiTenantManager.isTenantAdmin(userName, tenantId)
-          && !omAdminUsernames.contains(userName)) {
-        throw new IOException("Only tenant and ozone admins can access this " +
-            "API. '" + userName + "' is not an admin.");
+      final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+      if (!multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
+        throw new OMException("Only tenant and ozone admins can access this " +
+            "API. '" + ugi.getShortUserName() + "' is not an admin.",
+            PERMISSION_DENIED);
       }
       final TenantUserList userList =
           multiTenantManager.listUsersInTenant(tenantId, prefix);
@@ -3805,58 +3804,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omAdminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD) ||
           omAdminUsernames.contains(username);
     }
-  }
-
-  public boolean isTenantAdmin(UserGroupInformation callerUgi,
-                               String tenantId, Boolean delegated) {
-    if (callerUgi == null) {
-      return false;
-    } else {
-      return isTenantAdmin(callerUgi.getShortUserName(), tenantId, delegated)
-          || isTenantAdmin(callerUgi.getUserName(), tenantId, delegated);
-    }
-  }
-
-  /**
-   * Returns true if user is a tenant's admin, false otherwise.
-   * @param username User name string.
-   * @param tenantId Tenant name string.
-   * @param delegated True if operation requires delegated admin permission.
-   */
-  public boolean isTenantAdmin(String username,
-      String tenantId, Boolean delegated) {
-    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantId)) {
-      return false;
-    }
-
-    try {
-      final OmDBUserPrincipalInfo principalInfo =
-          getMetadataManager().getPrincipalToAccessIdsTable().get(username);
-
-      if (principalInfo == null) {
-        // The user is not assigned to any tenant
-        return false;
-      }
-
-      // Find accessId assigned to the specified tenant
-      for (final String accessId : principalInfo.getAccessIds()) {
-        final OmDBAccessIdInfo accessIdInfo =
-            getMetadataManager().getTenantAccessIdTable().get(accessId);
-        if (tenantId.equals(accessIdInfo.getTenantId())) {
-          if (!delegated) {
-            return accessIdInfo.getIsAdmin();
-          } else {
-            return accessIdInfo.getIsAdmin()
-                && accessIdInfo.getIsDelegatedAdmin();
-          }
-        }
-      }
-    } catch (IOException e) {
-      LOG.error("Error while retrieving value for key '" + username
-          + "' in PrincipalToAccessIdsTable");
-    }
-
-    return false;
   }
 
   /**

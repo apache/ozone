@@ -59,16 +59,17 @@ public final class OMTenantRequestHelper {
   }
 
   /**
-   * Passes check if caller is an Ozone cluster admin or tenant delegated admin,
-   * throws OMException otherwise.
+   * Check if caller is an Ozone cluster admin or tenant (delegated) admin.
+   * Throws PERMISSION_DENIED if the check failed.
+   *
    * @throws OMException PERMISSION_DENIED
    */
   static void checkTenantAdmin(OzoneManager ozoneManager, String tenantId)
       throws OMException {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isTenantAdmin(ugi, tenantId, true)) {
+    if (!ozoneManager.getMultiTenantManager().isTenantAdmin(
+        ugi, tenantId, true)) {
       throw new OMException("User '" + ugi.getUserName() +
           "' is neither an Ozone admin nor a delegated admin of tenant '" +
           tenantId + "'.", OMException.ResultCodes.PERMISSION_DENIED);
@@ -152,8 +153,9 @@ public final class OMTenantRequestHelper {
           OzoneManager ozoneManager, String accessId,
           UserGroupInformation ugi) throws IOException {
 
-    final OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
-            .getTenantAccessIdTable().get(accessId);
+    final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    final OmDBAccessIdInfo accessIdInfo =
+        metadataManager.getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
       // Doesn't have the accessId entry in TenantAccessIdTable.
@@ -182,8 +184,10 @@ public final class OMTenantRequestHelper {
       return true;
     }
 
-    // Check if ugi is an admin of this tenant
-    if (ozoneManager.isTenantAdmin(ugi, tenantId, true)) {
+    // Check if ugi is a tenant admin (or an Ozone cluster admin)
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+    if (multiTenantManager.isTenantAdmin(ugi, tenantId, true)) {
       return true;
     }
 
