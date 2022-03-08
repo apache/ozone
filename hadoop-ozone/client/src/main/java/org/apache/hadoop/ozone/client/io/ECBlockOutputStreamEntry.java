@@ -356,10 +356,18 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       outputStream.setIoException(e);
     }
 
-    if (containerCommandResponseProto != null
-        && outputStream.getIoException() != null) {
+    if (outputStream.getIoException() != null) {
       return true;
     }
+
+    if (containerCommandResponseProto == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Empty response from datanode {}",
+            outputStream.getDatanodeDetails());
+      }
+      return true;
+    }
+
     return false;
   }
 
