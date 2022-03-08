@@ -689,7 +689,7 @@ public class TestPipelinePlacementPolicy {
               .build();
 
           pipelineProto = pipeline.getProtobufMessage(
-              ClientVersions.CURRENT_VERSION);
+              ClientVersion.CURRENT_VERSION);
           nodeManager.addPipeline(pipeline);
           stateManager.addPipeline(pipelineProto);
           pipelineCount++;
@@ -773,7 +773,7 @@ public class TestPipelinePlacementPolicy {
         .build();
 
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
   }
