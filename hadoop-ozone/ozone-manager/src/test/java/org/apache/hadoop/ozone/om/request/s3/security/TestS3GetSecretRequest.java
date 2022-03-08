@@ -359,6 +359,12 @@ public class TestS3GetSecretRequest {
 
     // 2. AssignUserToTenantRequest: Assign "bob@EXAMPLE.COM" to "finance".
     ++txLogIndex;
+
+    // Additional mock setup needed for pass accessId check
+    when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
+    when(omMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB))
+        .thenReturn(ACCESS_ID_BOB);
+
     // Run preExecute
     OMTenantAssignUserAccessIdRequest omTenantAssignUserAccessIdRequest =
         new OMTenantAssignUserAccessIdRequest(
