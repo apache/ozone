@@ -1414,11 +1414,35 @@ message TenantInfo {
     optional string bucketPolicyGroupName = 5;
 }
 
+// For storing extended access ID information (related to a tenant) to OM DB
+// Does not include the access ID value itself
+message ExtendedAccessIdInfo {
+  optional string tenantId = 1;
+  optional string userPrincipal = 2;
+  optional bool isAdmin = 3;
+  optional bool isDelegatedAdmin = 4;
+  optional string roleId = 5;
+}
+
+// For `tenant user info` to store access ID along with its tenant-related info
+message TenantAccessIdInfo {
+  optional string accessId = 1;
+  optional string tenantId = 2;
+  optional bool isAdmin = 3;
+  optional bool isDelegatedAdmin = 4;
+}
+
+message TenantUserInfo {
+  optional string userPrincipal = 1;
+  repeated TenantAccessIdInfo accessIdInfo = 2;
+}
+
+// For `tenant user list` to store all access IDs assigned to the tenant
 message TenantUserAccessId {
-    optional string userPrincipal = 1;
-    optional string accessId = 2;
-    optional bool isAdmin = 3;
-    optional bool isDelegatedAdmin = 4;
+  optional string userPrincipal = 1;
+  optional string accessId = 2;
+  optional bool isAdmin = 3;
+  optional bool isDelegatedAdmin = 4;
 }
 
 
@@ -1446,18 +1470,6 @@ message TenantGetUserInfoResponse {
 message TenantListUserResponse {
     optional string tenantId = 1;
     repeated TenantUserAccessId userAccessIdInfo = 2;
-}
-
-message TenantUserInfo {
-    optional string userPrincipal = 1;
-    repeated TenantAccessIdInfo accessIdInfo = 2;
-}
-
-message TenantAccessIdInfo {
-    optional string accessId = 1;
-    optional string tenantId = 2;
-    optional bool isAdmin = 3;
-    optional bool isDelegatedAdmin = 4;
 }
 
 
@@ -1528,14 +1540,6 @@ message TenantAssignAdminResponse {
 
 message TenantRevokeAdminResponse {
 
-}
-
-message OmDBAccessInfo {
-  optional string tenantId = 1;
-  optional string userPrincipal = 2;
-  optional bool isAdmin = 3;
-  optional bool isDelegatedAdmin = 4;
-  optional string roleId = 5;
 }
 
 message GetS3VolumeContextResponse {

@@ -64,8 +64,8 @@ public final class OmDBAccessIdInfo {
   /**
    * Convert OmDBAccessIdInfo to protobuf to be persisted to DB.
    */
-  public OzoneManagerProtocolProtos.OmDBAccessInfo getProtobuf() {
-    return OzoneManagerProtocolProtos.OmDBAccessInfo.newBuilder()
+  public OzoneManagerProtocolProtos.ExtendedAccessIdInfo getProtobuf() {
+    return OzoneManagerProtocolProtos.ExtendedAccessIdInfo.newBuilder()
         .setTenantId(tenantId)
         .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
@@ -78,7 +78,8 @@ public final class OmDBAccessIdInfo {
    * Convert protobuf to OmDBAccessIdInfo.
    */
   public static OmDBAccessIdInfo getFromProtobuf(
-      OzoneManagerProtocolProtos.OmDBAccessInfo infoProto) throws IOException {
+      OzoneManagerProtocolProtos.ExtendedAccessIdInfo infoProto)
+      throws IOException {
     return new Builder()
         .setTenantId(infoProto.getTenantId())
         .setUserPrincipal(infoProto.getUserPrincipal())
