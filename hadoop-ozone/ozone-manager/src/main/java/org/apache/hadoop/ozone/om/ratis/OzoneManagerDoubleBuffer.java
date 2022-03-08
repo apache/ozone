@@ -122,7 +122,7 @@ public final class OzoneManagerDoubleBuffer {
     private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
     private Function<Long, Long> indexToTerm = null;
-    private int maxUnFlushedTransctions = 0;
+    private int maxUnFlushedTransctionSize = 0;
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -150,8 +150,8 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    public Builder setMaxUnFlushedTransctions(int maxUnFlushedTransctionSize) {
-      this.maxUnFlushedTransctions = maxUnFlushedTransctionSize;
+    public Builder setMaxUnFlushedTransctionSize(int size) {
+      this.maxUnFlushedTransctionSize = size;
       return this;
     }
 
@@ -161,12 +161,12 @@ public final class OzoneManagerDoubleBuffer {
                 "OzoneManagerRatisSnapshot should not be null");
         Preconditions.checkNotNull(indexToTerm, "When ratis is enabled " +
             "indexToTerm should not be null");
-        Preconditions.checkState(maxUnFlushedTransctions > 0L,
+        Preconditions.checkState(maxUnFlushedTransctionSize > 0L,
             "when ratis is enable, maxUnFlushedTransctions " +
                 "should be bigger than 0");
       }
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, maxUnFlushedTransctions);
+          isTracingEnabled, indexToTerm, maxUnFlushedTransctionSize);
     }
   }
 
@@ -208,6 +208,7 @@ public final class OzoneManagerDoubleBuffer {
   public void acquireUnFlushedTransctions(int n) throws InterruptedException {
     unFlushedTransctions.acquire(n);
   }
+
   /**
    *Releases the given number of permits,
    *returning them to the unFlushedTransctions.

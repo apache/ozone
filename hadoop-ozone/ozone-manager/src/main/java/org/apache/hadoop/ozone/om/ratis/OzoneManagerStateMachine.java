@@ -407,7 +407,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
-        .setMaxUnFlushedTransctions(maxUnflushedTransactionSize)
+        .setMaxUnFlushedTransctionSize(maxUnflushedTransactionSize)
         .setIndexToTerm(this::getTermForIndex)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
