@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds;
 /**
  * Versioning for datanode.
  */
-public enum DatanodeVersion {
+public enum DatanodeVersion implements ComponentVersion {
+
+  FUTURE_VERSION(-1, "Used internally in the client when the server side is "
+      + " newer and an unknown server version has arrived to the client."),
 
   DEFAULT_VERSION(0, "Initial version"),
 
@@ -37,10 +40,12 @@ public enum DatanodeVersion {
     this.description = description;
   }
 
+  @Override
   public int version() {
     return version;
   }
 
+  @Override
   public String description() {
     return description;
   }

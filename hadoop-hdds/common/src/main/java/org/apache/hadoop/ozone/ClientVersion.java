@@ -17,10 +17,15 @@
  */
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.hdds.ComponentVersion;
+
 /**
  * Versioning for protocol clients.
  */
-public enum ClientVersion {
+public enum ClientVersion implements ComponentVersion {
+
+  FUTURE_VERSION(-1, "Used internally when the server side is older and an"
+      + " unknown client version has arrived from the client."),
 
   // old client, doesn't even send version number in requests
   DEFAULT_VERSION(0, "Initial version"),
@@ -40,10 +45,12 @@ public enum ClientVersion {
     this.description = description;
   }
 
+  @Override
   public int version() {
     return version;
   }
 
+  @Override
   public String description() {
     return description;
   }
