@@ -247,7 +247,7 @@ public class TestRootedOzoneFileSystem {
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
   }
 
-  private OMMetrics getOMMetrics() {
+  protected OMMetrics getOMMetrics() {
     return cluster.getOzoneManager().getMetrics();
   }
 
@@ -372,7 +372,7 @@ public class TestRootedOzoneFileSystem {
   /**
    * OFS: Helper function for tests. Return a volume name that doesn't exist.
    */
-  private String getRandomNonExistVolumeName() throws IOException {
+  protected String getRandomNonExistVolumeName() throws IOException {
     final int numDigit = 5;
     long retriesLeft = Math.round(Math.pow(10, 5));
     String name = null;

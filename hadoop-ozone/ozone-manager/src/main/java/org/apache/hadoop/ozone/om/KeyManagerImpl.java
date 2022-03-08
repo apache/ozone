@@ -535,6 +535,8 @@ public class KeyManagerImpl implements KeyManager {
       int maxKeys) throws IOException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
+    Preconditions.checkArgument(!isBucketFSOptimized(volumeName, bucketName),
+        "ListKeys called for fso bucket instead of listStatus");
 
     // We don't take a lock in this path, since we walk the
     // underlying table using an iterator. That automatically creates a

@@ -468,6 +468,37 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
+  private class DeleteIteratorWithFSO extends OzoneListingIterator {
+    private final OzoneBucket bucket;
+    private final BasicRootedOzoneClientAdapterImpl adapterImpl;
+    DeleteIteratorWithFSO(Path f)
+        throws IOException {
+      super(f, true);
+      // Initialize bucket here to reduce number of RPC calls
+      OFSPath ofsPath = new OFSPath(f);
+      adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
+      this.bucket = adapterImpl.getBucket(ofsPath, false);
+    }
+
+    @Override
+    boolean processKeyPath(List<String> keyPathList) throws IOException {
+      LOG.trace("Deleting keys: {}", keyPathList);
+      boolean succeed = false;
+      for (String key : keyPathList) {
+        // if key is a directory
+        if (key.endsWith(OZONE_URI_DELIMITER)) {
+          succeed = adapterImpl.deleteObject(key, true);
+        } else {
+          succeed = adapterImpl.deleteObject(key);
+        }
+      }
+      // if recursive delete is requested ignore the return value of
+      // deleteObject and issue deletes for other keys.
+      return  succeed;
+    }
+  }
+
+
   /**
    * Deletes the children of the input dir path by iterating though the
    * DeleteIterator.
@@ -488,6 +519,28 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
   }
+
+  /**
+   * Deletes the children of the bucket i.e all files and dirs under it's
+   * path by iterating though th DeleteIteratorWithFSO.
+   *
+   * @param f directory path to be deleted
+   * @return true if successfully deletes all required keys, false otherwise
+   * @throws IOException
+   */
+  private boolean recursiveBucketDelete(Path f) throws IOException {
+    LOG.trace("delete() path:{}", f);
+    try {
+      DeleteIteratorWithFSO iterator = new DeleteIteratorWithFSO(f);
+      return iterator.iterate();
+    } catch (FileNotFoundException e) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Couldn't delete {} - does not exist", f);
+      }
+      return false;
+    }
+  }
+
 
   /**
    * {@inheritDoc}
@@ -567,7 +620,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
 
-      result = innerDelete(f, recursive);
+      if (ofsPath.isBucket() && isFSObucket(ofsPath.getVolumeName(),
+          ofsPath.getBucketName())) {
+        if (recursive) {
+          result = recursiveBucketDelete(f);
+        } else {
+          throw new PathIsNotEmptyDirectoryException(f.toString());
+        }
+      } else {
+        result = innerDelete(f, recursive);
+      }
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {
@@ -598,6 +660,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     return result;
+  }
+
+  private boolean isFSObucket(String volumeName, String bucketName)
+      throws IOException {
+    OzoneVolume volume =
+        adapterImpl.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    return bucket.getBucketLayout().isFileSystemOptimized();
   }
 
   /**
@@ -944,6 +1014,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     private final FileStatus status;
     private String pathKey;
     private Iterator<BasicKeyInfo> keyIterator;
+    private boolean isFSO;
 
     OzoneListingIterator(Path path)
         throws IOException {
@@ -955,6 +1026,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
       keyIterator = adapter.listKeys(pathKey);
     }
+
+    OzoneListingIterator(Path path, boolean isFSO)
+        throws IOException {
+      this.path = path;
+      this.status = getFileStatus(path);
+      this.pathKey = pathToKey(path);
+      if (status.isDirectory()) {
+        this.pathKey = addTrailingSlashIfNeeded(pathKey);
+      }
+      keyIterator = adapter.listKeys(pathKey);
+      this.isFSO = isFSO;
+    }
+
 
     /**
      * The output of processKey determines if further iteration through the
@@ -973,6 +1057,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      * stopped and returned with false indicating that all the keys could not
      * be processed successfully.
      *
+     * If isFSO is true, call is from DeleteIteratorWithFSO and the list of keys
+     * will only contain immediate children i.e top level dirs and files
+     *
      * @return true if all keys are processed successfully, false otherwise.
      * @throws IOException
      */
@@ -986,21 +1073,40 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         OFSPath ofsPath = new OFSPath(pathKey);
         String ofsPathPrefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
-        while (keyIterator.hasNext()) {
-          BasicKeyInfo key = keyIterator.next();
-          // Convert key to full path before passing it to processKeyPath
-          // TODO: This conversion is redundant. But want to use only full path
-          //  outside AdapterImpl. - Maybe a refactor later.
-          String keyPath = ofsPathPrefix + key.getName();
-          LOG.trace("iterating key path: {}", keyPath);
-          if (!key.getName().equals("")) {
-            keyPathList.add(keyPath);
+        if (isFSO) {
+          FileStatus[] fileStatuses;
+          fileStatuses = listStatus(path);
+          for (FileStatus fileStatus : fileStatuses) {
+            String keyName =
+                new OFSPath(fileStatus.getPath().toString()).getKeyName();
+            keyName = status.isDirectory() ? addTrailingSlashIfNeeded(keyName) :
+                keyName;
+            keyPathList.add(ofsPathPrefix + keyName);
           }
           if (keyPathList.size() >= batchSize) {
             if (!processKeyPath(keyPathList)) {
               return false;
             } else {
               keyPathList.clear();
+            }
+          }
+        } else {
+          while (keyIterator.hasNext()) {
+            BasicKeyInfo key = keyIterator.next();
+            // Convert key to full path before passing it to processKeyPath
+            // TODO: This conversion is redundant. But want to use only
+            //  full path outside AdapterImpl. - Maybe a refactor later.
+            String keyPath = ofsPathPrefix + key.getName();
+            LOG.trace("iterating key path: {}", keyPath);
+            if (!key.getName().equals("")) {
+              keyPathList.add(keyPath);
+            }
+            if (keyPathList.size() >= batchSize) {
+              if (!processKeyPath(keyPathList)) {
+                return false;
+              } else {
+                keyPathList.clear();
+              }
             }
           }
         }
