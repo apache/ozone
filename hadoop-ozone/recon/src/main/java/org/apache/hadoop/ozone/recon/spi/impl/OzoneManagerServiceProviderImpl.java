@@ -58,7 +58,7 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -71,6 +71,10 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -104,6 +108,9 @@ public class OzoneManagerServiceProviderImpl
   private ReconTaskStatusDao reconTaskStatusDao;
   private ReconUtils reconUtils;
   private OzoneManagerSyncMetrics metrics;
+
+  private long deltaUpdateLimit;
+  private int deltaUpdateLoopLimit;
 
   /**
    * OM Snapshot related task names.
@@ -145,17 +152,23 @@ public class OzoneManagerServiceProviderImpl
     String ozoneManagerHttpsAddress = configuration.get(OMConfigKeys
         .OZONE_OM_HTTPS_ADDRESS_KEY);
 
+    long deltaUpdateLimits = configuration.getLong(RECON_OM_DELTA_UPDATE_LIMIT,
+        RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT);
+    int deltaUpdateLoopLimits = configuration.getInt(
+        RECON_OM_DELTA_UPDATE_LOOP_LIMIT,
+        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT);
+
     omSnapshotDBParentDir = reconUtils.getReconDbDir(configuration,
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
 
     HttpConfig.Policy policy = HttpConfig.getHttpPolicy(configuration);
 
     omDBSnapshotUrl = "http://" + ozoneManagerHttpAddress +
-        OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 
     if (policy.isHttpsEnabled()) {
       omDBSnapshotUrl = "https://" + ozoneManagerHttpsAddress +
-          OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+          OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     }
 
     boolean flushParam = configuration.getBoolean(
@@ -176,6 +189,8 @@ public class OzoneManagerServiceProviderImpl
     this.ozoneManagerClient = ozoneManagerClient;
     this.configuration = configuration;
     this.metrics = OzoneManagerSyncMetrics.create();
+    this.deltaUpdateLimit = deltaUpdateLimits;
+    this.deltaUpdateLoopLimit = deltaUpdateLoopLimits;
   }
 
   public void registerOMDBTasks() {
@@ -183,7 +198,7 @@ public class OzoneManagerServiceProviderImpl
         OmSnapshotTaskName.OmDeltaRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OmDeltaRequest.name())){
+        OmSnapshotTaskName.OmDeltaRequest.name())) {
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
           OmSnapshotTaskName.OmDeltaRequest.name());
@@ -193,7 +208,7 @@ public class OzoneManagerServiceProviderImpl
         OmSnapshotTaskName.OmSnapshotRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OmSnapshotRequest.name())){
+        OmSnapshotTaskName.OmSnapshotRequest.name())) {
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
           OmSnapshotTaskName.OmSnapshotRequest.name());
@@ -271,7 +286,7 @@ public class OzoneManagerServiceProviderImpl
           omLeaderUrl = (policy.isHttpsEnabled() ?
               "https://" + info.getServiceAddress(Type.HTTPS) :
               "http://" + info.getServiceAddress(Type.HTTP)) +
-              OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+              OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
         }
       }
     }
@@ -356,14 +371,49 @@ public class OzoneManagerServiceProviderImpl
   void getAndApplyDeltaUpdatesFromOM(
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
+    int loopCount = 0;
+    LOG.info("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
+    long deltaUpdateCnt = Long.MAX_VALUE;
+    long inLoopStartSequenceNumber = fromSequenceNumber;
+    long inLoopLatestSequenceNumber;
+    while (loopCount < deltaUpdateLoopLimit &&
+        deltaUpdateCnt >= deltaUpdateLimit) {
+      innerGetAndApplyDeltaUpdatesFromOM(
+          inLoopStartSequenceNumber, omdbUpdatesHandler);
+      inLoopLatestSequenceNumber = getCurrentOMDBSequenceNumber();
+      deltaUpdateCnt = inLoopLatestSequenceNumber - inLoopStartSequenceNumber;
+      inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
+      loopCount++;
+    }
+    LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
+        getCurrentOMDBSequenceNumber() - fromSequenceNumber
+    );
+  }
+
+  /**
+   * Get Delta updates from OM through RPC call and apply to local OM DB as
+   * well as accumulate in a buffer.
+   * @param fromSequenceNumber from sequence number to request from.
+   * @param omdbUpdatesHandler OM DB updates handler to buffer updates.
+   * @throws IOException when OM RPC request fails.
+   * @throws RocksDBException when writing to RocksDB fails.
+   */
+  @VisibleForTesting
+  void innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
+      OMDBUpdatesHandler omdbUpdatesHandler)
+      throws IOException, RocksDBException {
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
-        .setSequenceNumber(fromSequenceNumber).build();
+        .setSequenceNumber(fromSequenceNumber)
+        .setLimitCount(deltaUpdateLimit)
+        .build();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
-    if (null != dbUpdates) {
+    int numUpdates = 0;
+    long latestSequenceNumberOfOM = -1L;
+    if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
+      latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       RocksDB rocksDB = rocksDBStore.getDb();
-      int numUpdates = dbUpdates.getData().size();
-      LOG.info("Number of updates received from OM : {}", numUpdates);
+      numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
       }
@@ -379,6 +429,12 @@ public class OzoneManagerServiceProviderImpl
         }
       }
     }
+    long lag = latestSequenceNumberOfOM == -1 ? 0 :
+        latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();
+    metrics.setSequenceNumberLag(lag);
+    LOG.info("Number of updates received from OM : {}, " +
+            "SequenceNumber diff: {}, SequenceNumber Lag from OM {}.",
+        numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag);
   }
 
   /**

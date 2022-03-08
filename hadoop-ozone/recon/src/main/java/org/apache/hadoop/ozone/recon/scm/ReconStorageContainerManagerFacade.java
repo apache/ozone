@@ -18,14 +18,18 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
@@ -59,9 +63,16 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -70,6 +81,8 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,11 +103,11 @@ public class ReconStorageContainerManagerFacade
   private final EventQueue eventQueue;
   private final SCMContext scmContext;
   private final SCMStorageConfig scmStorageConfig;
-  private final DBStore dbStore;
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
 
+  private DBStore dbStore;
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
@@ -110,8 +123,8 @@ public class ReconStorageContainerManagerFacade
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
-      ReconContainerMetadataManager reconContainerMetadataManager)
-      throws IOException {
+      ReconContainerMetadataManager reconContainerMetadataManager,
+      ReconUtils reconUtils) throws IOException {
     reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -120,7 +133,7 @@ public class ReconStorageContainerManagerFacade
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
-    this.scmStorageConfig = new ReconStorageConfig(conf);
+    this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
@@ -249,7 +262,15 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    initializePipelinesFromScm();
+    boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
+        ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
+        ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);
+    if (isSCMSnapshotEnabled) {
+      initializeSCMDB();
+      LOG.info("SCM DB initialized");
+    } else {
+      initializePipelinesFromScm();
+    }
     getDatanodeProtocolServer().start();
     this.reconScmTasks.forEach(ReconScmTask::start);
   }
@@ -305,6 +326,111 @@ public class ReconStorageContainerManagerFacade
       LOG.error("Exception encountered while getting pipelines from SCM.",
           ioEx);
     }
+  }
+
+  private void initializeSCMDB() {
+    try {
+      long scmContainersCount = scmServiceProvider.getContainerCount();
+      long reconContainerCount = containerManager.getContainers().size();
+      long threshold = ozoneConfiguration.getInt(
+          ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD,
+          ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
+
+      if (Math.abs(scmContainersCount - reconContainerCount) > threshold) {
+        LOG.info("Recon Container Count: {}, SCM Container Count: {}",
+            reconContainerCount, scmContainersCount);
+        updateReconSCMDBWithNewSnapshot();
+        LOG.info("Updated Recon DB with SCM DB");
+      } else {
+        initializePipelinesFromScm();
+      }
+    } catch (IOException e) {
+      LOG.error("Exception encountered while getting SCM DB.");
+    }
+  }
+
+  public void updateReconSCMDBWithNewSnapshot() throws IOException {
+    DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+    if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
+      LOG.info("Got new checkpoint from SCM : " +
+          dbSnapshot.getCheckpointLocation());
+      try {
+        initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
+      } catch (IOException e) {
+        LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+      }
+    } else {
+      LOG.error("Null snapshot location got from SCM.");
+    }
+  }
+
+  private void deleteOldSCMDB() throws IOException {
+    if (dbStore != null) {
+      File oldDBLocation = dbStore.getDbLocation();
+      if (oldDBLocation.exists()) {
+        LOG.info("Cleaning up old SCM snapshot db at {}.",
+            oldDBLocation.getAbsolutePath());
+        FileUtils.deleteDirectory(oldDBLocation);
+      }
+    }
+  }
+
+  private void initializeNewRdbStore(File dbFile) throws IOException {
+    try {
+      DBStore newStore = createDBAndAddSCMTablesAndCodecs(
+          dbFile, new ReconSCMDBDefinition());
+      Table<UUID, DatanodeDetails> nodeTable =
+          ReconSCMDBDefinition.NODES.getTable(dbStore);
+      Table<UUID, DatanodeDetails> newNodeTable =
+          ReconSCMDBDefinition.NODES.getTable(newStore);
+      TableIterator<UUID, ? extends KeyValue<UUID,
+          DatanodeDetails>> iterator = nodeTable.iterator();
+      while (iterator.hasNext()) {
+        KeyValue<UUID, DatanodeDetails> keyValue = iterator.next();
+        newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+      }
+      sequenceIdGen.reinitialize(
+          ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
+      pipelineManager.reinitialize(
+          ReconSCMDBDefinition.PIPELINES.getTable(newStore));
+      containerManager.reinitialize(
+          ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
+      nodeManager.reinitialize(
+          ReconSCMDBDefinition.NODES.getTable(newStore));
+      deleteOldSCMDB();
+      setDbStore(newStore);
+      File newDb = new File(dbFile.getParent() +
+          OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
+      boolean success = dbFile.renameTo(newDb);
+      if (success) {
+        LOG.info("SCM snapshot linked to Recon DB.");
+      }
+      LOG.info("Created SCM DB handle from snapshot at {}.",
+          dbFile.getAbsolutePath());
+    } catch (IOException ioEx) {
+      LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
+    }
+  }
+
+  private DBStore createDBAndAddSCMTablesAndCodecs(File dbFile,
+      ReconSCMDBDefinition definition) throws IOException {
+    DBStoreBuilder dbStoreBuilder =
+        DBStoreBuilder.newBuilder(ozoneConfiguration)
+            .setName(dbFile.getName())
+            .setPath(dbFile.toPath().getParent());
+    for (DBColumnFamilyDefinition columnFamily :
+        definition.getColumnFamilies()) {
+      dbStoreBuilder.addTable(columnFamily.getName());
+      dbStoreBuilder.addCodec(columnFamily.getKeyType(),
+          columnFamily.getKeyCodec());
+      dbStoreBuilder.addCodec(columnFamily.getValueType(),
+          columnFamily.getValueCodec());
+    }
+    return dbStoreBuilder.build();
+  }
+
+  public void setDbStore(DBStore dbStore) {
+    this.dbStore = dbStore;
   }
 
   @Override

@@ -49,7 +49,7 @@ public class TestSCMRatisRequest {
   }
 
   @Test(expected = InvalidProtocolBufferException.class)
-  public void testEncodeWithNonProto() throws Exception{
+  public void testEncodeWithNonProto() throws Exception {
     PipelineID pipelineID = PipelineID.randomId();
     // Non proto args
     Object[] args = new Object[] {pipelineID};

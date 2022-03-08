@@ -113,6 +113,7 @@ public class TestBlockDeletion {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
@@ -198,7 +199,8 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
@@ -310,7 +312,8 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
@@ -506,7 +509,8 @@ public class TestBlockDeletion {
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keys.get(j)).setDataSize(0)
           .setReplicationConfig(
-              new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+              RatisReplicationConfig
+                  .getInstance(HddsProtos.ReplicationFactor.THREE))
           .setRefreshPipeline(true)
           .build();
       writeClient.deleteKey(keyArgs);

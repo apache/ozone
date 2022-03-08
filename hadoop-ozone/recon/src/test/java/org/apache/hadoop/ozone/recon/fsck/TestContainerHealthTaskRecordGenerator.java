@@ -60,7 +60,8 @@ public class TestContainerHealthTaskRecordGenerator {
     container = mock(ContainerInfo.class);
     when(container.getReplicationConfig())
         .thenReturn(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE));
     when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(

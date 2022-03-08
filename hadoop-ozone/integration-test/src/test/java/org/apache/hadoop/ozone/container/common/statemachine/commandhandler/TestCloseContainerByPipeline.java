@@ -117,7 +117,7 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName(keyName).setRefreshPipeline(true).build();
     OmKeyLocationInfo omKeyLocationInfo =
@@ -174,7 +174,7 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName("standalone")
             .setRefreshPipeline(true)
@@ -233,7 +233,7 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test").
         setBucketName("test")
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setDataSize(1024)
         .setKeyName("ratis").setRefreshPipeline(true).build();
 
@@ -263,7 +263,7 @@ public class TestCloseContainerByPipeline {
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
           .getContainer(containerID);
-      try(ReferenceCountedDB store = BlockUtils.getDB(
+      try (ReferenceCountedDB store = BlockUtils.getDB(
           (KeyValueContainerData) dnContainer.getContainerData(), conf)) {
         metadataStores.add(store);
       }
@@ -297,7 +297,7 @@ public class TestCloseContainerByPipeline {
 
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName(keyName)
             .setRefreshPipeline(true)

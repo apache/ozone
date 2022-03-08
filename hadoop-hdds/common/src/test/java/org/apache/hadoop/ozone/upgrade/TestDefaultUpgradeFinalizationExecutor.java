@@ -38,8 +38,7 @@ public class TestDefaultUpgradeFinalizationExecutor {
         mock(AbstractLayoutVersionManager.class);
     when(mockLvm.needsFinalization()).thenReturn(true);
 
-    BasicUpgradeFinalizer uf =
-        new BasicUpgradeFinalizer(mockLvm) {
+    BasicUpgradeFinalizer uf = new BasicUpgradeFinalizer(mockLvm) {
       @Override
       protected void preFinalizeUpgrade(Object service) throws IOException {
         throw new IOException("Failure!");

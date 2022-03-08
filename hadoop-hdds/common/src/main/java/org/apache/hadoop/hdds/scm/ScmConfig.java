@@ -43,7 +43,7 @@ public class ScmConfig {
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-      description = "The keytab file used by SCM daemon to login as "+
+      description = "The keytab file used by SCM daemon to login as " +
           "its service principal."
   )
   private String keytab;

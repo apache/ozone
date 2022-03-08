@@ -113,7 +113,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       // old key and create operation on new key
 
       // check Acl fromKeyName
-      checkACLs(ozoneManager, volumeName, bucketName, fromKeyName,
+      checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
           IAccessAuthorizer.ACLType.DELETE);
 
       // check Acl toKeyName
@@ -149,7 +149,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                       volumeName, bucketName, toKeyName, 0);
 
       // Check if toKey exists.
-      if(toKeyFileStatus != null) {
+      if (toKeyFileStatus != null) {
         // Destination exists and following are different cases:
         OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
 

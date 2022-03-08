@@ -28,6 +28,7 @@ import java.io.IOException;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 
 /**
  * This class creates the OzoneClient for the Rest endpoints.
@@ -62,9 +63,6 @@ public class OzoneClientProducer {
   @Inject
   private OzoneConfiguration ozoneConfiguration;
 
-  @Inject
-  private String omServiceID;
-
   @Context
   private ContainerRequestContext context;
 
@@ -79,7 +77,7 @@ public class OzoneClientProducer {
 
   @PreDestroy
   public void destroy() throws IOException {
-    client.getObjectStore().getClientProxy().clearTheadLocalS3Auth();
+    client.getObjectStore().getClientProxy().clearThreadLocalS3Auth();
   }
   @Produces
   public S3Auth getSignature() {
@@ -92,7 +90,12 @@ public class OzoneClientProducer {
       }
 
       String awsAccessId = signatureInfo.getAwsAccessId();
-      validateAccessId(awsAccessId);
+      // ONLY validate aws access id when needed.
+      if (awsAccessId == null || awsAccessId.equals("")) {
+        LOG.debug("Malformed s3 header. awsAccessID: ", awsAccessId);
+        throw ACCESS_DENIED;
+      }
+
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
           awsAccessId);
@@ -115,20 +118,13 @@ public class OzoneClientProducer {
     // Set the expected OM version if not set via config.
     ozoneConfiguration.setIfUnset(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
         OZONE_OM_CLIENT_PROTOCOL_VERSION);
+    String omServiceID = OmUtils.getOzoneManagerServiceId(ozoneConfiguration);
     if (omServiceID == null) {
       return OzoneClientFactory.getRpcClient(ozoneConfiguration);
     } else {
       // As in HA case, we need to pass om service ID.
       return OzoneClientFactory.getRpcClient(omServiceID,
           ozoneConfiguration);
-    }
-  }
-
-  // ONLY validate aws access id when needed.
-  private void validateAccessId(String awsAccessId) throws Exception {
-    if (awsAccessId == null || awsAccessId.equals("")) {
-      LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
-      throw wrapOS3Exception(MALFORMED_HEADER);
     }
   }
 

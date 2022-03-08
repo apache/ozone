@@ -19,6 +19,7 @@ CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
+OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
@@ -39,6 +40,7 @@ OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_ozone.recon.address=recon:9891
+OZONE-SITE.XML_ozone.scm.ratis.enable=false
 
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
@@ -113,6 +115,10 @@ HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
 
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
+
+KMS-SITE.XML_hadoop.kms.proxyuser.root.users=*
+KMS-SITE.XML_hadoop.kms.proxyuser.root.groups=*
+KMS-SITE.XML_hadoop.kms.proxyuser.root.hosts=*
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm

@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -115,15 +115,15 @@ public class TestContainerPersistence {
   @Rule
   public Timeout testTimeout = Timeout.seconds(300);
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestContainerPersistence(ChunkLayOutVersion layout) {
+  public TestContainerPersistence(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @BeforeClass
@@ -639,53 +639,6 @@ public class TestContainerPersistence {
             .getChunks().size() - 1));
     Assert.assertEquals(
         lastChunk.getChecksumData(), readChunk.getChecksumData());
-  }
-
-  /**
-   * Deletes a block and tries to read it back.
-   *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
-   */
-  @Test
-  public void testDeleteBlock() throws IOException, NoSuchAlgorithmException {
-    long testContainerID = getTestContainerID();
-    Container container = addContainer(containerSet, testContainerID);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    ChunkInfo info = writeChunkHelper(blockID);
-    BlockData blockData = new BlockData(blockID);
-    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
-    chunkList.add(info.getProtoBufMessage());
-    blockData.setChunks(chunkList);
-    blockManager.putBlock(container, blockData);
-    blockManager.deleteBlock(container, blockID);
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage("Unable to find the block.");
-    blockManager.getBlock(container, blockData.getBlockID());
-  }
-
-  /**
-   * Tries to Deletes a block twice.
-   *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
-   */
-  @Test
-  public void testDeleteBlockTwice() throws IOException,
-      NoSuchAlgorithmException {
-    long testContainerID = getTestContainerID();
-    Container container = addContainer(containerSet, testContainerID);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    ChunkInfo info = writeChunkHelper(blockID);
-    BlockData blockData = new BlockData(blockID);
-    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
-    chunkList.add(info.getProtoBufMessage());
-    blockData.setChunks(chunkList);
-    blockManager.putBlock(container, blockData);
-    blockManager.deleteBlock(container, blockID);
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage("Unable to find the block.");
-    blockManager.deleteBlock(container, blockID);
   }
 
   /**

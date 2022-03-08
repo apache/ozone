@@ -26,7 +26,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.junit.Before;
 import org.junit.Test;
-import java.util.*;
+
+import java.util.HashSet;
+import java.util.Set;
+
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
@@ -429,6 +432,16 @@ public class TestContainerReplicaCount {
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertTrue(rcnt.isHealthy());
+  }
+
+  @Test
+  public void testContainerWithNoReplicasIsMissing() {
+    Set<ContainerReplica> replica = new HashSet<>();
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    ContainerReplicaCount rcnt =
+        new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
+    assertTrue(rcnt.isMissing());
+    assertFalse(rcnt.isSufficientlyReplicated());
   }
 
   private void validate(ContainerReplicaCount rcnt,

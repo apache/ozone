@@ -63,7 +63,7 @@ public interface MiniOzoneCluster {
    * @return MiniOzoneCluster builder
    */
   static Builder newOMHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneOMHAClusterImpl.Builder(conf);
+    return new MiniOzoneHAClusterImpl.Builder(conf);
   }
 
   static Builder newHABuilder(OzoneConfiguration conf) {
@@ -159,6 +159,8 @@ public interface MiniOzoneCluster {
    * @return List of {@link HddsDatanodeService}
    */
   List<HddsDatanodeService> getHddsDatanodes();
+
+  HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
    * Returns a {@link ReconServer} instance.

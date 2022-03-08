@@ -50,14 +50,10 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 execute_robot_test scm admincli
 
+execute_debug_tests
+
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-fso-ofs-link ozonefs/ozonefs.robot
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-fso-o3fs-bucket ozonefs/ozonefs.robot
-
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-objectputget s3/objectputget.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-objectdelete s3/objectdelete.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-objectcopy s3/objectcopy.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-objectmultidelete s3/objectmultidelete.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-fso-layout-MultipartUpload s3/MultipartUpload.robot
 
 stop_docker_env
 

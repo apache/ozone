@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
@@ -123,7 +123,7 @@ public class TestCloseContainerEventHandler {
     eventQueue.addHandler(DATANODE_COMMAND, nodeManager);
     // Move all pipelines created by background from ALLOCATED to OPEN state
     Thread.sleep(2000);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
   }
 
   @AfterClass
@@ -166,7 +166,7 @@ public class TestCloseContainerEventHandler {
   @Test
   public void testCloseContainerEventWithValidContainers() throws IOException {
     ContainerInfo container = containerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE), OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     DatanodeDetails datanode = pipelineManager
@@ -185,7 +185,7 @@ public class TestCloseContainerEventHandler {
     GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     ContainerInfo container = containerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     int[] closeCount = new int[3];

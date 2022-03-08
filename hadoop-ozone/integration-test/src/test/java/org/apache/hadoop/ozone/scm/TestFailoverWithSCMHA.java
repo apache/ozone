@@ -45,7 +45,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 
 /**

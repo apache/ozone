@@ -154,7 +154,7 @@ public final class OMMetadataManagerTestUtils {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName(key)
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .build());
   }
 
@@ -178,7 +178,7 @@ public final class OMMetadataManagerTestUtils {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
   }
@@ -204,7 +204,8 @@ public final class OMMetadataManagerTestUtils {
                     .setBucketName(bucket)
                     .setVolumeName(volume)
                     .setKeyName(key)
-                    .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+                    .setReplicationConfig(
+                        StandaloneReplicationConfig.getInstance(ONE))
                     .setObjectID(objectID)
                     .setParentObjectID(parentObjectId)
                     .setDataSize(dataSize)
@@ -228,7 +229,8 @@ public final class OMMetadataManagerTestUtils {
                     .setVolumeName(volName)
                     .setKeyName(keyName)
                     .setOmKeyLocationInfos(locationVersions)
-                    .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+                    .setReplicationConfig(
+                        StandaloneReplicationConfig.getInstance(ONE))
                     .setObjectID(objectId)
                     .setParentObjectID(parentObjectId)
                     .build());
@@ -299,7 +301,7 @@ public final class OMMetadataManagerTestUtils {
    */
   public static Pipeline getRandomPipeline(DatanodeDetails datanodeDetails) {
     return Pipeline.newBuilder()
-       .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+       .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.singletonList(datanodeDetails))
         .setState(Pipeline.PipelineState.OPEN)
