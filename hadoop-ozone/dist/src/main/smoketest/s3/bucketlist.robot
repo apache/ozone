@@ -36,4 +36,3 @@ List buckets with empty access id
                         Execute                    aws configure set aws_access_key_id ''
     ${result} =         Execute AWSS3APICli and checkrc         list-buckets    255
                         Should contain            ${result}         The authorization header you provided is invalid
-    Run Keyword         Setup s3 tests
