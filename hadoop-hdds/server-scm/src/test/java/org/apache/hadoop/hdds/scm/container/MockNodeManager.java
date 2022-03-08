@@ -556,6 +556,15 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
+
+  /**
    * Empty implementation for processNodeReport.
    *
    * @param dnUuid

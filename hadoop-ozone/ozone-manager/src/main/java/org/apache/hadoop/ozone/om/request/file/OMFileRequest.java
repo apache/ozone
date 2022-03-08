@@ -730,8 +730,8 @@ public final class OMFileRequest {
     builder.setObjectID(dirInfo.getObjectID());
     builder.setUpdateID(dirInfo.getUpdateID());
     builder.setFileName(dirInfo.getName());
-    builder.setReplicationConfig(new RatisReplicationConfig(
-            HddsProtos.ReplicationFactor.ONE));
+    builder.setReplicationConfig(RatisReplicationConfig
+        .getInstance(HddsProtos.ReplicationFactor.ONE));
     builder.setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())));
     return builder.build();

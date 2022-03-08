@@ -78,7 +78,7 @@ public class TestLeaderChoosePolicy {
   private void checkLeaderBalance(int dnNum, int leaderNumOfEachDn)
       throws Exception {
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
     for (Pipeline pipeline : pipelines) {
@@ -118,7 +118,7 @@ public class TestLeaderChoosePolicy {
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0,
-        pipelineManager.getPipelines(new RatisReplicationConfig(
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
@@ -167,7 +167,7 @@ public class TestLeaderChoosePolicy {
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0, pipelineManager.getPipelines(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
@@ -180,7 +180,7 @@ public class TestLeaderChoosePolicy {
       // then check leader balance
 
       List<Pipeline> pipelines = pipelineManager
-          .getPipelines(new RatisReplicationConfig(
+          .getPipelines(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
       int destroyNum = r.nextInt(pipelines.size());
@@ -212,7 +212,7 @@ public class TestLeaderChoosePolicy {
   private void waitForPipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
         .size() >= numPipelines, 100, 60000);
   }

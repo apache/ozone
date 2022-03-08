@@ -117,7 +117,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     BlockID blockID = keyLocationInfo.getBlockID();
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               ReplicationConfig
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();

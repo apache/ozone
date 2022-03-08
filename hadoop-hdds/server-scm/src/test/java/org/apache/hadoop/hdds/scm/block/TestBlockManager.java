@@ -182,7 +182,8 @@ public class TestBlockManager {
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, mapping, scmContext);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
-    replicationConfig = new RatisReplicationConfig(ReplicationFactor.THREE);
+    replicationConfig = RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE);
 
     scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
   }

@@ -79,7 +79,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       System.out.println("Container Balancer started successfully.");
       return;
     }
-    System.out.println("Container Balancer is already running. " +
-        "Please stop it first.");
+    System.out.println("Container Balancer is either already running or " +
+        "failed to start.\nPlease check the logs for more info.");
   }
 }

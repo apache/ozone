@@ -194,7 +194,7 @@ public class TestFailureHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -337,7 +337,7 @@ public class TestFailureHandlingByClient {
     // will be discarded and write a new block
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -399,7 +399,7 @@ public class TestFailureHandlingByClient {
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -464,7 +464,7 @@ public class TestFailureHandlingByClient {
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
@@ -528,7 +528,7 @@ public class TestFailureHandlingByClient {
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();

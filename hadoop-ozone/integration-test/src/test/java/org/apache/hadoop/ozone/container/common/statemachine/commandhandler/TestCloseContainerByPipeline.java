@@ -118,7 +118,7 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName(keyName).setRefreshPipeline(true).build();
     OmKeyLocationInfo omKeyLocationInfo =
@@ -175,7 +175,7 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName("standalone")
             .setRefreshPipeline(true)
@@ -234,7 +234,7 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test").
         setBucketName("test")
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setDataSize(1024)
         .setKeyName("ratis").setRefreshPipeline(true).build();
 
@@ -299,7 +299,7 @@ public class TestCloseContainerByPipeline {
 
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new RatisReplicationConfig(ONE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName(keyName)
             .setRefreshPipeline(true)
