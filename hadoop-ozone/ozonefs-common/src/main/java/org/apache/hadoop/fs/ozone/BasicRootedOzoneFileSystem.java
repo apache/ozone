@@ -468,6 +468,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
+  /**
+   * To be used only by recursiveBucketDelete()
+   */
   private class DeleteIteratorWithFSO extends OzoneListingIterator {
     private final OzoneBucket bucket;
     private final BasicRootedOzoneClientAdapterImpl adapterImpl;
@@ -492,8 +495,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           succeed = adapterImpl.deleteObject(key);
         }
       }
-      // if recursive delete is requested ignore the return value of
-      // deleteObject and issue deletes for other keys.
       return  succeed;
     }
   }
@@ -1035,7 +1036,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (status.isDirectory()) {
         this.pathKey = addTrailingSlashIfNeeded(pathKey);
       }
-      keyIterator = adapter.listKeys(pathKey);
+      // For fso case we won't use listKeys
+      keyIterator = null;
       this.isFSO = isFSO;
     }
 
