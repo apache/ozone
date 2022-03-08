@@ -154,6 +154,20 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator();
 
   /**
+   * Returns a prefixed iterator for this metadata store.
+   * @param prefix
+   * @return
+   */
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix)
+      throws IOException;
+
+  /**
+   * Set the fixed key prefix length.
+   * @param length
+   */
+  void setFixedPrefixLength(int length);
+
+  /**
    * Returns the Name of this Table.
    * @return - Table Name.
    * @throws IOException on failure.

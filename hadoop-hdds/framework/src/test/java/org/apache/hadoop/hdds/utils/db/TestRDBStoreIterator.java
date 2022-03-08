@@ -24,13 +24,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.rocksdb.RocksIterator;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -233,5 +237,55 @@ public class TestRDBStoreIterator {
     iter.close();
 
     verify(rocksDBIteratorMock, times(1)).close();
+  }
+
+  @Test
+  public void testNullPrefixedIterator() throws IOException {
+    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock,
+        rocksTableMock, null);
+    verify(rocksDBIteratorMock, times(1)).seekToFirst();
+    clearInvocations(rocksDBIteratorMock);
+
+    iter.seekToFirst();
+    verify(rocksDBIteratorMock, times(1)).seekToFirst();
+    clearInvocations(rocksDBIteratorMock);
+
+    when(rocksDBIteratorMock.isValid()).thenReturn(true);
+    assertTrue(iter.hasNext());
+    verify(rocksDBIteratorMock, times(1)).isValid();
+    verify(rocksDBIteratorMock, times(0)).key();
+
+    iter.seekToLast();
+    verify(rocksDBIteratorMock, times(1)).seekToLast();
+
+    iter.close();
+  }
+
+  @Test
+  public void testNormalPrefixedIterator() throws IOException {
+    byte[] testPrefix = "sample".getBytes(StandardCharsets.UTF_8);
+    RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock,
+        rocksTableMock, testPrefix);
+    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    clearInvocations(rocksDBIteratorMock);
+
+    iter.seekToFirst();
+    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    clearInvocations(rocksDBIteratorMock);
+
+    when(rocksDBIteratorMock.isValid()).thenReturn(true);
+    when(rocksDBIteratorMock.key()).thenReturn(testPrefix);
+    assertTrue(iter.hasNext());
+    verify(rocksDBIteratorMock, times(1)).isValid();
+    verify(rocksDBIteratorMock, times(1)).key();
+
+    try {
+      iter.seekToLast();
+      fail("Prefixed iterator does not support seekToLast");
+    } catch (Exception e) {
+      assertTrue(e instanceof UnsupportedOperationException);
+    }
+
+    iter.close();
   }
 }

@@ -281,6 +281,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public TableIterator<KEY, TypedKeyValue> iterator(KEY prefix)
+      throws IOException {
+    TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
+        rawTable.iterator(codecRegistry.asRawData(prefix));
+    return new TypedTableIterator(iterator, keyType, valueType);
+  }
+
+  @Override
+  public void setFixedPrefixLength(int length) {
+    rawTable.setFixedPrefixLength(length);
+  }
+
+  @Override
   public String getName() throws IOException {
     return rawTable.getName();
   }

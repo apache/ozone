@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
@@ -39,15 +40,26 @@ public class RDBStoreIterator
   private final RocksIterator rocksDBIterator;
   private RDBTable rocksDBTable;
   private ByteArrayKeyValue currentEntry;
+  // This is for schemas that use a fixed-length
+  // prefix for each key.
+  private byte[] prefix;
 
   public RDBStoreIterator(RocksIterator iterator) {
-    this.rocksDBIterator = iterator;
-    seekToFirst();
+    this(iterator, null);
   }
 
   public RDBStoreIterator(RocksIterator iterator, RDBTable table) {
-    this(iterator);
+    this(iterator, table, null);
+  }
+
+  public RDBStoreIterator(RocksIterator iterator, RDBTable table,
+      byte[] prefix) {
+    this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
+    if (prefix != null) {
+      this.prefix = Arrays.copyOf(prefix, prefix.length);
+    }
+    seekToFirst();
   }
 
   @Override
@@ -69,7 +81,9 @@ public class RDBStoreIterator
 
   @Override
   public boolean hasNext() {
-    return rocksDBIterator.isValid();
+    return rocksDBIterator.isValid() &&
+        (prefix == null || Arrays.equals(
+            Arrays.copyOf(rocksDBIterator.key(), prefix.length), prefix));
   }
 
   @Override
@@ -84,13 +98,21 @@ public class RDBStoreIterator
 
   @Override
   public void seekToFirst() {
-    rocksDBIterator.seekToFirst();
+    if (prefix == null) {
+      rocksDBIterator.seekToFirst();
+    } else {
+      rocksDBIterator.seek(prefix);
+    }
     setCurrentEntry();
   }
 
   @Override
   public void seekToLast() {
-    rocksDBIterator.seekToLast();
+    if (prefix == null) {
+      rocksDBIterator.seekToLast();
+    } else {
+      throw new UnsupportedOperationException("seekToLast");
+    }
     setCurrentEntry();
   }
 

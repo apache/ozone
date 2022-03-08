@@ -24,13 +24,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.StringUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -54,6 +57,10 @@ public class TestRDBTableStore {
           "Fourth", "Fifth",
           "Sixth", "Seventh",
           "Eighth");
+  private final List<String> prefixedFamilies = Arrays.asList(
+      "PrefixFirst"
+  );
+  private static final int PREFIX_LENGTH = 12;
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
   private RDBStore rdbStore = null;
@@ -82,6 +89,13 @@ public class TestRDBTableStore {
     Set<TableConfig> configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      configSet.add(newConfig);
+    }
+    for (String name : prefixedFamilies) {
+      ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
+      cfOptions.useFixedLengthPrefixExtractor(PREFIX_LENGTH);
+
+      TableConfig newConfig = new TableConfig(name, cfOptions);
       configSet.add(newConfig);
     }
     rdbStore = new RDBStore(folder.newFolder(), options, configSet);
@@ -423,6 +437,127 @@ public class TestRDBTableStore {
       byte[] value =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
+    }
+  }
+
+  @Test
+  public void testPrefixedIterator() throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst")) {
+      // write data
+      populatePrefixedTable(testTable, testData);
+
+      // iterator should seek to right pos in the middle
+      byte[] samplePrefix = testPrefixes.get(2).getBytes(
+          StandardCharsets.UTF_8);
+      try (TableIterator<byte[],
+          ? extends Table.KeyValue<byte[], byte[]>> iter = testTable.iterator(
+              samplePrefix)) {
+        int keyCount = 0;
+        while (iter.hasNext()) {
+          // iterator should only meet keys with samplePrefix
+          Assert.assertTrue(Arrays.equals(
+              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+              samplePrefix));
+          keyCount++;
+        }
+
+        // iterator should end at right pos
+        Assert.assertEquals(blockCount, keyCount);
+
+        // iterator should be able to seekToFirst
+        iter.seekToFirst();
+        Assert.assertTrue(iter.hasNext());
+        Assert.assertTrue(Arrays.equals(
+            Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
+            samplePrefix));
+      }
+    }
+  }
+
+  @Test
+  public void testPrefixedRangeKVs() throws Exception {
+    int containerCount = 3;
+    int blockCount = 5;
+    List<String> testPrefixes = generatePrefixes(containerCount);
+    List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
+
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst")) {
+      // should set prefixLength so we could extract prefix
+      // from the startKey
+      testTable.setFixedPrefixLength(PREFIX_LENGTH);
+
+      // write data
+      populatePrefixedTable(testTable, testData);
+
+      byte[] samplePrefix = testPrefixes.get(2).getBytes(
+          StandardCharsets.UTF_8);
+
+      // test start at first
+      byte[] startKey = samplePrefix;
+      List<? extends Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
+          .getRangeKVs(startKey, 3);
+      Assert.assertEquals(3, rangeKVs.size());
+
+      // test start with a middle key
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix) + "3");
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount);
+      Assert.assertEquals(2, rangeKVs.size());
+
+      // test with a filter
+      MetadataKeyFilters.KeyPrefixFilter filter1 = new MetadataKeyFilters
+          .KeyPrefixFilter()
+          .addFilter(StringUtils.bytes2String(samplePrefix) + "1");
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix));
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount, filter1);
+      Assert.assertEquals(1, rangeKVs.size());
+
+      // test start with a non-exist key
+      startKey = StringUtils.string2Bytes(
+          StringUtils.bytes2String(samplePrefix) + 123);
+      rangeKVs = testTable.getRangeKVs(startKey, 10);
+      Assert.assertEquals(0, rangeKVs.size());
+    }
+  }
+
+  private List<String> generatePrefixes(int prefixCount) {
+    List<String> prefixes = new ArrayList<>();
+    for (int i = 0; i < prefixCount; i++) {
+      // use alphabetic chars so we get fixed length prefix when
+      // convert to byte[]
+      prefixes.add(RandomStringUtils.randomAlphabetic(PREFIX_LENGTH));
+    }
+    return prefixes;
+  }
+
+  private List<Map<String, String>> generateKVs(List<String> prefixes,
+      int keyCount) {
+    List<Map<String, String>> data = new ArrayList<>();
+    for (String prefix : prefixes) {
+      Map<String, String> kvs = new HashMap<>();
+      for (int i = 0; i < keyCount; i++) {
+        String key = prefix + i;
+        String val = RandomStringUtils.random(10);
+        kvs.put(key, val);
+      }
+      data.add(kvs);
+    }
+    return data;
+  }
+
+  private void populatePrefixedTable(Table<byte[], byte[]> table,
+      List<Map<String, String>> testData) throws IOException {
+    for (Map<String, String> segment : testData) {
+      for (Map.Entry<String, String> entry : segment.entrySet()) {
+        table.put(entry.getKey().getBytes(StandardCharsets.UTF_8),
+            entry.getValue().getBytes(StandardCharsets.UTF_8));
+      }
     }
   }
 }

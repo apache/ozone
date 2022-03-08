@@ -78,6 +78,19 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
+      KEY prefix) {
+    throw new UnsupportedOperationException("Iterating tables directly is not" +
+        " supported for datanode containers due to differing schema " +
+        "version.");
+  }
+
+  @Override
+  public void setFixedPrefixLength(int length) {
+    table.setFixedPrefixLength(length);
+  }
+
+  @Override
   public String getName() throws IOException {
     return table.getName();
   }
