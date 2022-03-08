@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.Objects;
 
@@ -46,8 +47,6 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
    * Name of the bucket policy group.
    */
   private final String bucketPolicyGroupName;
-  // Implies above names should NOT contain the split key.
-  public static final String TENANT_INFO_SPLIT_KEY = ";";
 
   public OmDBTenantInfo(String tenantId,
       String bucketNamespaceName, String accountNamespaceName,
@@ -57,18 +56,6 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     this.accountNamespaceName = accountNamespaceName;
     this.userPolicyGroupName = userPolicyGroupName;
     this.bucketPolicyGroupName = bucketPolicyGroupName;
-  }
-
-  private OmDBTenantInfo(String tenantInfoString) {
-    String[] tInfo = tenantInfoString.split(TENANT_INFO_SPLIT_KEY);
-    Preconditions.checkState(tInfo.length == 5,
-        "Incorrect tenantInfoString");
-
-    tenantId = tInfo[0];
-    bucketNamespaceName = tInfo[1];
-    accountNamespaceName = tInfo[2];
-    userPolicyGroupName = tInfo[3];
-    bucketPolicyGroupName = tInfo[4];
   }
 
   @Override
@@ -102,34 +89,6 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     return tenantId;
   }
 
-  private String generateTenantInfo() {
-    StringBuilder sb = new StringBuilder();
-    sb.append(tenantId).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(bucketNamespaceName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(accountNamespaceName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(userPolicyGroupName).append(TENANT_INFO_SPLIT_KEY);
-    sb.append(bucketPolicyGroupName);
-    return sb.toString();
-  }
-
-  /**
-   * Convert OmDBTenantInfo to byteArray to be persisted to DB.
-   * @return byte[]
-   */
-  public byte[] convertToByteArray() {
-    return StringUtils.string2Bytes(generateTenantInfo());
-  }
-
-  /**
-   * Convert byte array to OmDBTenantInfo.
-   * @param bytes
-   * @return OmDBTenantInfo
-   */
-  public static OmDBTenantInfo getFromByteArray(byte[] bytes) {
-    String tInfo = StringUtils.bytes2String(bytes);
-    return new OmDBTenantInfo(tInfo);
-  }
-
   /**
    * Returns the bucket namespace name. a.k.a. volume name.
    *
@@ -150,6 +109,33 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
 
   public String getBucketPolicyGroupName() {
     return bucketPolicyGroupName;
+  }
+
+  /**
+   * Convert OmDBTenantInfo to protobuf to be persisted to DB.
+   */
+  public OzoneManagerProtocolProtos.TenantInfo getProtobuf() {
+    return OzoneManagerProtocolProtos.TenantInfo.newBuilder()
+        .setTenantId(tenantId)
+        .setBucketNamespaceName(bucketNamespaceName)
+        .setAccountNamespaceName(accountNamespaceName)
+        .setUserPolicyGroupName(userPolicyGroupName)
+        .setBucketPolicyGroupName(bucketPolicyGroupName)
+        .build();
+  }
+
+  /**
+   * Convert protobuf to OmDBTenantInfo.
+   */
+  public static OmDBTenantInfo getFromProtobuf(
+      OzoneManagerProtocolProtos.TenantInfo proto) {
+    return new Builder()
+        .setTenantId(proto.getTenantId())
+        .setBucketNamespaceName(proto.getBucketNamespaceName())
+        .setAccountNamespaceName(proto.getAccountNamespaceName())
+        .setUserPolicyGroupName(proto.getUserPolicyGroupName())
+        .setBucketPolicyGroupName(proto.getBucketPolicyGroupName())
+        .build();
   }
 
   /**

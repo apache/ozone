@@ -43,7 +43,7 @@ public final class OmDBAccessIdInfo {
    */
   private final boolean isDelegatedAdmin;
   /**
-   * Role name of the user (that this access ID points to) in this tenant.
+   * Role name of the user (that this access ID is assigned to) in this tenant.
    * e.g. "user", "admin", "auditor"
    */
   private final String roleId;
@@ -75,7 +75,7 @@ public final class OmDBAccessIdInfo {
   }
 
   /**
-   * Convert byte array to OmDBAccessIdInfo.
+   * Convert protobuf to OmDBAccessIdInfo.
    */
   public static OmDBAccessIdInfo getFromProtobuf(
       OzoneManagerProtocolProtos.OmDBAccessInfo infoProto) throws IOException {
