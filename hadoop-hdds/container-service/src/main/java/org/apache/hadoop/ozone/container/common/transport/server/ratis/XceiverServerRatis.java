@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -187,8 +188,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
-    if (datanodeDetails.getInitialVersion()
-        >= SEPARATE_RATIS_PORTS_AVAILABLE.version()) {
+    if (DatanodeVersion.fromProtoValue(datanodeDetails.getInitialVersion())
+        .compareTo(SEPARATE_RATIS_PORTS_AVAILABLE) >= 0) {
       adminPort = determinePort(
           OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
           OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);

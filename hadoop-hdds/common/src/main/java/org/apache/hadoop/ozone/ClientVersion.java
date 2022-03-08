@@ -24,15 +24,13 @@ import org.apache.hadoop.hdds.ComponentVersion;
  */
 public enum ClientVersion implements ComponentVersion {
 
-  FUTURE_VERSION(-1, "Used internally when the server side is older and an"
-      + " unknown client version has arrived from the client."),
-
-  // old client, doesn't even send version number in requests
   DEFAULT_VERSION(0, "Initial version"),
 
-  // DatanodeDetails#getFromProtobuf handles unknown types of ports
   VERSION_HANDLES_UNKNOWN_DN_PORTS(1,
-      "Client version that handles the REPLICATION port in DatanodeDetails.");
+      "Client version that handles the REPLICATION port in DatanodeDetails."),
+
+  FUTURE_VERSION(-1, "Used internally when the server side is older and an"
+      + " unknown client version has arrived from the client.");
 
   public static final ClientVersion CURRENT = latest();
   public static final int CURRENT_VERSION = CURRENT.version;
@@ -46,18 +44,26 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   @Override
-  public int version() {
-    return version;
-  }
-
-  @Override
   public String description() {
     return description;
   }
 
+  @Override
+  public int toProtoValue() {
+    return version;
+  }
+
+  public static ClientVersion fromProtoValue(int value) {
+    ClientVersion[] versions = ClientVersion.values();
+    if (value >= versions.length || value < 0) {
+      return FUTURE_VERSION;
+    }
+    return versions[value];
+  }
+
   private static ClientVersion latest() {
     ClientVersion[] versions = ClientVersion.values();
-    return versions[versions.length - 1];
+    return versions[versions.length - 2];
   }
 
 }

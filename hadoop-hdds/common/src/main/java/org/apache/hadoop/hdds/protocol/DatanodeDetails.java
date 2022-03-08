@@ -414,8 +414,8 @@ public class DatanodeDetails extends NodeImpl implements
     }
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
-    final boolean handlesUnknownPorts =
-        clientVersion >= VERSION_HANDLES_UNKNOWN_DN_PORTS.version();
+    final boolean handlesUnknownPorts = VERSION_HANDLES_UNKNOWN_DN_PORTS
+        .compareTo(ClientVersion.fromProtoValue(clientVersion)) >= 0;
     for (Port port : ports) {
       if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
         builder.addPorts(port.toProto());

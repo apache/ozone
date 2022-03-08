@@ -38,13 +38,13 @@ public class TestPipeline {
     Pipeline subject = MockPipeline.createPipeline(3);
 
     HddsProtos.Pipeline proto =
-        subject.getProtobufMessage(DEFAULT_VERSION.version());
+        subject.getProtobufMessage(DEFAULT_VERSION.toProtoValue());
     for (HddsProtos.DatanodeDetailsProto dn : proto.getMembersList()) {
       assertPorts(dn, V0_PORTS);
     }
 
-    HddsProtos.Pipeline protoV1 =
-        subject.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS.version());
+    HddsProtos.Pipeline protoV1 = subject.getProtobufMessage(
+        VERSION_HANDLES_UNKNOWN_DN_PORTS.toProtoValue());
     for (HddsProtos.DatanodeDetailsProto dn : protoV1.getMembersList()) {
       assertPorts(dn, ALL_PORTS);
     }

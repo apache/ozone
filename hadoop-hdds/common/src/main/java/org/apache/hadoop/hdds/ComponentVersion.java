@@ -18,15 +18,9 @@
 package org.apache.hadoop.hdds;
 
 /**
- * Base class for component version enums.
+ * Base type for component version enums.
  */
 public interface ComponentVersion {
-
-  /**
-   * Returns the version number the component version enum value has assigned.
-   * @return the version number the component version enum value has assigned.
-   */
-  int version();
 
   /**
    * Returns the description of the version enum value.
@@ -35,22 +29,9 @@ public interface ComponentVersion {
   String description();
 
   /**
-   * Method to compare the actual component version with the one provided by
-   * the other side of the communication.
-   * @param actual the actual component version of the server runtime
-   *               (NOTE: this is not the server's but the other party's
-   *               version number in the current runtime!)
-   * @param other the provided component version of the other component
-   * @return a negative value if the actual version is greater, 0 if the
-   *         two versions are equal, a positive value if the other version is
-   *         greater.
-   * @throws ClassCastException if the two provided component version instance
-   *                            are not instances of the same class.
+   * Returns the value that represents the enum in a protocol message
+   * transferred over the wire.
+   * @return the version associated with the enum value.
    */
-  default int compare(ComponentVersion actual, ComponentVersion other) {
-    if (actual.getClass() != other.getClass()) {
-      throw new ClassCastException();
-    }
-    return (other.version() & Integer.MAX_VALUE) - actual.version();
-  }
+  int toProtoValue();
 }

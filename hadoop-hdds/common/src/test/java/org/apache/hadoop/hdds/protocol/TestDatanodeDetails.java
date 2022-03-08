@@ -41,11 +41,11 @@ public class TestDatanodeDetails {
     DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();
 
     HddsProtos.DatanodeDetailsProto proto =
-        subject.toProto(DEFAULT_VERSION.version());
+        subject.toProto(DEFAULT_VERSION.toProtoValue());
     assertPorts(proto, V0_PORTS);
 
     HddsProtos.DatanodeDetailsProto protoV1 =
-        subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.version());
+        subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.toProtoValue());
     assertPorts(protoV1, ALL_PORTS);
   }
 

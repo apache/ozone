@@ -22,12 +22,12 @@ package org.apache.hadoop.hdds;
  */
 public enum DatanodeVersion implements ComponentVersion {
 
-  FUTURE_VERSION(-1, "Used internally in the client when the server side is "
-      + " newer and an unknown server version has arrived to the client."),
-
   DEFAULT_VERSION(0, "Initial version"),
 
-  SEPARATE_RATIS_PORTS_AVAILABLE(1, "Version with separated Ratis port.");
+  SEPARATE_RATIS_PORTS_AVAILABLE(1, "Version with separated Ratis port."),
+
+  FUTURE_VERSION(-1, "Used internally in the client when the server side is "
+      + " newer and an unknown server version has arrived to the client.");
 
   public static final DatanodeVersion CURRENT = latest();
   public static final int CURRENT_VERSION = CURRENT.version;
@@ -41,17 +41,25 @@ public enum DatanodeVersion implements ComponentVersion {
   }
 
   @Override
-  public int version() {
-    return version;
-  }
-
-  @Override
   public String description() {
     return description;
   }
 
+  @Override
+  public int toProtoValue() {
+    return version;
+  }
+
+  public static DatanodeVersion fromProtoValue(int value) {
+    DatanodeVersion[] versions = DatanodeVersion.values();
+    if (value >= versions.length || value < 0) {
+      return FUTURE_VERSION;
+    }
+    return versions[value];
+  }
+
   private static DatanodeVersion latest() {
     DatanodeVersion[] versions = DatanodeVersion.values();
-    return versions[versions.length - 1];
+    return versions[versions.length - 2];
   }
 }
