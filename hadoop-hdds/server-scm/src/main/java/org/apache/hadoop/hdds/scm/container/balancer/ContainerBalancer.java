@@ -374,6 +374,20 @@ public class ContainerBalancer {
             "Under-Utilized Datanodes that need to be balanced.",
         overUtilizedNodes.size(), underUtilizedNodes.size());
 
+    if (LOG.isDebugEnabled()) {
+      overUtilizedNodes.forEach(entry -> {
+        LOG.debug("Datanode {} {} is Over-Utilized.",
+            entry.getDatanodeDetails().getHostName(),
+            entry.getDatanodeDetails().getUuid());
+      });
+
+      underUtilizedNodes.forEach(entry -> {
+        LOG.debug("Datanode {} {} is Under-Utilized.",
+            entry.getDatanodeDetails().getHostName(),
+            entry.getDatanodeDetails().getUuid());
+      });
+    }
+
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager, findSourceStrategy);
     sourceToTargetMap = new HashMap<>(overUtilizedNodes.size() +
