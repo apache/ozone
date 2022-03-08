@@ -469,7 +469,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   /**
-   * To be used only by recursiveBucketDelete()
+   * To be used only by recursiveBucketDelete().
    */
   private class DeleteIteratorWithFSO extends OzoneListingIterator {
     private final OzoneBucket bucket;
