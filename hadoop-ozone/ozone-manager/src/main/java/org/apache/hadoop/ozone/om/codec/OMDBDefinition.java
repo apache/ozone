@@ -219,15 +219,6 @@ public class OMDBDefinition implements DBDefinition {
                     new OmDBTenantInfoCodec());
 
   public static final DBColumnFamilyDefinition<String, String>
-            TENANT_ROLE_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.TENANT_ROLE_TABLE,
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
-
-  public static final DBColumnFamilyDefinition<String, String>
             TENANT_POLICY_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TENANT_POLICY_TABLE,
@@ -257,7 +248,7 @@ public class OMDBDefinition implements DBDefinition {
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
         PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
-        TENANT_ROLE_TABLE, TENANT_POLICY_TABLE };
+        TENANT_POLICY_TABLE };
   }
 }
 

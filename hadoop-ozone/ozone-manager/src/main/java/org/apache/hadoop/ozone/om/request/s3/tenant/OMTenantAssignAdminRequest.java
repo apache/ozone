@@ -203,12 +203,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
 
-      // TODO: Update tenantRoleTable?
-//      final String roleName = "role_admin";
-//      omMetadataManager.getTenantRoleTable().addCacheEntry(
-//          new CacheKey<>(accessId),
-//          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
-
       omResponse.setTenantAssignAdminResponse(
           TenantAssignAdminResponse.newBuilder()
               .build());

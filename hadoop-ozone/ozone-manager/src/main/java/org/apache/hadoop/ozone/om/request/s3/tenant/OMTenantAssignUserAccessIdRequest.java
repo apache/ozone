@@ -92,7 +92,6 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
     - New entry or update existing entry in principalToAccessIdsTable:
       - Key: Kerberos principal of the user.
       - Value: OmDBKerberosPrincipalInfo. Has accessIds.
-    - tenantRoleTable: TBD. No-Op for now.
     - Release VOLUME_LOCK write lock
  */
 
@@ -314,13 +313,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(principalInfo),
               transactionLogIndex));
 
-      // Add to tenantRoleTable
-      // TODO: TenantRoleTable is unused for now.
-      final String roleName = "user";
-      omMetadataManager.getTenantRoleTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
-
       // Add S3SecretTable cache entry
       acquiredS3SecretLock = omMetadataManager.getLock()
           .acquireWriteLock(S3_SECRET_LOCK, accessId);
@@ -348,7 +340,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
               .build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
           omResponse.build(), s3SecretValue, userPrincipal,
-          roleName, accessId, omDBAccessIdInfo, principalInfo);
+          accessId, omDBAccessIdInfo, principalInfo);
     } catch (IOException ex) {
       handleRequestFailure(ozoneManager);
       exception = ex;

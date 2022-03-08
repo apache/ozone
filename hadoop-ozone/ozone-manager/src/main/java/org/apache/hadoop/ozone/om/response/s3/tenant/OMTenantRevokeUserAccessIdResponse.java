@@ -32,7 +32,6 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE;
 
 /**
  * Response for OMTenantRevokeUserAccessIdRequest.
@@ -40,8 +39,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
 @CleanupTableInfo(cleanupTables = {
     S3_SECRET_TABLE,
     TENANT_ACCESS_ID_TABLE,
-    PRINCIPAL_TO_ACCESS_IDS_TABLE,
-    TENANT_ROLE_TABLE
+    PRINCIPAL_TO_ACCESS_IDS_TABLE
 })
 public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
 
@@ -81,8 +79,6 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
     }
 
     omMetadataManager.getTenantAccessIdTable().deleteWithBatch(
-        batchOperation, accessId);
-    omMetadataManager.getTenantRoleTable().deleteWithBatch(
         batchOperation, accessId);
 
     if (omDBKerberosPrincipalInfo.getAccessIds().size() > 0) {

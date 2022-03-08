@@ -193,11 +193,6 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
-      // Remove from tenantRoleTable
-      omMetadataManager.getTenantRoleTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
       // Remove from S3SecretTable.
       // Note: S3SecretTable will be deprecated in the future.
       acquiredS3SecretLock = omMetadataManager.getLock()

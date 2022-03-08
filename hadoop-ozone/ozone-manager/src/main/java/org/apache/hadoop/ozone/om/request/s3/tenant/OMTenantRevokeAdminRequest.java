@@ -185,12 +185,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
 
-      // Update tenantRoleTable?
-//      final String roleName = "role_admin";
-//      omMetadataManager.getTenantRoleTable().addCacheEntry(
-//          new CacheKey<>(accessId),
-//          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
-
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()
               .build());
