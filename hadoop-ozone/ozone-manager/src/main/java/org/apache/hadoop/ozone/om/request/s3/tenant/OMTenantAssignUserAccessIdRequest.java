@@ -92,9 +92,6 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
     - New entry or update existing entry in principalToAccessIdsTable:
       - Key: Kerberos principal of the user.
       - Value: OmDBKerberosPrincipalInfo. Has accessIds.
-    - tenantGroupTable: Add this new user to the default tenant group.
-      - Key: finance$bob
-      - Value: finance-users
     - tenantRoleTable: TBD. No-Op for now.
     - Release VOLUME_LOCK write lock
  */
@@ -316,14 +313,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           new CacheValue<>(Optional.of(principalInfo),
               transactionLogIndex));
 
-      // Add to tenantGroupTable
-      // TODO: TenantGroupTable is unused for now.
-      final String defaultGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_USER_GROUP_SUFFIX;
-      omMetadataManager.getTenantGroupTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(defaultGroupName), transactionLogIndex));
-
       // Add to tenantRoleTable
       // TODO: TenantRoleTable is unused for now.
       final String roleName = "user";
@@ -357,7 +346,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
                   .setAwsSecret(awsSecret).setKerberosID(accessId))
               .build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
-          omResponse.build(), s3SecretValue, userPrincipal, defaultGroupName,
+          omResponse.build(), s3SecretValue, userPrincipal,
           roleName, accessId, omDBAccessIdInfo, principalInfo);
     } catch (IOException ex) {
       handleRequestFailure(ozoneManager);

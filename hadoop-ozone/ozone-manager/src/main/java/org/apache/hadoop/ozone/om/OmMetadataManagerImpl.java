@@ -143,8 +143,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | tenantStateTable          | tenantId -> OmDBTenantInfo               |
    * |----------------------------------------------------------------------|
-   * | tenantGroupTable          | accessId -> [tenant group A, B, ...]     |
-   * |----------------------------------------------------------------------|
    * | tenantRoleTable           | accessId -> roles [admin, roleB, ...]    |
    * |----------------------------------------------------------------------|
    * | tenantPolicyTable         | policyGroup -> [policyId1, policyId2]    |
@@ -198,7 +196,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
-  public static final String TENANT_GROUP_TABLE = "tenantGroupTable";
   public static final String TENANT_ROLE_TABLE = "tenantRoleTable";
   public static final String TENANT_POLICY_TABLE = "tenantPolicyTable";
 
@@ -222,7 +219,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       TENANT_ACCESS_ID_TABLE,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
-      TENANT_GROUP_TABLE,
       TENANT_ROLE_TABLE,
       TENANT_POLICY_TABLE
   };
@@ -252,7 +248,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table tenantAccessIdTable;
   private Table principalToAccessIdsTable;
   private Table tenantStateTable;
-  private Table tenantGroupTable;
   private Table tenantRoleTable;
   private Table tenantPolicyTable;
 
@@ -463,7 +458,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(TENANT_ACCESS_ID_TABLE)
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
-        .addTable(TENANT_GROUP_TABLE)
         .addTable(TENANT_ROLE_TABLE)
         .addTable(TENANT_POLICY_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
@@ -573,11 +567,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
         String.class, OmDBTenantInfo.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
-
-    // accessId -> list of tenant groups the user belongs to
-    tenantGroupTable = this.store.getTable(TENANT_GROUP_TABLE,
-        String.class, String.class /* TODO: Use custom list */);
-    checkTableStatus(tenantGroupTable, TENANT_GROUP_TABLE);
 
     // accessId -> list of roles in a tenant. e.g. admin for "finance"
     tenantRoleTable = this.store.getTable(TENANT_ROLE_TABLE,
@@ -1340,11 +1329,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmDBTenantInfo> getTenantStateTable() {
     return tenantStateTable;
-  }
-
-  @Override
-  public Table<String, String> getTenantGroupTable() {
-    return tenantGroupTable;
   }
 
   @Override

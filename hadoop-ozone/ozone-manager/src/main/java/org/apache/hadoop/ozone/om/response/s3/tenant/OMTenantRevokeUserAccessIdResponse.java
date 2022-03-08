@@ -32,7 +32,6 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_GROUP_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE;
 
 /**
@@ -42,7 +41,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
     S3_SECRET_TABLE,
     TENANT_ACCESS_ID_TABLE,
     PRINCIPAL_TO_ACCESS_IDS_TABLE,
-    TENANT_GROUP_TABLE,
     TENANT_ROLE_TABLE
 })
 public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
@@ -83,8 +81,6 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
     }
 
     omMetadataManager.getTenantAccessIdTable().deleteWithBatch(
-        batchOperation, accessId);
-    omMetadataManager.getTenantGroupTable().deleteWithBatch(
         batchOperation, accessId);
     omMetadataManager.getTenantRoleTable().deleteWithBatch(
         batchOperation, accessId);

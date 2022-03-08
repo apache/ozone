@@ -35,7 +35,6 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_GROUP_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE;
 
 /**
@@ -45,13 +44,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
     S3_SECRET_TABLE,
     TENANT_ACCESS_ID_TABLE,
     PRINCIPAL_TO_ACCESS_IDS_TABLE,
-    TENANT_GROUP_TABLE,
     TENANT_ROLE_TABLE
 })
 public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
 
   private S3SecretValue s3SecretValue;
-  private String principal, groupName, roleName, accessId;
+  private String principal, roleName, accessId;
   private OmDBAccessIdInfo omDBAccessIdInfo;
   private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
 
@@ -59,7 +57,6 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
   public OMTenantAssignUserAccessIdResponse(@Nonnull OMResponse omResponse,
       @Nonnull S3SecretValue s3SecretValue,
       @Nonnull String principal,
-      @Nonnull String groupName,
       @Nonnull String roleName,
       @Nonnull String accessId,
       @Nonnull OmDBAccessIdInfo omDBAccessIdInfo,
@@ -68,7 +65,6 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
     super(omResponse);
     this.s3SecretValue = s3SecretValue;
     this.principal = principal;
-    this.groupName = groupName;
     this.roleName = roleName;
     this.accessId = accessId;
     this.omDBAccessIdInfo = omDBAccessIdInfo;
@@ -99,8 +95,6 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
         batchOperation, accessId, omDBAccessIdInfo);
     omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
         batchOperation, principal, omDBKerberosPrincipalInfo);
-    omMetadataManager.getTenantGroupTable().putWithBatch(
-        batchOperation, accessId, groupName);
     omMetadataManager.getTenantRoleTable().putWithBatch(
         batchOperation, accessId, roleName);
   }
