@@ -151,12 +151,16 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
 
-  @Config(key = "ec.reconstruct.stripe.read.pool.size",
-      defaultValue = "14",
-      description = "Thread pool size for parallelly read" +
+  @Config(key = "ec.reconstruct.stripe.read.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for parallelly read" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
-  private int ecReconstructStripeReadPoolSize = 14;
+  // For the largest recommended EC policy rs-10-4-1024k,
+  // 10 chunks are required at least for stripe reconstruction,
+  // so 1 core thread for each chunk and
+  // 3 concurrent stripe read should be enough.
+  private int ecReconstructStripeReadPoolLimit = 10 * 3;
 
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
@@ -296,11 +300,11 @@ public class OzoneClientConfig {
     }
   }
 
-  public void setEcReconstructStripeReadPoolSize(int poolSize) {
-    this.ecReconstructStripeReadPoolSize = poolSize;
+  public void setEcReconstructStripeReadPoolLimit(int poolLimit) {
+    this.ecReconstructStripeReadPoolLimit = poolLimit;
   }
 
-  public int getEcReconstructStripeReadPoolSize() {
-    return ecReconstructStripeReadPoolSize;
+  public int getEcReconstructStripeReadPoolLimit() {
+    return ecReconstructStripeReadPoolLimit;
   }
 }

@@ -54,7 +54,7 @@ public class TestECBlockReconstructedInputStream {
   private SplittableRandom dataGenerator;
   private ByteBufferPool bufferPool = new ElasticByteBufferPool();
   private ExecutorService ecReconstructExecutor =
-      Executors.newFixedThreadPool(5);
+      Executors.newFixedThreadPool(3);
 
   @Before
   public void setup() throws IOException {

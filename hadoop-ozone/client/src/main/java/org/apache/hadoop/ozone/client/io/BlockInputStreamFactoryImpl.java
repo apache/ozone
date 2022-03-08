@@ -51,8 +51,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
   }
 
   public BlockInputStreamFactoryImpl() {
-    this(new ElasticByteBufferPool(),
-        () -> Executors.newSingleThreadExecutor());
+    this(new ElasticByteBufferPool(), Executors::newSingleThreadExecutor);
   }
 
   public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,

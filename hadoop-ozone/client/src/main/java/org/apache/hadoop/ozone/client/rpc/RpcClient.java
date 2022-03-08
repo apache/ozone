@@ -38,7 +38,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -165,6 +166,11 @@ public class RpcClient implements ClientProtocol {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RpcClient.class);
+
+  // For the minimal recommended EC policy rs-3-2-1024k,
+  // we should have at least 1 core thread for each necessary chunk
+  // for reconstruction.
+  private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
 
   private final ConfigurationSource conf;
   private final OzoneManagerClientProtocol ozoneManagerClient;
@@ -1724,8 +1730,10 @@ public class RpcClient implements ClientProtocol {
       synchronized (this) {
         executor = ecReconstructExecutor;
         if (executor == null) {
-          ecReconstructExecutor = Executors.newFixedThreadPool(
-              clientConfig.getEcReconstructStripeReadPoolSize(),
+          ecReconstructExecutor = new ThreadPoolExecutor(
+              EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
+              clientConfig.getEcReconstructStripeReadPoolLimit(),
+              60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
               new ThreadFactoryBuilder()
                   .setNameFormat("ec-reconstruct-reader-TID-%d")
                   .build());
