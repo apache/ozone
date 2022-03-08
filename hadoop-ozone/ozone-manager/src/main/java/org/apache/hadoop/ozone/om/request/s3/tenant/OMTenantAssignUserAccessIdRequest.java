@@ -292,9 +292,10 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantId(tenantId)
-          .setKerberosPrincipal(userPrincipal)
+          .setUserPrincipal(userPrincipal)
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
+          .setRoleId(OzoneConsts.TENANT_ROLE_USER)
           .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),

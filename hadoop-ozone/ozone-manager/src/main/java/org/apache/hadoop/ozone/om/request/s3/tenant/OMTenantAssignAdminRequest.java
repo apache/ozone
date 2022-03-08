@@ -192,11 +192,12 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-          .setTenantId(oldAccessIdInfo.getTenantId())
-          .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
-          .setIsAdmin(true)
-          .setIsDelegatedAdmin(delegated)
-          .build();
+              .setTenantId(oldAccessIdInfo.getTenantId())
+              .setUserPrincipal(oldAccessIdInfo.getUserPrincipal())
+              .setIsAdmin(true)
+              .setIsDelegatedAdmin(delegated)
+              .setRoleId(OzoneConsts.TENANT_ROLE_ADMIN)
+              .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),

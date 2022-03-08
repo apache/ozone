@@ -42,16 +42,19 @@ public final class OmDBAccessIdInfo {
    * Only effective if isAdmin is true.
    */
   private final boolean isDelegatedAdmin;
-
-  // This implies above String fields should NOT contain the split key.
-  public static final String SERIALIZATION_SPLIT_KEY = ";";
+  /**
+   * Role name of the user (that this access ID points to) in this tenant.
+   * e.g. "user", "admin", "auditor"
+   */
+  private final String roleId;
 
   public OmDBAccessIdInfo(String tenantId, String userPrincipal,
-                          boolean isAdmin, boolean isDelegatedAdmin) {
+      boolean isAdmin, boolean isDelegatedAdmin, String roleId) {
     this.tenantId = tenantId;
     this.userPrincipal = userPrincipal;
     this.isAdmin = isAdmin;
     this.isDelegatedAdmin = isDelegatedAdmin;
+    this.roleId = roleId;
   }
 
   public String getTenantId() {
@@ -63,10 +66,11 @@ public final class OmDBAccessIdInfo {
    */
   public OzoneManagerProtocolProtos.OmDBAccessInfo getProtobuf() {
     return OzoneManagerProtocolProtos.OmDBAccessInfo.newBuilder()
+        .setTenantId(tenantId)
         .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
         .setIsDelegatedAdmin(isDelegatedAdmin)
-        .setTenantId(tenantId)
+        .setRoleId(roleId)
         .build();
   }
 
@@ -76,10 +80,11 @@ public final class OmDBAccessIdInfo {
   public static OmDBAccessIdInfo getFromProtobuf(
       OzoneManagerProtocolProtos.OmDBAccessInfo infoProto) throws IOException {
     return new Builder()
-        .setKerberosPrincipal(infoProto.getUserPrincipal())
+        .setTenantId(infoProto.getTenantId())
+        .setUserPrincipal(infoProto.getUserPrincipal())
         .setIsAdmin(infoProto.getIsAdmin())
         .setIsDelegatedAdmin(infoProto.getIsDelegatedAdmin())
-        .setTenantId(infoProto.getTenantId())
+        .setRoleId(infoProto.getRoleId())
         .build();
   }
 
@@ -101,7 +106,8 @@ public final class OmDBAccessIdInfo {
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String tenantId;
-    private String kerberosPrincipal;
+    private String userPrincipal;
+    private String roleId;
     private boolean isAdmin;
     private boolean isDelegatedAdmin;
 
@@ -110,8 +116,8 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
-    public Builder setKerberosPrincipal(String kerberosPrincipal) {
-      this.kerberosPrincipal = kerberosPrincipal;
+    public Builder setUserPrincipal(String userPrincipal) {
+      this.userPrincipal = userPrincipal;
       return this;
     }
 
@@ -125,9 +131,14 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
+    public Builder setRoleId(String roleId) {
+      this.roleId = roleId;
+      return this;
+    }
+
     public OmDBAccessIdInfo build() {
-      return new OmDBAccessIdInfo(tenantId, kerberosPrincipal,
-          isAdmin, isDelegatedAdmin);
+      return new OmDBAccessIdInfo(
+          tenantId, userPrincipal, isAdmin, isDelegatedAdmin, roleId);
     }
   }
 }

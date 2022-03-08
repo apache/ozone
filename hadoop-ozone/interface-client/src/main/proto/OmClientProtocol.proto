@@ -1535,6 +1535,7 @@ message OmDBAccessInfo {
   optional string userPrincipal = 2;
   optional bool isAdmin = 3;
   optional bool isDelegatedAdmin = 4;
+  optional string roleId = 5;
 }
 
 message GetS3VolumeContextResponse {

@@ -174,11 +174,12 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-          .setTenantId(oldAccessIdInfo.getTenantId())
-          .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
-          .setIsAdmin(false)
-          .setIsDelegatedAdmin(false)
-          .build();
+              .setTenantId(oldAccessIdInfo.getTenantId())
+              .setUserPrincipal(oldAccessIdInfo.getUserPrincipal())
+              .setIsAdmin(false)
+              .setIsDelegatedAdmin(false)
+              .setRoleId(OzoneConsts.TENANT_ROLE_USER)
+              .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
