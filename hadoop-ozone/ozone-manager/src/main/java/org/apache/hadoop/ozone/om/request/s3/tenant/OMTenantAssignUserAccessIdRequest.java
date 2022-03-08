@@ -54,7 +54,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
-import static org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo.SERIALIZATION_SPLIT_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
@@ -141,13 +140,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       throw new OMException("Invalid accessId '" + accessId + "'. "
           + "Specifying a custom access ID disallowed. "
           + "Expected accessId to be assigned is '" + expectedAccessId + "'",
-          OMException.ResultCodes.INVALID_ACCESS_ID);
-    }
-
-    // Check accessId validity.
-    if (accessId.contains(SERIALIZATION_SPLIT_KEY)) {
-      throw new OMException("Invalid accessId '" + accessId +
-          "'. accessId should not contain '" + SERIALIZATION_SPLIT_KEY + "'",
           OMException.ResultCodes.INVALID_ACCESS_ID);
     }
 

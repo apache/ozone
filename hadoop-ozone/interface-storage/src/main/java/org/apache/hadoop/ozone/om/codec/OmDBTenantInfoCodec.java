@@ -51,7 +51,7 @@ public class OmDBTenantInfoCodec implements Codec<OmDBTenantInfo> {
 
   @Override
   public OmDBTenantInfo copyObject(OmDBTenantInfo object) {
-    // TODO: Not really a "copy". from OMTransactionInfoCodec
+    // Note: Not really a "copy". from OMTransactionInfoCodec
     return object;
   }
 }

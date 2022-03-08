@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ public class OmDBKerberosPrincipalInfoCodec
   public byte[] toPersistedFormat(OmDBKerberosPrincipalInfo object)
       throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.convertToByteArray();
+    return object.getProtobuf().toByteArray();
   }
 
   @Override
@@ -46,13 +47,14 @@ public class OmDBKerberosPrincipalInfoCodec
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OmDBKerberosPrincipalInfo.getFromByteArray(rawData);
+    return OmDBKerberosPrincipalInfo.getFromProtobuf(
+        OzoneManagerProtocolProtos.TenantUserPrincipalInfo.parseFrom(rawData));
   }
 
   @Override
   public OmDBKerberosPrincipalInfo copyObject(
       OmDBKerberosPrincipalInfo object) {
-    // TODO: Not really a "copy". See OMTransactionInfoCodec
+    // Note: Not really a "copy". See OMTransactionInfoCodec
     return object;
   }
 }

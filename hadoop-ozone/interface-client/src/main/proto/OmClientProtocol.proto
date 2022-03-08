@@ -1414,6 +1414,10 @@ message TenantInfo {
     optional string bucketPolicyGroupName = 5;
 }
 
+message TenantUserPrincipalInfo {
+  repeated string accessIds = 1;
+}
+
 // For storing extended access ID information (related to a tenant) to OM DB
 // Does not include the access ID value itself
 message ExtendedAccessIdInfo {

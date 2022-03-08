@@ -51,7 +51,7 @@ public class OmDBAccessIdInfoCodec implements Codec<OmDBAccessIdInfo> {
 
   @Override
   public OmDBAccessIdInfo copyObject(OmDBAccessIdInfo object) {
-    // TODO: Not really a "copy". See OMTransactionInfoCodec
+    // Note: Not really a "copy". See OMTransactionInfoCodec
     return object;
   }
 }
