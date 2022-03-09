@@ -38,7 +38,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   @Option(names = {"-t", "--threshold"},
       description = "Percentage deviation from average utilization of " +
           "the cluster after which a datanode will be rebalanced (for " +
-          "example, '10' for 10%).")
+          "example, '10' for 10%%).")
   private Optional<Double> threshold;
 
   @Option(names = {"-i", "--iterations"},
@@ -49,7 +49,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   @Option(names = {"-d", "--maxDatanodesPercentageToInvolvePerIteration"},
       description = "Max percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration (for example, " +
-          "'20' for 20%).")
+          "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
   @Option(names = {"-s", "--maxSizeToMovePerIterationInGB"},
