@@ -22,6 +22,8 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
@@ -525,14 +527,40 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     count = request.getCount();
     HddsProtos.LifeCycleState state = null;
     HddsProtos.ReplicationFactor factor = null;
+    HddsProtos.ReplicationType replicationType = null;
+    ReplicationConfig repConfig = null;
     if (request.hasState()) {
       state = request.getState();
     }
-    if (request.hasFactor()) {
+    if (request.hasType()) {
+      replicationType = request.getType();
+    }
+    if (replicationType != null) {
+      // This must come from an upgraded client as the older version never
+      // passed Type. Therefore, we must check for replicationConfig.
+      if (replicationType == HddsProtos.ReplicationType.EC) {
+        if (request.hasEcReplicationConfig()) {
+          repConfig = new ECReplicationConfig(request.getEcReplicationConfig());
+        }
+      } else {
+        if (request.hasFactor()) {
+          repConfig = ReplicationConfig
+              .fromProtoTypeAndFactor(request.getType(), request.getFactor());
+        }
+      }
+    } else if (request.hasFactor()) {
       factor = request.getFactor();
     }
-    List<ContainerInfo> containerList =
-        impl.listContainer(startContainerID, count, state, factor);
+    List<ContainerInfo> containerList;
+    if (factor != null) {
+      // Call from a legacy client
+      containerList =
+          impl.listContainer(startContainerID, count, state, factor);
+    } else {
+      containerList =
+          impl.listContainer(startContainerID, count, state, replicationType,
+              repConfig);
+    }
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
     for (ContainerInfo container : containerList) {

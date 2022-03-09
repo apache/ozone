@@ -20,7 +20,11 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import java.io.IOException;
 import java.util.List;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -65,9 +69,14 @@ public class ListSubcommand extends ScmSubcommand {
           "DELETING, DELETED)")
   private HddsProtos.LifeCycleState state;
 
-  @Option(names = {"--factor"},
-      description = "Container factor(ONE, THREE)")
-  private HddsProtos.ReplicationFactor factor;
+  @Option(names = {"-t", "--type"},
+      description = "Replication Type (RATIS, STANDALONE or EC)")
+  private HddsProtos.ReplicationType type;
+
+  @Option(names = {"-r", "--replication", "--factor"},
+      description = "Container replication (ONE, THREE for Ratis, " +
+          "rs-6-3-1024k for EC)")
+  private String replication;
 
   private static final ObjectWriter WRITER;
 
@@ -90,8 +99,17 @@ public class ListSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (!Strings.isNullOrEmpty(replication) && type == null) {
+      throw new IOException("Type must be set if replication is passed");
+    }
+    ReplicationConfig repConfig = null;
+    if (!Strings.isNullOrEmpty(replication)) {
+      repConfig = ReplicationConfig.parse(
+          ReplicationType.valueOf(type.toString()),
+          replication, new OzoneConfiguration());
+    }
     List<ContainerInfo> containerList =
-        scmClient.listContainer(startId, count, state, factor);
+        scmClient.listContainer(startId, count, state, type, repConfig);
 
     // Output data list
     for (ContainerInfo container : containerList) {
