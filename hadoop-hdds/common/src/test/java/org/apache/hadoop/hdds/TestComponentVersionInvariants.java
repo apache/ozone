@@ -54,7 +54,8 @@ public class TestComponentVersionInvariants {
 
   public TestComponentVersionInvariants(ComponentVersion[] values,
       ComponentVersion defaultValue, ComponentVersion futureValue) {
-    this.values = values;
+    this.values = new ComponentVersion[values.length];
+    System.arraycopy(values, 0, this.values, 0, values.length);
     this.defaultValue = defaultValue;
     this.futureValue = futureValue;
   }
