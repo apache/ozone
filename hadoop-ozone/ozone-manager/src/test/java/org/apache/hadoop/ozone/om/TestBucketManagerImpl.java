@@ -24,6 +24,8 @@ import java.util.Collections;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.Rule;
+
 import org.mockito.Mockito;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -36,11 +38,16 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -67,7 +74,8 @@ public class TestBucketManagerImpl {
     om.stop();
   }
 
-  private OzoneConfiguration createNewTestPath() throws IOException, AuthenticationException {
+  private OzoneConfiguration createNewTestPath() throws IOException,
+          AuthenticationException {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.newFolder();
     if (!newFolder.exists()) {
@@ -98,16 +106,16 @@ public class TestBucketManagerImpl {
   public void testCreateBucketWithoutVolume() throws Exception {
     thrown.expectMessage("Volume doesn't exist");
     OzoneConfiguration conf = createNewTestPath();
-
     omTestManagers = new OmTestManagers(conf);
+
     try {
-      OzoneManagerProtocol writeClient = omTestManagers.getWriteClient();
+      OzoneManagerProtocol writeCl = omTestManagers.getWriteClient();
 
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("sample-vol")
           .setBucketName("bucket-one")
           .build();
-      writeClient.createBucket(bucketInfo);
+      writeCl.createBucket(bucketInfo);
     } catch (OMException omEx) {
       Assert.assertEquals(ResultCodes.VOLUME_NOT_FOUND,
           omEx.getResult());
@@ -139,13 +147,14 @@ public class TestBucketManagerImpl {
                 BucketEncryptionKeyInfo.Builder().setKeyName("key1").build())
         .build();
     writeClient.createBucket(bucketInfo);
-    Assert.assertNotNull(bucketManager.getBucketInfo("sample-vol", "bucket-one"));
+    Assert.assertNotNull(bucketManager.getBucketInfo("sample-vol",
+            "bucket-one"));
 
     OmBucketInfo bucketInfoRead =
-        bucketManager.getBucketInfo("sample-vol",  "bucket-one");
+            bucketManager.getBucketInfo("sample-vol", "bucket-one");
 
-   Assert.assertTrue(bucketInfoRead.getEncryptionKeyInfo().getKeyName()
-        .equals(bucketInfo.getEncryptionKeyInfo().getKeyName()));
+    Assert.assertTrue(bucketInfoRead.getEncryptionKeyInfo().getKeyName()
+            .equals(bucketInfo.getEncryptionKeyInfo().getKeyName()));
   }
 
 
@@ -363,7 +372,7 @@ public class TestBucketManagerImpl {
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
-                    new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+              new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
             .build();
 
     OpenKeySession session1 = writeClient.openKey(args1);
@@ -376,7 +385,7 @@ public class TestBucketManagerImpl {
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
-                    new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+              new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
             .build();
 
     OpenKeySession session2 = writeClient.openKey(args2);

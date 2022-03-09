@@ -120,7 +120,7 @@ public final class OmTestManagers {
         .getInternalState(om, "prefixManager");
   }
 
-  public KeyProviderCryptoExtension kmsProviderInit(){
+  public KeyProviderCryptoExtension kmsProviderInit() {
     kmsProvider = Mockito.mock(KeyProviderCryptoExtension.class);
 
     HddsWhiteboxTestUtils.setInternalState(om,

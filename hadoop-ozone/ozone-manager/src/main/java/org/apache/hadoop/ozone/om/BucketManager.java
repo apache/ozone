@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 
 import java.io.IOException;
