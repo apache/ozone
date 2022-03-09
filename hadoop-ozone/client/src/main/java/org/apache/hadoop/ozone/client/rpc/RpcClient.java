@@ -38,7 +38,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -1733,10 +1733,11 @@ public class RpcClient implements ClientProtocol {
           ecReconstructExecutor = new ThreadPoolExecutor(
               EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
               clientConfig.getEcReconstructStripeReadPoolLimit(),
-              60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
+              60, TimeUnit.SECONDS, new SynchronousQueue<>(),
               new ThreadFactoryBuilder()
                   .setNameFormat("ec-reconstruct-reader-TID-%d")
-                  .build());
+                  .build(),
+              new ThreadPoolExecutor.CallerRunsPolicy());
           executor = ecReconstructExecutor;
         }
       }
