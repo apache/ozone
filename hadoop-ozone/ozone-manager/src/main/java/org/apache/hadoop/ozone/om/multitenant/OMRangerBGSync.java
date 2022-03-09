@@ -40,7 +40,6 @@ import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ConcurrentHashMultiset;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -57,8 +56,8 @@ public class OMRangerBGSync implements Runnable, Closeable {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(OMRangerBGSync.class);
-  private static int WAIT_MILI = 1000;
-  private static int MAX_ATTEMPT = 2;
+  private static final int WAIT_MILI = 1000;
+  private static final int MAX_ATTEMPT = 2;
 
   /**
    * ExecutorService used for scheduling sync operation.
@@ -67,32 +66,32 @@ public class OMRangerBGSync implements Runnable, Closeable {
   private ScheduledFuture<?> rangerSyncFuture;
   private final int rangerSyncInterval;
 
-  long rangerBGSyncCounter = 0;
-  long currentOzoneServiceVersionInOMDB;
-  long proposedOzoneServiceVersionInOMDB;
-  public static int ozoneServiceId;
+  private long rangerBGSyncCounter = 0;
+  private long currentOzoneServiceVersionInOMDB;
+  private long proposedOzoneServiceVersionInOMDB;
+  private static int ozoneServiceId;
 
-  MultiTenantAccessAuthorizerRangerPlugin authorizer;
+  private MultiTenantAccessAuthorizerRangerPlugin authorizer;
 
-  class BGRole{
-    String name;
-    String id;
-    HashSet<String> users;
+  class BGRole {
+    private String name;
+    private String id;
+    private HashSet<String> users;
 
     BGRole(String n) {
       this.name = n;
       users = new HashSet<>();
     }
 
-    void addId(String i) {
-      this.id =i;
+    public void addId(String i) {
+      this.id = i;
     }
 
-    void addUsers(String u) {
+    public void addUsers(String u) {
       users.add(u);
     }
 
-    HashSet<String> getUsers() {
+    public HashSet<String> getUsers() {
       return users;
     }
 
@@ -100,13 +99,18 @@ public class OMRangerBGSync implements Runnable, Closeable {
     public int hashCode() {
       return name.hashCode();
     }
+
+    @Override
+    public boolean equals(Object obj) {
+      return (this.hashCode() == obj.hashCode());
+    }
   }
 
   // we will track all the policies in Ranger here. After we have
   // processed all the policies from OMDB, this map will
   // be left with policies that we need to delete.
   // Its a map of Policy ID to policy names
-  ConcurrentHashMap<String, String> mtRangerPoliciesTobeDeleted =
+  private ConcurrentHashMap<String, String> mtRangerPoliciesTobeDeleted =
       new ConcurrentHashMap<>();
 
   // This map will be used to keep all the policies that are found in
@@ -114,18 +118,19 @@ public class OMRangerBGSync implements Runnable, Closeable {
   // policyID. This can result if a tenant is deleted but the system
   // crashed. Its an easy recovery to retry the "tenant delete" operation.
   // Its a map of policy ID to policy names
-  ConcurrentHashMap<String, String> mtRangerPoliciesTobeCreated =
+  private ConcurrentHashMap<String, String> mtRangerPoliciesTobeCreated =
       new ConcurrentHashMap<>();
 
   // This map will keep all the Multiotenancy related roles from Ranger.
-  ConcurrentHashMap<String, BGRole> mtRangerRoles = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, BGRole> mtRangerRoles =
+      new ConcurrentHashMap<>();
 
   // keep OMDB mapping of Roles -> list of user principals.
-  ConcurrentHashMap<String, HashSet<String>> mtOMDBRoles =
+  private ConcurrentHashMap<String, HashSet<String>> mtOMDBRoles =
       new ConcurrentHashMap<>();
 
   // Every BG ranger sync cycle we update this
-  long lastRangerPolicyLoadTime;
+  private long lastRangerPolicyLoadTime;
 
   public OMRangerBGSync(OzoneManager om) throws Exception {
     try {
@@ -243,8 +248,8 @@ public class OMRangerBGSync implements Runnable, Closeable {
         proposedOzoneServiceVersionInOMDB = getRangerServiceVersion();
       }
     } catch (Exception e) {
-      LOG.warn("Exception during a Ranger Sync Cycle. " + e.getMessage() );
-    }finally {
+      LOG.warn("Exception during a Ranger Sync Cycle. " + e.getMessage());
+    } finally {
       ozoneManager.getMultiTenantManager().resetInProgressMtOpState();
     }
   }
@@ -263,7 +268,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     try {
       lastKnownVersion =
           ozoneManager.getMetadataManager().getOmRangerStateTable()
-              .get(OmMetadataManagerImpl.RangerOzoneServiceVersionKey);
+              .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
     } catch (Exception ex) {
       return 0;
     }
@@ -318,10 +323,10 @@ public class OMRangerBGSync implements Runnable, Closeable {
         JsonObject policy = policyItems.get(j).getAsJsonObject();
         JsonArray roles = policy.getAsJsonArray("roles");
         for (int k = 0; k < roles.size(); ++k) {
-          if(!mtRangerRoles.containsKey(roles.get(k).getAsString())) {
+          if (!mtRangerRoles.containsKey(roles.get(k).getAsString())) {
             // We only get the role name here. We need to query and populate it.
             mtRangerRoles.put(roles.get(k).getAsString(),
-            new BGRole(roles.get(k).getAsString()));
+                new BGRole(roles.get(k).getAsString()));
           }
         }
       }
@@ -336,7 +341,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
       BGRole role = mtRangerRoles.get(rolename);
       role.addId(roleObject.get("id").getAsString());
       JsonArray userArray = roleObject.getAsJsonArray("users");
-      for (int i =0; i< userArray.size(); ++i) {
+      for (int i = 0; i < userArray.size(); ++i) {
         role.addUsers(userArray.get(i).getAsJsonObject().get("name")
             .getAsString());
       }
@@ -378,7 +383,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
       String policy = mtRangerPoliciesTobeDeleted.get(policyId);
       AccessPolicy accessPolicy = authorizer.getAccessPolicyByName(policy);
       if (lastRangerPolicyLoadTime >
-          (accessPolicy.getLastUpdateTime() + 3600 *1000)) {
+          (accessPolicy.getLastUpdateTime() + 3600 * 1000)) {
         LOG.warn("Deleting policies from Ranger: " + policy);
         authorizer.deletePolicybyName(policy);
         for (String deletedrole : accessPolicy.getRoleList()) {
@@ -462,7 +467,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
   public void pushOMDBRoleToRanger(String roleName) throws IOException {
     HashSet<String> omdbUserList = mtOMDBRoles.get(roleName);
     String roleJsonStr = authorizer.getRole(roleName);
-    authorizer.assignAllUsers(omdbUserList, roleJsonStr) ;
+    authorizer.assignAllUsers(omdbUserList, roleJsonStr);
   }
 
   public void setOzoneClient(OzoneClient oc) {

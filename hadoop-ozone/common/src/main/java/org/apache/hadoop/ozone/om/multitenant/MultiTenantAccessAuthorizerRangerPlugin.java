@@ -21,7 +21,6 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT;
@@ -555,7 +554,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return policy;
   }
 
-  public int getOzoneServiceId () throws Exception {
+  public int getOzoneServiceId() throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;
     int id = 0;
@@ -576,9 +575,10 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return id;
   }
 
-  public long getCurrentOzoneServiceVersion (int ozoneServiceId) throws Exception {
-    String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + ozoneServiceId;
+  public long getCurrentOzoneServiceVersion(int ozoneServiceId)
+      throws Exception {
+    String rangerAdminUrl = rangerHttpsAddress
+        + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + ozoneServiceId;
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);
@@ -587,7 +587,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return jObject.get("policyVersion").getAsLong();
   }
 
-  public String getIncrementalRangersChanges (long baseVersion) throws Exception {
+  public String getIncrementalRangersChanges(long baseVersion)
+      throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_DOWNLOAD_ENDPOINT + baseVersion;
 
@@ -597,11 +598,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return sInfo;
   }
 
-  public String getAllMultiTenantPolicies (int ozoneServiceId) throws Exception {
+  public String getAllMultiTenantPolicies(int ozoneServiceId)
+      throws Exception {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT
-            + ozoneServiceId + "?policyLabelsPartial=OzoneMultiTenant"
-        ;
+            + ozoneServiceId + "?policyLabelsPartial=OzoneMultiTenant";
 
     HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
         "GET", false);

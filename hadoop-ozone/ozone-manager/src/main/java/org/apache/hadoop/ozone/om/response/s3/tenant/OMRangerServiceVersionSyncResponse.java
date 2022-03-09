@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.RANGER_STATE_TABLE;
 
 import java.io.IOException;
@@ -38,8 +37,8 @@ import com.google.common.annotations.VisibleForTesting;
  */
 @CleanupTableInfo(cleanupTables = {RANGER_STATE_TABLE})
 public class OMRangerServiceVersionSyncResponse extends OMClientResponse {
-  long newServiceVersion;
-  String serviceVersionkey;
+  private long newServiceVersion;
+  private String serviceVersionkey;
 
   public OMRangerServiceVersionSyncResponse(@Nonnull OMResponse omResponse,
                                             @Nonnull long proposedVersion,

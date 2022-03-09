@@ -975,8 +975,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public void rangerServiceVersionSync(OmRangerSyncArgs omArgs) throws IOException {
-    final RangerServiceVersionSyncRequest request = RangerServiceVersionSyncRequest.newBuilder()
+  public void rangerServiceVersionSync(OmRangerSyncArgs omArgs)
+      throws IOException {
+    final RangerServiceVersionSyncRequest request =
+        RangerServiceVersionSyncRequest.newBuilder()
         .setRangerServiceVersion(omArgs.getNewSyncServiceVersion())
         .build();
     final OMRequest omRequest = createOMRequest(Type.RangerServiceVersionSync)

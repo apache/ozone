@@ -77,11 +77,11 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
                                    String existingRole) throws IOException;
 
   /**
-   * Assign all the users to an existing role
+   * Assign all the users to an existing role.
    * @param users list of user principals
    * @param existingRole roleName
    */
-  public String assignAllUsers(HashSet<String> users,
+  String assignAllUsers(HashSet<String> users,
                                String existingRole) throws IOException;
 
   /**
@@ -135,7 +135,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return
    * @throws IOException
    */
-  public String createUser(String userName,
+  String createUser(String userName,
                            String password)
       throws IOException;
   /**

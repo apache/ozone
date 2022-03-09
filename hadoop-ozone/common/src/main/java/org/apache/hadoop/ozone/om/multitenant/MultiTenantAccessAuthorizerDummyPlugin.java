@@ -52,12 +52,14 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String revokeUserFromRole(BasicUserPrincipal principal, String existingRole) throws IOException {
+  public String revokeUserFromRole(BasicUserPrincipal principal,
+                                   String existingRole) throws IOException {
     return null;
   }
 
   @Override
-  public String assignAllUsers(HashSet<String> users, String existingRole) throws IOException {
+  public String assignAllUsers(HashSet<String> users, String existingRole)
+      throws IOException {
     return null;
   }
 
@@ -88,7 +90,8 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String createUser(String userName, String password) throws IOException {
+  public String createUser(String userName, String password)
+      throws IOException {
     return null;
   }
 

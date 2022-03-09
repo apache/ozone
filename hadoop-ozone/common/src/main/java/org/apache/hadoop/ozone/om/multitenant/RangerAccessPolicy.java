@@ -103,7 +103,7 @@ public class RangerAccessPolicy implements AccessPolicy {
     // TODO : retrieve other policy fields as well.
     try {
       setLastUpdateTime(jsonObject.get("updateTime").getAsLong());
-    } catch (Exception e){
+    } catch (Exception e) {
       // lets ignore the exception in case the field is not set.
     }
     return null;
@@ -295,7 +295,8 @@ public class RangerAccessPolicy implements AccessPolicy {
         "{\"policyType\":\"0\"," + "\"name\":\"" + policyName + "\","
             + "\"isEnabled\":true," + "\"policyPriority\":0,"
             + "\"description\":\"Policy created by Ozone for Multi-Tenancy\","
-            + "\"policyLabels\":[\"OzoneMultiTenant\"]," + "\"description\":\"\","
+            + "\"policyLabels\":[\"OzoneMultiTenant\"],"
+            + "\"description\":\"\","
             + "\"isAuditEnabled\":true," + createRangerResourceItems()
             + "\"isDenyAllElse\":false," + createRangerPolicyItems()
             + "\"allowExceptions\":[]," + "\"denyPolicyItems\":[],"

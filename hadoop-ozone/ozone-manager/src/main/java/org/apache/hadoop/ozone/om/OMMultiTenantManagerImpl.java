@@ -180,7 +180,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // Then create user role, and add admin role as its delegated admin
       final OzoneTenantRolePrincipal userRole =
           OzoneTenantRolePrincipal.getUserRole(tenantID);
-      String userRoleId = authorizer.createRole(userRole.getName(), adminRole.getName());
+      String userRoleId = authorizer.createRole(userRole.getName(),
+          adminRole.getName());
       tenant.addTenantAccessRole(userRoleId);
 
       BucketNameSpace bucketNameSpace = tenant.getTenantBucketNameSpace();

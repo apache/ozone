@@ -583,10 +583,11 @@ public interface OzoneManagerProtocol
 
   /**
    * Syncs Ranger Service Version.
-   * @param omTenantArgs OmTenantArgs
+   * @param omArgs OmTenantArgs
    * @throws IOException
    */
-  default void rangerServiceVersionSync(OmRangerSyncArgs omArgs) throws IOException {
+  default void rangerServiceVersionSync(OmRangerSyncArgs omArgs)
+      throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
   }

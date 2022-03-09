@@ -149,7 +149,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | tenantPolicyTable         | policyGroup -> [policyId1, policyId2]    |
    * |----------------------------------------------------------------------|
-   * | RangerStateTable         | String""RangerOzoneServiceVersion" -> service version in Ranger]    |
+   * | RangerStateTable         | "ranger State key"-> ranger state Value   |
    * |----------------------------------------------------------------------|
    *
    *
@@ -205,7 +205,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String TENANT_ROLE_TABLE = "tenantRoleTable";
   public static final String TENANT_POLICY_TABLE = "tenantPolicyTable";
   public static final String RANGER_STATE_TABLE = "RangerStateTable";
-  public static final String RangerOzoneServiceVersionKey = "RangerOzoneServiceVersion";
+
+  public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
+      "RangerOzoneServiceVersion";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,

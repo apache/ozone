@@ -247,16 +247,16 @@ public class TestMultiTenantVolume {
 
   @Test
   public void testBGSync() throws Exception {
-    final int TRIAL_VERSION = 10;
+    final int trialVersion = 10;
 
     // Default client not belonging to a tenant should end up in the S3 volume.
     ObjectStore store = cluster.getClient().getObjectStore();
-    store.rangerServiceVersionSync(TRIAL_VERSION);
+    store.rangerServiceVersionSync(trialVersion);
     long version =
         cluster.getOzoneManager().getMetadataManager()
             .getOmRangerStateTable()
-            .get(OmMetadataManagerImpl.RangerOzoneServiceVersionKey);
-    if (version != TRIAL_VERSION) {
+            .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
+    if (version != trialVersion) {
       throw new OMException(INVALID_ACCESSID);
     }
   }

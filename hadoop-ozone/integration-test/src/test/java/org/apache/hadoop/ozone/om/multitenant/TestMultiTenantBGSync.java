@@ -94,15 +94,16 @@ public class TestMultiTenantBGSync {
    */
   @Rule
   public Timeout timeout = new Timeout(600000);
-  public TemporaryFolder folder = new TemporaryFolder();
+
+  private TemporaryFolder folder = new TemporaryFolder();
 
   // The following values need to be set before this test can be enabled.
-  private static final String RANGER_ENDPOINT ="";
+  private static final String RANGER_ENDPOINT = "";
   private static final String RANGER_ENDPOINT_USER = "";
   private static final String RANGER_ENDPOINT_USER_PASSWD = "";
 
-  MultiTenantAccessAuthorizer omm;
-  OMRangerBGSync bgSync;
+  private MultiTenantAccessAuthorizer omm;
+  private OMRangerBGSync bgSync;
 
   private List<String> usersIdsCreated = new ArrayList<String>();
   private List<String> policyNamesCreated = new ArrayList<String>();
@@ -121,10 +122,10 @@ public class TestMultiTenantBGSync {
       ((response, transactionIndex) -> null);
 
   // UGI-related vars
-  private final String USER_ALICE = "alice@EXAMPLE.COM";
-  private final String TENANT_NAME = "finance";
-  private final String USER_BOB = "bob@EXAMPLE.COM";
-  private final String ACCESS_ID_BOB =
+  private static final String USER_ALICE = "alice@EXAMPLE.COM";
+  private static final String TENANT_NAME = "finance";
+  private static final String USER_BOB = "bob@EXAMPLE.COM";
+  private static final String ACCESS_ID_BOB =
       TENANT_NAME + TENANT_NAME_USER_NAME_DELIMITER + USER_BOB;
 
   private UserGroupInformation ugiAlice;
@@ -200,10 +201,10 @@ public class TestMultiTenantBGSync {
     framework().clearInlineMocks();
   }
 
-  private AccessPolicy createVolumeAccessPolicy(String vol, String tenant)
+  private AccessPolicy createVolumeAccessPolicy(String vol, String tnt)
       throws IOException {
     OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tenant);
+        OzoneTenantRolePrincipal.getUserRole(tnt);
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         // principal already contains volume name
         principal.getName() + "VolumeAccess");
@@ -217,10 +218,10 @@ public class TestMultiTenantBGSync {
     return tenantVolumeAccessPolicy;
   }
 
-  private AccessPolicy allowCreateBucketPolicy(String vol, String tenant)
+  private AccessPolicy allowCreateBucketPolicy(String vol, String tnt)
       throws IOException {
     OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tenant);
+        OzoneTenantRolePrincipal.getUserRole(tnt);
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
         // principal already contains volume name
         principal.getName() + "BucketAccess");
@@ -253,34 +254,44 @@ public class TestMultiTenantBGSync {
       omm.createRole(role2Principal.getName(), null);
       String role2 = omm.getRole(role2Principal);
       roleIdsCreated.add(role2);
-    } catch (Exception e) {}
+    } catch (Exception e) {
+      LOG.info(e.getMessage());
+    }
 
     try {
       omm.createUser("user1Test", "user1Test1234");
       usersCreated.add(userPrincipal);
       omm.assignUser(userPrincipal, omm.getRole(role2Principal), false);
-    } catch (Exception e) {}
+    } catch (Exception e) {
+      LOG.info(e.getMessage());
+    }
 
     try {
       omm.createUser("user2Test", "user1Test1234");
       usersCreated.add(userPrincipal2);
       omm.assignUser(userPrincipal2, omm.getRole(role2Principal), false);
-    } catch (Exception e) {}
+    } catch (Exception e) {
+      LOG.info(e.getMessage());
+    }
 
 
     try {
-      AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
-        "vol1", "tenant1");
+      AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy("vol1",
+          "tenant1");
       policyIdsCreated.add(omm.createAccessPolicy(tenant1VolumeAccessPolicy));
       policyNamesCreated.add(tenant1VolumeAccessPolicy.getPolicyName());
-    } catch (Exception e) {}
+    } catch (Exception e) {
+      LOG.info(e.getMessage());
+    }
 
     try {
-      AccessPolicy tenant1BucketCreatePolicy = allowCreateBucketPolicy(
-        "vol1", "tenant1");
+      AccessPolicy tenant1BucketCreatePolicy = allowCreateBucketPolicy("vol1",
+          "tenant1");
       policyIdsCreated.add(omm.createAccessPolicy(tenant1BucketCreatePolicy));
       policyNamesCreated.add(tenant1BucketCreatePolicy.getPolicyName());
-    } catch (Exception e) {}
+    } catch (Exception e) {
+      LOG.info(e.getMessage());
+    }
   }
 
   public void cleanupPolicies() {
@@ -288,6 +299,7 @@ public class TestMultiTenantBGSync {
       try {
         omm.deletePolicybyName(name);
       } catch (Exception e) {
+        LOG.info(e.getMessage());
       }
     }
   }
@@ -298,18 +310,20 @@ public class TestMultiTenantBGSync {
         omm.deleteRole(new JsonParser().parse(role).getAsJsonObject().get(
             "id").getAsString());
       } catch (Exception e) {
+        LOG.info(e.getMessage());
       }
     }
   }
 
   public void cleanupUsers() {
-      for (BasicUserPrincipal user : usersCreated) {
-        try {
-          String userId = omm.getUserId(user);
-          omm.deleteUser(userId);
-        } catch (Exception e) {
-        }
+    for (BasicUserPrincipal user : usersCreated) {
+      try {
+        String userId = omm.getUserId(user);
+        omm.deleteUser(userId);
+      } catch (Exception e) {
+        LOG.info(e.getMessage());
       }
+    }
   }
 
 
@@ -326,7 +340,7 @@ public class TestMultiTenantBGSync {
     Mockito.doAnswer(invocationOnMock -> {
       long v = invocationOnMock.getArgument(0);
       ozoneManager.getMetadataManager().getOmRangerStateTable()
-          .put(OmMetadataManagerImpl.RangerOzoneServiceVersionKey,
+          .put(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY,
               v);
       return null;
     }).when(objectStore).rangerServiceVersionSync(ozoneVersion);
@@ -348,7 +362,7 @@ public class TestMultiTenantBGSync {
 
       // Wait for background sync to go through few cycles.
       while (bgSync.getRangerBGSyncCounter() <= 4) {
-        sleep(bgSync.getRangerSyncInterval()*1000*10);
+        sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
       Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() == ozoneVersion);
 
@@ -410,7 +424,7 @@ public class TestMultiTenantBGSync {
 
 
       while (bgSync.getRangerBGSyncCounter() <= 4) {
-        sleep(bgSync.getRangerSyncInterval()*1000*10);
+        sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
       Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() == ozoneVersion);
 
@@ -487,9 +501,9 @@ public class TestMultiTenantBGSync {
             .put(userAccessId, omDBAccessIdInfo);
       }
 
-      long base_version =  bgSync.getRangerBGSyncCounter();
-      while (bgSync.getRangerBGSyncCounter() <= base_version + 1) {
-        sleep(bgSync.getRangerSyncInterval()*1000*10);
+      long baseVersion = bgSync.getRangerBGSyncCounter();
+      while (bgSync.getRangerBGSyncCounter() <= baseVersion + 1) {
+        sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
       Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() >= ozoneVersion);
 

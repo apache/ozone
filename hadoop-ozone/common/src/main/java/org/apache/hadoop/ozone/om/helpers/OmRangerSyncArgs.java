@@ -47,7 +47,7 @@ public class OmRangerSyncArgs {
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
-    long newServiceVersion;
+    private long newServiceVersion;
     /**
      * Constructs a builder.
      */

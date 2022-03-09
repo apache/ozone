@@ -182,7 +182,7 @@ public final class OzoneManagerRatisUtils {
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
     case RangerServiceVersionSync:
-        return new OMRangerServiceVersionSyncRequest(omRequest);
+      return new OMRangerServiceVersionSyncRequest(omRequest);
     case CreateTenant:
       return new OMTenantCreateRequest(omRequest);
     case DeleteTenant:
