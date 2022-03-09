@@ -18,13 +18,16 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import io.grpc.Server;
@@ -47,9 +50,20 @@ public class GrpcOzoneManagerServer {
                                     omTranslator,
                                 OzoneDelegationTokenSecretManager
                                     delegationTokenMgr) {
-    this.port = config.getObject(
-        GrpcOzoneManagerServerConfig.class).
-        getPort();
+    OptionalInt haPort = HddsUtils.getNumberFromConfigKeys(config,
+        ConfUtils.addKeySuffixes(
+            OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
+            config.get(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY),
+            config.get(OMConfigKeys.OZONE_OM_NODE_ID_KEY)),
+        OMConfigKeys.OZONE_OM_GRPC_PORT_KEY);
+    if (haPort.isPresent()) {
+      this.port = haPort.getAsInt();
+    } else {
+      this.port = config.getObject(
+              GrpcOzoneManagerServerConfig.class).
+          getPort();
+    }
+
     init(omTranslator,
         delegationTokenMgr,
         config);
