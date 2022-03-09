@@ -2237,6 +2237,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <groups>flaky</groups>
+              <excludedGroups>slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
