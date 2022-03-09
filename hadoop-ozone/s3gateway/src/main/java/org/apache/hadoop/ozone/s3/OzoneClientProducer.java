@@ -107,7 +107,7 @@ public class OzoneClientProducer {
       // For any other critical errors during object creation throw Internal
       // error.
       LOG.debug("Error during Client Creation: ", e);
-      throw wrapOS3Exception(S3ErrorTable.getInternalError(e));
+      throw wrapOS3Exception(S3ErrorTable.newError(INTERNAL_ERROR, null, e));
     }
   }
 
