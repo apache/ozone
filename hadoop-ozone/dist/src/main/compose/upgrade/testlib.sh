@@ -100,13 +100,13 @@ run_test() {
 ## @description Generates data on the cluster.
 ## @param The prefix to use for data generated.
 generate() {
-    execute_robot_test scm -v PREFIX:"$1" upgrade/generate.robot
+    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/generate.robot
 }
 
 ## @description Validates that data exists on the cluster.
 ## @param The prefix of the data to be validated.
 validate() {
-    execute_robot_test scm -v PREFIX:"$1" upgrade/validate.robot
+    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/validate.robot
 }
 
 ## @description Checks that the metadata layout version of the provided node matches what is expected.
