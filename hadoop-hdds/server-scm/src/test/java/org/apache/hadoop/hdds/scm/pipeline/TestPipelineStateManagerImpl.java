@@ -164,7 +164,8 @@ public class TestPipelineStateManagerImpl {
     pipelines.add(pipeline);
 
     Set<Pipeline> pipelines1 = new HashSet<>(stateManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.ONE)));
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.ONE)));
     Assert.assertEquals(pipelines1.size(), pipelines.size());
 
     pipelines1 = new HashSet<>(stateManager.getPipelines());
@@ -460,14 +461,16 @@ public class TestPipelineStateManagerImpl {
         .getProtobufMessage(ClientVersions.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
     Assert.assertEquals(0, stateManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
         .size());
 
     // pipeline in open state should be reported
     openPipeline(pipelineProto);
     Assert.assertEquals(1, stateManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
         .size());
 
@@ -481,14 +484,16 @@ public class TestPipelineStateManagerImpl {
     // pipeline in open state should be reported
     stateManager.addPipeline(pipelineProto2);
     Assert.assertEquals(2, stateManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
         .size());
 
     // pipeline in closed state should not be reported
     finalizePipeline(pipelineProto2);
     Assert.assertEquals(1, stateManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE),
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
         .size());
 

@@ -131,7 +131,7 @@ public class TestReplicatedFileChecksumHelper {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setFileEncryptionInfo(null)
         .setAcls(null)
@@ -172,20 +172,21 @@ public class TestReplicatedFileChecksumHelper {
     pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.CLOSED)
         .setNodes(dns)
         .build();
 
     XceiverClientGrpc xceiverClientGrpc =
         new XceiverClientGrpc(pipeline, conf) {
-      @Override
-      public XceiverClientReply sendCommandAsync(
-          ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) {
-        return buildValidResponse();
-      }
-    };
+          @Override
+          public XceiverClientReply sendCommandAsync(
+              ContainerProtos.ContainerCommandRequestProto request,
+              DatanodeDetails dn) {
+            return buildValidResponse();
+          }
+        };
     XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
     when(factory.acquireClientForReadData(ArgumentMatchers.any())).
         thenReturn(xceiverClientGrpc);
@@ -213,7 +214,7 @@ public class TestReplicatedFileChecksumHelper {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setFileEncryptionInfo(null)
         .setAcls(null)

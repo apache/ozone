@@ -120,7 +120,8 @@ public class ChunkKeyHandler extends KeyHandler implements
       Pipeline pipeline = keyLocation.getPipeline();
       if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
         pipeline = Pipeline.newBuilder(pipeline)
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE)).build();
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .build();
       }
       xceiverClient = xceiverClientManager
               .acquireClientForReadData(pipeline);

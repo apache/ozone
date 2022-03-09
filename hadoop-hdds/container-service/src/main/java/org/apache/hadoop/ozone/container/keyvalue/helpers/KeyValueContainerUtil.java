@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -252,12 +253,18 @@ public final class KeyValueContainerUtil {
       Long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
       if (blockCount != null) {
         isBlockMetadataSet = true;
-        kvContainerData.setKeyCount(blockCount);
+        kvContainerData.setBlockCount(blockCount);
       }
       if (!isBlockMetadataSet) {
         initializeUsedBytesAndBlockCount(store, kvContainerData);
       }
 
+      // If the container is missing a chunks directory, possibly due to the
+      // bug fixed by HDDS-6235, create it here.
+      File chunksDir = new File(kvContainerData.getChunksPath());
+      if (!chunksDir.exists()) {
+        Files.createDirectories(chunksDir.toPath());
+      }
       // Run advanced container inspection/repair operations if specified on
       // startup. If this method is called but not as a part of startup,
       // The inspectors will be unloaded and this will be a no-op.
@@ -323,10 +330,10 @@ public final class KeyValueContainerUtil {
       }
     }
     kvData.setBytesUsed(usedBytes);
-    kvData.setKeyCount(blockCount);
+    kvData.setBlockCount(blockCount);
   }
 
-  private static long getBlockLength(BlockData block) throws IOException {
+  public static long getBlockLength(BlockData block) throws IOException {
     long blockLen = 0;
     List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
 

@@ -154,7 +154,7 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOwner("test")
             .setState(OPEN)
             .build();
@@ -174,7 +174,8 @@ public class AbstractReconContainerManagerTest {
               .setContainerID(cID.getId())
               .setNumberOfKeys(10)
               .setPipelineID(pipeline.getId())
-              .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+              .setReplicationConfig(
+                  StandaloneReplicationConfig.getInstance(ONE))
               .setOwner("test")
               //add containers in all kinds of state
               .setState(stateTypes[i % stateTypeCount])
@@ -208,7 +209,7 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOwner("test")
             .setState(state)
             .build();
@@ -226,7 +227,7 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOwner("test")
             .setState(state)
             .build();

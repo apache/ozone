@@ -303,7 +303,7 @@ public class TestKeyManagerUnit {
         .setBucketName(bucket)
         .setKeyName(key)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .build();
     OmMultipartInfo omMultipartInfo = omtest.initiateMultipartUpload(key1);
@@ -319,7 +319,7 @@ public class TestKeyManagerUnit {
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
@@ -351,7 +351,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnOne.getUuid())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
@@ -360,7 +360,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineTwo = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnFour.getUuid())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
@@ -408,7 +408,7 @@ public class TestKeyManagerUnit {
         .setModificationTime(Time.now())
         .setDataSize(256000)
         .setReplicationConfig(
-                    new RatisReplicationConfig(ReplicationFactor.THREE))
+                    RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
             .setAcls(Collections.emptyList())
         .build();
     OMRequestTestUtils.addKeyToOM(metadataManager, keyInfo);
@@ -477,8 +477,8 @@ public class TestKeyManagerUnit {
           .setCreationTime(Time.now())
           .setOmKeyLocationInfos(singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setReplicationConfig(
-                      new RatisReplicationConfig(ReplicationFactor.THREE))
+          .setReplicationConfig(RatisReplicationConfig
+              .getInstance(ReplicationFactor.THREE))
           .setKeyName(keyPrefix + i)
           .setObjectID(i)
           .setUpdateID(i)

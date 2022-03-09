@@ -83,11 +83,11 @@ public class TestRatisPipelineCreateAndDestroy {
     // make sure two pipelines are created
     waitForPipelines(2);
     Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.closePipeline(pipeline, false);
@@ -105,11 +105,11 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0, pipelineManager.getPipelines(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.closePipeline(pipeline, false);
@@ -129,7 +129,7 @@ public class TestRatisPipelineCreateAndDestroy {
     List<HddsDatanodeService> dns = new ArrayList<>(cluster.getHddsDatanodes());
 
     List<Pipeline> pipelines =
-        pipelineManager.getPipelines(new RatisReplicationConfig(
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
     for (HddsDatanodeService dn : dns) {
       cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
@@ -137,7 +137,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     // try creating another pipeline now
     try {
-      pipelineManager.createPipeline(new RatisReplicationConfig(
+      pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
           ReplicationFactor.THREE));
       Assert.fail("pipeline creation should fail after shutting down pipeline");
     } catch (IOException ioe) {
@@ -173,7 +173,7 @@ public class TestRatisPipelineCreateAndDestroy {
   private void waitForPipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
         .size() >= numPipelines, 100, 60000);
   }

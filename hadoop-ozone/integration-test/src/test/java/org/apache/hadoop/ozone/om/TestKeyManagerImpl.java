@@ -122,10 +122,14 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
-import static org.mockito.Matchers.anyList;
+
 import org.mockito.Mockito;
+
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -209,9 +213,9 @@ public class TestKeyManagerImpl {
 
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
-            Mockito.any(ReplicationConfig.class),
+            any(ReplicationConfig.class),
             Mockito.anyString(),
-            Mockito.any(ExcludeList.class))).thenThrow(
+            any(ExcludeList.class))).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
@@ -318,7 +322,7 @@ public class TestKeyManagerImpl {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .build();
@@ -458,6 +462,7 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testCheckAccessForFileKey() throws Exception {
+    // GIVEN
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName("testdir/deep/NOTICE.txt")
         .build();
@@ -466,12 +471,19 @@ public class TestKeyManagerImpl {
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
 
+    reset(mockScmContainerClient);
     OzoneObj fileKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
     RequestContext context = currentUserReads();
-    Assert.assertTrue(keyManager.checkAccess(fileKey, context));
 
+    // WHEN
+    boolean access = keyManager.checkAccess(fileKey, context);
+
+    // THEN
+    Assert.assertTrue(access);
+    verify(mockScmContainerClient, never())
+        .getContainerWithPipelineBatch(any());
   }
 
   @Test
@@ -779,7 +791,7 @@ public class TestKeyManagerImpl {
     Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
-        new RatisReplicationConfig(ReplicationFactor.THREE), nodeList);
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     List<OmKeyLocationInfo> locationList =
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
@@ -865,7 +877,7 @@ public class TestKeyManagerImpl {
     Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
-        new RatisReplicationConfig(ReplicationFactor.THREE), nodeList);
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     List<OmKeyLocationInfo> locationList =
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
@@ -1338,7 +1350,7 @@ public class TestKeyManagerImpl {
     StorageContainerLocationProtocol sclProtocolMock = mock(
         StorageContainerLocationProtocol.class);
     doThrow(new IOException(errorMessage)).when(sclProtocolMock)
-        .getContainerWithPipelineBatch(anyList());
+        .getContainerWithPipelineBatch(any());
 
     ScmClient scmClientMock = mock(ScmClient.class);
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
@@ -1379,7 +1391,7 @@ public class TestKeyManagerImpl {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(new ArrayList<>())
         .build();
   }
@@ -1502,7 +1514,7 @@ public class TestKeyManagerImpl {
         .setBucketName(bucketName)
         .setDataSize(0)
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ONE))
+            StandaloneReplicationConfig.getInstance(ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .setVolumeName(VOLUME_NAME);

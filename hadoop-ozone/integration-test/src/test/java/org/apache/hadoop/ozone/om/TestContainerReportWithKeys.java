@@ -120,7 +120,8 @@ public class TestContainerReportWithKeys {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setReplicationConfig(
-            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+            StandaloneReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(keySize)
         .setRefreshPipeline(true)
         .build();

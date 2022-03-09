@@ -261,10 +261,22 @@ public class SimpleMockNodeManager implements NodeManager {
       throws NodeNotFoundException {
   }
 
-
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
+  }
 
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  }
+
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
   }
 
   @Override

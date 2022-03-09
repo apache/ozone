@@ -92,7 +92,7 @@ public class TestS3MultipartResponse {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(multipartUploadID)
         .setCreationTime(Time.now())
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .build();
 
@@ -102,7 +102,7 @@ public class TestS3MultipartResponse {
         .setKeyName(keyName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
@@ -183,7 +183,7 @@ public class TestS3MultipartResponse {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
             .setUploadID(multipartUploadID)
             .setCreationTime(Time.now())
-            .setReplicationConfig(new RatisReplicationConfig(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setParentID(parentID)
             .build();
@@ -197,7 +197,7 @@ public class TestS3MultipartResponse {
             .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
-            .setReplicationConfig(new RatisReplicationConfig(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
                     new OmKeyLocationInfoGroup(0, new ArrayList<>())))
@@ -234,7 +234,7 @@ public class TestS3MultipartResponse {
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
               .setUploadID(multipartUploadID)
               .setCreationTime(Time.now())
-              .setReplicationConfig(new RatisReplicationConfig(
+              .setReplicationConfig(RatisReplicationConfig.getInstance(
                       HddsProtos.ReplicationFactor.ONE))
               .setParentID(parentID)
               .build();
@@ -257,7 +257,7 @@ public class TestS3MultipartResponse {
             .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
-            .setReplicationConfig(new RatisReplicationConfig(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
                     new OmKeyLocationInfoGroup(0, new ArrayList<>())))
