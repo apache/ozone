@@ -207,7 +207,7 @@ public class OzoneManagerLock {
 
   private void updateReadLockMetrics(Resource resource, String lockType,
                                      long startWaitingTimeNanos) {
-    if (lockType == READ_LOCK) {
+    if (lockType.equals(READ_LOCK)) {
       long longestReadWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
 
@@ -434,7 +434,7 @@ public class OzoneManagerLock {
   }
 
   private void updateReadUnlockMetrics(Resource resource, String lockType) {
-    if (lockType == READ_LOCK) {
+    if (lockType.equals(READ_LOCK)) {
       long longestReadHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
