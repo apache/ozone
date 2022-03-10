@@ -171,7 +171,6 @@ public class TestBucketManagerImpl {
   @Test
   public void testCreateAlreadyExistingBucket() throws Exception {
     thrown.expectMessage("Bucket already exist");
-
     createSampleVol();
 
     try {
@@ -318,10 +317,8 @@ public class TestBucketManagerImpl {
   @Test
   public void testDeleteBucket() throws Exception {
     thrown.expectMessage("Bucket not found");
-
     createSampleVol();
     BucketManager bucketManager = omTestManagers.getBucketManager();
-
     for (int i = 0; i < 5; i++) {
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("sample-vol")
@@ -354,7 +351,6 @@ public class TestBucketManagerImpl {
   public void testDeleteNonEmptyBucket() throws Exception {
     thrown.expectMessage("Bucket is not empty");
     createSampleVol();
-
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sample-vol")
         .setBucketName("bucket-one")
