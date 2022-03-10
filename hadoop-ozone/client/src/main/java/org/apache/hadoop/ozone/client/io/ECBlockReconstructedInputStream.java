@@ -47,8 +47,6 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
     this.repConfig = repConfig;
     this.byteBufferPool = byteBufferPool;
     this.stripeReader = stripeReader;
-
-    allocateBuffers();
   }
 
   @Override
@@ -75,6 +73,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized int read(ByteBuffer buf) throws IOException {
     ensureNotClosed();
+    allocateBuffers();
     if (!hasRemaining()) {
       return EOF;
     }
@@ -193,6 +192,9 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   }
 
   private void allocateBuffers() {
+    if (bufs != null) {
+      return;
+    }
     bufs = new ByteBuffer[repConfig.getData()];
     for (int i = 0; i < repConfig.getData(); i++) {
       bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());

@@ -108,7 +108,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private Set<Integer> failedDataIndexes = new HashSet<>();
   private ByteBufferPool byteBufferPool;
 
-  private final RawErasureDecoder decoder;
+  private RawErasureDecoder decoder;
 
   private boolean initialized = false;
 
@@ -125,11 +125,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         refreshFunction, streamFactory);
     this.byteBufferPool = byteBufferPool;
     this.executor = ecReconstructExecutor;
-    decoder = CodecUtil.createRawDecoderWithFallback(repConfig);
-
-    // The EC decoder needs an array data+parity long, with missing or not
-    // needed indexes set to null.
-    decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
   }
 
   /**
@@ -160,6 +155,14 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   protected void init() throws InsufficientLocationsException {
+    if (decoder == null) {
+      CodecUtil.createRawDecoderWithFallback(getRepConfig());
+    }
+    if (decoderInputBuffers == null) {
+      // The EC decoder needs an array data+parity long, with missing or not
+      // needed indexes set to null.
+      decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
+    }
     if (!hasSufficientLocations()) {
       throw new InsufficientLocationsException("There are insufficient " +
           "datanodes to read the EC block");
