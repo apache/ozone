@@ -29,6 +29,7 @@ import org.junit.Test;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 /**
@@ -213,6 +214,21 @@ public class TestOzoneManagerLock {
     }
   }
 
+  private String generateResourceLockName(OzoneManagerLock.Resource resource,
+                                          String... resources) {
+    if (resources.length == 1 &&
+        resource != OzoneManagerLock.Resource.BUCKET_LOCK) {
+      return OzoneManagerLockUtil.generateResourceLockName(resource,
+          resources[0]);
+    } else if (resources.length == 2 &&
+        resource == OzoneManagerLock.Resource.BUCKET_LOCK) {
+      return OzoneManagerLockUtil.generateBucketLockName(resources[0],
+          resources[1]);
+    } else {
+      throw new IllegalArgumentException("acquire lock is supported on single" +
+          " resource for all locks except for resource bucket");
+    }
+  }
 
   /**
    * Class used to store locked resource info.
@@ -340,5 +356,67 @@ public class TestOzoneManagerLock {
     // Let's give some time for the new thread to run
     Thread.sleep(100);
     Assert.assertTrue(gotLock.get());
+  }
+
+  @Test
+  public void testLockHoldCount() throws Exception {
+    String[] resourceName;
+    String resourceLockName;
+    for (OzoneManagerLock.Resource resource :
+        OzoneManagerLock.Resource.values()) {
+      // USER_LOCK, S3_SECRET_LOCK and PREFIX_LOCK disallow lock re-acquire by
+      // the same thread.
+      if (resource != OzoneManagerLock.Resource.USER_LOCK &&
+          resource != OzoneManagerLock.Resource.S3_SECRET_LOCK &&
+          resource != OzoneManagerLock.Resource.PREFIX_LOCK) {
+        resourceName = generateResourceName(resource);
+        resourceLockName = generateResourceLockName(resource, resourceName);
+        testLockHoldCountUtil(resource, resourceName, resourceLockName);
+      }
+    }
+  }
+
+  private void testLockHoldCountUtil(OzoneManagerLock.Resource resource,
+                                     String[] resourceName,
+                                     String resourceLockName) throws Exception {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    assertEquals(0, lock.getHoldCount(resourceLockName));
+
+    lock.acquireReadLock(resource, resourceName);
+    assertEquals(1, lock.getHoldCount(resourceLockName));
+
+    lock.acquireReadLock(resource, resourceName);
+    assertEquals(2, lock.getHoldCount(resourceLockName));
+
+    lock.acquireReadLock(resource, resourceName);
+    assertEquals(3, lock.getHoldCount(resourceLockName));
+
+    lock.releaseReadLock(resource, resourceName);
+    assertEquals(2, lock.getHoldCount(resourceLockName));
+
+    lock.releaseReadLock(resource, resourceName);
+    assertEquals(1, lock.getHoldCount(resourceLockName));
+
+    lock.releaseReadLock(resource, resourceName);
+    assertEquals(0, lock.getHoldCount(resourceLockName));
+
+    lock.acquireWriteLock(resource, resourceName);
+    assertEquals(1, lock.getHoldCount(resourceLockName));
+
+    lock.acquireWriteLock(resource, resourceName);
+    assertEquals(2, lock.getHoldCount(resourceLockName));
+
+    lock.acquireWriteLock(resource, resourceName);
+    assertEquals(3, lock.getHoldCount(resourceLockName));
+
+    lock.releaseWriteLock(resource, resourceName);
+    assertEquals(2, lock.getHoldCount(resourceLockName));
+
+    lock.releaseWriteLock(resource, resourceName);
+    assertEquals(1, lock.getHoldCount(resourceLockName));
+
+    lock.releaseWriteLock(resource, resourceName);
+    assertEquals(0, lock.getHoldCount(resourceLockName));
   }
 }

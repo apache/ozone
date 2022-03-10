@@ -292,4 +292,10 @@ public final class OMConfigKeys {
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
 
+  /**
+   * Default threshold configurations for OMLockMetrics.
+   */
+  public static final String OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY =
+      "ozone.om.lock.reporting.threshold.ms";
+  public static final long OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_DEFAULT = 3000L;
 }

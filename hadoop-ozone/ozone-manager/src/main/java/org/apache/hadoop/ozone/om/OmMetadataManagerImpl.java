@@ -228,7 +228,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Map<String, Table> tableMap = new HashMap<>();
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
-
     this.lock = new OzoneManagerLock(conf);
     this.openKeyExpireThresholdMS = 1000L * conf.getInt(
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
@@ -514,6 +513,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       store.close();
       store = null;
     }
+    // OzoneManagerLock cleanup
+    lock.cleanup();
   }
 
   /**

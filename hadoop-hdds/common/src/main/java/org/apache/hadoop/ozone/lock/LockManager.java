@@ -234,4 +234,17 @@ public class LockManager<R> {
     });
   }
 
+  /**
+   * Returns the active lock count on a given resource.
+   *
+   * @param resource for which the active lock count has to be returned
+   * @return active lock count
+   */
+  public int getActiveLockCount(final R resource) {
+    ActiveLock activeLock = activeLocks.get(resource);
+    if (activeLock != null) {
+      return activeLock.getActiveLockCount();
+    }
+    return 0;
+  }
 }
