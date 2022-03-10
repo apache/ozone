@@ -151,6 +151,17 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
 
+  @Config(key = "ec.reconstruct.stripe.read.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for parallelly read" +
+          " available ec chunks to reconstruct the whole stripe.",
+      tags = ConfigTag.CLIENT)
+  // For the largest recommended EC policy rs-10-4-1024k,
+  // 10 chunks are required at least for stripe reconstruction,
+  // so 1 core thread for each chunk and
+  // 3 concurrent stripe read should be enough.
+  private int ecReconstructStripeReadPoolLimit = 10 * 3;
+
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -287,5 +298,13 @@ public class OzoneClientConfig {
       return ChecksumCombineMode.valueOf(
           ChecksumCombineMode.COMPOSITE_CRC.name());
     }
+  }
+
+  public void setEcReconstructStripeReadPoolLimit(int poolLimit) {
+    this.ecReconstructStripeReadPoolLimit = poolLimit;
+  }
+
+  public int getEcReconstructStripeReadPoolLimit() {
+    return ecReconstructStripeReadPoolLimit;
   }
 }

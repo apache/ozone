@@ -93,6 +93,8 @@ public class OzoneClientKeyValidator extends BaseFreonGenerator
 
     runTests(this::validateKey);
 
+    rpcClient.close();
+
     return null;
   }
 

@@ -28,7 +28,9 @@ import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Factory class to create various BlockStream instances.
@@ -38,16 +40,21 @@ public final class ECBlockInputStreamFactoryImpl implements
 
   private final BlockInputStreamFactory inputStreamFactory;
   private final ByteBufferPool byteBufferPool;
+  private final Supplier<ExecutorService> ecReconstructExecutorSupplier;
 
   public static ECBlockInputStreamFactory getInstance(
-      BlockInputStreamFactory streamFactory, ByteBufferPool byteBufferPool) {
-    return new ECBlockInputStreamFactoryImpl(streamFactory, byteBufferPool);
+      BlockInputStreamFactory streamFactory, ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    return new ECBlockInputStreamFactoryImpl(streamFactory, byteBufferPool,
+        ecReconstructExecutorSupplier);
   }
 
   private ECBlockInputStreamFactoryImpl(BlockInputStreamFactory streamFactory,
-      ByteBufferPool byteBufferPool) {
+      ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
     this.byteBufferPool = byteBufferPool;
     this.inputStreamFactory = streamFactory;
+    this.ecReconstructExecutorSupplier = ecReconstructExecutorSupplier;
   }
 
   /**
@@ -77,7 +84,7 @@ public final class ECBlockInputStreamFactoryImpl implements
           new ECBlockReconstructedStripeInputStream(
               (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
               xceiverFactory, refreshFunction, inputStreamFactory,
-              byteBufferPool);
+              byteBufferPool, ecReconstructExecutorSupplier.get());
       if (failedLocations != null) {
         sis.addFailedDatanodes(failedLocations);
       }

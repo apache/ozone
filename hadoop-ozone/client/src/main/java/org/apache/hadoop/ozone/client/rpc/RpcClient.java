@@ -37,10 +37,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -163,6 +167,11 @@ public class RpcClient implements ClientProtocol {
   private static final Logger LOG =
       LoggerFactory.getLogger(RpcClient.class);
 
+  // For the minimal recommended EC policy rs-3-2-1024k,
+  // we should have at least 1 core thread for each necessary chunk
+  // for reconstruction.
+  private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
+
   private final ConfigurationSource conf;
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
@@ -181,6 +190,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
+  private volatile ExecutorService ecReconstructExecutor;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -295,7 +305,7 @@ public class RpcClient implements ClientProtocol {
         }).build();
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
-        .getInstance(byteBufferPool);
+        .getInstance(byteBufferPool, this::getECReconstructExecutor);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -1147,6 +1157,10 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
+    if (ecReconstructExecutor != null) {
+      ecReconstructExecutor.shutdownNow();
+      ecReconstructExecutor = null;
+    }
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
     keyProviderCache.cleanUp();
@@ -1706,5 +1720,28 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setOwnerName(owner);
     return ozoneManagerClient.setBucketOwner(builder.build());
+  }
+
+  public ExecutorService getECReconstructExecutor() {
+    // local ref to a volatile to ensure access
+    // to a completed initialized object
+    ExecutorService executor = ecReconstructExecutor;
+    if (executor == null) {
+      synchronized (this) {
+        executor = ecReconstructExecutor;
+        if (executor == null) {
+          ecReconstructExecutor = new ThreadPoolExecutor(
+              EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
+              clientConfig.getEcReconstructStripeReadPoolLimit(),
+              60, TimeUnit.SECONDS, new SynchronousQueue<>(),
+              new ThreadFactoryBuilder()
+                  .setNameFormat("ec-reconstruct-reader-TID-%d")
+                  .build(),
+              new ThreadPoolExecutor.CallerRunsPolicy());
+          executor = ecReconstructExecutor;
+        }
+      }
+    }
+    return executor;
   }
 }
