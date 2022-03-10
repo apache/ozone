@@ -21,13 +21,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.Rule;
-
-import org.mockito.Mockito;
-
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -48,9 +41,14 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.Rule;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
+import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 /**
@@ -99,7 +97,6 @@ public class TestBucketManagerImpl {
             .setOwnerName("bilbo")
             .build();
     writeClient.createVolume(args);
-
   }
 
   @Test
