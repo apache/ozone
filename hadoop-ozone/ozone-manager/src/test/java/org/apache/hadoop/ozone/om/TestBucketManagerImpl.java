@@ -121,9 +121,7 @@ public class TestBucketManagerImpl {
 
   @Test
   public void testCreateBucket() throws Exception {
-
     createSampleVol();
-
     KeyProviderCryptoExtension kmsProvider = omTestManagers.kmsProviderInit();
 
     String testBekName = "key1";
