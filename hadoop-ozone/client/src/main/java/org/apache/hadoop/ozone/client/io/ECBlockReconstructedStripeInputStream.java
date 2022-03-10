@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -48,9 +47,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
 import java.util.function.Function;
 
 /**
@@ -117,23 +114,22 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
   private ExecutorService executor;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ECBlockReconstructedStripeInputStream(ECReplicationConfig repConfig,
       OmKeyLocationInfo blockInfo, boolean verifyChecksum,
-       XceiverClientFactory xceiverClientFactory, Function<BlockID,
+      XceiverClientFactory xceiverClientFactory, Function<BlockID,
       Pipeline> refreshFunction, BlockInputStreamFactory streamFactory,
-      ByteBufferPool byteBufferPool) {
+      ByteBufferPool byteBufferPool,
+      ExecutorService ecReconstructExecutor) {
     super(repConfig, blockInfo, verifyChecksum, xceiverClientFactory,
         refreshFunction, streamFactory);
     this.byteBufferPool = byteBufferPool;
+    this.executor = ecReconstructExecutor;
     decoder = CodecUtil.createRawDecoderWithFallback(repConfig);
 
     // The EC decoder needs an array data+parity long, with missing or not
     // needed indexes set to null.
     decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
-
-    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(
-        "ec-reader-for-" + blockInfo.getBlockID() + "-TID-%d").build();
-    executor = Executors.newFixedThreadPool(repConfig.getData(), threadFactory);
   }
 
   /**
@@ -579,7 +575,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   @Override
   public synchronized void close() {
     super.close();
-    executor.shutdownNow();
     // Inside this class, we only allocate buffers to read parity into. Data
     // is reconstructed or read into a set of buffers passed in from the calling
     // class. Therefore we only need to ensure we free the parity buffers here.
