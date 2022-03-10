@@ -86,7 +86,7 @@ public final class OmTestManagers {
       blockClient =
           new ScmBlockLocationTestingClient(null, null, 0);
     }
-    
+
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);
     OMStorage omStorage = new OMStorage(conf);

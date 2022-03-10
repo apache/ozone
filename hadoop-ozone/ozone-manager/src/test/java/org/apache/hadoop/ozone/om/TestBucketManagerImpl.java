@@ -107,7 +107,6 @@ public class TestBucketManagerImpl {
     thrown.expectMessage("Volume doesn't exist");
     OzoneConfiguration conf = createNewTestPath();
     omTestManagers = new OmTestManagers(conf);
-
     try {
       OzoneManagerProtocol writeCl = omTestManagers.getWriteClient();
 
@@ -144,17 +143,17 @@ public class TestBucketManagerImpl {
         .setVolumeName("sample-vol")
         .setBucketName("bucket-one")
         .setBucketEncryptionKey(new
-                BucketEncryptionKeyInfo.Builder().setKeyName("key1").build())
+            BucketEncryptionKeyInfo.Builder().setKeyName("key1").build())
         .build();
     writeClient.createBucket(bucketInfo);
     Assert.assertNotNull(bucketManager.getBucketInfo("sample-vol",
-            "bucket-one"));
+        "bucket-one"));
 
     OmBucketInfo bucketInfoRead =
-            bucketManager.getBucketInfo("sample-vol", "bucket-one");
+        bucketManager.getBucketInfo("sample-vol", "bucket-one");
 
     Assert.assertTrue(bucketInfoRead.getEncryptionKeyInfo().getKeyName()
-            .equals(bucketInfo.getEncryptionKeyInfo().getKeyName()));
+        .equals(bucketInfo.getEncryptionKeyInfo().getKeyName()));
   }
 
 
