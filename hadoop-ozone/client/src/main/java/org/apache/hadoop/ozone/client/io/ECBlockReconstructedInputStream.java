@@ -141,9 +141,11 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() throws IOException {
     stripeReader.close();
-    for (int i = 0; i < bufs.length; i++) {
-      byteBufferPool.putBuffer(bufs[i]);
-      bufs[i] = null;
+    if (bufs != null) {
+      for (int i = 0; i < bufs.length; i++) {
+        byteBufferPool.putBuffer(bufs[i]);
+        bufs[i] = null;
+      }
     }
     closed = true;
   }
