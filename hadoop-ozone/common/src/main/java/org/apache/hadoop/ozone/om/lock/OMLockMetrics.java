@@ -27,7 +27,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
- * This class is for maintaining the various Ozone Manager Lock Metrics
+ * This class is for maintaining the various Ozone Manager Lock Metrics.
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Lock Metrics", context = OzoneConsts.OZONE)

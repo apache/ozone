@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.lock;
 
+/**
+ * Maintains lock related information useful in updating OMLockMetrics.
+ */
 public class LockUsageInfo {
 
   private long startHeldTimeNanos = -1;

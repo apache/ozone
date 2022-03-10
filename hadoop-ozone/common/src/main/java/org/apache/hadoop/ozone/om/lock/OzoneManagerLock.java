@@ -470,7 +470,7 @@ public class OzoneManagerLock {
    * @return holdCount
    */
   @VisibleForTesting
-  public int getHoldCount(String resourceName){
+  public int getHoldCount(String resourceName) {
     return manager.getActiveLockCount(resourceName);
   }
 
