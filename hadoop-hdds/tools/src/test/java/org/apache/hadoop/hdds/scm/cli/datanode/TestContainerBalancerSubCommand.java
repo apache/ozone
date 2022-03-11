@@ -134,8 +134,10 @@ public class TestContainerBalancerSubCommand {
         .thenAnswer(invocation -> false);
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Container\\sBalancer\\sis\\salready" +
-        "\\srunning.\\sPlease\\sstop\\sit\\sfirst.");
+    Pattern p = Pattern.compile("^Container\\sBalancer\\sis\\seither" +
+        "\\salready\\srunning\\sor\\sfailed\\sto\\sstart.\\nPlease\\scheck" +
+        "\\sthe\\slogs\\sfor\\smore\\sinfo.");
+
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }

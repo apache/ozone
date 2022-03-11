@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -71,7 +72,7 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
     long start = Time.monotonicNow();
 
     long msInQueue =
-        (Instant.now().getNano() - task.getQueued().getNano()) / 1_000_000;
+        Duration.between(task.getQueued(), Instant.now()).toMillis();
     queueTime.incr(msInQueue);
     delegate.replicate(task);
     long elapsed = Time.monotonicNow() - start;

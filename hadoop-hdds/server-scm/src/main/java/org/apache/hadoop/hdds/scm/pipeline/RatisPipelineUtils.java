@@ -91,7 +91,7 @@ public final class RatisPipelineUtils {
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
     final RaftPeer p = RatisHelper.toRaftPeer(dn);
-    try(RaftClient client = RatisHelper
+    try (RaftClient client = RatisHelper
         .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType), p,
             retryPolicy, grpcTlsConfig, ozoneConf)) {
       client.getGroupManagementApi(p.getId())
@@ -110,7 +110,8 @@ public final class RatisPipelineUtils {
   static List<Pipeline> checkPipelineContainSameDatanodes(
       PipelineStateManager stateManager, Pipeline pipeline) {
     return stateManager
-        .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE))
         .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
             (p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
                 p.sameDatanodes(pipeline)))

@@ -174,7 +174,7 @@ public class TestContainerDataYaml {
   }
 
   @Test
-  public void testIncorrectContainerFile() throws IOException{
+  public void testIncorrectContainerFile() throws IOException {
     try {
       String containerFile = "incorrect.container";
       //Get file from resources folder

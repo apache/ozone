@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -75,7 +75,9 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test class for {@link OzoneNativeAuthorizer}.
@@ -170,8 +172,8 @@ public class TestOzoneNativeAuthorizer {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(keyName)
-        .setReplicationConfig(
-            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setReplicationConfig(StandaloneReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(0)
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))
@@ -203,7 +205,7 @@ public class TestOzoneNativeAuthorizer {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .build();
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
     buckObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setBucketName(buck)
@@ -218,7 +220,7 @@ public class TestOzoneNativeAuthorizer {
         .setAdminName(adminUgi.getUserName())
         .setOwnerName(testUgi.getUserName())
         .build();
-    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
+    OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
     volObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setResType(VOLUME)
@@ -349,7 +351,7 @@ public class TestOzoneNativeAuthorizer {
     List<OzoneAcl> acls;
     String user = testUgi.getUserName();
     String group = (testUgi.getGroups().size() > 0) ?
-        testUgi.getGroups().get(0): "";
+        testUgi.getGroups().get(0) : "";
 
     RequestContext.Builder builder = new RequestContext.Builder()
         .setClientUgi(testUgi)
@@ -372,7 +374,7 @@ public class TestOzoneNativeAuthorizer {
       // Reset acls to only one right.
       if (obj.getResourceType() == VOLUME) {
         setVolumeAcl(Collections.singletonList(newAcl));
-      } else if (obj.getResourceType() == BUCKET){
+      } else if (obj.getResourceType() == BUCKET) {
         setBucketAcl(Collections.singletonList(newAcl));
       } else {
         aclImplementor.setAcl(obj, Collections.singletonList(newAcl));
@@ -450,7 +452,7 @@ public class TestOzoneNativeAuthorizer {
           // only DB not cache.
           if (obj.getResourceType() == VOLUME) {
             addVolumeAcl(addAcl);
-          } else if (obj.getResourceType() == BUCKET){
+          } else if (obj.getResourceType() == BUCKET) {
             addBucketAcl(addAcl);
           } else {
             aclImplementor.addAcl(obj, addAcl);

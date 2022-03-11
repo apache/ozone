@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -110,10 +110,10 @@ public class TestPipelineDatanodesIntersection {
 
   @Test
   public void testPipelineDatanodesIntersection() throws IOException {
-    NodeManager nodeManager= new MockNodeManager(true, nodeCount);
+    NodeManager nodeManager = new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    SCMHAManager scmhaManager = MockSCMHAManager.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
 
     PipelineStateManager stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
@@ -132,7 +132,7 @@ public class TestPipelineDatanodesIntersection {
     int createdPipelineCount = 0;
     while (!end && createdPipelineCount <= healthyNodeCount * nodeHeaviness) {
       try {
-        Pipeline pipeline = provider.create(new RatisReplicationConfig(
+        Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
             ClientVersions.CURRENT_VERSION);
@@ -157,7 +157,7 @@ public class TestPipelineDatanodesIntersection {
           }
         }
         createdPipelineCount++;
-      } catch(SCMException e) {
+      } catch (SCMException e) {
         end = true;
       } catch (IOException e) {
         end = true;
@@ -170,7 +170,8 @@ public class TestPipelineDatanodesIntersection {
 
     LOG.info("Among total " +
         stateManager
-            .getPipelines(new RatisReplicationConfig(ReplicationFactor.THREE))
+            .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
             .size() + " created pipelines" +
         " with " + healthyNodeCount + " healthy datanodes and " +
         nodeHeaviness + " as node heaviness, " +

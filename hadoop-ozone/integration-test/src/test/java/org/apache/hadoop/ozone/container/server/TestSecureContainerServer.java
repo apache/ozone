@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -81,8 +80,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteBlockRequestBuilder;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.newDeleteChunkRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newGetBlockRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newGetCommittedBlockLengthBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
@@ -170,7 +167,7 @@ public class TestSecureContainerServer {
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(dd, conf,
-            hddsDispatcher, caClient), (dn, p) -> {}, (p) -> {});
+            hddsDispatcher, caClient), (dn, p) -> {  }, (p) -> { });
   }
 
   private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
@@ -195,7 +192,7 @@ public class TestSecureContainerServer {
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
               containerSet, volumeSet, metrics,
-              TestHddsDispatcher.NO_OP_ICR_SENDER));
+              c -> { }));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
@@ -235,7 +232,7 @@ public class TestSecureContainerServer {
         XceiverClientRatis::newXceiverClientRatis,
         TestSecureContainerServer::newXceiverServerRatis,
         (dn, p) -> RatisTestHelper.initXceiverServerRatis(rpc, dn, p),
-        (p) -> {});
+        (p) -> { });
   }
 
   private static void runTestClientServer(
@@ -298,14 +295,6 @@ public class TestSecureContainerServer {
       ContainerCommandRequestProto.Builder getCommittedBlockLength =
           newGetCommittedBlockLengthBuilder(pipeline, putBlock.getPutBlock());
       assertRequiresToken(client, encodedToken, getCommittedBlockLength);
-
-      ContainerCommandRequestProto.Builder deleteChunk =
-          newDeleteChunkRequestBuilder(pipeline, writeChunk.getWriteChunk());
-      assertRequiresToken(client, encodedToken, deleteChunk);
-
-      ContainerCommandRequestProto.Builder deleteBlock =
-          newDeleteBlockRequestBuilder(pipeline, putBlock.getPutBlock());
-      assertRequiresToken(client, encodedToken, deleteBlock);
     } finally {
       stopServer.accept(pipeline);
       servers.forEach(XceiverServerSpi::stop);

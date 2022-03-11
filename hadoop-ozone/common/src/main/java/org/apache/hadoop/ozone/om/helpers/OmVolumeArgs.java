@@ -64,8 +64,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * @param updateID - A sequence number that denotes the last update on this
    * object. This is a monotonically increasing number.
    */
-  @SuppressWarnings({"checkstyle:ParameterNumber", "This is invoked from a " +
-      "builder."})
+  @SuppressWarnings({"checkstyle:ParameterNumber",
+      "This is invoked from a builder."})
   private OmVolumeArgs(String adminName, String ownerName, String volume,
       long quotaInBytes, long quotaInNamespace, long usedNamespace,
       Map<String, String> metadata, List<OzoneAcl> acls, long creationTime,
@@ -94,7 +94,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   }
 
   public void setQuotaInNamespace(long quotaInNamespace) {
-    this.quotaInNamespace= quotaInNamespace;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   public void setCreationTime(long time) {

@@ -31,7 +31,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  * This class is for maintaining Ozone Manager statistics.
  */
 @InterfaceAudience.Private
-@Metrics(about="Ozone Manager Metrics", context="dfs")
+@Metrics(about = "Ozone Manager Metrics", context = "dfs")
 public class OMMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
@@ -48,10 +48,12 @@ public class OMMetrics {
   private @Metric MutableCounterLong numVolumeInfos;
   private @Metric MutableCounterLong numVolumeCheckAccesses;
   private @Metric MutableCounterLong numBucketCreates;
+  private @Metric MutableCounterLong numFSOBucketCreates;
   private @Metric MutableCounterLong numVolumeDeletes;
   private @Metric MutableCounterLong numBucketInfos;
   private @Metric MutableCounterLong numBucketUpdates;
   private @Metric MutableCounterLong numBucketDeletes;
+  private @Metric MutableCounterLong numFSOBucketDeletes;
   private @Metric MutableCounterLong numKeyAllocate;
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyRenames;
@@ -246,17 +248,17 @@ public class OMMetrics {
 
   public void setNumKeys(long val) {
     long oldVal = this.numKeys.value();
-    this.numKeys.incr(val- oldVal);
+    this.numKeys.incr(val - oldVal);
   }
 
   public void setNumDirs(long val) {
     long oldVal = this.numDirs.value();
-    this.numDirs.incr(val- oldVal);
+    this.numDirs.incr(val - oldVal);
   }
 
   public void setNumFiles(long val) {
     long oldVal = this.numDirs.value();
-    this.numDirs.incr(val- oldVal);
+    this.numDirs.incr(val - oldVal);
   }
 
   public void decNumKeys(long val) {
@@ -306,6 +308,10 @@ public class OMMetrics {
     numBucketCreates.incr();
   }
 
+  public void incNumFSOBucketCreates() {
+    numFSOBucketCreates.incr();
+  }
+
   public void incNumBucketInfos() {
     numBucketOps.incr();
     numBucketInfos.incr();
@@ -319,6 +325,10 @@ public class OMMetrics {
   public void incNumBucketDeletes() {
     numBucketOps.incr();
     numBucketDeletes.incr();
+  }
+
+  public void incNumFSOBucketDeletes() {
+    numFSOBucketDeletes.incr();
   }
 
   public void incNumBucketLists() {
@@ -630,6 +640,11 @@ public class OMMetrics {
   }
 
   @VisibleForTesting
+  public long getNumFSOBucketCreates() {
+    return numFSOBucketCreates.value();
+  }
+
+  @VisibleForTesting
   public long getNumBucketInfos() {
     return numBucketInfos.value();
   }
@@ -642,6 +657,11 @@ public class OMMetrics {
   @VisibleForTesting
   public long getNumBucketDeletes() {
     return numBucketDeletes.value();
+  }
+
+  @VisibleForTesting
+  public long getNumFSOBucketDeletes() {
+    return numFSOBucketDeletes.value();
   }
 
   @VisibleForTesting

@@ -65,7 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -208,7 +208,7 @@ public class TestKeyManagerUnit {
 
     initMultipartUpload(writeClient, volume, bucket, "dir/ozonekey2");
 
-    OmMultipartInfo omMultipartInfo3 =addinitMultipartUploadToCache(volume,
+    OmMultipartInfo omMultipartInfo3 = addinitMultipartUploadToCache(volume,
         bucket, "dir/ozonekey3");
 
     OmMultipartInfo omMultipartInfo4 = initMultipartUpload(writeClient,
@@ -292,7 +292,7 @@ public class TestKeyManagerUnit {
         .setIsVersionEnabled(false)
         .setAcls(new ArrayList<>())
         .build();
-    TestOMRequestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
+    OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
   }
 
   private OmMultipartInfo initMultipartUpload(OzoneManagerProtocol omtest,
@@ -303,7 +303,7 @@ public class TestKeyManagerUnit {
         .setBucketName(bucket)
         .setKeyName(key)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .build();
     OmMultipartInfo omMultipartInfo = omtest.initiateMultipartUpload(key1);
@@ -319,7 +319,7 @@ public class TestKeyManagerUnit {
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
@@ -351,7 +351,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnOne.getUuid())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
@@ -360,7 +360,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineTwo = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnFour.getUuid())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
@@ -382,13 +382,13 @@ public class TestKeyManagerUnit {
         .setAdminName("admin")
         .setOwnerName("admin")
         .build();
-    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
+    OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
 
     final OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("volumeOne")
           .setBucketName("bucketOne")
           .build();
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
 
     final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(1L, 1L))
@@ -408,10 +408,10 @@ public class TestKeyManagerUnit {
         .setModificationTime(Time.now())
         .setDataSize(256000)
         .setReplicationConfig(
-                    new RatisReplicationConfig(ReplicationFactor.THREE))
+                    RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
             .setAcls(Collections.emptyList())
         .build();
-    TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);
+    OMRequestTestUtils.addKeyToOM(metadataManager, keyInfo);
 
     final OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
         .setVolumeName("volumeOne")
@@ -444,10 +444,10 @@ public class TestKeyManagerUnit {
     String keyPrefix = "key";
     String client = "client.host";
 
-    TestOMRequestUtils.addVolumeToDB(volume, OzoneConsts.OZONE,
+    OMRequestTestUtils.addVolumeToDB(volume, OzoneConsts.OZONE,
         metadataManager);
 
-    TestOMRequestUtils.addBucketToDB(volume, bucket, metadataManager);
+    OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager);
 
     final Pipeline pipeline = MockPipeline.createPipeline(3);
     final List<String> nodes = pipeline.getNodes().stream()
@@ -477,14 +477,14 @@ public class TestKeyManagerUnit {
           .setCreationTime(Time.now())
           .setOmKeyLocationInfos(singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setReplicationConfig(
-                      new RatisReplicationConfig(ReplicationFactor.THREE))
+          .setReplicationConfig(RatisReplicationConfig
+              .getInstance(ReplicationFactor.THREE))
           .setKeyName(keyPrefix + i)
           .setObjectID(i)
           .setUpdateID(i)
           .build();
       keyInfo.appendNewBlocks(singletonList(keyLocationInfo), false);
-      TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);
+      OMRequestTestUtils.addKeyToOM(metadataManager, keyInfo);
     }
 
     when(containerClient.getContainerWithPipelineBatch(containerIDs))

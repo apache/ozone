@@ -59,7 +59,7 @@ import org.junit.rules.Timeout;
 /**
  * Tests Close Container Exception handling by Ozone Client.
  */
-public class TestDiscardPreallocatedBlocks{
+public class TestDiscardPreallocatedBlocks {
 
   /**
    * Set a timeout for each test.

@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
@@ -85,6 +86,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 
@@ -268,7 +270,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
-      NodeOperationalState newState) throws NodeNotFoundException{
+      NodeOperationalState newState) throws NodeNotFoundException {
     setNodeOperationalState(datanodeDetails, newState, 0);
   }
 
@@ -283,7 +285,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       NodeOperationalState newState, long opStateExpiryEpocSec)
-      throws NodeNotFoundException{
+      throws NodeNotFoundException {
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
   }
@@ -612,7 +614,7 @@ public class SCMNodeManager implements NodeManager {
         // send Finalize command multiple times.
         scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
             new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
-      } catch(NotLeaderException ex) {
+      } catch (NotLeaderException ex) {
         LOG.warn("Skip sending finalize upgrade command since current SCM is" +
             "not leader.", ex);
       }
@@ -680,7 +682,7 @@ public class SCMNodeManager implements NodeManager {
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
     List<DatanodeDetails> healthyNodes =
-        getNodes(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY);
+        getNodes(IN_SERVICE, NodeState.HEALTHY);
 
     List<DatanodeUsageInfo> datanodeUsageInfoList =
         new ArrayList<>(healthyNodes.size());
@@ -764,7 +766,7 @@ public class SCMNodeManager implements NodeManager {
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
       NodeStatus status = dni.getNodeStatus();
       nodes.get(status.getOperationalState().name())
-          .compute(status.getHealth().name(), (k, v) -> v+1);
+          .compute(status.getHealth().name(), (k, v) -> v + 1);
     }
     return nodes;
   }
@@ -972,6 +974,13 @@ public class SCMNodeManager implements NodeManager {
     nodeStateManager.addContainer(datanodeDetails.getUuid(), containerId);
   }
 
+  @Override
+  public void removeContainer(final DatanodeDetails datanodeDetails,
+                           final ContainerID containerId)
+      throws NodeNotFoundException {
+    nodeStateManager.removeContainer(datanodeDetails.getUuid(), containerId);
+  }
+
   /**
    * Update set of containers available on a datanode.
    *
@@ -988,7 +997,9 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Return set of containerIDs available on a datanode.
+   * Return set of containerIDs available on a datanode. This is a copy of the
+   * set which resides inside NodeManager and hence can be modified without
+   * synchronization or side effects.
    *
    * @param datanodeDetails - DatanodeID
    * @return - set of containerIDs
@@ -1006,6 +1017,25 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
     this.commandQueue.addCommand(dnId, command);
+  }
+
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    RefreshVolumeUsageCommand refreshVolumeUsageCommand =
+        new RefreshVolumeUsageCommand();
+    try {
+      refreshVolumeUsageCommand.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending refreshVolumeUsage command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
+    getNodes(IN_SERVICE, HEALTHY).forEach(datanode ->
+        addDatanodeCommand(datanode.getUuid(), refreshVolumeUsageCommand));
   }
 
   /**

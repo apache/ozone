@@ -203,7 +203,7 @@ public class TestOzoneManagerPrepareState {
     if (!mkdirs) {
       throw new IOException("Unable to create marker file directory.");
     }
-    try(FileOutputStream stream =
+    try (FileOutputStream stream =
             new FileOutputStream(markerFile)) {
       stream.write(bytes);
     }

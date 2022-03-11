@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -94,7 +97,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     configuration.setBoolean("ozone.client.verify.checksum",
         !isChecksumVerifyEnabled);
 
-    if(isChecksumVerifyEnabled) {
+    if (isChecksumVerifyEnabled) {
       clientProtocol = client.getObjectStore().getClientProxy();
       clientProtocolWithoutChecksum = new RpcClient(configuration, null);
     } else {
@@ -187,14 +190,14 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
           Throwable cause = e.getCause();
           replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION,
               e.getMessage());
-          if(cause instanceof OzoneChecksumException) {
+          if (cause instanceof OzoneChecksumException) {
             BlockID blockID = block.getKey().getBlockID();
             String datanodeUUID = replica.getKey().getUuidString();
             is = getInputStreamWithoutChecksum(replicasWithoutChecksum,
                 datanodeUUID, blockID);
             Files.copy(is, replicaFile.toPath(),
                 StandardCopyOption.REPLACE_EXISTING);
-          } else if(cause instanceof StatusRuntimeException) {
+          } else if (cause instanceof StatusRuntimeException) {
             break;
           }
         } finally {
@@ -213,10 +216,10 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     OzoneInputStream is = new OzoneInputStream();
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         block : replicasWithoutChecksum.entrySet()) {
-      if(block.getKey().getBlockID().equals(blockID)) {
+      if (block.getKey().getBlockID().equals(blockID)) {
         for (Map.Entry<DatanodeDetails, OzoneInputStream>
             replica : block.getValue().entrySet()) {
-          if(replica.getKey().getUuidString().equals(datanodeUUID)) {
+          if (replica.getKey().getUuidString().equals(datanodeUUID)) {
             is = replica.getValue();
           }
         }
@@ -234,8 +237,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         "_" + fileSuffix;
     System.out.println("Creating directory : " + directoryName);
     File dir = new File(outputDir + "/" + directoryName);
-    if (!dir.exists()){
-      if(dir.mkdir()) {
+    if (!dir.exists()) {
+      if (dir.mkdir()) {
         System.out.println("Successfully created!");
       } else {
         throw new IOException(String.format(

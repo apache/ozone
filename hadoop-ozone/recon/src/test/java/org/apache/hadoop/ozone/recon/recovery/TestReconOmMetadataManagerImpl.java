@@ -172,7 +172,7 @@ public class TestReconOmMetadataManagerImpl {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_one")
-            .setReplicationConfig(new StandaloneReplicationConfig(
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .build());
     omMetadataManager.getKeyTable(getBucketLayout()).put(
@@ -180,7 +180,7 @@ public class TestReconOmMetadataManagerImpl {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_two")
-            .setReplicationConfig(new StandaloneReplicationConfig(
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .build());
 

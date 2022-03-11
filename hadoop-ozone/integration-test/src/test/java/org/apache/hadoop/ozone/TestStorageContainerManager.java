@@ -55,7 +55,7 @@ import java.util.stream.Stream;
 import java.util.Arrays;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
@@ -82,7 +82,10 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.*;
+import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -650,7 +653,7 @@ public class TestStorageContainerManager {
     exception.expect(SCMException.class);
     exception.expectMessage(
         "SCM not initialized due to storage config failure");
-    TestUtils.getScmSimple(conf);
+    HddsTestUtils.getScmSimple(conf);
   }
 
   @Test
@@ -668,7 +671,7 @@ public class TestStorageContainerManager {
       scmStore.setScmId(scmId);
       // writes the version file properties
       scmStore.initialize();
-      StorageContainerManager scm = TestUtils.getScmSimple(conf);
+      StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
       //Reads the SCM Info from SCM instance
       ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
       Assert.assertEquals(clusterId, scmInfo.getClusterId());

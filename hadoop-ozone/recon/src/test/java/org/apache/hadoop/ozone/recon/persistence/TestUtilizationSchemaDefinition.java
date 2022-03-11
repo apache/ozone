@@ -94,7 +94,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         new ImmutablePair<>("count", Types.BIGINT));
 
     List<Pair<String, Integer>> actualPairsFileCount = new ArrayList<>();
-    while(resultSetFileCount.next()) {
+    while (resultSetFileCount.next()) {
       actualPairsFileCount.add(new ImmutablePair<>(resultSetFileCount.getString(
           "COLUMN_NAME"), resultSetFileCount.getInt(
               "DATA_TYPE")));

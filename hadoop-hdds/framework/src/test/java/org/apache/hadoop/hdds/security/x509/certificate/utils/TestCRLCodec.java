@@ -138,7 +138,7 @@ public class TestCRLCodec {
     assertTrue(crlFile.exists());
 
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-        new FileInputStream(crlFile), UTF_8))){
+        new FileInputStream(crlFile), UTF_8))) {
 
       // Verify contents of the file
       String header = reader.readLine();

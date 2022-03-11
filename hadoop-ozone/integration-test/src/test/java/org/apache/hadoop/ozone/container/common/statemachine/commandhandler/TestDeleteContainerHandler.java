@@ -260,7 +260,7 @@ public class TestDeleteContainerHandler {
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();
@@ -282,7 +282,7 @@ public class TestDeleteContainerHandler {
   private Boolean isContainerClosed(HddsDatanodeService hddsDatanodeService,
       long containerID) {
     ContainerData containerData;
-    containerData =hddsDatanodeService
+    containerData = hddsDatanodeService
         .getDatanodeStateMachine().getContainer().getContainerSet()
         .getContainer(containerID).getContainerData();
     return !containerData.isOpen();

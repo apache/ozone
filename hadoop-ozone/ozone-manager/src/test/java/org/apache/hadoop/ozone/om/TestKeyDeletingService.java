@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
@@ -215,14 +216,14 @@ public class TestKeyDeletingService {
       // cheat here, just create a volume and bucket entry so that we can
       // create the keys, we put the same data for key and value since the
       // system does not decode the object
-      TestOMRequestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+      OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
           OmVolumeArgs.newBuilder()
               .setOwnerName("o")
               .setAdminName("a")
               .setVolume(volumeName)
               .build());
 
-      TestOMRequestUtils.addBucketToOM(keyManager.getMetadataManager(),
+      OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
           OmBucketInfo.newBuilder().setVolumeName(volumeName)
               .setBucketName(bucketName)
               .build());
@@ -233,7 +234,7 @@ public class TestKeyDeletingService {
               .setBucketName(bucketName)
               .setKeyName(keyName)
               .setAcls(Collections.emptyList())
-              .setReplicationConfig(new StandaloneReplicationConfig(
+              .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                   HddsProtos.ReplicationFactor.ONE))
               .setLocationInfoList(new ArrayList<>())
               .build();

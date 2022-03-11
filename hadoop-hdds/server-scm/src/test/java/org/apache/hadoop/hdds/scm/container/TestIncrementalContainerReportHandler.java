@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -69,8 +69,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
-import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
 /**
@@ -109,7 +109,7 @@ public class TestIncrementalContainerReportHandler {
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
     dbStore = DBStoreBuilder.createDBStore(
@@ -131,18 +131,18 @@ public class TestIncrementalContainerReportHandler {
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     Mockito.when(containerManager.getContainerReplicas(
         Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     Mockito.doAnswer(invocation -> {
       containerStateManager
           .removeContainerReplica(((ContainerID)invocation
-                  .getArguments()[0]).getProtobuf(),
+                  .getArguments()[0]),
               (ContainerReplica)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
@@ -162,7 +162,7 @@ public class TestIncrementalContainerReportHandler {
     Mockito.doAnswer(invocation -> {
       containerStateManager
           .updateContainerReplica(((ContainerID)invocation
-                  .getArguments()[0]).getProtobuf(),
+                  .getArguments()[0]),
               (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
@@ -201,7 +201,7 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -234,7 +234,7 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
 
 
     final IncrementalContainerReportProto containerReport =
@@ -272,7 +272,7 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -305,9 +305,9 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID().getProtobuf(), r));
+        container.containerID(), r));
     Assert.assertEquals(3, containerStateManager
-        .getContainerReplicas(container.containerID().getProtobuf()).size());
+        .getContainerReplicas(container.containerID()).size());
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
             ContainerReplicaProto.State.DELETED,
@@ -317,7 +317,7 @@ public class TestIncrementalContainerReportHandler {
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
     Assert.assertEquals(2, containerStateManager
-        .getContainerReplicas(container.containerID().getProtobuf()).size());
+        .getContainerReplicas(container.containerID()).size());
   }
 
   @Test
@@ -352,7 +352,7 @@ public class TestIncrementalContainerReportHandler {
     final ContainerReportsProto fullReport = TestContainerReportHandler
         .getContainerReportsProto(containerTwo.containerID(), CLOSED,
             datanode.getUuidString());
-    final ContainerReportFromDatanode fcr =new ContainerReportFromDatanode(
+    final ContainerReportFromDatanode fcr = new ContainerReportFromDatanode(
         datanode, fullReport);
 
     // We need to run the FCR and ICR at the same time via the executor so we
@@ -363,7 +363,7 @@ public class TestIncrementalContainerReportHandler {
       // Running this test 10 times to ensure the race condition we are testing
       // for does not occur. In local tests, before the code was fixed, this
       // test failed consistently every time (reproducing the issue).
-      for (int i=0; i<10; i++) {
+      for (int i = 0; i < 10; i++) {
         Future<?> t1 =
             executor.submit(() -> fullReportHandler.onMessage(fcr, publisher));
         Future<?> t2 =
@@ -376,7 +376,7 @@ public class TestIncrementalContainerReportHandler {
           // If we find "container" in the NM, then we must also have it in
           // Container Manager.
           Assert.assertEquals(1, containerStateManager
-              .getContainerReplicas(container.containerID().getProtobuf())
+              .getContainerReplicas(container.containerID())
               .size());
           Assert.assertEquals(2, nmContainers.size());
         } else {
@@ -385,12 +385,12 @@ public class TestIncrementalContainerReportHandler {
           // NM, but have found something for it in ContainerManager, and that
           // should not happen. It should be in both, or neither.
           Assert.assertEquals(0, containerStateManager
-              .getContainerReplicas(container.containerID().getProtobuf())
+              .getContainerReplicas(container.containerID())
               .size());
           Assert.assertEquals(1, nmContainers.size());
         }
         Assert.assertEquals(1, containerStateManager
-            .getContainerReplicas(containerTwo.containerID().getProtobuf())
+            .getContainerReplicas(containerTwo.containerID())
             .size());
       }
     } finally {

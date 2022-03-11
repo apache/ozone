@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -100,13 +100,13 @@ public class TestContainerPlacement {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager = new MockPipelineManager(dbStore,
         scmhaManager, nodeManager);
-    pipelineManager.createPipeline(new RatisReplicationConfig(
+    pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE));
   }
 
@@ -189,8 +189,8 @@ public class TestContainerPlacement {
 
     SCMNodeManager scmNodeManager = createNodeManager(conf);
     containerManager = createContainerManager();
-    List<DatanodeDetails> datanodes =
-        TestUtils.getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
+    List<DatanodeDetails> datanodes = HddsTestUtils
+        .getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
     LayoutVersionManager versionManager =
         scmNodeManager.getLayoutVersionManager();
@@ -212,7 +212,7 @@ public class TestContainerPlacement {
       assertEquals(remaining * nodeCount,
           (long) scmNodeManager.getStats().getRemaining().get());
 
-      xceiverClientManager= new XceiverClientManager(conf);
+      xceiverClientManager = new XceiverClientManager(conf);
 
       ContainerInfo container = containerManager
           .allocateContainer(
