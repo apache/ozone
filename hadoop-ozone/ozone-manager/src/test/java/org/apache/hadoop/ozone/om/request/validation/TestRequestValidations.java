@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -245,11 +245,11 @@ public class TestRequestValidations {
   }
 
   private int olderClientVersion() {
-    return ClientVersions.CURRENT_VERSION - 1;
+    return ClientVersion.CURRENT_VERSION - 1;
   }
 
   private int currentClientVersion() {
-    return ClientVersions.CURRENT_VERSION;
+    return ClientVersion.CURRENT_VERSION;
   }
 
   private OMRequest aCreateKeyRequest(int clientVersion) {

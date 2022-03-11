@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 /**
@@ -47,7 +47,7 @@ public enum ValidationCondition {
   OLDER_CLIENT_REQUESTS {
     @Override
     public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() < ClientVersions.CURRENT_VERSION;
+      return req.getVersion() < ClientVersion.CURRENT_VERSION;
     }
   };
 
