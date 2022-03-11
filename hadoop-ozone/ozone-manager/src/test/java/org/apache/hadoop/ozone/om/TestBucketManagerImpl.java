@@ -361,7 +361,7 @@ public class TestBucketManagerImpl {
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
-              new StandaloneReplicationConfig(ReplicationFactor.ONE))
+              StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
             .build();
 
     OpenKeySession session1 = writeClient.openKey(args1);
@@ -374,7 +374,7 @@ public class TestBucketManagerImpl {
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
-              new StandaloneReplicationConfig(ReplicationFactor.ONE))
+              StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
             .build();
 
     OpenKeySession session2 = writeClient.openKey(args2);
