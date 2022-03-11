@@ -69,6 +69,9 @@ public final class ConfUtils {
    * Return true if it matches, false otherwsie.
    */
   public static boolean isAddressLocal(InetSocketAddress addr) {
+    if (addr.getAddress() == null) {
+      return false;
+    }
     return NetUtils.isLocalAddress(addr.getAddress());
   }
 

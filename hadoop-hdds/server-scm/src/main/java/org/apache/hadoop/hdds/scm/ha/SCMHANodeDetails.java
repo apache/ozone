@@ -59,6 +59,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.ha.FlexibleFQDNResolution.isAddressHostNameLocal;
 
 /**
  * SCM HA node details.
@@ -227,13 +230,16 @@ public class SCMHANodeDetails {
           throw e;
         }
 
-        if (addr.isUnresolved()) {
+        boolean flexibleFqdnResolutionEnabled = conf.getBoolean(OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+        if (!flexibleFqdnResolutionEnabled && addr.isUnresolved() || flexibleFqdnResolutionEnabled && !isAddressHostNameLocal(addr)) {
           LOG.error("Address for SCM {} : {} couldn't be resolved. Proceeding "
                   + "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 
-        if (!addr.isUnresolved() && !isPeer && ConfUtils.isAddressLocal(addr)) {
+        if (!isPeer && (!flexibleFqdnResolutionEnabled && !addr.isUnresolved() && ConfUtils.isAddressLocal(addr)
+                || flexibleFqdnResolutionEnabled && isAddressHostNameLocal(addr))) {
           localRpcAddress = addr;
           localScmServiceId = serviceId;
           localScmNodeId = nodeId;

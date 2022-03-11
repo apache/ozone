@@ -37,6 +37,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.ha.FlexibleFQDNResolution.isAddressHostNameLocal;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
@@ -169,13 +172,16 @@ public class OMHANodeDetails {
           throw e;
         }
 
-        if (addr.isUnresolved()) {
+        boolean flexibleFqdnResolutionEnabled = conf.getBoolean(OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+        if (!flexibleFqdnResolutionEnabled && addr.isUnresolved() || flexibleFqdnResolutionEnabled && !isAddressHostNameLocal(addr)) {
           LOG.error("Address for OM {} : {} couldn't be resolved. Proceeding " +
                   "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 
-        if (!addr.isUnresolved() && !isPeer && ConfUtils.isAddressLocal(addr)) {
+        if (!isPeer && (!flexibleFqdnResolutionEnabled && !addr.isUnresolved() && ConfUtils.isAddressLocal(addr)
+                || flexibleFqdnResolutionEnabled && isAddressHostNameLocal(addr))) {
           localRpcAddress = addr;
           localOMServiceId = serviceId;
           localOMNodeId = nodeId;
