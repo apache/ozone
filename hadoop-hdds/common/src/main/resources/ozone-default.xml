@@ -441,7 +441,7 @@
   </property>
   <property>
     <name>ozone.om.lock.reporting.threshold.ms</name>
-    <tag>OM</tag>
+    <tag>OZONE, MANAGEMENT</tag>
     <value>3000</value>
     <description>
       If read/write lock waiting/held time exceeds this threshold, a
