@@ -161,7 +161,16 @@ import com.google.protobuf.ByteString;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequestArgs;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -603,7 +612,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName());
 
-    if(args.getAcls() != null) {
+    if (args.getAcls() != null) {
       keyArgs.addAllAcls(args.getAcls().stream().distinct().map(a ->
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
@@ -1231,7 +1240,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OMPBHelper.convertToDelegationToken(resp.getResponse().getToken())
           : null;
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Get delegation token failed.", e,
@@ -1263,7 +1272,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           .getRenewDelegationTokenResponse();
       return resp.getResponse().getNewExpiryTime();
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Renew delegation token failed.", e,
@@ -1292,7 +1301,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     try {
       handleError(submitRequest(omRequest));
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Cancel delegation token failed.", e,
@@ -1506,6 +1515,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     dbUpdatesWrapper.setCurrentSequenceNumber(
         dbUpdatesResponse.getSequenceNumber());
+    dbUpdatesWrapper.setLatestSequenceNumber(
+        dbUpdatesResponse.getLatestSequenceNumber());
     return dbUpdatesWrapper;
   }
 

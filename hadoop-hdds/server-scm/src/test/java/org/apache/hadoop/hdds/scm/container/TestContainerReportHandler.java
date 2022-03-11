@@ -103,13 +103,13 @@ public class TestContainerReportHandler {
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     Mockito.when(containerManager.getContainerReplicas(
         Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
-                .getArguments()[0]).getProtobuf()));
+                .getArguments()[0])));
 
     Mockito.doAnswer(invocation -> {
       containerStateManager
@@ -123,7 +123,7 @@ public class TestContainerReportHandler {
 
     Mockito.doAnswer(invocation -> {
       containerStateManager.updateContainerReplica(
-          ((ContainerID)invocation.getArguments()[0]).getProtobuf(),
+          ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
@@ -131,7 +131,7 @@ public class TestContainerReportHandler {
 
     Mockito.doAnswer(invocation -> {
       containerStateManager.removeContainerReplica(
-          ((ContainerID)invocation.getArguments()[0]).getProtobuf(),
+          ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
@@ -177,13 +177,13 @@ public class TestContainerReportHandler {
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
         .forEach(r -> containerStateManager.updateContainerReplica(
-            containerOne.containerID().getProtobuf(), r));
+            containerOne.containerID(), r));
 
     getReplicas(containerTwo.containerID(),
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
         .forEach(r -> containerStateManager.updateContainerReplica(
-            containerTwo.containerID().getProtobuf(), r));
+            containerTwo.containerID(), r));
 
 
     // SCM expects both containerOne and containerTwo to be in all the three
@@ -236,13 +236,13 @@ public class TestContainerReportHandler {
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
         .forEach(r -> containerStateManager.updateContainerReplica(
-            containerOne.containerID().getProtobuf(), r));
+            containerOne.containerID(), r));
 
     getReplicas(containerTwo.containerID(),
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
         .forEach(r -> containerStateManager.updateContainerReplica(
-            containerTwo.containerID().getProtobuf(), r));
+            containerTwo.containerID(), r));
 
 
     // SCM expects both containerOne and containerTwo to be in all the three
@@ -315,11 +315,11 @@ public class TestContainerReportHandler {
 
     containerOneReplicas.forEach(r ->
         containerStateManager.updateContainerReplica(
-        containerTwo.containerID().getProtobuf(), r));
+        containerTwo.containerID(), r));
 
     containerTwoReplicas.forEach(r ->
         containerStateManager.updateContainerReplica(
-        containerTwo.containerID().getProtobuf(), r));
+        containerTwo.containerID(), r));
 
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
@@ -383,11 +383,11 @@ public class TestContainerReportHandler {
 
     containerOneReplicas.forEach(r ->
         containerStateManager.updateContainerReplica(
-        containerTwo.containerID().getProtobuf(), r));
+        containerTwo.containerID(), r));
 
     containerTwoReplicas.forEach(r ->
         containerStateManager.updateContainerReplica(
-        containerTwo.containerID().getProtobuf(), r));
+        containerTwo.containerID(), r));
 
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
@@ -454,11 +454,11 @@ public class TestContainerReportHandler {
 
     containerOneReplicas.forEach(r ->
         containerStateManager.updateContainerReplica(
-        containerTwo.containerID().getProtobuf(), r));
+        containerTwo.containerID(), r));
 
     containerTwoReplicas.forEach(r ->
         containerStateManager.updateContainerReplica(
-        containerTwo.containerID().getProtobuf(), r));
+        containerTwo.containerID(), r));
 
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
@@ -482,7 +482,7 @@ public class TestContainerReportHandler {
         NodeStatus.inServiceHealthy()).iterator();
 
     Pipeline pipeline = pipelineManager.createPipeline(
-        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
 
     final DatanodeDetails datanodeOne = nodeIterator.next();
     final DatanodeDetails datanodeTwo = nodeIterator.next();

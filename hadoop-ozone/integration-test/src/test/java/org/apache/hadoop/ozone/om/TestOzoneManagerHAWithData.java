@@ -537,7 +537,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     Assert.assertTrue(partInfoList.size() == partsMap.size());
 
-    for (int i=0; i< partsMap.size(); i++) {
+    for (int i = 0; i < partsMap.size(); i++) {
       Assert.assertEquals(partsMap.get(partInfoList.get(i).getPartNumber()),
           partInfoList.get(i).getPartName());
 

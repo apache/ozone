@@ -71,28 +71,24 @@ public class ListInfoSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
-    if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
-      getAllNodes(scmClient).forEach(this::printDatanodeInfo);
-    } else {
-      Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
-      if (!Strings.isNullOrEmpty(ipaddress)) {
-        allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
-            .compareToIgnoreCase(ipaddress) == 0);
-      }
-      if (!Strings.isNullOrEmpty(uuid)) {
-        allNodes = allNodes.filter(p ->
-            p.getDatanodeDetails().getUuidString().equals(uuid));
-      }
-      if (!Strings.isNullOrEmpty(nodeOperationalState)) {
-        allNodes = allNodes.filter(p -> p.getOpState().toString()
-            .compareToIgnoreCase(nodeOperationalState) == 0);
-      }
-      if (!Strings.isNullOrEmpty(nodeState)) {
-        allNodes = allNodes.filter(p -> p.getHealthState().toString()
-            .compareToIgnoreCase(nodeState) == 0);
-      }
-      allNodes.forEach(this::printDatanodeInfo);
+    Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
+    if (!Strings.isNullOrEmpty(ipaddress)) {
+      allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
+          .compareToIgnoreCase(ipaddress) == 0);
     }
+    if (!Strings.isNullOrEmpty(uuid)) {
+      allNodes = allNodes.filter(p ->
+          p.getDatanodeDetails().getUuidString().equals(uuid));
+    }
+    if (!Strings.isNullOrEmpty(nodeOperationalState)) {
+      allNodes = allNodes.filter(p -> p.getOpState().toString()
+          .compareToIgnoreCase(nodeOperationalState) == 0);
+    }
+    if (!Strings.isNullOrEmpty(nodeState)) {
+      allNodes = allNodes.filter(p -> p.getHealthState().toString()
+          .compareToIgnoreCase(nodeState) == 0);
+    }
+    allNodes.forEach(this::printDatanodeInfo);
   }
 
   private List<DatanodeWithAttributes> getAllNodes(ScmClient scmClient)

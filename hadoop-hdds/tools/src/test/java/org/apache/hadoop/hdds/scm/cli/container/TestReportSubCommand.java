@@ -73,7 +73,7 @@ public class TestReportSubCommand {
 
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
       Pattern p = Pattern.compile(
-          "^"+state.toString() + ": 0$", Pattern.MULTILINE);
+          "^" + state.toString() + ": 0$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
@@ -81,7 +81,7 @@ public class TestReportSubCommand {
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
       Pattern p = Pattern.compile(
-          "^"+state.toString() + ": 0$", Pattern.MULTILINE);
+          "^" + state.toString() + ": 0$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
@@ -98,7 +98,7 @@ public class TestReportSubCommand {
     int counter = SEED;
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
       Pattern p = Pattern.compile(
-          "^"+state.toString() + ": " + counter + "$", Pattern.MULTILINE);
+          "^" + state.toString() + ": " + counter + "$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
       counter++;
@@ -108,13 +108,13 @@ public class TestReportSubCommand {
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
       Pattern p = Pattern.compile(
-          "^"+state.toString() + ": " + counter + "$", Pattern.MULTILINE);
+          "^" + state.toString() + ": " + counter + "$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
 
       // Check the correct samples are returned
       p = Pattern.compile(
-          "^First 100 "+ state + " containers:\n"
+          "^First 100 " + state + " containers:\n"
               + containerList(0, counter) + "$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
@@ -151,7 +151,7 @@ public class TestReportSubCommand {
       if (i != start) {
         sb.append(", ");
       }
-      sb.append("#"+i);
+      sb.append("#" + i);
     }
     return sb.toString();
   }

@@ -94,7 +94,6 @@ run_test() {
     RESULT=1
   fi
 
-  generate_report 'upgrade' "$RESULT_DIR"
   copy_results "$test_subdir" "$ALL_RESULT_DIR"
 }
 

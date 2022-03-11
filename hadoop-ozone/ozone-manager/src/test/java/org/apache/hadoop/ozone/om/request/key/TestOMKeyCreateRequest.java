@@ -574,7 +574,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   protected long checkIntermediatePaths(Path keyPath) throws Exception {
     // Check intermediate paths are created
     keyPath = keyPath.getParent();
-    while(keyPath != null) {
+    while (keyPath != null) {
       Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
           omMetadataManager
               .getOzoneDirKey(volumeName, bucketName, keyPath.toString())));

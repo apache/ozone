@@ -53,7 +53,7 @@ public class TestOmKeyInfo {
         .setModificationTime(123L)
         .setDataSize(123L)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .build();
@@ -83,7 +83,7 @@ public class TestOmKeyInfo {
         .setModificationTime(Time.now())
         .setDataSize(100L)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .setOmKeyLocationInfos(
@@ -147,7 +147,7 @@ public class TestOmKeyInfo {
   Pipeline getPipeline() {
     return Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.EMPTY_LIST)
         .setState(Pipeline.PipelineState.OPEN)

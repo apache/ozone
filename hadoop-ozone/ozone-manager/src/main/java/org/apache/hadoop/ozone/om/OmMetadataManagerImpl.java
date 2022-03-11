@@ -834,13 +834,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
-      getBucketIterator(){
+      getBucketIterator() {
     return bucketTable.cacheIterator();
   }
 
   @Override
   public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-      getKeyIterator(){
+      getKeyIterator() {
     return keyTable.iterator();
   }
 
@@ -933,7 +933,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           // entries.
           CacheValue<OmKeyInfo> cacheValue =
               keyTable.getCacheValue(new CacheKey<>(kv.getKey()));
-          if(cacheValue == null || cacheValue.getCacheValue() != null) {
+          if (cacheValue == null || cacheValue.getCacheValue() != null) {
             cacheKeyMap.put(kv.getKey(), kv.getValue());
             currentCount++;
           }
@@ -1105,7 +1105,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         if (kv != null) {
           RepeatedOmKeyInfo infoList = kv.getValue();
           // Get block keys as a list.
-          for(OmKeyInfo info : infoList.getOmKeyInfoList()){
+          for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
             OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
             List<BlockID> item = latest.getLocationList().stream()
                 .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))

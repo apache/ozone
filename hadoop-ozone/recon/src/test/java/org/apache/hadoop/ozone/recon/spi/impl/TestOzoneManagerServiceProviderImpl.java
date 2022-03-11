@@ -217,7 +217,7 @@ public class TestOzoneManagerServiceProviderImpl {
     RocksDB rocksDB = ((RDBStore)sourceOMMetadataMgr.getStore()).getDb();
     TransactionLogIterator transactionLogIterator = rocksDB.getUpdatesSince(0L);
     DBUpdates dbUpdatesWrapper = new DBUpdates();
-    while(transactionLogIterator.isValid()) {
+    while (transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
       result.writeBatch().markWalTerminationPoint();
@@ -280,7 +280,7 @@ public class TestOzoneManagerServiceProviderImpl {
     TransactionLogIterator transactionLogIterator = rocksDB.getUpdatesSince(0L);
     DBUpdates[] dbUpdatesWrapper = new DBUpdates[4];
     int index = 0;
-    while(transactionLogIterator.isValid()) {
+    while (transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
       result.writeBatch().markWalTerminationPoint();

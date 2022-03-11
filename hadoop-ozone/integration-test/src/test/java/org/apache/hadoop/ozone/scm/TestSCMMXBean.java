@@ -151,14 +151,14 @@ public class TestSCMMXBean {
     ContainerManager scmContainerManager = scm.getContainerManager();
 
     List<ContainerInfo> containerInfoList = new ArrayList<>();
-    for (int i=0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       containerInfoList.add(
-          scmContainerManager.allocateContainer(new StandaloneReplicationConfig(
-                  ReplicationFactor.ONE),
+          scmContainerManager.allocateContainer(
+              StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE),
               UUID.randomUUID().toString()));
     }
     long containerID;
-    for (int i=0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       if (i % 2 == 0) {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
@@ -184,7 +184,7 @@ public class TestSCMMXBean {
     containerStateCount = scm.getContainerStateCount();
 
     containerStateCount.forEach((k, v) -> {
-      if(k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
+      if (k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
         assertEquals((int)v, 5);
       } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
         assertEquals((int)v, 5);

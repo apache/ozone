@@ -34,7 +34,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 
 /**
  * Publishes ContainerReport which will be sent to SCM as part of heartbeat.
- * ContainerReport consist of the following information about each containers:
+ * ContainerReport consist of the following information about each container:
  *   - containerID
  *   - size
  *   - used
@@ -80,7 +80,6 @@ public class ContainerReportPublisher extends
 
   @Override
   protected ContainerReportsProto getReport() throws IOException {
-    return getContext().getParent().getContainer()
-        .getController().getContainerReport();
+    return getContext().getFullContainerReportDiscardPendingICR();
   }
 }

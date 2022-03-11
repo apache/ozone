@@ -28,8 +28,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.helpers.*;
 
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -356,16 +361,16 @@ public class TestBucketManagerImpl {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_one")
-            .setReplicationConfig(
-                    new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            .setReplicationConfig(StandaloneReplicationConfig
+                .getInstance(ReplicationFactor.ONE))
             .build());
     metaMgr.getKeyTable(getBucketLayout()).put("/sampleVol/bucketOne/key_two",
         new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_two")
-            .setReplicationConfig(
-                        new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            .setReplicationConfig(StandaloneReplicationConfig
+                .getInstance(ReplicationFactor.ONE))
             .build());
     try {
       bucketManager.deleteBucket("sampleVol", "bucketOne");

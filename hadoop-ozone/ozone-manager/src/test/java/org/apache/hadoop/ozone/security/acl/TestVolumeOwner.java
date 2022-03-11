@@ -134,7 +134,7 @@ public class TestVolumeOwner {
               .setBucketName(getTestBucketName(j))
               .setKeyName(getTestKeyName(k))
               .setReplicationConfig(
-                  new StandaloneReplicationConfig(
+                  StandaloneReplicationConfig.getInstance(
                       HddsProtos.ReplicationFactor.ONE))
               .setDataSize(0);
           if (k == 0) {
@@ -187,7 +187,7 @@ public class TestVolumeOwner {
 
     List<IAccessAuthorizer.ACLType> aclsToTest =
         Arrays.stream(IAccessAuthorizer.ACLType.values()).filter(
-            (type)-> type != NONE && type != CREATE)
+            (type) -> type != NONE && type != CREATE)
             .collect(Collectors.toList());
     for (IAccessAuthorizer.ACLType type: aclsToTest) {
       nonAdminOwnerContext = getUserRequestContext(getTestVolOwnerName(0),
@@ -296,6 +296,6 @@ public class TestVolumeOwner {
 
   List<IAccessAuthorizer.ACLType> getAclsToTest() {
     return Arrays.stream(IAccessAuthorizer.ACLType.values()).filter(
-        (type)-> type != NONE).collect(Collectors.toList());
+        (type) -> type != NONE).collect(Collectors.toList());
   }
 }

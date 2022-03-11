@@ -642,53 +642,6 @@ public class TestContainerPersistence {
   }
 
   /**
-   * Deletes a block and tries to read it back.
-   *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
-   */
-  @Test
-  public void testDeleteBlock() throws IOException, NoSuchAlgorithmException {
-    long testContainerID = getTestContainerID();
-    Container container = addContainer(containerSet, testContainerID);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    ChunkInfo info = writeChunkHelper(blockID);
-    BlockData blockData = new BlockData(blockID);
-    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
-    chunkList.add(info.getProtoBufMessage());
-    blockData.setChunks(chunkList);
-    blockManager.putBlock(container, blockData);
-    blockManager.deleteBlock(container, blockID);
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage("Unable to find the block.");
-    blockManager.getBlock(container, blockData.getBlockID());
-  }
-
-  /**
-   * Tries to Deletes a block twice.
-   *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
-   */
-  @Test
-  public void testDeleteBlockTwice() throws IOException,
-      NoSuchAlgorithmException {
-    long testContainerID = getTestContainerID();
-    Container container = addContainer(containerSet, testContainerID);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    ChunkInfo info = writeChunkHelper(blockID);
-    BlockData blockData = new BlockData(blockID);
-    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
-    chunkList.add(info.getProtoBufMessage());
-    blockData.setChunks(chunkList);
-    blockManager.putBlock(container, blockData);
-    blockManager.deleteBlock(container, blockID);
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage("Unable to find the block.");
-    blockManager.deleteBlock(container, blockID);
-  }
-
-  /**
    * Tries to update an existing and non-existing container. Verifies container
    * map and persistent data both updated.
    *

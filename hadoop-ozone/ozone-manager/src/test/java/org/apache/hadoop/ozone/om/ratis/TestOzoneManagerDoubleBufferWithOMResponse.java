@@ -284,7 +284,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private void doMixTransactions(String volumeName, int bucketCount,
       Queue<OMBucketDeleteResponse> deleteBucketQueue,
       Queue<OMBucketCreateResponse> bucketQueue) {
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       String bucketName = UUID.randomUUID().toString();
       long transactionID = trxId.incrementAndGet();
       OMBucketCreateResponse omBucketCreateResponse = createBucket(volumeName,
@@ -434,7 +434,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private void doTransactions(int bucketCount) {
     String volumeName = UUID.randomUUID().toString();
     createVolume(volumeName, trxId.incrementAndGet());
-    for (int i=0; i< bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       createBucket(volumeName, UUID.randomUUID().toString(),
           trxId.incrementAndGet());
     }

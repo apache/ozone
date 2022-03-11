@@ -100,7 +100,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
-      checkACLs(ozoneManager, volumeName, bucketName, keyName,
+      checkACLsWithFSO(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.DELETE);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,

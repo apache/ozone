@@ -69,7 +69,7 @@ public class TestReconScmSnapshot {
     testSnapshot(ozoneCluster);
   }
 
-  public static void testSnapshot(MiniOzoneCluster cluster) throws Exception{
+  public static void testSnapshot(MiniOzoneCluster cluster) throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(LoggerFactory.getLogger(
         ReconStorageContainerManagerFacade.class));
@@ -92,7 +92,7 @@ public class TestReconScmSnapshot {
         .getContainerManager();
 
     for (int i = 0; i < 10; i++) {
-      containerManager.allocateContainer(new RatisReplicationConfig(
+      containerManager.allocateContainer(RatisReplicationConfig.getInstance(
           HddsProtos.ReplicationFactor.ONE), "testOwner");
     }
 

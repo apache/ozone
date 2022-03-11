@@ -17,13 +17,19 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -35,21 +41,24 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_PO
 
 /**
  * Fixed thread pool EventExecutor to call all the event handler one-by-one.
+ * Payloads with the same hashcode will be mapped to the same thread.
  *
  * @param <P> the payload type of events
  */
 @Metrics(context = "EventQueue")
-public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
+public class FixedThreadPoolWithAffinityExecutor<P>
+    implements EventExecutor<P> {
 
   private static final String EVENT_QUEUE = "EventQueue";
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(FixedThreadPoolExecutor.class);
+      LoggerFactory.getLogger(FixedThreadPoolWithAffinityExecutor.class);
 
   private final String name;
 
-  private final ExecutorService executor;
+  private final List<ThreadPoolExecutor> executors;
 
+  // MutableCounterLong is thread safe.
   @Metric
   private MutableCounterLong queued;
 
@@ -63,34 +72,57 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
   private MutableCounterLong scheduled;
 
   /**
-   * Create FixedThreadPoolExecutor.
+   * Create FixedThreadPoolExecutor with affinity.
+   * Based on the payload's hash code, the payload will be scheduled to the
+   * same thread.
    *
-   * @param eventName
    * @param name Unique name used in monitoring and metrics.
    */
-  public FixedThreadPoolExecutor(String eventName, String name) {
+  public FixedThreadPoolWithAffinityExecutor(
+      String name,
+      List<ThreadPoolExecutor> executors) {
     this.name = name;
     DefaultMetricsSystem.instance()
-        .register(EVENT_QUEUE + name, "Event Executor metrics ", this);
+        .register(EVENT_QUEUE + name,
+            "Event Executor metrics ",
+            this);
+    this.executors = executors;
+  }
 
-
+  public static List<ThreadPoolExecutor> initializeExecutorPool(
+      String eventName) {
+    List<ThreadPoolExecutor> executors = new LinkedList<>();
     OzoneConfiguration configuration = new OzoneConfiguration();
     int threadPoolSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
             StringUtils.camelize(eventName) + ".thread.pool.size",
         OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
-
-    executor = Executors.newFixedThreadPool(threadPoolSize, runnable -> {
-      Thread thread = new Thread(runnable);
-      thread.setName(EVENT_QUEUE + "-" + name);
-      return thread;
-    });
+    BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
+    for (int i = 0; i < threadPoolSize; i++) {
+      ThreadFactory threadFactory = new ThreadFactoryBuilder()
+          .setDaemon(true)
+          .setNameFormat("FixedThreadPoolWithAffinityExecutor-" + i + "-%d")
+          .build();
+      executors.add(new
+          ThreadPoolExecutor(
+          1,
+          1,
+          0,
+          TimeUnit.SECONDS,
+          workQueue,
+          threadFactory));
+    }
+    return executors;
   }
 
   @Override
   public void onMessage(EventHandler<P> handler, P message, EventPublisher
       publisher) {
     queued.incr();
-    executor.execute(() -> {
+    // For messages that need to be routed to the same thread need to
+    // implement hashCode to match the messages. This should be safe for
+    // other messages that implement the native hash.
+    int index = message.hashCode() & (executors.size() - 1);
+    executors.get(index).execute(() -> {
       scheduled.incr();
       try {
         handler.onMessage(message, publisher);
@@ -124,7 +156,9 @@ public class FixedThreadPoolExecutor<P> implements EventExecutor<P> {
 
   @Override
   public void close() {
-    executor.shutdown();
+    for (ThreadPoolExecutor executor : executors) {
+      executor.shutdown();
+    }
   }
 
   @Override

@@ -136,7 +136,7 @@ public final class RatisHelper {
   }
 
   private static RaftGroup newRaftGroup(Collection<RaftPeer> peers) {
-    return peers.isEmpty()? emptyRaftGroup()
+    return peers.isEmpty() ? emptyRaftGroup()
         : RaftGroup.valueOf(DUMMY_GROUP_ID, peers);
   }
 

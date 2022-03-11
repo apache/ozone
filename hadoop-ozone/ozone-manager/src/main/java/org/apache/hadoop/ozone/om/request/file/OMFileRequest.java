@@ -199,7 +199,7 @@ public final class OMFileRequest {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
         // Assume /vol1/buck1/a/b/c exists, then add d, e, f into missing list.
-        if(elements.hasNext()){
+        if (elements.hasNext()) {
           // skips leaf node.
           missing.add(fileName);
         }
@@ -273,7 +273,7 @@ public final class OMFileRequest {
    * Includes the list of missing intermediate directories and
    * the directory search result code.
    */
-  public static class OMPathInfoWithFSO extends OMPathInfo{
+  public static class OMPathInfoWithFSO extends OMPathInfo {
     private String leafNodeName;
     private long lastKnownParentId;
     private long leafNodeObjectId;
@@ -730,8 +730,8 @@ public final class OMFileRequest {
     builder.setObjectID(dirInfo.getObjectID());
     builder.setUpdateID(dirInfo.getUpdateID());
     builder.setFileName(dirInfo.getName());
-    builder.setReplicationConfig(new RatisReplicationConfig(
-            HddsProtos.ReplicationFactor.ONE));
+    builder.setReplicationConfig(RatisReplicationConfig
+        .getInstance(HddsProtos.ReplicationFactor.ONE));
     builder.setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())));
     return builder.build();
@@ -759,7 +759,7 @@ public final class OMFileRequest {
    * @param keyInfo omKeyInfo
    * @return omDirectoryInfo object
    */
-  public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo){
+  public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
     OmDirectoryInfo.Builder builder = new OmDirectoryInfo.Builder();
     builder.setParentObjectID(keyInfo.getParentObjectID());
     builder.setAcls(keyInfo.getAcls());
@@ -838,7 +838,7 @@ public final class OMFileRequest {
               "Failed to rename %s to %s, %s doesn't exist", fromKeyName,
               toKeyName, toKeyParentDir),
               OMException.ResultCodes.KEY_RENAME_ERROR);
-    } else if (toKeyParentDirStatus.isFile()){
+    } else if (toKeyParentDirStatus.isFile()) {
       throw new OMException(String.format(
               "Failed to rename %s to %s, %s is a file", fromKeyName, toKeyName,
               toKeyParentDir), OMException.ResultCodes.KEY_RENAME_ERROR);
@@ -975,7 +975,7 @@ public final class OMFileRequest {
     long lastKnownParentId = bucketId;
 
     // If no sub-dirs then bucketID is the root/parent.
-    if(!pathComponents.hasNext()){
+    if (!pathComponents.hasNext()) {
       return bucketId;
     }
     if (StringUtils.isBlank(errMsg)) {

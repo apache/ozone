@@ -253,21 +253,29 @@ public abstract class GenericTestUtils {
 
     public static LogCapturer captureLogs(Log l) {
       Logger logger = ((Log4JLogger) l).getLogger();
-      return new LogCapturer(logger);
+      return new LogCapturer(logger, getDefaultLayout());
     }
 
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
-      return new LogCapturer(toLog4j(logger));
+      return new LogCapturer(toLog4j(logger), getDefaultLayout());
     }
 
-    private LogCapturer(Logger logger) {
-      this.logger = logger;
+    public static LogCapturer captureLogs(org.slf4j.Logger logger,
+        Layout layout) {
+      return new LogCapturer(toLog4j(logger), layout);
+    }
+
+    private static Layout getDefaultLayout() {
       Appender defaultAppender = Logger.getRootLogger().getAppender("stdout");
       if (defaultAppender == null) {
         defaultAppender = Logger.getRootLogger().getAppender("console");
       }
-      final Layout layout = (defaultAppender == null) ? new PatternLayout() :
+      return (defaultAppender == null) ? new PatternLayout() :
           defaultAppender.getLayout();
+    }
+
+    private LogCapturer(Logger logger, Layout layout) {
+      this.logger = logger;
       this.appender = new WriterAppender(layout, sw);
       logger.addAppender(this.appender);
     }

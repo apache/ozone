@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
@@ -44,9 +44,9 @@ import java.util.List;
 public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   private int blockIdx;
 
-  ReplicatedFileChecksumHelper(
+  public ReplicatedFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
-      RpcClient rpcClient) throws IOException {
+      ClientProtocol rpcClient) throws IOException {
     super(volume, bucket, keyName, length, rpcClient);
   }
 
@@ -117,7 +117,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     BlockID blockID = keyLocationInfo.getBlockID();
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               ReplicationConfig
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
