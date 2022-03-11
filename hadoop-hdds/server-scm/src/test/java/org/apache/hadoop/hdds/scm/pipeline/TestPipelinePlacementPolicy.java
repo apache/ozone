@@ -55,7 +55,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -289,7 +289,7 @@ public class TestPipelinePlacementPolicy {
             .setNodes(nodes)
             .build();
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-            ClientVersions.CURRENT_VERSION);
+            ClientVersion.CURRENT_VERSION);
         nodeManager.addPipeline(pipeline);
         stateManager.addPipeline(pipelineProto);
       } catch (SCMException e) {
@@ -689,7 +689,7 @@ public class TestPipelinePlacementPolicy {
               .build();
 
           pipelineProto = pipeline.getProtobufMessage(
-              ClientVersions.CURRENT_VERSION);
+              ClientVersion.CURRENT_VERSION);
           nodeManager.addPipeline(pipeline);
           stateManager.addPipeline(pipelineProto);
           pipelineCount++;
@@ -773,7 +773,7 @@ public class TestPipelinePlacementPolicy {
         .build();
 
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
   }
