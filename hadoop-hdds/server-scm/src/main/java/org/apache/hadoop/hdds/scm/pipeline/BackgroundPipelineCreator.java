@@ -46,6 +46,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_IP_OR_HOSTNAME_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
@@ -66,7 +67,7 @@ public class BackgroundPipelineCreator implements SCMService {
    * SCMService related variables.
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
-   * 2) NewNodeHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
+   * 2) NewNodeHandler, NodeIpOrHostnameUpdateHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
    *    will trigger a one-shot run of BackgroundPipelineCreator,
    *    no matter in safe mode or not.
    */
@@ -280,8 +281,9 @@ public class BackgroundPipelineCreator implements SCMService {
       return;
     }
     if (event == NEW_NODE_HANDLER_TRIGGERED
-        || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
-        || event == PRE_CHECK_COMPLETED) {
+            || event == NODE_IP_OR_HOSTNAME_UPDATE_HANDLER_TRIGGERED
+            || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
+            || event == PRE_CHECK_COMPLETED) {
       LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
 
       serviceLock.lock();

@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
@@ -63,6 +65,8 @@ import org.slf4j.LoggerFactory;
 public final class RatisHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
+
+  private static final OzoneConfiguration conf = new OzoneConfiguration();
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis";
@@ -96,7 +100,13 @@ public final class RatisHelper {
   }
 
   private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
-    return id.getIpAddress() + ":" + id.getPort(port).getValue();
+    if (datanodeUseHostName()) {
+      LOG.debug("Datanode is using hostname for raft peer address");
+      return id.getHostName() + ":" + id.getPort(port).getValue();
+    } else {
+      LOG.debug("Datanode is using IP for raft peer address");
+      return id.getIpAddress() + ":" + id.getPort(port).getValue();
+    }
   }
 
   public static RaftPeerId toRaftPeerId(DatanodeDetails id) {
@@ -321,6 +331,12 @@ public final class RatisHelper {
       Collection<RaftProtos.CommitInfoProto> commitInfos) {
     return commitInfos.stream().map(RaftProtos.CommitInfoProto::getCommitIndex)
         .min(Long::compareTo).orElse(null);
+  }
+
+  private static boolean datanodeUseHostName() {
+    return conf.getBoolean(
+            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
+            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
 
   private static <U> Class<? extends U> getClass(String name,

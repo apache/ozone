@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.node.NodeIpOrHostnameUpdateHandler;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -410,6 +411,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
         scmDecommissionManager, configuration, serviceManager);
+    NodeIpOrHostnameUpdateHandler nodeIpOrHostnameUpdateHandler = new NodeIpOrHostnameUpdateHandler(pipelineManager,
+            scmDecommissionManager, serviceManager);
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(scmNodeManager, pipelineManager, configuration);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
@@ -471,6 +474,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
+    eventQueue.addHandler(SCMEvents.NODE_IP_OR_HOSTNAME_UPDATE, nodeIpOrHostnameUpdateHandler);
     eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
     eventQueue.addHandler(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
         readOnlyHealthyToHealthyNodeHandler);
@@ -1152,6 +1156,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
 
     InetSocketAddress scmAddress = null;
+    LOG.info("!!!!!!!!!!!!!!!!! haDetails: {}", haDetails);
+    LOG.info("!!!!!!!!!!!!!!!!! haDetails.getLocalNodeDetails(): {}", haDetails.getLocalNodeDetails());
     if (SCMHAUtils.getScmServiceId(conf) != null) {
       for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
         if (haDetails.getLocalNodeDetails().getNodeId() != null

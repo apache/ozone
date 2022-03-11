@@ -390,6 +390,26 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Update node.
+   *
+   * @param datanodeDetails the datanode details
+   * @param layoutInfo the layoutInfo
+   * @throws NodeNotFoundException the node not found exception
+   */
+  public void updateNode(DatanodeDetails datanodeDetails, LayoutVersionProto layoutInfo)
+          throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo = nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
+    LOG.info("updating node {} from {} to {} with status {}",
+            datanodeDetails.getUuidString(),
+            datanodeInfo,
+            datanodeDetails,
+            newNodeStatus);
+    nodeStateMap.updateNode(datanodeDetails, newNodeStatus, layoutInfo);
+    updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
+  }
+
+  /**
    * Returns the current state of the node.
    *
    * @param datanodeDetails DatanodeDetails

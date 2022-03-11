@@ -1862,4 +1862,69 @@ public class TestSCMNodeManager {
     }
   }
 
+  /**
+   * Test node register with updated IP and host name.
+   */
+  @Test
+  public void testScmRegisterNodeWithUpdatedIpAndHostname()
+          throws IOException, InterruptedException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
+            MILLISECONDS);
+
+    // create table mapping file
+    String hostName = "host1";
+    String ipAddress = "1.2.3.4";
+    String mapFile = this.getClass().getClassLoader()
+            .getResource("nodegroup-mapping").getPath();
+    conf.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            "org.apache.hadoop.net.TableMapping");
+    conf.set(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, mapFile);
+    conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+            "network-topology-nodegroup.xml");
+
+    // use default IP address to resolve node
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      String nodeUuid = UUID.randomUUID().toString();
+      DatanodeDetails node = createDatanodeDetails(
+              nodeUuid, hostName, ipAddress, null);
+      nodeManager.register(node, null, null);
+
+      // verify network topology cluster has all the registered nodes
+      Thread.sleep(2 * 1000);
+      NetworkTopology clusterMap = scm.getClusterMap();
+      assertEquals(1,
+              nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(1, clusterMap.getNumOfLeafNode(""));
+      assertEquals(4, clusterMap.getMaxLevel());
+      List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
+      assertEquals(1, nodeList.size());
+
+      DatanodeDetails returnedNode = nodeList.get(0);
+      assertEquals(ipAddress, returnedNode.getIpAddress());
+      assertEquals(hostName, returnedNode.getHostName());
+      Assert.assertTrue(returnedNode.getNetworkLocation().startsWith("/rack1/ng"));
+      Assert.assertTrue(returnedNode.getParent() != null);
+
+      // test updating ip address and host name
+      String updatedIpAddress = "2.3.4.5";
+      String updatedHostName = "host2";
+      DatanodeDetails updatedNode = createDatanodeDetails(
+              nodeUuid, updatedHostName, updatedIpAddress, null);
+      nodeManager.register(updatedNode, null, null);
+
+      assertEquals(1,
+              nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(1, clusterMap.getNumOfLeafNode(""));
+      assertEquals(4, clusterMap.getMaxLevel());
+      List<DatanodeDetails> updatedNodeList = nodeManager.getAllNodes();
+      assertEquals(1, updatedNodeList.size());
+
+      DatanodeDetails returnedUpdatedNode = updatedNodeList.get(0);
+      assertEquals(updatedIpAddress, returnedUpdatedNode.getIpAddress());
+      assertEquals(updatedHostName, returnedUpdatedNode.getHostName());
+      Assert.assertTrue(returnedUpdatedNode.getNetworkLocation().startsWith("/rack1/ng"));
+      Assert.assertTrue(returnedUpdatedNode.getParent() != null);
+    }
+  }
 }

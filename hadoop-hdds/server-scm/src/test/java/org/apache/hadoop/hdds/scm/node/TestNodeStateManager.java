@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -304,6 +305,40 @@ public class TestNodeStateManager {
       nsm.setNodeOperationalState(dn, s);
       assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
     }
+  }
+
+  @Test
+  public void testUpdateNode() throws NodeAlreadyExistsException, NodeNotFoundException {
+    UUID dnUuid = UUID.randomUUID();
+    String ipAddress = "1.2.3.4";
+    String hostName = "test-host";
+    StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutVersionProto =
+            UpgradeUtils.toLayoutVersionProto(1, 2);
+    DatanodeDetails dn = DatanodeDetails.newBuilder()
+            .setUuid(dnUuid)
+            .setIpAddress(ipAddress)
+            .setHostName(hostName)
+            .setPersistedOpState(HddsProtos.NodeOperationalState.IN_MAINTENANCE)
+            .build();
+    nsm.addNode(dn, layoutVersionProto);
+
+    String newIpAddress = "2.3.4.5";
+    String newHostName = "new-host";
+    StorageContainerDatanodeProtocolProtos.LayoutVersionProto newLayoutVersionProto =
+            UpgradeUtils.defaultLayoutVersionProto();
+    DatanodeDetails newDn = DatanodeDetails.newBuilder()
+            .setUuid(dnUuid)
+            .setIpAddress(newIpAddress)
+            .setHostName(newHostName)
+            .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+            .build();
+    nsm.updateNode(newDn, newLayoutVersionProto);
+
+    DatanodeInfo updatedDn = nsm.getNode(dn);
+    assertEquals(newIpAddress, updatedDn.getIpAddress());
+    assertEquals(newHostName, updatedDn.getHostName());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE, updatedDn.getPersistedOpState());
+    assertEquals(NodeStatus.inServiceHealthy(), updatedDn.getNodeStatus());
   }
 
   private DatanodeDetails generateDatanode() {
