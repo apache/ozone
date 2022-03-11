@@ -34,7 +34,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -251,6 +253,11 @@ public class TestOmMetrics {
   }
 
   @Test
+  public void testECKeyOps() throws Exception {
+
+  }
+
+  @Test
   public void testKeyOps() throws Exception {
     // This test needs a cluster with DNs and SCM to wait on safemode
     clusterBuilder.setNumDatanodes(3);
@@ -262,7 +269,8 @@ public class TestOmMetrics {
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
     TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
-    OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName);
+    OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
@@ -275,13 +283,16 @@ public class TestOmMetrics {
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
 
-    keyArgs = createKeyArgs(volumeName, bucketName);
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = createKeyArgs(volumeName, bucketName);
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = createKeyArgs(volumeName, bucketName);
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     keySession = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
@@ -301,7 +312,8 @@ public class TestOmMetrics {
 
     // inject exception to test for Failure Metrics on the write path
     mockWritePathExceptions(OmBucketInfo.class);
-    keyArgs = createKeyArgs(volumeName, bucketName);
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
@@ -323,8 +335,14 @@ public class TestOmMetrics {
 
     assertCounter("NumKeys", 2L, omMetrics);
 
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        new ECReplicationConfig("rs-3-2-1024K"));
+    doKeyOps(keyArgs);
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 3L, omMetrics);
+
     cluster.restartOzoneManager();
-    assertCounter("NumKeys", 2L, omMetrics);
+    assertCounter("NumKeys", 3L, omMetrics);
 
   }
 
@@ -556,8 +574,8 @@ public class TestOmMetrics {
     }
   }
 
-  private OmKeyArgs createKeyArgs(String volumeName, String bucketName)
-      throws IOException {
+  private OmKeyArgs createKeyArgs(String volumeName, String bucketName,
+      ReplicationConfig repConfig) throws IOException {
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
         .setPipeline(MockPipeline.createSingleNodePipeline())
@@ -571,10 +589,10 @@ public class TestOmMetrics {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setAcls(Lists.emptyList())
-        .setReplicationConfig(RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.THREE))
+        .setReplicationConfig(repConfig)
         .build();
   }
+
   private OmVolumeArgs createVolumeArgs() {
     String volumeName = UUID.randomUUID().toString();
     return new OmVolumeArgs.Builder()

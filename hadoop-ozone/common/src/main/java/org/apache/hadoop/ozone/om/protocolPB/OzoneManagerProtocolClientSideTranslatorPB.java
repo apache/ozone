@@ -963,9 +963,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
 
     if (omKeyArgs.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-              ReplicationConfig
-                      .getLegacyFactor(omKeyArgs.getReplicationConfig()));
+      if (omKeyArgs.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) omKeyArgs.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(ReplicationConfig
+            .getLegacyFactor(omKeyArgs.getReplicationConfig()));
+      }
       keyArgs.setType(omKeyArgs.getReplicationConfig().getReplicationType());
     }
 

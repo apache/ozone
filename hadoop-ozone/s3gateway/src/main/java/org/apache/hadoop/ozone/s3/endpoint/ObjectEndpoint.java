@@ -54,7 +54,6 @@ import java.util.Map;
 import java.util.OptionalLong;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -498,17 +497,21 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
-      S3StorageType s3StorageType;
-      if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
-      } else {
-        s3StorageType = S3Utils.toS3StorageType(storageType);
+      ReplicationConfig clientConfiguredReplicationConfig = null;
+      String replication = ozoneConfiguration.get(OZONE_REPLICATION);
+      if (replication != null) {
+        clientConfiguredReplicationConfig = ReplicationConfig.parse(
+            ReplicationType.valueOf(ozoneConfiguration
+                .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
+            replication, ozoneConfiguration);
       }
-      ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      ReplicationConfig replicationConfig = S3Utils
+          .resolveS3ClientSideReplicationConfig(storageType,
+              clientConfiguredReplicationConfig,
+              ozoneBucket.getReplicationConfig());
 
-      OmMultipartInfo multipartInfo = ozoneBucket
-          .initiateMultipartUpload(key, replicationType, replicationFactor);
+      OmMultipartInfo multipartInfo =
+          ozoneBucket.initiateMultipartUpload(key, replicationConfig);
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
