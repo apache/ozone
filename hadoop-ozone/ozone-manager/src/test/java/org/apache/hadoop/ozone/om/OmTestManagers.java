@@ -120,6 +120,7 @@ public final class OmTestManagers {
         .getInternalState(om, "prefixManager");
   }
 
+  //initializing and returning a mock kmsProvider
   public KeyProviderCryptoExtension kmsProviderInit() {
     kmsProvider = Mockito.mock(KeyProviderCryptoExtension.class);
 

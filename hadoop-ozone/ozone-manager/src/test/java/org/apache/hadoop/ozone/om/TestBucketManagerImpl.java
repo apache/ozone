@@ -26,25 +26,25 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Test;
+import org.junit.After;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -72,8 +72,7 @@ public class TestBucketManagerImpl {
     om.stop();
   }
 
-  private OzoneConfiguration createNewTestPath() throws IOException,
-          AuthenticationException {
+  private OzoneConfiguration createNewTestPath() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.newFolder();
     if (!newFolder.exists()) {
@@ -105,13 +104,13 @@ public class TestBucketManagerImpl {
     OzoneConfiguration conf = createNewTestPath();
     omTestManagers = new OmTestManagers(conf);
     try {
-      OzoneManagerProtocol writeCl = omTestManagers.getWriteClient();
+      writeClient = omTestManagers.getWriteClient();
 
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("sample-vol")
           .setBucketName("bucket-one")
           .build();
-      writeCl.createBucket(bucketInfo);
+      writeClient.createBucket(bucketInfo);
     } catch (OMException omEx) {
       Assert.assertEquals(ResultCodes.VOLUME_NOT_FOUND,
           omEx.getResult());
@@ -362,7 +361,7 @@ public class TestBucketManagerImpl {
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
-              new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+              new StandaloneReplicationConfig(ReplicationFactor.ONE))
             .build();
 
     OpenKeySession session1 = writeClient.openKey(args1);
@@ -375,7 +374,7 @@ public class TestBucketManagerImpl {
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
-              new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+              new StandaloneReplicationConfig(ReplicationFactor.ONE))
             .build();
 
     OpenKeySession session2 = writeClient.openKey(args2);
