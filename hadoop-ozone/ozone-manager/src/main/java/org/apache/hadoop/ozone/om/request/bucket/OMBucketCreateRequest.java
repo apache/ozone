@@ -152,6 +152,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
       String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
       BucketLayout defaultType = BucketLayout.fromString(omDefaultBucketLayout);
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
+      LOG.info("Bucket Layout not present for volume/bucket = {}/{}, "
+              + "initialising with default bucket layout" + ": {}", volumeName,
+          bucketName, omDefaultBucketLayout);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
     }
@@ -246,7 +249,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     // return response.
     if (exception == null) {
-      LOG.debug("created bucket: {} in volume: {}", bucketName, volumeName);
+      LOG.info("created bucket: {} of layout {} in volume: {}", bucketName,
+          bucketInfo.getBucketLayout(), volumeName);
       omMetrics.incNumBuckets();
       return omClientResponse;
     } else {

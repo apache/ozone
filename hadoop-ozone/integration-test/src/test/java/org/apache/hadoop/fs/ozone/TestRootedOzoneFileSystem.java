@@ -1086,8 +1086,8 @@ public class TestRootedOzoneFileSystem {
     deleteNonRecursivelyAndFail(bucketPath3);
     // Delete key first, then bucket, then volume
     Assert.assertTrue(fs.delete(dirPath3, false));
-    Assert.assertTrue(fs.delete(bucketPath3, true));
-    Assert.assertTrue(fs.delete(volumePath3, true));
+    Assert.assertTrue(fs.delete(bucketPath3, false));
+    Assert.assertTrue(fs.delete(volumePath3, false));
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr3));
 
