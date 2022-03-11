@@ -101,40 +101,6 @@ public class TestValidatorRegistry {
     assertEquals(expectedMethodName, validators.get(0).getName());
   }
 
-/*  @Test
-  public void testRegistryHasTheNewClientPreProcessCreateKeyValidator()
-      throws MalformedURLException {
-    Collection<URL> urls = ClasspathHelper.forPackage(PACKAGE);
-    Collection<URL> urlsToUse = new ArrayList<>();
-    for (URL url : urls) {
-      urlsToUse.add(new URL(url, PACKAGE.replaceAll("\\.", "/")));
-    }
-    ValidatorRegistry registry = new ValidatorRegistry(urlsToUse);
-    List<Method> validators =
-        registry.validationsFor(
-            asList(NEWER_CLIENT_REQUESTS), CreateKey, PRE_PROCESS);
-
-    assertEquals(1, validators.size());
-    String expectedMethodName = "newClientPreProcessCreateKeyValidator";
-    assertEquals(expectedMethodName, validators.get(0).getName());
-  }
-
-  @Test
-  public void testRegistryHasTheNewClientPostProcessCreateKeyValidator() {
-    ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
-    List<Method> validators =
-        registry.validationsFor(
-            asList(NEWER_CLIENT_REQUESTS), CreateKey, POST_PROCESS);
-
-    assertEquals(2, validators.size());
-    List<String> methodNames =
-        validators.stream().map(Method::getName).collect(Collectors.toList());
-    assertTrue(
-        methodNames.contains("newClientPostProcessCreateKeyValidator"));
-    assertTrue(
-        methodNames.contains("newClientPostProcessCreateKeyValidator2"));
-  }*/
-
   @Test
   public void testRegistryHasTheOldClientPreProcessCreateKeyValidator() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
@@ -163,30 +129,6 @@ public class TestValidatorRegistry {
     assertTrue(methodNames.contains("oldClientPostProcessCreateKeyValidator2"));
   }
 
-/*  @Test
-  public void testRegistryHasTheUnconditionalPreProcessCreateKeyValidator() {
-    ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
-    List<Method> validators =
-        registry.validationsFor(
-            asList(UNCONDITIONAL), CreateKey, PRE_PROCESS);
-
-    assertEquals(1, validators.size());
-    String expectedMethodName = "unconditionalPreProcessCreateKeyValidator";
-    assertEquals(expectedMethodName, validators.get(0).getName());
-  }
-
-  @Test
-  public void testRegistryHasTheUnconditionalPostProcessCreateKeyValidator() {
-    ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
-    List<Method> validators =
-        registry.validationsFor(
-            asList(UNCONDITIONAL), CreateKey, POST_PROCESS);
-
-    assertEquals(1, validators.size());
-    String expectedMethodName = "unconditionalPostProcessCreateKeyValidator";
-    assertEquals(expectedMethodName, validators.get(0).getName());
-  }*/
-
   @Test
   public void testRegistryHasTheMultiPurposePreProcessCreateVolumeValidator() {
     ValidatorRegistry registry = new ValidatorRegistry(PACKAGE);
@@ -213,17 +155,12 @@ public class TestValidatorRegistry {
     List<Method> oldClientValidators =
         registry.validationsFor(
             asList(OLDER_CLIENT_REQUESTS), CreateVolume, POST_PROCESS);
-//    List<Method> unconditionalValidators =
-//        registry.validationsFor(
-//            asList(UNCONDITIONAL), CreateVolume, POST_PROCESS);
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, oldClientValidators.size());
-//    assertEquals(1, unconditionalValidators.size());
     String expectedMethodName = "multiPurposePostProcessCreateVolumeValidator";
     assertEquals(expectedMethodName, preFinalizeValidators.get(0).getName());
     assertEquals(expectedMethodName, oldClientValidators.get(0).getName());
-//  assertEquals(expectedMethodName, unconditionalValidators.get(0).getName());
   }
 
   @Test

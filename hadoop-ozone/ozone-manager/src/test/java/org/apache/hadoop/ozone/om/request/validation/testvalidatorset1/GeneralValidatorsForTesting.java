@@ -108,26 +108,6 @@ public final class GeneralValidatorsForTesting {
     return resp;
   }
 
-/*  @RequestFeatureValidator(
-      conditions = { NEWER_CLIENT_REQUESTS },
-      processingPhase = PRE_PROCESS,
-      requestType = CreateKey)
-  public static OMRequest newClientPreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx) {
-    fireValidationEvent("newClientPreProcessCreateKeyValidator");
-    return req;
-  }
-
-  @RequestFeatureValidator(
-      conditions = { NEWER_CLIENT_REQUESTS },
-      processingPhase = POST_PROCESS,
-      requestType = CreateKey)
-  public static OMResponse newClientPostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx) {
-    fireValidationEvent("newClientPostProcessCreateKeyValidator");
-    return resp;
-  }*/
-
   @RequestFeatureValidator(
       conditions = { OLDER_CLIENT_REQUESTS },
       processingPhase = PRE_PROCESS,
@@ -147,26 +127,6 @@ public final class GeneralValidatorsForTesting {
     fireValidationEvent("oldClientPostProcessCreateKeyValidator");
     return resp;
   }
-
-/*  @RequestFeatureValidator(
-      conditions = { UNCONDITIONAL },
-      processingPhase = PRE_PROCESS,
-      requestType = CreateKey)
-  public static OMRequest unconditionalPreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx) {
-    fireValidationEvent("unconditionalPreProcessCreateKeyValidator");
-    return req;
-  }
-
-  @RequestFeatureValidator(
-      conditions = { UNCONDITIONAL },
-      processingPhase = POST_PROCESS,
-      requestType = CreateKey)
-  public static OMResponse unconditionalPostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx) {
-    fireValidationEvent("unconditionalPostProcessCreateKeyValidator");
-    return resp;
-  }*/
 
   @RequestFeatureValidator(
       conditions = { CLUSTER_NEEDS_FINALIZATION, OLDER_CLIENT_REQUESTS },

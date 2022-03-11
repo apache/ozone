@@ -49,30 +49,7 @@ public enum ValidationCondition {
     public boolean shouldApply(OMRequest req, ValidationContext ctx) {
       return req.getVersion() < ClientVersions.CURRENT_VERSION;
     }
-  } /*,
-
-  /**
-   * Classifies validations that has to run, when the client uses a newer
-   * protocol version than the server.
-   *//*
-  NEWER_CLIENT_REQUESTS {
-    @Override
-    public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() > ClientVersions.CURRENT_VERSION;
-    }
-  },
-
-  /**
-   * Classifies validations that has to run for every request.
-   * If you plan to use this, please justify why the validation code should not
-   * be part of the actual request handling code.
-   *//*
-  UNCONDITIONAL {
-    @Override
-    public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return true;
-    }
-  }*/;
+  };
 
   public abstract boolean shouldApply(OMRequest req, ValidationContext ctx);
 }

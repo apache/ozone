@@ -92,12 +92,10 @@ public class TestRequestValidations {
         .validateRequest(aCreateKeyRequest(currentClientVersion()));
 
     validationListener.assertNumOfEvents(0);
-//    validationListener
-//        .assertCalled("unconditionalPreProcessCreateKeyValidator");
   }
 
   @Test
-  public void testNoPreValdiationsWithoutValidationMethods()
+  public void testNoPreValidationsWithoutValidationMethods()
       throws ServiceException {
     int omVersion = 0;
     ValidationContext ctx = of(aFinalizedVersionManager());
@@ -109,7 +107,7 @@ public class TestRequestValidations {
   }
 
   @Test
-  public void testNoPostValdiationsWithoutValidationMethods()
+  public void testNoPostValidationsWithoutValidationMethods()
       throws ServiceException {
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadEmptyValidations(ctx);
@@ -143,33 +141,6 @@ public class TestRequestValidations {
     validationListener.assertNumOfEvents(0);
   }
 
-/*  @Test
-  public void testUnconditionalPreProcessValidationsAreCalled()
-      throws ServiceException {
-    ValidationContext ctx = of(aFinalizedVersionManager());
-    RequestValidations validations = loadValidations(ctx);
-
-    validations.validateRequest(aCreateKeyRequest(currentClientVersion()));
-
-    validationListener.assertNumOfEvents(1);
-    validationListener
-        .assertCalled("unconditionalPreProcessCreateKeyValidator");
-  }
-
-  @Test
-  public void testUnconditionalPostProcessValidationsAreCalled()
-      throws ServiceException {
-    ValidationContext ctx = of(aFinalizedVersionManager());
-    RequestValidations validations = loadValidations(ctx);
-
-    validations.validateResponse(
-        aCreateKeyRequest(currentClientVersion()), aCreateKeyResponse());
-
-    validationListener.assertNumOfEvents(1);
-    validationListener
-        .assertCalled("unconditionalPostProcessCreateKeyValidator");
-  }*/
-
   @Test
   public void testPreProcessorExceptionHandling() {
     ValidationContext ctx = of(aFinalizedVersionManager());
@@ -181,7 +152,8 @@ public class TestRequestValidations {
     } catch (ServiceException ignored) { }
 
     validationListener.assertNumOfEvents(1);
-    validationListener.assertCalled("throwingPreProcessValidator");
+    validationListener.assertExactListOfValidatorsCalled(
+        "throwingPreProcessValidator");
   }
 
   @Test
@@ -196,38 +168,9 @@ public class TestRequestValidations {
     } catch (ServiceException ignored) { }
 
     validationListener.assertNumOfEvents(1);
-    validationListener.assertCalled("throwingPostProcessValidator");
+    validationListener.assertExactListOfValidatorsCalled(
+        "throwingPostProcessValidator");
   }
-
-/*  @Test
-  public void testNewClientConditionIsRecognizedAndPreValidatorsApplied()
-      throws ServiceException {
-    ValidationContext ctx = of(aFinalizedVersionManager());
-    RequestValidations validations = loadValidations(ctx);
-
-    validations.validateRequest(aCreateKeyRequest(newerClientVersion()));
-
-    validationListener.assertNumOfEvents(2);
-    validationListener.assertAllCalled(
-        "unconditionalPreProcessCreateKeyValidator",
-        "newClientPreProcessCreateKeyValidator");
-  }
-
-  @Test
-  public void testNewClientConditionIsRecognizedAndPostValidatorsApplied()
-      throws ServiceException {
-    ValidationContext ctx = of(aFinalizedVersionManager());
-    RequestValidations validations = loadValidations(ctx);
-
-    validations.validateResponse(
-        aCreateKeyRequest(newerClientVersion()), aCreateKeyResponse());
-
-    validationListener.assertNumOfEvents(3);
-    validationListener.assertAllCalled(
-        "unconditionalPostProcessCreateKeyValidator",
-        "newClientPostProcessCreateKeyValidator",
-        "newClientPostProcessCreateKeyValidator2");
-  }*/
 
   @Test
   public void testOldClientConditionIsRecognizedAndPreValidatorsApplied()
@@ -238,8 +181,7 @@ public class TestRequestValidations {
     validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
 
     validationListener.assertNumOfEvents(1);
-    validationListener.assertAllCalled(
-//        "unconditionalPreProcessCreateKeyValidator",
+    validationListener.assertExactListOfValidatorsCalled(
         "oldClientPreProcessCreateKeyValidator");
   }
 
@@ -253,8 +195,7 @@ public class TestRequestValidations {
         aCreateKeyRequest(olderClientVersion()), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(2);
-    validationListener.assertAllCalled(
-//        "unconditionalPostProcessCreateKeyValidator",
+    validationListener.assertExactListOfValidatorsCalled(
         "oldClientPostProcessCreateKeyValidator",
         "oldClientPostProcessCreateKeyValidator2");
   }
@@ -268,8 +209,7 @@ public class TestRequestValidations {
     validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
 
     validationListener.assertNumOfEvents(2);
-    validationListener.assertAllCalled(
-//        "unconditionalPreProcessCreateKeyValidator",
+    validationListener.assertExactListOfValidatorsCalled(
         "preFinalizePreProcessCreateKeyValidator",
         "oldClientPreProcessCreateKeyValidator");
   }
@@ -284,8 +224,7 @@ public class TestRequestValidations {
         aCreateKeyRequest(olderClientVersion()), aCreateKeyResponse());
 
     validationListener.assertNumOfEvents(3);
-    validationListener.assertAllCalled(
-//        "unconditionalPostProcessCreateKeyValidator",
+    validationListener.assertExactListOfValidatorsCalled(
         "preFinalizePostProcessCreateKeyValidator",
         "oldClientPostProcessCreateKeyValidator",
         "oldClientPostProcessCreateKeyValidator2");
@@ -312,10 +251,6 @@ public class TestRequestValidations {
   private int currentClientVersion() {
     return ClientVersions.CURRENT_VERSION;
   }
-
-/*  private int newerClientVersion() {
-    return ClientVersions.CURRENT_VERSION + 1;
-  }*/
 
   private OMRequest aCreateKeyRequest(int clientVersion) {
     return aRequest(CreateKey, clientVersion);
@@ -389,15 +324,7 @@ public class TestRequestValidations {
       calledMethods = new ArrayList<>();
     }
 
-    public void assertCalled(String... methodNames) {
-      for (String methodName : methodNames) {
-        if (!calledMethods.contains(methodName)) {
-          fail("Expected method call for " + methodName + " did not happened.");
-        }
-      }
-    }
-
-    public void assertAllCalled(String... methodNames) {
+    public void assertExactListOfValidatorsCalled(String... methodNames) {
       List<String> calls = new ArrayList<>(calledMethods);
       for (String methodName : methodNames) {
         if (!calls.remove(methodName)) {
