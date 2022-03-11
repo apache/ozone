@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
@@ -135,7 +135,7 @@ public class TestPipelineDatanodesIntersection {
         Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-            ClientVersions.CURRENT_VERSION);
+            ClientVersion.CURRENT_VERSION);
         stateManager.addPipeline(pipelineProto);
         nodeManager.addPipeline(pipeline);
         List<Pipeline> overlapPipelines = RatisPipelineUtils

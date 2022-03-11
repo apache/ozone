@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 
@@ -62,7 +63,6 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status.OK;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -103,7 +103,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   private SCMBlockLocationRequest.Builder createSCMBlockRequest(Type cmdType) {
     return SCMBlockLocationRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setTraceID(TracingUtil.exportCurrentSpan());
   }
 

@@ -99,6 +99,7 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -111,7 +112,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -155,7 +155,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     try {
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
-          .setVersion(CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT_VERSION)
           .setTraceID(TracingUtil.exportCurrentSpan());
       builderConsumer.accept(builder);
       ScmContainerLocationRequest wrapper = builder.build();
