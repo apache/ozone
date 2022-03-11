@@ -133,9 +133,6 @@ public class BackgroundPipelineCreator implements SCMService {
         .setDaemon(false)
         .setNameFormat(THREAD_NAME + " - %d")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
-          // gracefully shutdown SCM.
-          scmContext.getScm().stop();
-
           String message = "Terminate SCM, encounter uncaught exception"
               + " in RatisPipelineUtilsThread";
           ExitUtils.terminate(1, message, ex, LOG);
