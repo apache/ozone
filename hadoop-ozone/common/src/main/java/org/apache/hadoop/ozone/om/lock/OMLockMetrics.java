@@ -23,7 +23,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -35,8 +35,8 @@ public class OMLockMetrics {
   private static final String SOURCE_NAME =
       OMLockMetrics.class.getSimpleName();
 
-  private @Metric MutableGaugeLong longestReadLockWaitingTimeMs;
-  private @Metric MutableGaugeLong longestReadLockHeldTimeMs;
+  private @Metric MutableStat readLockWaitingTimeMsStat;
+  private @Metric MutableStat readLockHeldTimeMsStat;
   private @Metric MutableCounterLong numReadLockLongWaiting;
   private @Metric MutableCounterLong numReadLockLongHeld;
 
@@ -60,23 +60,21 @@ public class OMLockMetrics {
   }
 
   /**
-   * Sets the longest time (ms) a read lock was waiting since the last
-   * measurement.
+   * Adds a snapshot to the metric readLockWaitingTimeMsStat.
    *
-   * @param longestReadLockWaitingTimeMs longest read lock waiting time (ms)
+   * @param readLockWaitingTimeMs read lock waiting time (ms)
    */
-  public void setLongestReadLockWaitingTimeMs(
-      long longestReadLockWaitingTimeMs) {
-    this.longestReadLockWaitingTimeMs.set(longestReadLockWaitingTimeMs);
+  public void setReadLockWaitingTimeMsStat(long readLockWaitingTimeMs) {
+    this.readLockWaitingTimeMsStat.add(readLockWaitingTimeMs);
   }
 
   /**
-   * Sets the longest time (ms) a read lock was held since the last measurement.
+   * Adds a snapshot to the metric readLockHeldTimeMsStat.
    *
-   * @param longestReadLockHeldTimeMs longest read lock held time (ms)
+   * @param readLockHeldTimeMs read lock held time (ms)
    */
-  public void setLongestReadLockHeldTimeMs(long longestReadLockHeldTimeMs) {
-    this.longestReadLockHeldTimeMs.set(longestReadLockHeldTimeMs);
+  public void setReadLockHeldTimeMsStat(long readLockHeldTimeMs) {
+    this.readLockHeldTimeMsStat.add(readLockHeldTimeMs);
   }
 
   /**
@@ -96,13 +94,35 @@ public class OMLockMetrics {
   }
 
   /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  public String getReadLockWaitingTimeMsStat() {
+    return readLockWaitingTimeMsStat.toString();
+  }
+
+  /**
    * Returns the longest time (ms) a read lock was waiting since the last
    * measurement.
    *
    * @return longest read lock waiting time (ms)
    */
   public long getLongestReadLockWaitingTimeMs() {
-    return longestReadLockWaitingTimeMs.value();
+    return (long) readLockWaitingTimeMsStat.lastStat().max();
+  }
+
+  /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  public String getReadLockHeldTimeMsStat() {
+    return readLockHeldTimeMsStat.toString();
   }
 
   /**
@@ -112,7 +132,7 @@ public class OMLockMetrics {
    * @return longest read lock held time (ms)
    */
   public long getLongestReadLockHeldTimeMs() {
-    return longestReadLockHeldTimeMs.value();
+    return (long) readLockHeldTimeMsStat.lastStat().max();
   }
 
   /**

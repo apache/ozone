@@ -208,28 +208,23 @@ public class OzoneManagerLock {
   private void updateReadLockMetrics(Resource resource, String lockType,
                                      long startWaitingTimeNanos) {
     if (lockType.equals(READ_LOCK)) {
-      long longestReadWaitingTimeNanos =
+      long readLockWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
 
-      // updates longestReadLockWaitingTimeMs if read lock waiting time is
-      // greater than the previous measurement.
-      if (omLockMetrics.getLongestReadLockWaitingTimeMs() <
-          TimeUnit.NANOSECONDS.toMillis(
-              longestReadWaitingTimeNanos)) {
-        omLockMetrics.setLongestReadLockWaitingTimeMs(
-            TimeUnit.NANOSECONDS.toMillis(longestReadWaitingTimeNanos));
-      }
+      // Adds a snapshot to the metric readLockWaitingTimeMsStat.
+      omLockMetrics.setReadLockWaitingTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
 
-      // increments numReadLockLongWaiting if read lock has been waiting longer
+      // Increments numReadLockLongWaiting if read lock has been waiting longer
       // than the threshold.
-      if (TimeUnit.NANOSECONDS.toMillis(
-          longestReadWaitingTimeNanos) >= this.readLockReportingThresholdMs) {
+      if (TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos) >=
+          this.readLockReportingThresholdMs) {
         omLockMetrics.incNumReadLockLongWaiting();
         LOG.warn(
             "Read lock waiting time {} ms is longer than default threshold " +
                 "configuration {} = {} ms",
             TimeUnit.NANOSECONDS.toMillis(
-                longestReadWaitingTimeNanos),
+                readLockWaitingTimeNanos),
             OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
             this.readLockReportingThresholdMs);
       }
@@ -435,28 +430,23 @@ public class OzoneManagerLock {
 
   private void updateReadUnlockMetrics(Resource resource, String lockType) {
     if (lockType.equals(READ_LOCK)) {
-      long longestReadHeldTimeNanos =
+      long readLockHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
-      // updates longestReadLockHeldTimeMs if read lock held time is greater
-      // than the previous measurement.
-      if (omLockMetrics.getLongestReadLockHeldTimeMs() <
-          TimeUnit.NANOSECONDS.toMillis(
-              longestReadHeldTimeNanos)) {
-        omLockMetrics.setLongestReadLockHeldTimeMs(
-            TimeUnit.NANOSECONDS.toMillis(longestReadHeldTimeNanos));
-      }
+      // Adds a snapshot to the metric readLockHeldTimeMsStat.
+      omLockMetrics.setReadLockHeldTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
 
-      // increments numReadLockLongHeld if read lock has been held longer than
+      // Increments numReadLockLongHeld if read lock has been held longer than
       // the threshold.
-      if (TimeUnit.NANOSECONDS.toMillis(
-          longestReadHeldTimeNanos) >= this.readLockReportingThresholdMs) {
+      if (TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos) >=
+          this.readLockReportingThresholdMs) {
         omLockMetrics.incNumReadLockLongHeld();
         LOG.warn(
             "Read lock held time {} ms is longer than default threshold " +
                 "configuration {} = {} ms",
             TimeUnit.NANOSECONDS.toMillis(
-                longestReadHeldTimeNanos),
+                readLockHeldTimeNanos),
             OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
             this.readLockReportingThresholdMs);
       }
@@ -475,6 +465,18 @@ public class OzoneManagerLock {
   }
 
   /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  @VisibleForTesting
+  public String getReadLockWaitingTimeMsStat() {
+    return omLockMetrics.getReadLockWaitingTimeMsStat();
+  }
+
+  /**
    * Returns the longest time (ms) a read lock was waiting since the last
    * measurement.
    *
@@ -483,6 +485,18 @@ public class OzoneManagerLock {
   @VisibleForTesting
   public long getLongestReadLockWaitingTimeMs() {
     return omLockMetrics.getLongestReadLockWaitingTimeMs();
+  }
+
+  /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  @VisibleForTesting
+  public String getReadLockHeldTimeMsStat() {
+    return omLockMetrics.getReadLockHeldTimeMsStat();
   }
 
   /**
