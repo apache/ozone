@@ -53,7 +53,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -187,7 +187,7 @@ public class TestKeyManagerImpl {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setNetworkTopology(clusterMap);
-    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
     scm = HddsTestUtils.getScm(conf, configurator);
     scm.start();

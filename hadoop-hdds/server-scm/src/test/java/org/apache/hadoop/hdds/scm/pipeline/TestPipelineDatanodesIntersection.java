@@ -27,14 +27,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
@@ -113,7 +113,7 @@ public class TestPipelineDatanodesIntersection {
     NodeManager nodeManager = new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    SCMHAManager scmhaManager = MockSCMHAManager.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
 
     PipelineStateManager stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
@@ -135,7 +135,7 @@ public class TestPipelineDatanodesIntersection {
         Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-            ClientVersions.CURRENT_VERSION);
+            ClientVersion.CURRENT_VERSION);
         stateManager.addPipeline(pipelineProto);
         nodeManager.addPipeline(pipeline);
         List<Pipeline> overlapPipelines = RatisPipelineUtils

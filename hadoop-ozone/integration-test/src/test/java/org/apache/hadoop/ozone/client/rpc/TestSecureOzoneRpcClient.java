@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
@@ -70,7 +71,6 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
@@ -244,7 +244,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
         .setCreateVolumeRequest(CreateVolumeRequest.newBuilder().
             setVolumeInfo(VolumeInfo.newBuilder().setVolume(volumeName)
@@ -266,7 +266,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     // Read Request
     OMRequest readRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
         .setInfoVolumeRequest(InfoVolumeRequest.newBuilder()
             .setVolumeName(volumeName).build())

@@ -32,8 +32,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -117,7 +117,7 @@ public class TestPipelineManagerImpl {
   private PipelineManagerImpl createPipelineManager(boolean isLeader)
       throws IOException {
     return PipelineManagerImpl.newPipelineManager(conf,
-        MockSCMHAManager.getInstance(isLeader),
+        SCMHAManagerStub.getInstance(isLeader),
         new MockNodeManager(true, 20),
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
@@ -128,7 +128,7 @@ public class TestPipelineManagerImpl {
   private PipelineManagerImpl createPipelineManager(
       boolean isLeader, SCMHADBTransactionBuffer buffer) throws IOException {
     return PipelineManagerImpl.newPipelineManager(conf,
-        MockSCMHAManager.getInstance(isLeader, buffer),
+        SCMHAManagerStub.getInstance(isLeader, buffer),
         new MockNodeManager(true, 20),
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
@@ -139,7 +139,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testCreatePipeline() throws Exception {
     SCMHADBTransactionBuffer buffer1 =
-        new MockSCMHADBTransactionBuffer(dbStore);
+        new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer1);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
@@ -156,7 +156,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
 
     SCMHADBTransactionBuffer buffer2 =
-        new MockSCMHADBTransactionBuffer(dbStore);
+        new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
@@ -189,7 +189,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testUpdatePipelineStates() throws Exception {
-    SCMHADBTransactionBuffer buffer = new MockSCMHADBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =
@@ -243,8 +243,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
-    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
+    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
+    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.openPipeline(pipeline.getId());
     } catch (NotLeaderException ex) {
@@ -264,8 +264,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
-    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
+    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
+    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.activatePipeline(pipeline.getId());
     } catch (NotLeaderException ex) {
@@ -285,8 +285,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
-    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
+    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
+    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.deactivatePipeline(pipeline.getId());
     } catch (NotLeaderException ex) {
@@ -357,8 +357,8 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
     Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
     // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
-    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
+    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
+    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
     try {
       pipelineManager.closePipeline(pipeline, false);
     } catch (NotLeaderException ex) {
@@ -478,7 +478,7 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
     SCMHADBTransactionBuffer buffer1 =
-        new MockSCMHADBTransactionBuffer(dbStore);
+        new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer1);
 
@@ -579,8 +579,8 @@ public class TestPipelineManagerImpl {
             Pipeline.PipelineState.ALLOCATED).contains(pipeline));
 
     // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof MockSCMHAManager;
-    ((MockSCMHAManager) pipelineManager.getScmhaManager()).setIsLeader(false);
+    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
+    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
 
     try {
       pipelineManager
@@ -670,7 +670,7 @@ public class TestPipelineManagerImpl {
   public void testAddContainerWithClosedPipeline() throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
             captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
-    SCMHADBTransactionBuffer buffer = new MockSCMHADBTransactionBuffer(dbStore);
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
             createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =

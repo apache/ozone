@@ -15,24 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone;
+package org.apache.hadoop.hdds;
 
 /**
- * Versioning for protocol clients.
+ * Base type for component version enums.
  */
-public final class ClientVersions {
+public interface ComponentVersion {
 
-  // old client, doesn't even send version number in requests
-  public static final int DEFAULT_VERSION = 0;
+  /**
+   * Returns the description of the version enum value.
+   * @return the description of the version enum value.
+   */
+  String description();
 
-  // DatanodeDetails#getFromProtobuf handles unknown types of ports
-  public static final int VERSION_HANDLES_UNKNOWN_DN_PORTS = 1;
-
-  // this should always point to the latest version
-  public static final int CURRENT_VERSION = VERSION_HANDLES_UNKNOWN_DN_PORTS;
-
-  private ClientVersions() {
-    // no instances
-  }
-
+  /**
+   * Returns the value that represents the enum in a protocol message
+   * transferred over the wire.
+   * @return the version associated with the enum value.
+   */
+  int toProtoValue();
 }

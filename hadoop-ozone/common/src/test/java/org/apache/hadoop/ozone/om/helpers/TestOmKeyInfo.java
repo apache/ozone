@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -35,7 +36,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 
 /**
@@ -58,8 +58,8 @@ public class TestOmKeyInfo {
         .addMetadata("key2", "value2")
         .build();
 
-    OmKeyInfo keyAfterSerialization =
-        OmKeyInfo.getFromProtobuf(key.getProtobuf(CURRENT_VERSION));
+    OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
+        key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
     Assert.assertEquals(key, keyAfterSerialization);
   }

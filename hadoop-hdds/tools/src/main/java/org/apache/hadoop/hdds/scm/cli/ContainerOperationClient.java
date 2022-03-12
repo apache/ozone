@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
@@ -56,7 +57,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -276,7 +276,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName, CURRENT_VERSION);
+        queryScope, poolName, ClientVersion.CURRENT_VERSION);
   }
 
   @Override
@@ -620,7 +620,7 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
-        uuid, CURRENT_VERSION);
+        uuid, ClientVersion.CURRENT_VERSION);
   }
 
   /**
@@ -636,7 +636,7 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count,
-        CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
   }
 
   @Override
