@@ -15,8 +15,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+
 
 @CommandLine.Command(name = "wtb",
         aliases = "write-throughput-benchmark",
@@ -24,7 +23,8 @@ import java.util.concurrent.Executors;
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
-public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements Callable<Void>{
+public class WriteFileThroughputBenchmark extends BaseFreonGenerator
+        implements Callable<Void>{
 
     @Option(names = {"-o"},
             description = "Ozone filesystem path",
@@ -36,13 +36,14 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
             defaultValue = "1")
     private long fileSize;
 
-    @Option(names = {"-b", "--block"},
+    @Option(names = {"-bl", "--block"},
             description = "Specify the Block Size in MB",
             defaultValue = "128")
     private long blockSize;
 
-    @Option(names = {"-i", "--buffer"},
-            description = "Size of buffer used store the generated key content",
+    @Option(names = {"-bu", "--buffer"},
+            description = "Size of buffer used store the generated " +
+                    "key content",
             defaultValue = "10240")
     private int bufferSize;
 
@@ -53,17 +54,19 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
 
     @Option(names = {"-re", "--replication"},
             description = "Specify the Replication factor",
-            defaultValue = "3")
+            defaultValue = "1")
     private short replication;
 
     @Option(names= {"--sync"},
-            description = "Optionally Issue hsync after every write Cannot be used with hflush",
+            description = "Optionally Issue hsync after every write " +
+                    "Cannot be used with hflush",
             defaultValue = "false"
     )
     private boolean hSync;
 
     @Option(names= {"--flush"},
-            description = "Optionally Issue hsync after every write Cannot be used with hflush",
+            description = "Optionally Issue hsync after every write " +
+                    "Cannot be used with hflush",
             defaultValue = "false"
     )
     private boolean hFlush;
@@ -75,6 +78,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
 
     private URI uri;
 
+    // variable to check if the user wants a delay
     private boolean isThrottled;
 
     long expectedIoTimeNs;
@@ -86,15 +90,6 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
 
     public static final Logger LOG =
             LoggerFactory.getLogger(WriteFileThroughputBenchmark.class);
-
-    // Checking whether an output directory is created inside the bucket
-    private static void ensureOutputDirExists(FileSystem fs, Path outputDir)
-            throws IOException {
-        if (!fs.exists(outputDir)) {
-            LOG.error("No Such Output Directory exists : {}", outputDir);
-            System.exit(1);
-        }
-    }
 
 
     public Void call() throws Exception{
@@ -113,11 +108,11 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
             LOG.info("Hflush after every write= True");
         }
 
-        // Initialize the configuration variable
+        // Initialize the configuration variable with
+        // OzoneFS configuration
         configuration = createOzoneConfiguration();
 
-        //Constructs a URI by parsing the given string rootPath
-        // We Initialize the uri variable with the path
+        //Constructs a URI object by parsing the given string rootPath
         uri = URI.create(rootPath);
 
         // Disabling the file system cache
@@ -126,7 +121,8 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
         print("Disabling FS cache: " + disableCacheName);
         configuration.setBoolean(disableCacheName, true);
 
-        Path file = new Path(rootPath + "/" + generateObjectName(0));
+        Path file = new Path(rootPath + "/" +
+                generateObjectName(0));
         try (FileSystem fileSystem = threadLocalFileSystem.get()) {
             fileSystem.mkdirs(file.getParent());
         }
@@ -135,8 +131,8 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
 
         // Initialize the size of the file to be written in Bytes
         long filesizeinBytes = fileSize*1_000_000_000;
-        contentGenerator =  new ContentGenerator(filesizeinBytes, bufferSize,
-                hSync, hFlush);
+        contentGenerator =  new ContentGenerator(filesizeinBytes,
+                bufferSize, hSync, hFlush);
 
         expectedIoTimeNs =
                 (isThrottled ? (((long) bufferSize * 1_000_000_000) / throttle)
@@ -169,8 +165,6 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
         });
     }
 
-
-
     private FileSystem createFS() {
         try {
             return FileSystem.get(uri, configuration);
@@ -178,14 +172,27 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
             throw new UncheckedIOException(e);
         }
     }
-    static void enforceThrottle(long ioTimeNs, long expectedIoTimeNs)
-            throws InterruptedException {
+
+    // Method to cause the delay of a certain amount
+    static void enforceThrottle(long ioTimeNs, long expectedIoTimeNs) throws
+            InterruptedException {
         if (ioTimeNs < expectedIoTimeNs) {
             // The IO completed too fast, so sleep for some time.
             long sleepTimeNs = expectedIoTimeNs - ioTimeNs;
-            Thread.sleep(sleepTimeNs / 1_000_000, (int) (sleepTimeNs % 1_000_000));
+            Thread.sleep(sleepTimeNs / 1_000_000, (int)
+                    (sleepTimeNs % 1_000_000));
         }
     }
+
+    // Checking whether an output directory is created inside the bucket
+    private static void ensureOutputDirExists(FileSystem fs, Path outputDir)
+            throws IOException {
+        if (!fs.exists(outputDir)) {
+            LOG.error("No Such Output Directory exists : {}", outputDir);
+            System.exit(1);
+        }
+    }
+
     @Override
     protected void taskLoopCompleted() {
         FileSystem fileSystem = threadLocalFileSystem.get();
@@ -196,4 +203,3 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator implements 
         }
     }
 }
-
