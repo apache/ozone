@@ -22,7 +22,6 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -37,8 +36,6 @@ public class OMLockMetrics {
 
   private @Metric MutableStat readLockWaitingTimeMsStat;
   private @Metric MutableStat readLockHeldTimeMsStat;
-  private @Metric MutableCounterLong numReadLockLongWaiting;
-  private @Metric MutableCounterLong numReadLockLongHeld;
 
   /**
    * Registers OMLockMetrics source.
@@ -75,22 +72,6 @@ public class OMLockMetrics {
    */
   public void setReadLockHeldTimeMsStat(long readLockHeldTimeMs) {
     this.readLockHeldTimeMsStat.add(readLockHeldTimeMs);
-  }
-
-  /**
-   * Increments number of times the read lock has been waiting longer than
-   * the default threshold configuration.
-   */
-  public void incNumReadLockLongWaiting() {
-    numReadLockLongWaiting.incr();
-  }
-
-  /**
-   * Increments number of times the read lock has been held longer than the
-   * default threshold configuration.
-   */
-  public void incNumReadLockLongHeld() {
-    numReadLockLongHeld.incr();
   }
 
   /**
@@ -133,25 +114,5 @@ public class OMLockMetrics {
    */
   public long getLongestReadLockHeldTimeMs() {
     return (long) readLockHeldTimeMsStat.lastStat().max();
-  }
-
-  /**
-   * Returns number of times the read lock has been waiting longer than the
-   * default threshold configuration.
-   *
-   * @return number of times read lock waiting time crossed default threshold
-   */
-  public long getNumReadLockLongWaiting() {
-    return numReadLockLongWaiting.value();
-  }
-
-  /**
-   * Returns number of times the read lock has been held longer than the default
-   * threshold configuration.
-   *
-   * @return number of times read lock held time crossed default threshold
-   */
-  public long getNumReadLockLongHeld() {
-    return numReadLockLongHeld.value();
   }
 }
