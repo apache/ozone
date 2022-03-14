@@ -477,6 +477,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     return auditMap;
   }
 
+
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyName) throws OMException {
     if (enableFileSystemPaths) {

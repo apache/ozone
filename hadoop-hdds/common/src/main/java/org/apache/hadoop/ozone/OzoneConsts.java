@@ -355,7 +355,6 @@ public final class OzoneConsts {
       Metadata.Key.of(OZONE_USER, ASCII_STRING_MARSHALLER);
 
   public static final String RPC_PORT = "RPC";
-  public static final String RATIS_PORT = "RATIS_PORT";
 
   // Default OMServiceID for OM Ratis servers to use as RaftGroupId
   public static final String OM_SERVICE_ID_DEFAULT = "omServiceIdDefault";
@@ -363,11 +362,6 @@ public final class OzoneConsts {
 
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";
-
-  public static final String OZONE_OM_SERVICE_HOSTNAME = "omServiceHostname";
-  public static final String OZONE_OM_SERVICE_PORT_TYPE = "omServicePortType";
-  public static final String OZONE_OM_SERVICE_PORT_TYPE_HTTP = "http";
-  public static final String OZONE_OM_SERVICE_PORT_TYPE_HTTPS = "https";
 
 
   public static final int S3_BUCKET_MIN_LENGTH = 3;
