@@ -108,7 +108,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private Set<Integer> failedDataIndexes = new HashSet<>();
   private ByteBufferPool byteBufferPool;
 
-  private final RawErasureDecoder decoder;
+  private RawErasureDecoder decoder;
 
   private boolean initialized = false;
 
@@ -125,11 +125,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         refreshFunction, streamFactory);
     this.byteBufferPool = byteBufferPool;
     this.executor = ecReconstructExecutor;
-    decoder = CodecUtil.createRawDecoderWithFallback(repConfig);
-
-    // The EC decoder needs an array data+parity long, with missing or not
-    // needed indexes set to null.
-    decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
   }
 
   /**
@@ -160,6 +155,14 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   protected void init() throws InsufficientLocationsException {
+    if (decoder == null) {
+      decoder = CodecUtil.createRawDecoderWithFallback(getRepConfig());
+    }
+    if (decoderInputBuffers == null) {
+      // The EC decoder needs an array data+parity long, with missing or not
+      // needed indexes set to null.
+      decoderInputBuffers = new ByteBuffer[getRepConfig().getRequiredNodes()];
+    }
     if (!hasSufficientLocations()) {
       throw new InsufficientLocationsException("There are insufficient " +
           "datanodes to read the EC block");
@@ -578,12 +581,14 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     // Inside this class, we only allocate buffers to read parity into. Data
     // is reconstructed or read into a set of buffers passed in from the calling
     // class. Therefore we only need to ensure we free the parity buffers here.
-    for (int i = getRepConfig().getData();
-         i < getRepConfig().getRequiredNodes(); i++) {
-      ByteBuffer buf = decoderInputBuffers[i];
-      if (buf != null) {
-        byteBufferPool.putBuffer(buf);
-        decoderInputBuffers[i] = null;
+    if (decoderInputBuffers != null) {
+      for (int i = getRepConfig().getData();
+           i < getRepConfig().getRequiredNodes(); i++) {
+        ByteBuffer buf = decoderInputBuffers[i];
+        if (buf != null) {
+          byteBufferPool.putBuffer(buf);
+          decoderInputBuffers[i] = null;
+        }
       }
     }
   }
