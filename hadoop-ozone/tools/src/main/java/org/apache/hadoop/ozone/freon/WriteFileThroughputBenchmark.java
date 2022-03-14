@@ -16,7 +16,9 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.concurrent.Callable;
 
-
+/**
+ * File Generator for populating the cluster with random files
+ */
 @CommandLine.Command(name = "wtb",
     aliases = "write-throughput-benchmark",
     description = "Benchmark for creating a file",
