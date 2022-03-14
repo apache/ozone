@@ -28,6 +28,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -38,13 +42,17 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -67,6 +75,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -146,14 +155,22 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    * */
   @Test
   public void testPutKeySuccessWithBlockToken() throws Exception {
+    testPutKeySuccessWithBlockTokenWithBucketLayout(BucketLayout.OBJECT_STORE);
+    testPutKeySuccessWithBlockTokenWithBucketLayout(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  private void testPutKeySuccessWithBlockTokenWithBucketLayout(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     Instant testStartTime = Instant.now();
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     String value = "sample value";
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    volume.createBucket(bucketName,
+        new BucketArgs.Builder().setBucketLayout(bucketLayout).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     for (int i = 0; i < 10; i++) {
@@ -177,6 +194,30 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         is.read(fileContent);
       }
 
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+      String bucketId = String.valueOf(
+          omMetadataManager.getBucketTable().get(bucketKey).getObjectID());
+      String keyPrefix =
+          bucketLayout.isFileSystemOptimized() ? bucketId : bucketKey;
+      Table table = omMetadataManager.getKeyTable(bucketLayout);
+
+      // Check table entry.
+      try (
+          TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+              keyIterator = table.iterator()) {
+        Table.KeyValue<String, OmKeyInfo> kv =
+            keyIterator.seek(keyPrefix + "/" + keyName);
+
+        CacheValue<OmKeyInfo> cacheValue =
+            table.getCacheValue(new CacheKey(kv.getKey()));
+        if (cacheValue != null) {
+          assertTokenIsNull(cacheValue.getCacheValue());
+        } else {
+          assertTokenIsNull(kv.getValue());
+        }
+      }
+
+
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.RATIS,
           ReplicationFactor.ONE));
@@ -184,6 +225,15 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
+  }
+
+  private void assertTokenIsNull(OmKeyInfo value) {
+    value.getKeyLocationVersions()
+        .forEach(
+            keyLocationInfoGroup -> keyLocationInfoGroup.getLocationList()
+                .forEach(
+                    keyLocationInfo -> Assert.assertNull(keyLocationInfo
+                        .getToken())));
   }
 
   /**

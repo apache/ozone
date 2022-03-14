@@ -109,10 +109,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
 
-      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
-      }
+      List<OmKeyLocationInfo>
+          locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
       bucketLockAcquired =
               omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
