@@ -18,8 +18,13 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * This class is used for storing Ozone tenant accessId info.
@@ -43,18 +48,22 @@ public final class OmDBAccessIdInfo {
    */
   private final boolean isDelegatedAdmin;
   /**
-   * Role name of the user (that this access ID is assigned to) in this tenant.
-   * e.g. "user", "admin", "auditor"
+   * Role names of the user (that this access ID is assigned to) in this tenant.
+   * e.g. OzoneConsts.TENANT_ROLE_USER, OzoneConsts.TENANT_ROLE_ADMIN,
+   *      or other custom role names.
    */
-  private final String roleId;
+  private final Set<String> roleIds;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmDBAccessIdInfo.class);
 
   public OmDBAccessIdInfo(String tenantId, String userPrincipal,
-      boolean isAdmin, boolean isDelegatedAdmin, String roleId) {
+      boolean isAdmin, boolean isDelegatedAdmin, Set<String> roleId) {
     this.tenantId = tenantId;
     this.userPrincipal = userPrincipal;
     this.isAdmin = isAdmin;
     this.isDelegatedAdmin = isDelegatedAdmin;
-    this.roleId = roleId;
+    this.roleIds = roleId;
   }
 
   public String getTenantId() {
@@ -70,7 +79,7 @@ public final class OmDBAccessIdInfo {
         .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
         .setIsDelegatedAdmin(isDelegatedAdmin)
-        .setRoleId(roleId)
+        .addAllRoleIds(roleIds)
         .build();
   }
 
@@ -85,7 +94,7 @@ public final class OmDBAccessIdInfo {
         .setUserPrincipal(infoProto.getUserPrincipal())
         .setIsAdmin(infoProto.getIsAdmin())
         .setIsDelegatedAdmin(infoProto.getIsDelegatedAdmin())
-        .setRoleId(infoProto.getRoleId())
+        .setRoleIds(infoProto.getRoleIdsList())
         .build();
   }
 
@@ -101,6 +110,28 @@ public final class OmDBAccessIdInfo {
     return isDelegatedAdmin;
   }
 
+  public Set<String> getRoleIdsSet() {
+    return roleIds;
+  }
+
+  public OmDBAccessIdInfo addRoleId(String roleId) {
+    if (roleIds.contains(roleId)) {
+      LOG.warn("Role ID '" + roleId + "' already exists. Ignored addRoleId");
+    } else {
+      roleIds.add(roleId);
+    }
+    return this;
+  }
+
+  public OmDBAccessIdInfo removeRoleId(String roleId) {
+    if (roleIds.contains(roleId)) {
+      roleIds.remove(roleId);
+    } else {
+      LOG.warn("Role ID '" + roleId + "' doesn't exist. Ignored removeRoleId");
+    }
+    return this;
+  }
+
   /**
    * Builder for OmDBAccessIdInfo.
    */
@@ -108,7 +139,7 @@ public final class OmDBAccessIdInfo {
   public static final class Builder {
     private String tenantId;
     private String userPrincipal;
-    private String roleId;
+    private Set<String> roleIds;
     private boolean isAdmin;
     private boolean isDelegatedAdmin;
 
@@ -132,14 +163,28 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
-    public Builder setRoleId(String roleId) {
-      this.roleId = roleId;
+    public Builder setRoleIds(Set<String> roleIds) {
+      this.roleIds = roleIds;
+      return this;
+    }
+
+    public Builder setRoleIds(List<String> roleIds) {
+      // Convert list to set
+      this.roleIds = new HashSet<>(roleIds);
+      return this;
+    }
+
+    public Builder addRoleId(String roleId) {
+      if (roleIds == null) {
+        roleIds = new HashSet<>();
+      }
+      this.roleIds.add(roleId);
       return this;
     }
 
     public OmDBAccessIdInfo build() {
       return new OmDBAccessIdInfo(
-          tenantId, userPrincipal, isAdmin, isDelegatedAdmin, roleId);
+          tenantId, userPrincipal, isAdmin, isDelegatedAdmin, roleIds);
     }
   }
 }

@@ -346,7 +346,9 @@ public final class OzoneConsts {
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
   public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
   // Predefined tenant roles
+  // Tenant user role. All tenant users are assigned this role by default
   public static final String TENANT_ROLE_USER = "user";
+  // Tenant admin role. All tenant admins are assigned this role
   public static final String TENANT_ROLE_ADMIN = "admin";
 
   // For OM metrics saving to a file

@@ -1415,40 +1415,39 @@ message TenantInfo {
 }
 
 message TenantUserPrincipalInfo {
-  repeated string accessIds = 1;
+    repeated string accessIds = 1;
 }
 
 // For storing extended access ID information (related to a tenant) to OM DB
 // Does not include the access ID value itself
 message ExtendedAccessIdInfo {
-  optional string tenantId = 1;
-  optional string userPrincipal = 2;
-  optional bool isAdmin = 3;
-  optional bool isDelegatedAdmin = 4;
-  optional string roleId = 5;
+    optional string tenantId = 1;
+    optional string userPrincipal = 2;
+    optional bool isAdmin = 3;
+    optional bool isDelegatedAdmin = 4;
+    repeated string roleIds = 5;
 }
 
 // For `tenant user info` to store access ID along with its tenant-related info
 message TenantAccessIdInfo {
-  optional string accessId = 1;
-  optional string tenantId = 2;
-  optional bool isAdmin = 3;
-  optional bool isDelegatedAdmin = 4;
+    optional string accessId = 1;
+    optional string tenantId = 2;
+    optional bool isAdmin = 3;
+    optional bool isDelegatedAdmin = 4;
 }
 
 message TenantUserInfo {
-  optional string userPrincipal = 1;
-  repeated TenantAccessIdInfo accessIdInfo = 2;
+    optional string userPrincipal = 1;
+    repeated TenantAccessIdInfo accessIdInfo = 2;
 }
 
 // For `tenant user list` to store all access IDs assigned to the tenant
 message TenantUserAccessId {
-  optional string userPrincipal = 1;
-  optional string accessId = 2;
-  optional bool isAdmin = 3;
-  optional bool isDelegatedAdmin = 4;
+    optional string userPrincipal = 1;
+    optional string accessId = 2;
+    optional bool isAdmin = 3;
+    optional bool isDelegatedAdmin = 4;
 }
-
 
 message ListTenantRequest {
 
@@ -1475,7 +1474,6 @@ message TenantListUserResponse {
     optional string tenantId = 1;
     repeated TenantUserAccessId userAccessIdInfo = 2;
 }
-
 
 message LayoutVersion {
   required uint64 version = 1;

@@ -161,24 +161,27 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
 
-      final OmDBAccessIdInfo oldAccessIdInfo =
+      final OmDBAccessIdInfo dbAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
 
-      if (oldAccessIdInfo == null) {
+      if (dbAccessIdInfo == null) {
         throw new OMException("OmDBAccessIdInfo entry is missing for accessId '"
-            + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
+            + accessId + "'", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert (oldAccessIdInfo.getTenantId().equals(tenantId));
+      assert (dbAccessIdInfo.getTenantId().equals(tenantId));
+
+      // Remove the admin role from OmDBAccessIdInfo we got previously in-place
+      dbAccessIdInfo.removeRoleId(OzoneConsts.TENANT_ROLE_ADMIN);
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-              .setTenantId(oldAccessIdInfo.getTenantId())
-              .setUserPrincipal(oldAccessIdInfo.getUserPrincipal())
+              .setTenantId(dbAccessIdInfo.getTenantId())
+              .setUserPrincipal(dbAccessIdInfo.getUserPrincipal())
               .setIsAdmin(false)
               .setIsDelegatedAdmin(false)
-              .setRoleId(OzoneConsts.TENANT_ROLE_USER)
+              .setRoleIds(dbAccessIdInfo.getRoleIdsSet())
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),

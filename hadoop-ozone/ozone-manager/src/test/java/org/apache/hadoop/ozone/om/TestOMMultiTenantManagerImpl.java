@@ -24,6 +24,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import com.google.common.base.Optional;
 
@@ -76,7 +77,7 @@ public class TestOMMultiTenantManagerImpl {
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
         new OmDBAccessIdInfo(tenantName, "seed-user1", false, false,
-            OzoneConsts.TENANT_ROLE_USER));
+            new HashSet<String>() {{ add(OzoneConsts.TENANT_ROLE_USER); }}));
 
     OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
     Mockito.when(ozoneManager.getMetadataManager())
