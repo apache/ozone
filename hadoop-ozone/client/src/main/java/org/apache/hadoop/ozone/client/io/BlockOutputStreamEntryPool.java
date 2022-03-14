@@ -23,14 +23,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
+import org.apache.hadoop.ozone.client.checksum.ReplicatedFileChecksumHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -334,11 +338,61 @@ public class BlockOutputStreamEntryPool {
         commitUploadPartInfo =
             omClient.commitMultipartUploadPart(keyArgs, openID);
       } else {
+        keyArgs.setFileChecksum(getFileChecksum(length));
         omClient.commitKey(keyArgs, openID);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
     }
+  }
+
+  /**
+   * The helper class to compute file checksum for replicated files for
+   * output stream.
+   */
+  public static class ReplicatedFileChecksumCommitHelper extends
+      ReplicatedFileChecksumHelper {
+    long length;
+    List<BlockOutputStreamEntry> streamEntries;
+    ReplicatedFileChecksumCommitHelper(
+        long len,
+        List<BlockOutputStreamEntry> entries) {
+      super();
+      this.length = len;
+      this.streamEntries = entries;
+    }
+
+    @Override
+    protected boolean isEmpty() {
+      return streamEntries == null || streamEntries.isEmpty();
+    }
+
+    @Override
+    protected void checksumBlocks() throws IOException {
+      long currentLength = 0;
+      for (BlockOutputStreamEntry entry : streamEntries) {
+        ContainerProtos.BlockData.Builder blockData =
+            ((RatisBlockOutputStream)entry.getOutputStream())
+                .getContainerBlockDataData();
+        List<ContainerProtos.ChunkInfo>  chunkInfoList =
+            blockData.getChunksList();
+        currentLength += entry.getLength();
+        if (currentLength > getLength()) {
+          return;
+        }
+
+        prepareBlockChecksum(chunkInfoList);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  FileChecksum getFileChecksum(long length) throws IOException {
+    // go through each BlockOutputStream
+    ReplicatedFileChecksumCommitHelper helper =
+        new ReplicatedFileChecksumCommitHelper(length, streamEntries);
+    helper.compute();
+    return helper.getFileChecksum();
   }
 
   BlockOutputStreamEntry getCurrentStreamEntry() {

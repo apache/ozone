@@ -483,6 +483,10 @@ public class BlockOutputStream extends OutputStream {
     return flushFuture;
   }
 
+  public BlockData.Builder getContainerBlockDataData() {
+    return containerBlockData;
+  }
+
   void putFlushFuture(long flushPos,
       CompletableFuture<ContainerCommandResponseProto> flushFuture) {
   }

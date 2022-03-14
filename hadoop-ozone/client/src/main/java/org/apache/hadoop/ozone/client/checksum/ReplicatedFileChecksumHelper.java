@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -46,6 +47,10 @@ import java.util.List;
  */
 public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   private int blockIdx;
+
+  public ReplicatedFileChecksumHelper() {
+
+  }
 
   public ReplicatedFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
@@ -99,21 +104,32 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     // for each block, send request
     List<ContainerProtos.ChunkInfo> chunkInfos =
         getChunkInfos(keyLocationInfo);
+
+    Preconditions.checkState(chunkInfos.size() > 0);
+
+    String blockChecksumForDebug = prepareBlockChecksum(chunkInfos);
+    ContainerProtos.ChecksumData checksumData =
+        chunkInfos.get(0).getChecksumData();
+    LOG.debug("got reply from pipeline {} for block {}: blockChecksum={}, " +
+            "blockChecksumType={}",
+        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
+        blockChecksumForDebug, checksumData.getType());
+    return true;
+  }
+
+  protected String prepareBlockChecksum(List<ContainerProtos.ChunkInfo> chunkInfos)
+      throws IOException {
     ContainerProtos.ChecksumData checksumData =
         chunkInfos.get(0).getChecksumData();
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 
     ByteBuffer blockChecksumByteBuffer = getBlockChecksumFromChunkChecksums(
-        keyLocationInfo, chunkInfos);
+        chunkInfos);
     String blockChecksumForDebug =
         populateBlockChecksumBuf(blockChecksumByteBuffer);
 
-    LOG.debug("got reply from pipeline {} for block {}: blockChecksum={}, " +
-            "blockChecksumType={}",
-        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
-        blockChecksumForDebug, checksumData.getType());
-    return true;
+    return blockChecksumForDebug;
   }
 
   // copied from BlockInputStream
@@ -166,7 +182,6 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
   // TODO: copy BlockChecksumHelper here
   ByteBuffer getBlockChecksumFromChunkChecksums(
-      OmKeyLocationInfo keyLocationInfo,
       List<ContainerProtos.ChunkInfo> chunkInfoList)
       throws IOException {
     AbstractBlockChecksumComputer blockChecksumComputer =

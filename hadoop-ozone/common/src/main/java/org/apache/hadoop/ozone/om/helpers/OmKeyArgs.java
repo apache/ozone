@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -49,6 +50,7 @@ public final class OmKeyArgs implements Auditable {
   private boolean latestVersionLocation;
   private boolean recursive;
   private boolean headOp;
+  private FileChecksum fileChecksum;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
@@ -57,7 +59,8 @@ public final class OmKeyArgs implements Auditable {
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
       List<OzoneAcl> acls, boolean sortDatanode,
-      boolean latestVersionLocation, boolean recursive, boolean headOp) {
+      boolean latestVersionLocation, boolean recursive, boolean headOp,
+      FileChecksum checksum) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -74,6 +77,7 @@ public final class OmKeyArgs implements Auditable {
     this.latestVersionLocation = latestVersionLocation;
     this.recursive = recursive;
     this.headOp = headOp;
+    this.fileChecksum = checksum;
   }
 
   public boolean getIsMultipartKey() {
@@ -112,8 +116,16 @@ public final class OmKeyArgs implements Auditable {
     return dataSize;
   }
 
+  public FileChecksum getFileChecksum() {
+    return fileChecksum;
+  }
+
   public void setDataSize(long size) {
     dataSize = size;
+  }
+
+  public void setFileChecksum(FileChecksum checksum) {
+    fileChecksum = checksum;
   }
 
   public Map<String, String> getMetadata() {
@@ -211,6 +223,7 @@ public final class OmKeyArgs implements Auditable {
     private List<OzoneAcl> acls;
     private boolean recursive;
     private boolean headOp;
+    private FileChecksum fileChecksum;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -297,12 +310,18 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setFileChecksum(FileChecksum checksum) {
+      this.fileChecksum = checksum;
+      return this;
+    }
+
     public OmKeyArgs build() {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
           replicationConfig, locationInfoList, isMultipartKey,
           multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp);
+          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp,
+          fileChecksum);
     }
 
   }

@@ -66,6 +66,10 @@ public abstract class BaseFileChecksumHelper {
   private int bytesPerCRC = -1;
   private long crcPerBlock = 0;
 
+  BaseFileChecksumHelper() {
+    this.length = 0;
+  }
+
   // initialization
   BaseFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName,
@@ -200,17 +204,26 @@ public abstract class BaseFileChecksumHelper {
      * request length is 0 or the file is empty, return one with the
      * magic entry that matches the md5 of a 32 byte zero-padded byte array.
      */
-    if (keyLocationInfos == null || keyLocationInfos.isEmpty()) {
-      // Explicitly specified here in case the default DataOutputBuffer
-      // buffer length value is changed in future.
-      final int lenOfZeroBytes = 32;
-      byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
-      MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-      fileChecksum = new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+    if (isEmpty()) {
+      fileChecksum =  createEmptyMd5Checksum();
     } else {
       checksumBlocks();
       fileChecksum = makeFinalResult();
     }
+  }
+
+  protected boolean isEmpty() {
+    return keyLocationInfos == null || keyLocationInfos.isEmpty();
+  }
+
+  protected FileChecksum createEmptyMd5Checksum() {
+    // Explicitly specified here in case the default DataOutputBuffer
+    // buffer length value is changed in future.
+    final int lenOfZeroBytes = 32;
+    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
+    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
+    fileChecksum =  new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+    return fileChecksum;
   }
 
   /**
