@@ -135,6 +135,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
         contentGenerator =  new ContentGenerator(filesizeinBytes,
                 bufferSize, hSync, hFlush);
 
+        // Initializing the time it should take to write a file
         expectedIoTimeNs =
                 (isThrottled ? (((long) bufferSize * 1_000_000_000) / throttle)
                         : 0);
