@@ -620,7 +620,7 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
-        uuid);
+        uuid, ClientVersion.CURRENT_VERSION);
   }
 
   /**
@@ -635,7 +635,8 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
-    return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count);
+    return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count,
+        ClientVersion.CURRENT_VERSION);
   }
 
   @Override
