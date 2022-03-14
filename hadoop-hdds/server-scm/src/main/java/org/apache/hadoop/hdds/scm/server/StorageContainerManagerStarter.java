@@ -57,7 +57,8 @@ public class StorageContainerManagerStarter extends GenericCli {
       LoggerFactory.getLogger(StorageContainerManagerStarter.class);
 
   public static void main(String[] args) {
-    FlexibleFQDNResolution.disableJvmNetworkAddressCacheIfRequired(new OzoneConfiguration());
+    FlexibleFQDNResolution.disableJvmNetworkAddressCacheIfRequired(
+            new OzoneConfiguration());
     new StorageContainerManagerStarter(
         new StorageContainerManagerStarter.SCMStarterHelper()).run(args);
   }

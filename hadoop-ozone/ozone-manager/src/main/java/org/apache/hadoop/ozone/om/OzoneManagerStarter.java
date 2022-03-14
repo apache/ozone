@@ -52,7 +52,8 @@ public class OzoneManagerStarter extends GenericCli {
       LoggerFactory.getLogger(OzoneManagerStarter.class);
 
   public static void main(String[] args) throws Exception {
-    FlexibleFQDNResolution.disableJvmNetworkAddressCacheIfRequired(new OzoneConfiguration());
+    FlexibleFQDNResolution.disableJvmNetworkAddressCacheIfRequired(
+            new OzoneConfiguration());
     new OzoneManagerStarter(
         new OzoneManagerStarter.OMStarterHelper()).run(args);
   }

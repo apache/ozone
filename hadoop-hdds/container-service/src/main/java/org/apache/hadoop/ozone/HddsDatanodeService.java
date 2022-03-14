@@ -152,7 +152,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public static void main(String[] args) {
     try {
-      FlexibleFQDNResolution.disableJvmNetworkAddressCacheIfRequired(new OzoneConfiguration());
+      FlexibleFQDNResolution.disableJvmNetworkAddressCacheIfRequired(
+              new OzoneConfiguration());
       Introspector.checkCompliance(DNMXBeanImpl.class);
       HddsDatanodeService hddsDatanodeService =
           createHddsDatanodeService(args, true);

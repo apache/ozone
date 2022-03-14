@@ -230,16 +230,22 @@ public class SCMHANodeDetails {
           throw e;
         }
 
-        boolean flexibleFqdnResolutionEnabled = conf.getBoolean(OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+        boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
                 OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
-        if (!flexibleFqdnResolutionEnabled && addr.isUnresolved() || flexibleFqdnResolutionEnabled && !isAddressHostNameLocal(addr)) {
+        if (!flexibleFqdnResolutionEnabled && addr.isUnresolved()
+                || flexibleFqdnResolutionEnabled
+                && !isAddressHostNameLocal(addr)) {
           LOG.error("Address for SCM {} : {} couldn't be resolved. Proceeding "
                   + "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 
-        if (!isPeer && (!flexibleFqdnResolutionEnabled && !addr.isUnresolved() && ConfUtils.isAddressLocal(addr)
-                || flexibleFqdnResolutionEnabled && isAddressHostNameLocal(addr))) {
+        if (!isPeer && (!flexibleFqdnResolutionEnabled
+                && !addr.isUnresolved()
+                && ConfUtils.isAddressLocal(addr)
+                || flexibleFqdnResolutionEnabled
+                && isAddressHostNameLocal(addr))) {
           localRpcAddress = addr;
           localScmServiceId = serviceId;
           localScmNodeId = nodeId;

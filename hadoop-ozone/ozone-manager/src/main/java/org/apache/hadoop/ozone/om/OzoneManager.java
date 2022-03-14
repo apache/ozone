@@ -1014,10 +1014,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     InetSocketAddress omNodeRpcAddr = OmUtils.getOmAddress(conf);
-    boolean flexibleFqdnResolutionEnabled = conf.getBoolean(OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+    boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
             OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
     if (flexibleFqdnResolutionEnabled && omNodeRpcAddr.getAddress() == null) {
-      omNodeRpcAddr = FlexibleFQDNResolution.getAddressWithHostName(omNodeRpcAddr);
+      omNodeRpcAddr =
+              FlexibleFQDNResolution.getAddressWithHostName(omNodeRpcAddr);
     }
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
@@ -1972,7 +1974,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),
         client.getPrivateKey());
-    boolean flexibleFqdnResolutionEnabled = config.getBoolean(OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+    boolean flexibleFqdnResolutionEnabled = config.getBoolean(
+            OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
             OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
     InetSocketAddress omRpcAdd = OmUtils.getOmAddress(config);
     String hostname = omRpcAdd.getHostName();
@@ -1981,8 +1984,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     boolean addressResolved = omRpcAdd != null && omRpcAdd.getAddress() != null;
     if (flexibleFqdnResolutionEnabled && !addressResolved) {
-      InetSocketAddress omRpcAddWithHostName = FlexibleFQDNResolution.getAddressWithHostName(omRpcAdd);
-      if (omRpcAddWithHostName != null && omRpcAddWithHostName.getAddress() != null) {
+      InetSocketAddress omRpcAddWithHostName =
+              FlexibleFQDNResolution.getAddressWithHostName(omRpcAdd);
+      if (omRpcAddWithHostName != null
+              && omRpcAddWithHostName.getAddress() != null) {
         addressResolved = true;
         ip = omRpcAddWithHostName.getAddress().getHostAddress();
       }
