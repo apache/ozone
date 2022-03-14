@@ -50,36 +50,40 @@ public class ContentGenerator {
   private final byte[] buffer;
 
   /**
-   * Issue Hsync after every write ( Cannot be used with Hflush )
+   * Issue Hsync after every write ( Cannot be used with Hflush ).
    */
   private final boolean hSync;
 
   /**
-   * Issue Hflush after every write ( Cannot be used with Hsync )
+   * Issue Hflush after every write ( Cannot be used with Hsync ).
    */
   private final boolean hFlush;
 
   ContentGenerator(long keySize, int bufferSize) {
-    this(keySize, bufferSize, bufferSize,false,false);
+    this(keySize, bufferSize, bufferSize, false, false);
   }
 
-  ContentGenerator(long keySize, int bufferSize, int copyBufferSize){
-    this(keySize, bufferSize, copyBufferSize,false,false);
+  ContentGenerator(long keySize, int bufferSize, int copyBufferSize) {
+    this(keySize, bufferSize, copyBufferSize, false, false);
   }
 
-  ContentGenerator(long keySize, int bufferSize, boolean hsync, boolean hflush) {
-    this(keySize, bufferSize, bufferSize,hsync,hflush);
+  ContentGenerator(long keySize, int bufferSize, boolean hsync,
+                   boolean hflush) {
+    this(keySize, bufferSize, bufferSize, hsync, hflush);
   }
 
-  ContentGenerator(long keySize, int bufferSize, int copyBufferSize, boolean hSync, boolean hFlush) {
+  ContentGenerator(long keySize, int bufferSize, int copyBufferSize,
+                   boolean hSync, boolean hFlush) {
     this.keySize = keySize;
     this.bufferSize = bufferSize;
     this.copyBufferSize = copyBufferSize;
     this.hSync = hSync;
     this.hFlush = hFlush;
 
-    buffer = RandomStringUtils.randomAscii(bufferSize).getBytes(StandardCharsets.UTF_8);
+    buffer = RandomStringUtils.randomAscii(bufferSize)
+        .getBytes(StandardCharsets.UTF_8);
   }
+
   /**
    * Write the required bytes to the output stream.
    */
@@ -105,9 +109,9 @@ public class ContentGenerator {
   private void flushOrSync(OutputStream outputStream) throws IOException {
     if (outputStream instanceof FSDataOutputStream) {
       if (hSync) {
-        ((FSDataOutputStream)outputStream).hsync();
+        ((FSDataOutputStream) outputStream).hsync();
       } else if (hFlush) {
-        ((FSDataOutputStream)outputStream).hflush();
+        ((FSDataOutputStream) outputStream).hflush();
       }
     }
   }
