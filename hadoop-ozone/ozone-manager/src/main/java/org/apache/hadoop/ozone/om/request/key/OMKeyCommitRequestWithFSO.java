@@ -106,7 +106,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               commitKeyRequest.getClientID());
 
 
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
 
@@ -122,7 +121,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String fileName = OzoneFSUtils.getFileName(keyName);
-      omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       long bucketId = omBucketInfo.getObjectID();
       long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
           keyName, omMetadataManager, "Cannot create file : " + keyName
