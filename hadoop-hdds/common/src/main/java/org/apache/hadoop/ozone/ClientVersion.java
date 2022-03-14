@@ -19,6 +19,12 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.ComponentVersion;
 
+import java.util.Arrays;
+import java.util.Map;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
+
 /**
  * Versioning for protocol clients.
  */
@@ -34,6 +40,10 @@ public enum ClientVersion implements ComponentVersion {
 
   public static final ClientVersion CURRENT = latest();
   public static final int CURRENT_VERSION = CURRENT.version;
+
+  private static final Map<Integer, ClientVersion> BY_PROTO_VALUE =
+      Arrays.stream(values())
+          .collect(toMap(ClientVersion::toProtoValue, identity()));
 
   private final int version;
   private final String description;
@@ -54,11 +64,7 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   public static ClientVersion fromProtoValue(int value) {
-    ClientVersion[] versions = ClientVersion.values();
-    if (value >= versions.length || value < 0) {
-      return FUTURE_VERSION;
-    }
-    return versions[value];
+    return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
   }
 
   private static ClientVersion latest() {
