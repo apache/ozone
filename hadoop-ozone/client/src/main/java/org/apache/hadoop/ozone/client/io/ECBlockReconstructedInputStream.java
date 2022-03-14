@@ -38,6 +38,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   private ByteBuffer[] bufs;
   private final ByteBufferPool byteBufferPool;
   private boolean closed = false;
+  private boolean unBuffered = false;
 
   private long position = 0;
 
@@ -73,9 +74,13 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized int read(ByteBuffer buf) throws IOException {
     ensureNotClosed();
-    allocateBuffers();
     if (!hasRemaining()) {
       return EOF;
+    }
+    allocateBuffers();
+    if (unBuffered) {
+      seek(getPos());
+      unBuffered = false;
     }
     int totalRead = 0;
     while (buf.hasRemaining() && getRemaining() > 0) {
@@ -87,6 +92,14 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
       }
       long read = readBufferToDest(b, buf);
       totalRead += read;
+    }
+    if (!hasRemaining()) {
+      // We have reached the end of the block. While the block is still open
+      // and could be seeked back, it is most likely the block will be closed.
+      // KeyInputStream does not call close on the block until all blocks in the
+      // key have been read, so releasing the resources here helps to avoid
+      // excessive memory usage.
+      freeBuffers();
     }
     return totalRead;
   }
@@ -131,6 +144,8 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void unbuffer() {
     stripeReader.unbuffer();
+    freeBuffers();
+    unBuffered = true;
   }
 
   @Override
@@ -141,13 +156,18 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() throws IOException {
     stripeReader.close();
+    freeBuffers();
+    closed = true;
+  }
+
+  private void freeBuffers() {
     if (bufs != null) {
       for (int i = 0; i < bufs.length; i++) {
         byteBufferPool.putBuffer(bufs[i]);
         bufs[i] = null;
       }
+      bufs = null;
     }
-    closed = true;
   }
 
   @Override
@@ -174,6 +194,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   }
 
   private void readAndSeekStripe(int offset) throws IOException {
+    allocateBuffers();
     readStripe();
     if (offset == 0) {
       return;

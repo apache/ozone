@@ -612,7 +612,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void freeAllResourcesWithoutClosing() throws IOException {
-    LOG.info("Freeing all resources while leaving the block open");
+    LOG.debug("Freeing all resources while leaving the block open");
     freeBuffers();
     closeStreams();
   }
