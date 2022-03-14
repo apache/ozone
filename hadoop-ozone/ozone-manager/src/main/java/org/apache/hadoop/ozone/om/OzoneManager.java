@@ -2808,8 +2808,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public List<ServiceInfo> getServiceList() throws IOException {
-    Map<String, String> auditMap = new LinkedHashMap<>();
-
     // When we implement multi-home this call has to be handled properly.
     List<ServiceInfo> services = new ArrayList<>();
     ServiceInfo.Builder omServiceInfoBuilder = ServiceInfo.newBuilder()
@@ -2820,20 +2818,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
             .build());
-
-    auditMap.put(OzoneConsts.OZONE_OM_SERVICE_HOSTNAME,
-        omRpcAddress.getHostName());
-    auditMap.put("RPC_PORT", String.valueOf(omRpcAddress.getPort()));
-
     if (httpServer != null
         && httpServer.getHttpAddress() != null) {
       omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
           .setType(ServicePort.Type.HTTP)
           .setValue(httpServer.getHttpAddress().getPort())
           .build());
-
-      auditMap.put(OzoneConsts.OZONE_OM_SERVICE_PORT_TYPE,
-          OzoneConsts.OZONE_OM_SERVICE_PORT_TYPE_HTTP);
     }
     if (httpServer != null
         && httpServer.getHttpsAddress() != null) {
@@ -2841,9 +2831,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           .setType(ServicePort.Type.HTTPS)
           .setValue(httpServer.getHttpsAddress().getPort())
           .build());
-
-      auditMap.put(OzoneConsts.OZONE_OM_SERVICE_PORT_TYPE,
-          OzoneConsts.OZONE_OM_SERVICE_PORT_TYPE_HTTPS);
     }
 
     // Since this OM is processing the request, we can assume it to be the
@@ -2861,9 +2848,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RATIS)
             .setValue(omNodeDetails.getRatisPort())
             .build());
-
-        auditMap.put(OzoneConsts.RATIS_PORT,
-            String.valueOf(omNodeDetails.getRatisPort()));
       }
 
       for (OMNodeDetails peerNode : peerNodesMap.values()) {
@@ -2913,7 +2897,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // handle exception in this method, we need to incorporate
     // metrics.incNumGetServiceListFails()
     AUDIT.logReadSuccess(
-        buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST, auditMap));
+        buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
+            new LinkedHashMap<>()));
     return services;
   }
 

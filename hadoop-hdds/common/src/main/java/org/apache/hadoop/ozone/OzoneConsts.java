@@ -456,7 +456,7 @@ public final class OzoneConsts {
   public static final String OZONE_HTTP_FILTER_INITIALIZERS_SECURE =
       "org.apache.hadoop.security.AuthenticationFilterInitializer";
 
-  public static final String DELEGATION_TOKEN_KIND = "delegationTokenKind";
-  public static final String DELEGATION_TOKEN_SERVICE =
-      "delegationTokenService";
+  public static final String DELEGATION_TOKEN_KIND = "kind";
+  public static final String DELEGATION_TOKEN_SERVICE = "service";
+  public static final String DELEGATION_TOKEN_RENEWER = "renewer";
 }

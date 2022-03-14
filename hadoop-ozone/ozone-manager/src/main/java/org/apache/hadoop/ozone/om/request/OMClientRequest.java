@@ -40,13 +40,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -478,19 +476,6 @@ public abstract class OMClientRequest implements RequestAuditor {
     auditMap.put(OzoneConsts.VOLUME, volume);
     return auditMap;
   }
-
-  @Override
-  public Map<String, String> buildTokenAuditMap(
-      Token<OzoneTokenIdentifier> token) {
-    Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.DELEGATION_TOKEN_KIND,
-        token.getKind() == null ? "" : token.getKind().toString());
-    auditMap.put(OzoneConsts.DELEGATION_TOKEN_SERVICE,
-        token.getService() == null ? "" : token.getService().toString());
-
-    return auditMap;
-  }
-
 
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyName) throws OMException {

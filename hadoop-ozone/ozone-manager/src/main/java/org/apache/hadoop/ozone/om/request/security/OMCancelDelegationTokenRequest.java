@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.security;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -42,7 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Map;
+
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.buildTokenAuditMap;
 
 /**
  * Handle CancelDelegationToken Request.
@@ -59,11 +63,24 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
-    // Call OM to cancel token, this does check whether we can cancel token
-    // or not. This does not remove token from DB/in-memory.
-    ozoneManager.cancelDelegationToken(getToken());
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.USERNAME,
+        getOmRequest().getUserInfo().getUserName());
+    auditMap.put(OzoneConsts.CLIENT_ID, getOmRequest().getClientId());
 
-    return super.preExecute(ozoneManager);
+    try {
+      // Call OM to cancel token, this does check whether we can cancel token
+      // or not. This does not remove token from DB/in-memory.
+      ozoneManager.cancelDelegationToken(getToken());
+      return super.preExecute(ozoneManager);
+
+    } catch (IOException ioe) {
+      auditLog(auditLogger,
+          buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, ioe,
+              getOmRequest().getUserInfo()));
+      throw ioe;
+    }
   }
 
   @Override
