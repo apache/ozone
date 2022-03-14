@@ -70,7 +70,7 @@ public class ListSubcommand extends ScmSubcommand {
   private HddsProtos.LifeCycleState state;
 
   @Option(names = {"-t", "--type"},
-      description = "Replication Type (RATIS, STANDALONE or EC)")
+      description = "Replication Type (RATIS, STAND_ALONE or EC)")
   private HddsProtos.ReplicationType type;
 
   @Option(names = {"-r", "--replication", "--factor"},
@@ -100,12 +100,14 @@ public class ListSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (!Strings.isNullOrEmpty(replication) && type == null) {
-      throw new IOException("Type must be set if replication is passed");
+      // Set type to RATIS as that is what any command prior to this change
+      // would have expected.
+      type = HddsProtos.ReplicationType.RATIS;
     }
     ReplicationConfig repConfig = null;
     if (!Strings.isNullOrEmpty(replication)) {
       repConfig = ReplicationConfig.parse(
-          ReplicationType.valueOf(type.toString()),
+          ReplicationType.fromProto(type),
           replication, new OzoneConfiguration());
     }
     List<ContainerInfo> containerList =

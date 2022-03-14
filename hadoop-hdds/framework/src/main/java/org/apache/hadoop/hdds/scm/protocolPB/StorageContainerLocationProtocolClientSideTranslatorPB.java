@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.protocolPB;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -423,8 +422,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public List<ContainerInfo> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
       throws IOException {
-    throw new NotImplementedException("Should no longer be called from the " +
-        " client side");
+    throw new UnsupportedOperationException("Should no longer be called from " +
+        "the client side");
   }
 
   /**
