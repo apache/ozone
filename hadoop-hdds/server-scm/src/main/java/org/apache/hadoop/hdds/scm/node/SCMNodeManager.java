@@ -379,7 +379,7 @@ public class SCMNodeManager implements NodeManager {
     }
 
     if (!isNodeRegistered(datanodeDetails)) {
-      try{
+      try {
         clusterMap.add(datanodeDetails);
         nodeStateManager.addNode(datanodeDetails, layoutInfo);
         // Check that datanode in nodeStateManager has topology parent set
@@ -402,9 +402,11 @@ public class SCMNodeManager implements NodeManager {
     } else {
       // Update datanode if it is registered but the ip or hostname changes
       try {
-        final DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+        final DatanodeInfo datanodeInfo =
+                nodeStateManager.getNode(datanodeDetails);
         if (!datanodeInfo.getIpAddress().equals(datanodeDetails.getIpAddress())
-                || !datanodeInfo.getHostName().equals(datanodeDetails.getHostName())) {
+                || !datanodeInfo.getHostName()
+                .equals(datanodeDetails.getHostName())) {
           LOG.info("Updating data node {} from {} to {}",
                   datanodeDetails.getUuidString(),
                   datanodeInfo,
@@ -428,10 +430,12 @@ public class SCMNodeManager implements NodeManager {
           Preconditions.checkState(dn.getParent() != null);
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated Datanode to: {}", dn);
-          scmNodeEventPublisher.fireEvent(SCMEvents.NODE_IP_OR_HOSTNAME_UPDATE, dn);
+          scmNodeEventPublisher
+                  .fireEvent(SCMEvents.NODE_IP_OR_HOSTNAME_UPDATE, dn);
         }
       } catch (NodeNotFoundException e) {
-        LOG.error("Cannot find datanode {} from nodeStateManager", datanodeDetails);
+        LOG.error("Cannot find datanode {} from nodeStateManager",
+                datanodeDetails);
       }
     }
 

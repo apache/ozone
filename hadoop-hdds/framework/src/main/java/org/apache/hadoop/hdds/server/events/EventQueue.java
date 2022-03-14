@@ -67,12 +67,15 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private boolean isSilent = false;
 
-  // The field parent in DatanodeDetails class has the circular reference which will result in Gson infinite recursive
-  // parsing. We need to exclude this field when generating json string for DatanodeDetails object
-  static class DatanodeDetailsGsonExclusionStrategy implements ExclusionStrategy {
+  // The field parent in DatanodeDetails class has the circular reference
+  // which will result in Gson infinite recursive parsing. We need to exclude
+  // this field when generating json string for DatanodeDetails object
+  static class DatanodeDetailsGsonExclusionStrategy
+          implements ExclusionStrategy {
     @Override
     public boolean shouldSkipField(FieldAttributes f) {
-      return f.getDeclaringClass() == NodeImpl.class && f.getName().equals("parent");
+      return f.getDeclaringClass() == NodeImpl.class
+              && f.getName().equals("parent");
     }
 
     @Override

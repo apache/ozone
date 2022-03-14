@@ -396,9 +396,11 @@ public class NodeStateManager implements Runnable, Closeable {
    * @param layoutInfo the layoutInfo
    * @throws NodeNotFoundException the node not found exception
    */
-  public void updateNode(DatanodeDetails datanodeDetails, LayoutVersionProto layoutInfo)
+  public void updateNode(DatanodeDetails datanodeDetails,
+                         LayoutVersionProto layoutInfo)
           throws NodeNotFoundException {
-    DatanodeInfo datanodeInfo = nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    DatanodeInfo datanodeInfo =
+            nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
     NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
     LOG.info("updating node {} from {} to {} with status {}",
             datanodeDetails.getUuidString(),

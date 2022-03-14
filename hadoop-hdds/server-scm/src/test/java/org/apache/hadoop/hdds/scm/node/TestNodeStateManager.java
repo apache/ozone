@@ -308,11 +308,13 @@ public class TestNodeStateManager {
   }
 
   @Test
-  public void testUpdateNode() throws NodeAlreadyExistsException, NodeNotFoundException {
+  public void testUpdateNode() throws NodeAlreadyExistsException,
+          NodeNotFoundException {
     UUID dnUuid = UUID.randomUUID();
     String ipAddress = "1.2.3.4";
     String hostName = "test-host";
-    StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutVersionProto =
+    StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+            layoutVersionProto =
             UpgradeUtils.toLayoutVersionProto(1, 2);
     DatanodeDetails dn = DatanodeDetails.newBuilder()
             .setUuid(dnUuid)
@@ -324,8 +326,8 @@ public class TestNodeStateManager {
 
     String newIpAddress = "2.3.4.5";
     String newHostName = "new-host";
-    StorageContainerDatanodeProtocolProtos.LayoutVersionProto newLayoutVersionProto =
-            UpgradeUtils.defaultLayoutVersionProto();
+    StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+            newLayoutVersionProto = UpgradeUtils.defaultLayoutVersionProto();
     DatanodeDetails newDn = DatanodeDetails.newBuilder()
             .setUuid(dnUuid)
             .setIpAddress(newIpAddress)
@@ -337,7 +339,8 @@ public class TestNodeStateManager {
     DatanodeInfo updatedDn = nsm.getNode(dn);
     assertEquals(newIpAddress, updatedDn.getIpAddress());
     assertEquals(newHostName, updatedDn.getHostName());
-    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE, updatedDn.getPersistedOpState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+            updatedDn.getPersistedOpState());
     assertEquals(NodeStatus.inServiceHealthy(), updatedDn.getNodeStatus());
   }
 

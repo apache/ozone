@@ -67,7 +67,8 @@ public class BackgroundPipelineCreator implements SCMService {
    * SCMService related variables.
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
-   * 2) NewNodeHandler, NodeIpOrHostnameUpdateHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
+   * 2) NewNodeHandler, NodeIpOrHostnameUpdateHandler,
+   *    NonHealthyToHealthyNodeHandler, PreCheckComplete
    *    will trigger a one-shot run of BackgroundPipelineCreator,
    *    no matter in safe mode or not.
    */

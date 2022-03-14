@@ -1903,7 +1903,8 @@ public class TestSCMNodeManager {
       DatanodeDetails returnedNode = nodeList.get(0);
       assertEquals(ipAddress, returnedNode.getIpAddress());
       assertEquals(hostName, returnedNode.getHostName());
-      Assert.assertTrue(returnedNode.getNetworkLocation().startsWith("/rack1/ng"));
+      Assert.assertTrue(returnedNode.getNetworkLocation()
+              .startsWith("/rack1/ng"));
       Assert.assertTrue(returnedNode.getParent() != null);
 
       // test updating ip address and host name
@@ -1923,7 +1924,8 @@ public class TestSCMNodeManager {
       DatanodeDetails returnedUpdatedNode = updatedNodeList.get(0);
       assertEquals(updatedIpAddress, returnedUpdatedNode.getIpAddress());
       assertEquals(updatedHostName, returnedUpdatedNode.getHostName());
-      Assert.assertTrue(returnedUpdatedNode.getNetworkLocation().startsWith("/rack1/ng"));
+      Assert.assertTrue(returnedUpdatedNode.getNetworkLocation()
+              .startsWith("/rack1/ng"));
       Assert.assertTrue(returnedUpdatedNode.getParent() != null);
     }
   }

@@ -66,7 +66,7 @@ public final class RatisHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
 
-  private static final OzoneConfiguration conf = new OzoneConfiguration();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis";
@@ -334,7 +334,7 @@ public final class RatisHelper {
   }
 
   private static boolean datanodeUseHostName() {
-    return conf.getBoolean(
+    return CONF.getBoolean(
             DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
             DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
