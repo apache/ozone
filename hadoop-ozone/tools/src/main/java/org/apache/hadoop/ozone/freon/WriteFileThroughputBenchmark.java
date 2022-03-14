@@ -94,6 +94,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
 
     public Void call() throws Exception{
 
+        init();
         LOG.info("NumFiles=" + getTestNo());
         LOG.info("Total FileSize=" + fileSize);
         LOG.info("BlockSize=" + blockSize);
@@ -154,7 +155,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
 
         timer.time(() -> {
             try ( FSDataOutputStream outputStream = fileSystem.create(file,
-                    false, bufferSize,replication,blockSize);) {
+                    false, bufferSize,replication,blockSize)) {
                 contentGenerator.write(outputStream);
 
                 // Enforcing throttle delay
