@@ -258,12 +258,12 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    * @throws IOException
    */
   public synchronized int readStripe(ByteBuffer[] bufs) throws IOException {
-    if (!initialized) {
-      init();
-    }
     int toRead = (int)Math.min(getRemaining(), getStripeSize());
     if (toRead == 0) {
       return EOF;
+    }
+    if (!initialized) {
+      init();
     }
     validateBuffers(bufs);
     while (true) {
@@ -305,6 +305,13 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       flipInputs();
     }
     setPos(getPos() + toRead);
+    if (remaining() == 0) {
+      // If we reach the end of the block (ie remaining is zero) we free
+      // the underlying streams and buffers. This is because KeyInputStream,
+      // which reads from the EC streams does not close the blocks until it has
+      // read all blocks in the key.
+      freeAllResourcesWithoutClosing();
+    }
     return toRead;
   }
 
@@ -578,6 +585,16 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   @Override
   public synchronized void close() {
     super.close();
+    freeBuffers();
+  }
+
+  @Override
+  public synchronized void unbuffer() {
+    super.unbuffer();
+    freeBuffers();
+  }
+
+  private void freeBuffers() {
     // Inside this class, we only allocate buffers to read parity into. Data
     // is reconstructed or read into a set of buffers passed in from the calling
     // class. Therefore we only need to ensure we free the parity buffers here.
@@ -591,6 +608,13 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         }
       }
     }
+    initialized = false;
+  }
+
+  private void freeAllResourcesWithoutClosing() throws IOException {
+    LOG.info("Freeing all resources while leaving the block open");
+    freeBuffers();
+    closeStreams();
   }
 
   @Override

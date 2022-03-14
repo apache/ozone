@@ -36,8 +36,11 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -474,6 +477,11 @@ public class TestECBlockReconstructedStripeInputStream {
     }
   }
 
+  private Integer getRandomStreamIndex(Set<Integer> set) {
+    return set.stream().skip(new Random().nextInt(set.size()))
+        .findFirst().orElse(null);
+  }
+
   @Test
   public void testErrorReadingBlockContinuesReading() throws IOException {
     // Generate the input data for 3 full stripes and generate the parity.
@@ -487,15 +495,8 @@ public class TestECBlockReconstructedStripeInputStream {
         .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
     ByteBuffer[] parity = generateParity(dataBufs, repConfig);
 
-    List<List<Integer>> failLists = new ArrayList<>();
-    failLists.add(indexesToList(0, 1));
-    // These will be the first parity read and then the next parity read as a
-    // replacement
-    failLists.add(indexesToList(2, 3));
-    // First parity and then the data block
-    failLists.add(indexesToList(2, 0));
-
-    for (List<Integer> failList : failLists) {
+    for (int k = 0; k < 5; k++) {
+      Set<Integer> failed = new HashSet<>();
       streamFactory = new TestBlockInputStreamFactory();
       addDataStreamsToFactory(dataBufs, parity);
 
@@ -519,8 +520,11 @@ public class TestECBlockReconstructedStripeInputStream {
           Assert.assertEquals(stripeSize(), read);
           clearBuffers(bufs);
           if (i == 0) {
-            streamFactory.getBlockStreams().get(failList.remove(0))
+            Integer failStream =
+                getRandomStreamIndex(streamFactory.getStreamIndexes());
+            streamFactory.getBlockStream(failStream)
                 .setShouldError(true);
+            failed.add(failStream);
           }
         }
         // The next read is a partial stripe
@@ -531,10 +535,17 @@ public class TestECBlockReconstructedStripeInputStream {
         Assert.assertEquals(0, bufs[2].remaining());
         Assert.assertEquals(0, bufs[2].position());
 
-        // seek back to zero, make another block fail. The next read should
-        // error as there are not enough blocks to read.
+        // seek back to zero and read a stripe to re-open the streams
         ecb.seek(0);
-        streamFactory.getBlockStreams().get(failList.remove(0))
+        clearBuffers(bufs);
+        ecb.readStripe(bufs);
+        // Now fail another random stream and the read should fail with
+        // insufficient locations
+        Set<Integer> currentStreams =
+            new HashSet<>(streamFactory.getStreamIndexes());
+        currentStreams.removeAll(failed);
+        Integer failStream = getRandomStreamIndex(currentStreams);
+        streamFactory.getBlockStream(failStream)
             .setShouldError(true);
         try {
           clearBuffers(bufs);

@@ -41,10 +41,13 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Utility class providing methods useful in EC tests.
@@ -218,7 +221,8 @@ public final class ECStreamTestUtil {
   public static class TestBlockInputStreamFactory implements
       BlockInputStreamFactory {
 
-    private List<TestBlockInputStream> blockStreams = new ArrayList<>();
+    private Map<Integer, TestBlockInputStream> blockStreams =
+        new LinkedHashMap<>();
     private List<ByteBuffer> blockStreamData;
     // List of EC indexes that should fail immediately on read
     private List<Integer> failIndexes = new ArrayList<>();
@@ -227,7 +231,16 @@ public final class ECStreamTestUtil {
 
     public synchronized
         List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
-      return blockStreams;
+      return blockStreams.values().stream().collect(Collectors.toList());
+    }
+
+    public synchronized Set<Integer> getStreamIndexes() {
+      return blockStreams.keySet();
+    }
+
+    public synchronized ECStreamTestUtil.TestBlockInputStream getBlockStream(
+        int ecIndex) {
+      return blockStreams.get(ecIndex);
     }
 
     public synchronized void setBlockStreamData(List<ByteBuffer> bufs) {
@@ -256,7 +269,7 @@ public final class ECStreamTestUtil {
       if (failIndexes.contains(repInd)) {
         stream.setShouldError(true);
       }
-      blockStreams.add(stream);
+      blockStreams.put(repInd, stream);
       return stream;
     }
   }
