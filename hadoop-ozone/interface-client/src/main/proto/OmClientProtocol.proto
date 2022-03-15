@@ -1276,7 +1276,7 @@ message MultipartUploadListPartsResponse {
     optional uint32 nextPartNumberMarker = 4;
     optional bool isTruncated = 5;
     repeated PartInfo partsList = 6;
-
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
 }
 
 message ListMultipartUploadsRequest {
@@ -1298,7 +1298,7 @@ message MultipartUploadInfo {
     required uint64 creationTime = 5;
     required hadoop.hdds.ReplicationType type = 6;
     required hadoop.hdds.ReplicationFactor factor = 7;
-
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
 }
 
 message PartInfo {

@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -499,13 +501,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     omPartInfoList.forEach(partInfo -> partInfoList.add(partInfo.getProto()));
 
-    response.setType(
-            omMultipartUploadListParts
-                    .getReplicationConfig()
-                    .getReplicationType());
-    response.setFactor(
-            ReplicationConfig.getLegacyFactor(
-                    omMultipartUploadListParts.getReplicationConfig()));
+    HddsProtos.ReplicationType repType = omMultipartUploadListParts
+        .getReplicationConfig()
+        .getReplicationType();
+    response.setType(repType);
+    if (repType == HddsProtos.ReplicationType.EC) {
+      response.setEcReplicationConfig(
+          ((ECReplicationConfig)omMultipartUploadListParts
+              .getReplicationConfig()).toProto());
+    } else {
+      response.setFactor(ReplicationConfig.getLegacyFactor(
+          omMultipartUploadListParts.getReplicationConfig()));
+    }
     response.setNextPartNumberMarker(
         omMultipartUploadListParts.getNextPartNumberMarker());
     response.setIsTruncated(omMultipartUploadListParts.isTruncated());
@@ -526,17 +533,27 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()
         .stream()
-        .map(upload -> MultipartUploadInfo.newBuilder()
-            .setVolumeName(upload.getVolumeName())
-            .setBucketName(upload.getBucketName())
-            .setKeyName(upload.getKeyName())
-            .setUploadId(upload.getUploadId())
-            .setType(upload.getReplicationConfig().getReplicationType())
-            .setFactor(
-                    ReplicationConfig.getLegacyFactor(
-                            upload.getReplicationConfig()))
-            .setCreationTime(upload.getCreationTime().toEpochMilli())
-            .build())
+        .map(upload -> {
+          MultipartUploadInfo.Builder bldr = MultipartUploadInfo.newBuilder()
+              .setVolumeName(upload.getVolumeName())
+              .setBucketName(upload.getBucketName())
+              .setKeyName(upload.getKeyName())
+              .setUploadId(upload.getUploadId());
+
+          HddsProtos.ReplicationType repType = upload.getReplicationConfig()
+              .getReplicationType();
+          bldr.setType(repType);
+          if (repType == HddsProtos.ReplicationType.EC) {
+            bldr.setEcReplicationConfig(
+                ((ECReplicationConfig)upload.getReplicationConfig())
+                    .toProto());
+          } else {
+            bldr.setFactor(ReplicationConfig.getLegacyFactor(
+                upload.getReplicationConfig()));
+          }
+          bldr.setCreationTime(upload.getCreationTime().toEpochMilli());
+          return bldr.build();
+        })
         .collect(Collectors.toList());
 
     ListMultipartUploadsResponse response =
