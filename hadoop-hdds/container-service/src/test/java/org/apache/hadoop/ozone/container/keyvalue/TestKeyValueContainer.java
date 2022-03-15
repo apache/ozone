@@ -321,19 +321,20 @@ public class TestKeyValueContainer {
    * Add some keys to the container.
    */
   private void populate(long numberOfKeysToWrite) throws IOException {
-    try (DBHandle metadataStore =
-        BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
+    KeyValueContainerData cData = keyValueContainer.getContainerData();
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, CONF)) {
       Table<String, BlockData> blockDataTable =
               metadataStore.getStore().getBlockDataTable();
 
       for (long i = 0; i < numberOfKeysToWrite; i++) {
-        blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));
+        blockDataTable.put(cData.blockKey(i),
+            new BlockData(new BlockID(i, i)));
       }
 
       // As now when we put blocks, we increment block count and update in DB.
       // As for test, we are doing manually so adding key count to DB.
       metadataStore.getStore().getMetadataTable()
-              .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
+              .put(cData.blockCountKey(), numberOfKeysToWrite);
     }
 
     Map<String, String> metadata = new HashMap<>();

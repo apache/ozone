@@ -124,18 +124,19 @@ public class TestContainerReader {
 
   private void markBlocksForDelete(KeyValueContainer keyValueContainer,
       boolean setMetaData, List<Long> blockNames, int count) throws Exception {
-    try (DBHandle metadataStore = BlockUtils.getDB(keyValueContainer
-        .getContainerData(), conf)) {
+    KeyValueContainerData cData = keyValueContainer.getContainerData();
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
       for (int i = 0; i < count; i++) {
         Table<String, BlockData> blockDataTable =
                 metadataStore.getStore().getBlockDataTable();
 
-        String blk = Long.toString(blockNames.get(i));
+        Long localID = blockNames.get(i);
+        String blk = cData.blockKey(localID);
         BlockData blkInfo = blockDataTable.get(blk);
 
         blockDataTable.delete(blk);
-        blockDataTable.put(OzoneConsts.DELETING_KEY_PREFIX + blk, blkInfo);
+        blockDataTable.put(cData.deletingBlockKey(localID), blkInfo);
       }
 
       if (setMetaData) {
@@ -143,7 +144,7 @@ public class TestContainerReader {
         // and bytes used metadata values, so those do not change.
         Table<String, Long> metadataTable =
                 metadataStore.getStore().getMetadataTable();
-        metadataTable.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, (long)count);
+        metadataTable.put(cData.pendingDeleteBlockCountKey(), (long)count);
       }
     }
 
@@ -152,10 +153,9 @@ public class TestContainerReader {
   private List<Long> addBlocks(KeyValueContainer keyValueContainer,
       boolean setMetaData) throws Exception {
     long containerId = keyValueContainer.getContainerData().getContainerID();
-
+    KeyValueContainerData cData = keyValueContainer.getContainerData();
     List<Long> blkNames = new ArrayList<>();
-    try (DBHandle metadataStore = BlockUtils.getDB(keyValueContainer
-        .getContainerData(), conf)) {
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
       for (int i = 0; i < blockCount; i++) {
         // Creating BlockData
@@ -172,14 +172,14 @@ public class TestContainerReader {
         blockData.setChunks(chunkList);
         blkNames.add(localBlockID);
         metadataStore.getStore().getBlockDataTable()
-                .put(Long.toString(localBlockID), blockData);
+                .put(cData.blockKey(localBlockID), blockData);
       }
 
       if (setMetaData) {
         metadataStore.getStore().getMetadataTable()
-                .put(OzoneConsts.BLOCK_COUNT, (long)blockCount);
+                .put(cData.blockCountKey(), (long)blockCount);
         metadataStore.getStore().getMetadataTable()
-                .put(OzoneConsts.CONTAINER_BYTES_USED, blockCount * blockLen);
+                .put(cData.bytesUsedKey(), blockCount * blockLen);
       }
     }
 

@@ -25,7 +25,6 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -102,17 +101,17 @@ public class TestStorageContainerManagerHelper {
   public List<String> getPendingDeletionBlocks(Long containerID)
       throws IOException {
     List<String> pendingDeletionBlocks = Lists.newArrayList();
-    try (DBHandle meta = getContainerMetadata(containerID)) {
-      KeyPrefixFilter filter =
-          new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);
+    KeyValueContainerData cData = getContainerMetadata(containerID);
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+      KeyPrefixFilter filter = cData.getDeletingBlockKeyFilter();
 
       List<? extends Table.KeyValue<String, BlockData>> kvs =
-          meta.getStore().getBlockDataTable()
-              .getRangeKVs(null, Integer.MAX_VALUE, filter);
+          db.getStore().getBlockDataTable()
+              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE, filter);
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
         pendingDeletionBlocks
-            .add(entry.getKey().replace(OzoneConsts.DELETING_KEY_PREFIX, ""));
+            .add(entry.getKey().replace(cData.deletingBlockKeyPrefix(), ""));
       }
     }
     return pendingDeletionBlocks;
@@ -129,12 +128,13 @@ public class TestStorageContainerManagerHelper {
 
   public List<Long> getAllBlocks(Long containeID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
-    try (DBHandle meta = getContainerMetadata(containeID)) {
+    KeyValueContainerData cData = getContainerMetadata(containeID);
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
 
       List<? extends Table.KeyValue<String, BlockData>> kvs =
-          meta.getStore().getBlockDataTable()
-              .getRangeKVs(null, Integer.MAX_VALUE,
-                  MetadataKeyFilters.getUnprefixedKeyFilter());
+          db.getStore().getBlockDataTable()
+              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                  cData.getUnprefixedKeyFilter());
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
         allBlocks.add(Long.valueOf(entry.getKey()));
@@ -146,8 +146,9 @@ public class TestStorageContainerManagerHelper {
   public boolean verifyBlocksWithTxnTable(Map<Long, List<Long>> containerBlocks)
       throws IOException {
     for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
-      try (DBHandle meta = getContainerMetadata(entry.getKey())) {
-        DatanodeStore ds = meta.getStore();
+      KeyValueContainerData cData = getContainerMetadata(entry.getKey());
+      try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+        DatanodeStore ds = db.getStore();
         DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
             (DatanodeStoreSchemaTwoImpl) ds;
         List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
@@ -166,7 +167,7 @@ public class TestStorageContainerManagerHelper {
     return true;
   }
 
-  private DBHandle getContainerMetadata(Long containerID)
+  private KeyValueContainerData getContainerMetadata(Long containerID)
       throws IOException {
     ContainerWithPipeline containerWithPipeline = cluster
         .getStorageContainerManager().getClientProtocolServer()
@@ -179,7 +180,7 @@ public class TestStorageContainerManagerHelper {
     KeyValueContainerData containerData =
         (KeyValueContainerData) containerServer.getContainerSet()
         .getContainer(containerID).getContainerData();
-    return BlockUtils.getDB(containerData, conf);
+    return containerData;
   }
 
   private OzoneContainer getContainerServerByDatanodeUuid(String dnUUID)

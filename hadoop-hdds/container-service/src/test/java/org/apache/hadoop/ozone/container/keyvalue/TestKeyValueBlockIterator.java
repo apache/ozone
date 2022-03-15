@@ -219,7 +219,7 @@ public class TestKeyValueBlockIterator {
             normalBlocks, deletingBlocks);
     try (BlockIterator<BlockData> keyValueBlockIterator =
                 db.getStore().getBlockIterator(CONTAINER_ID,
-                        MetadataKeyFilters.getDeletingKeyFilter())) {
+                        containerData.getDeletingBlockKeyFilter())) {
       List<Long> deletingBlockIDs =
               blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX);
       int counter = 0;
@@ -281,13 +281,13 @@ public class TestKeyValueBlockIterator {
     Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
             prefixCounts);
     // Test deleting filter.
-    testWithFilter(MetadataKeyFilters.getDeletingKeyFilter(),
+    testWithFilter(containerData.getDeletingBlockKeyFilter(),
             blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX));
 
     // Test arbitrary filter.
     MetadataKeyFilters.KeyPrefixFilter secondFilter =
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(secondPrefix);
+            .addFilter(containerData.containerPrefix() + secondPrefix);
     testWithFilter(secondFilter, blockIDs.get(secondPrefix));
   }
 
@@ -394,8 +394,9 @@ public class TestKeyValueBlockIterator {
           blockIndex++;
           BlockData blockData = new BlockData(blockID);
           blockData.setChunks(chunkList);
-          String localID = prefix + blockID.getLocalID();
-          blockDataTable.put(localID, blockData);
+          String blockKey = containerData.containerPrefix() + prefix +
+              blockID.getLocalID();
+          blockDataTable.put(blockKey, blockData);
           blockIDs.get(prefix).add(blockID.getLocalID());
         }
       }
