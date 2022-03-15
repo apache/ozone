@@ -32,13 +32,13 @@ public class ContentGenerator {
   /**
    * Size of the destination object (key or file).
    */
-  private long keySize;
+  private final long keySize;
 
   /**
    * Buffer for the pre-allocated content (will be reused if less than the
    * keySize).
    */
-  private int bufferSize;
+  private final int bufferSize;
 
   /**
    * Number of bytes to write in one call.

@@ -28,9 +28,9 @@ import java.util.concurrent.Callable;
 public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     implements Callable<Void> {
 
-  @Option(names = {"-o"},
-      description = "Ozone filesystem path",
-      defaultValue = "o3fs://bucket1.vol1")
+  @Option(names = {"-p", "--path"},
+      description = "Ozone filesystem path OFS scheme",
+      defaultValue = "ofs://ozone1/volume1/bucket1")
   private String rootPath;
 
   @Option(names = {"-s", "--size"},
@@ -97,6 +97,15 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
   public Void call() throws Exception {
 
     init();
+
+    // We cannot have both Hsync and Hflush set to TRUE at the same time
+    if(hSync == true || hFlush == true){
+      if(hSync == hFlush){
+        LOG.info("Both Hsync and Hflush cannot be set to TRUE");
+        System.exit(1);
+      }
+    }
+
     LOG.info("NumFiles=" + getTestNo());
     LOG.info("Total FileSize=" + fileSize);
     LOG.info("BlockSize=" + blockSize);
@@ -125,7 +134,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
 
     Path file = new Path(rootPath + "/" +
         generateObjectName(0));
-    FileSystem fileSystem = threadLocalFileSystem.get();
+    FileSystem fileSystem =  FileSystem.get(configuration);
     fileSystem.mkdirs(file.getParent());
     // Checks whether output directory exists
     ensureOutputDirExists(createFS(), file);
