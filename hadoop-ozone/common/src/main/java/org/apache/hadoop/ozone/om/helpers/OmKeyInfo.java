@@ -271,8 +271,8 @@ public final class OmKeyInfo extends WithParentObjectId {
    * version to the all version list.
    *
    * @param newLocationList the list of new blocks to be added.
-   * @param updateTime - if true, updates modification time.
-   * @param keepOldVersions - if false, old blocks won't be kept
+   * @param updateTime if true, updates modification time.
+   * @param keepOldVersions if false, old blocks won't be kept
    *                        and the new block versions will always be 0
    * @throws IOException
    */
