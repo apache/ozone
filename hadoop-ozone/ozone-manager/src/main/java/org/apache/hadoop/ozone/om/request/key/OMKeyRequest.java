@@ -32,6 +32,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -129,8 +130,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
       boolean grpcBlockTokenEnabled, String omID) throws IOException {
-    int numBlocks = Math.min((int) ((requestedSize - 1) / scmBlockSize + 1),
-        preallocateBlocksMax);
+    int dataGroupSize = replicationConfig instanceof ECReplicationConfig
+        ? ((ECReplicationConfig) replicationConfig).getData() : 1;
+    int numBlocks = Math.min(preallocateBlocksMax,
+        (int) ((requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1));
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
