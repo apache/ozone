@@ -125,9 +125,8 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
 
     Path file = new Path(rootPath + "/" +
         generateObjectName(0));
-    try (FileSystem fileSystem = threadLocalFileSystem.get()) {
-      fileSystem.mkdirs(file.getParent());
-    }
+    FileSystem fileSystem = threadLocalFileSystem.get();
+    fileSystem.mkdirs(file.getParent());
     // Checks whether output directory exists
     ensureOutputDirExists(createFS(), file);
 
