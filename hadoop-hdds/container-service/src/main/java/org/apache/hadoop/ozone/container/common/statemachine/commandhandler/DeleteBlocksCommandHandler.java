@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers
@@ -366,16 +365,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
         for (Long blkLong : delTX.getLocalIDList()) {
-          String blk = blkLong.toString();
+          String blk = containerData.blockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           if (blkInfo != null) {
-            String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
+            String deletingKey = containerData.deletingBlockKey(blkLong);
             if (blockDataTable.get(deletingKey) != null
                 || deletedBlocksTable.get(blk) != null) {
               if (LOG.isDebugEnabled()) {
-                LOG.debug(String.format(
-                    "Ignoring delete for block %s in container %d."
-                        + " Entry already added.", blk, containerId));
+                LOG.debug("Ignoring delete for block {} in container {}."
+                        + " Entry already added.", blkLong, containerId);
               }
               continue;
             }
@@ -386,12 +384,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             newDeletionBlocks++;
             if (LOG.isDebugEnabled()) {
               LOG.debug("Transited Block {} to DELETING state in container {}",
-                  blk, containerId);
+                  blkLong, containerId);
             }
           } else {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Block {} not found or already under deletion in"
-                  + " container {}, skip deleting it.", blk, containerId);
+                  + " container {}, skip deleting it.", blkLong, containerId);
             }
           }
         }
@@ -422,14 +420,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
         // Update in DB pending delete key count and delete transaction ID.
         metadataTable
-            .putWithBatch(batchOperation, OzoneConsts.DELETE_TRANSACTION_KEY,
+            .putWithBatch(batchOperation, containerData.latestDeleteTxnKey(),
                 delTX.getTxID());
       }
 
       long pendingDeleteBlocks =
           containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
       metadataTable
-          .putWithBatch(batchOperation, OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+          .putWithBatch(batchOperation,
+              containerData.pendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
       // update pending deletion blocks count and delete transaction ID in

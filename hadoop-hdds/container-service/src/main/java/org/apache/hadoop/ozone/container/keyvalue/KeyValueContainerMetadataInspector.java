@@ -25,7 +25,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -209,7 +208,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
       // Build aggregate values.
       JsonObject aggregates = getAggregateValues(store,
-          containerData.getContainerID(), schemaVersion);
+          containerData, schemaVersion);
       containerJson.add("aggregates", aggregates);
 
       // Build info about chunks directory.
@@ -243,7 +242,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   }
 
   private JsonObject getAggregateValues(DatanodeStore store,
-      long containerID, String schemaVersion) throws IOException {
+      KeyValueContainerData containerData, String schemaVersion)
+      throws IOException {
     JsonObject aggregates = new JsonObject();
 
     long usedBytesTotal = 0;
@@ -251,8 +251,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     long pendingDeleteBlockCountTotal = 0;
     // Count normal blocks.
     try (BlockIterator<BlockData> blockIter =
-             store.getBlockIterator(containerID,
-                 MetadataKeyFilters.getUnprefixedKeyFilter())) {
+             store.getBlockIterator(containerData.getContainerID(),
+                 containerData.getUnprefixedKeyFilter())) {
 
       while (blockIter.hasNext()) {
         blockCountTotal++;
@@ -263,8 +263,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     // Count pending delete blocks.
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
       try (BlockIterator<BlockData> blockIter =
-               store.getBlockIterator(containerID,
-                   MetadataKeyFilters.getDeletingKeyFilter())) {
+               store.getBlockIterator(containerData.getContainerID(),
+                   containerData.getDeletingBlockKeyFilter())) {
 
         while (blockIter.hasNext()) {
           blockCountTotal++;

@@ -1597,11 +1597,10 @@ public abstract class TestOzoneRpcClientAbstract {
       // Change first and second replica commit sequenceId
       if (index < 3) {
         long newBCSID = container.getBlockCommitSequenceId() - 1;
-        try (DBHandle db = BlockUtils.getDB(
-            (KeyValueContainerData) container.getContainerData(),
-            cluster.getConf())) {
-          db.getStore().getMetadataTable().put(
-              OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, newBCSID);
+        KeyValueContainerData cData =
+            (KeyValueContainerData) container.getContainerData();
+        try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
+          db.getStore().getMetadataTable().put(cData.bcsIdKey(), newBCSID);
         }
         container.updateBlockCommitSequenceId(newBCSID);
         index++;

@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -277,35 +276,37 @@ public class TestOzoneContainer {
 
     long freeBytes = container.getContainerData().getMaxSize();
     long containerId = container.getContainerData().getContainerID();
-    DBHandle db = BlockUtils.getDB(container.getContainerData(), conf);
+    KeyValueContainerData cData = container.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
 
-    Table<String, Long> metadataTable = db.getStore().getMetadataTable();
-    Table<String, BlockData> blockDataTable = db.getStore().getBlockDataTable();
+      Table<String, Long> metadataTable =
+          db.getStore().getMetadataTable();
+      Table<String, BlockData> blockDataTable =
+          db.getStore().getBlockDataTable();
 
-    for (int bi = 0; bi < blocks; bi++) {
-      // Creating BlockData
-      BlockID blockID = new BlockID(containerId, bi);
-      BlockData blockData = new BlockData(blockID);
-      List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
+      for (int bi = 0; bi < blocks; bi++) {
+        // Creating BlockData
+        BlockID blockID = new BlockID(containerId, bi);
+        BlockData blockData = new BlockData(blockID);
+        List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
 
-      chunkList.clear();
-      for (int ci = 0; ci < chunksPerBlock; ci++) {
-        String chunkName = strBlock + bi + strChunk + ci;
-        long offset = ci * (long) datalen;
-        ChunkInfo info = new ChunkInfo(chunkName, offset, datalen);
-        usedBytes += datalen;
-        chunkList.add(info.getProtoBufMessage());
+        chunkList.clear();
+        for (int ci = 0; ci < chunksPerBlock; ci++) {
+          String chunkName = strBlock + bi + strChunk + ci;
+          long offset = ci * (long) datalen;
+          ChunkInfo info = new ChunkInfo(chunkName, offset, datalen);
+          usedBytes += datalen;
+          chunkList.add(info.getProtoBufMessage());
+        }
+        blockData.setChunks(chunkList);
+        blockDataTable.put(cData.blockKey(blockID.getLocalID()), blockData);
       }
-      blockData.setChunks(chunkList);
-      blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
+
+      // Set Block count and used bytes.
+      metadataTable.put(cData.blockCountKey(), (long) blocks);
+      metadataTable.put(cData.bytesUsedKey(), usedBytes);
     }
-
-    // Set Block count and used bytes.
-    metadataTable.put(OzoneConsts.BLOCK_COUNT, (long)blocks);
-    metadataTable.put(OzoneConsts.CONTAINER_BYTES_USED, usedBytes);
-
     // remaining available capacity of the container
-    db.close();
     return (freeBytes - usedBytes);
   }
 
