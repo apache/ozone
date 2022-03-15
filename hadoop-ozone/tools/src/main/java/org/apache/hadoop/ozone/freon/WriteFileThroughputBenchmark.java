@@ -120,7 +120,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     // Disabling the file system cache
     String disableCacheName = String.format("fs.%s.impl.disable.cache",
         uri.getScheme());
-    print("Disabling FS cache: " + disableCacheName);
+    LOG.info("Disabling FS cache: "+disableCacheName);
     configuration.setBoolean(disableCacheName, true);
 
     Path file = new Path(rootPath + "/" +
