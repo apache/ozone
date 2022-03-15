@@ -96,13 +96,19 @@ public class GrpcOzoneManagerServer {
     SecurityConfig secConf = new SecurityConfig(omServerConfig);
     if (secConf.isGrpcTlsEnabled()) {
       try {
-        SslContextBuilder sslClientContextBuilder = SslContextBuilder.forServer(
-            caClient.getPrivateKey(), caClient.getCertificate());
-        SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
-            sslClientContextBuilder,
-            SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,
-                HDDS_GRPC_TLS_PROVIDER_DEFAULT)));
-        nettyServerBuilder.sslContext(sslContextBuilder.build());
+        if (secConf.isSecurityEnabled()) {
+          SslContextBuilder sslClientContextBuilder =
+              SslContextBuilder.forServer(caClient.getPrivateKey(),
+                  caClient.getCertificate());
+          SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
+              sslClientContextBuilder,
+              SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,
+                  HDDS_GRPC_TLS_PROVIDER_DEFAULT)));
+          nettyServerBuilder.sslContext(sslContextBuilder.build());
+        } else {
+          LOG.error("ozone.security not enabled when TLS specified," +
+                            " creating Om S3g GRPC channel using plaintext");
+        }
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure Om S3g GRPC channel.", ex);
       }

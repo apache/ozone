@@ -153,13 +153,18 @@ public class GrpcOmTransport implements OmTransport {
     if (secConfig.isGrpcTlsEnabled()) {
       try {
         SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-        if (caCerts != null) {
-          sslContextBuilder.trustManager(caCerts);
+        if (secConfig.isSecurityEnabled()) {
+          if (caCerts != null) {
+            sslContextBuilder.trustManager(caCerts);
+          } else {
+            LOG.error("x509Certicates empty");
+          }
+          channelBuilder.useTransportSecurity().
+              sslContext(sslContextBuilder.build());
         } else {
-          LOG.error("x509Certicates empty");
+          LOG.error("ozone.security not enabled when TLS specified," +
+              " using plaintext");
         }
-        channelBuilder.useTransportSecurity().
-            sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("cannot establish TLS for grpc om transport client");
       }

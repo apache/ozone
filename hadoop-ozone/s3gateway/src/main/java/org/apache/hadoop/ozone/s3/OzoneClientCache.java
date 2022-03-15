@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -141,6 +143,7 @@ public final class OzoneClientCache {
           caCertPem = serviceInfoEx.getCaCertificate();
           caCertPems = serviceInfoEx.getCaCertPemList();
           if (caCertPems == null || caCertPems.isEmpty()) {
+            Preconditions.checkNotNull(caCertPem);
             caCertPems = Collections.singletonList(caCertPem);
           }
           GrpcOmTransport.setCaCerts(OzoneSecurityUtil
