@@ -205,6 +205,10 @@ public abstract class EndpointBase {
   protected Map<String, String> getCustomMetadataFromHeaders(
       MultivaluedMap<String, String> requestHeaders) {
     Map<String, String> customMetadata = new HashMap<>();
+    if (requestHeaders == null || requestHeaders.isEmpty()) {
+      return customMetadata;
+    }
+
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> k.startsWith(CUSTOM_METADATA_HEADER_PREFIX))
             .collect(Collectors.toSet());
