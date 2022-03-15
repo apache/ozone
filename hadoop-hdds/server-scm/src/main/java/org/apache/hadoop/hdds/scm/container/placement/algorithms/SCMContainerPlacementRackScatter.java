@@ -98,6 +98,18 @@ public final class SCMContainerPlacementRackScatter
       throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
+    int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
+    List<Node> totalNodes = networkTopology.getNodes(
+        networkTopology.getMaxLevel());
+    if (excludedNodes != null) {
+      totalNodes.removeAll(excludedNodes);
+    }
+    if (totalNodes.size() < nodesRequired) {
+      throw new SCMException("No enough datanodes to choose. " +
+          "TotalNode = " + totalNodes.size() +
+          " RequiredNode = " + nodesRequired +
+          " ExcludedNode = " + excludedNodesCount, null);
+    }
 
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
     if (favoredNodes != null) {
