@@ -138,7 +138,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    *
    * @param dns A list of DatanodeDetails that are known to be bad.
    */
-  public void addFailedDatanodes(List<DatanodeDetails> dns) {
+  public synchronized void addFailedDatanodes(List<DatanodeDetails> dns) {
     if (initialized) {
       throw new RuntimeException("Cannot add failed datanodes after the " +
           "reader has been initialized");
@@ -154,7 +154,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
   }
 
-  protected void init() throws InsufficientLocationsException {
+  private void init() throws InsufficientLocationsException {
     if (decoder == null) {
       decoder = CodecUtil.createRawDecoderWithFallback(getRepConfig());
     }
