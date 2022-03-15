@@ -465,7 +465,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   private synchronized void removeEntryFromDnsToUuidMap(String dnsName) {
-    if (!dnsToUuidMap.contains(dnsName)) {
+    if (!dnsToUuidMap.containsKey(dnsName)) {
       return;
     }
     Set<String> dnSet = dnsToUuidMap.get(dnsName);
