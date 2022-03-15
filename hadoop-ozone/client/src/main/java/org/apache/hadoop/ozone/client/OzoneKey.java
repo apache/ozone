@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A class that encapsulates OzoneKey.
@@ -56,6 +58,8 @@ public class OzoneKey {
 
   private ReplicationConfig replicationConfig;
 
+  private Map<String, String> metadata = new HashMap<>();
+
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -76,6 +80,22 @@ public class OzoneKey {
             ReplicationFactor.valueOf(replicationFactor));
   }
 
+  @SuppressWarnings("parameternumber")
+  public OzoneKey(String volumeName, String bucketName,
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationType type,
+                  int replicationFactor, Map<String, String> metadata) {
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
+    this.name = keyName;
+    this.dataSize = size;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type,
+        ReplicationFactor.valueOf(replicationFactor));
+    this.metadata.putAll(metadata);
+  }
+
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -93,6 +113,20 @@ public class OzoneKey {
     this.replicationConfig = replicationConfig;
   }
 
+  @SuppressWarnings("parameternumber")
+  public OzoneKey(String volumeName, String bucketName,
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationConfig replicationConfig,
+                  Map<String, String> metadata) {
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
+    this.name = keyName;
+    this.dataSize = size;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    this.replicationConfig = replicationConfig;
+    this.metadata.putAll(metadata);
+  }
   /**
    * Returns Volume Name associated with the Key.
    *
@@ -152,6 +186,10 @@ public class OzoneKey {
    *
    * @return replicationType
    */
+
+  public Map<String, String> getMetadata() {
+    return metadata;
+  }
 
   @Deprecated
   public ReplicationType getReplicationType() {

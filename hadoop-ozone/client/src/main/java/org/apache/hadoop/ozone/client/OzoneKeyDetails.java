@@ -35,8 +35,6 @@ public class OzoneKeyDetails extends OzoneKey {
    */
   private List<OzoneKeyLocation> ozoneKeyLocations;
 
-  private Map<String, String> metadata;
-
   private FileEncryptionInfo feInfo;
 
   /**
@@ -50,9 +48,8 @@ public class OzoneKeyDetails extends OzoneKey {
                          ReplicationType type, Map<String, String> metadata,
                          FileEncryptionInfo feInfo, int replicationFactor) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor);
+        modificationTime, type, replicationFactor, metadata);
     this.ozoneKeyLocations = ozoneKeyLocations;
-    this.metadata = metadata;
     this.feInfo = feInfo;
   }
 
@@ -68,9 +65,8 @@ public class OzoneKeyDetails extends OzoneKey {
       Map<String, String> metadata,
       FileEncryptionInfo feInfo) {
     super(volumeName, bucketName, keyName, size, creationTime,
-            modificationTime, replicationConfig);
+            modificationTime, replicationConfig, metadata);
     this.ozoneKeyLocations = ozoneKeyLocations;
-    this.metadata = metadata;
     this.feInfo = feInfo;
   }
 
@@ -79,10 +75,6 @@ public class OzoneKeyDetails extends OzoneKey {
    */
   public List<OzoneKeyLocation> getOzoneKeyLocations() {
     return ozoneKeyLocations;
-  }
-
-  public Map<String, String> getMetadata() {
-    return metadata;
   }
 
   public FileEncryptionInfo getFileEncryptionInfo() {

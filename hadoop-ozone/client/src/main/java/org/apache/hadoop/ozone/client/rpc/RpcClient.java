@@ -1627,7 +1627,8 @@ public class RpcClient implements ClientProtocol {
 
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
-        keyInfo.getModificationTime(), keyInfo.getReplicationConfig());
+        keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
+        keyInfo.getMetadata());
 
   }
 
