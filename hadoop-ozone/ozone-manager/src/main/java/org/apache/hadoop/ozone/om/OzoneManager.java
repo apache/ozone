@@ -1978,12 +1978,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
             OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
     InetSocketAddress omRpcAdd = OmUtils.getOmAddress(config);
-    String hostname = omRpcAdd.getHostName();
-    int port = omRpcAdd.getPort();
     String ip = null;
 
     boolean addressResolved = omRpcAdd != null && omRpcAdd.getAddress() != null;
-    if (flexibleFqdnResolutionEnabled && !addressResolved) {
+    if (flexibleFqdnResolutionEnabled && !addressResolved && omRpcAdd != null) {
       InetSocketAddress omRpcAddWithHostName =
               FlexibleFQDNResolution.getAddressWithHostName(omRpcAdd);
       if (omRpcAddWithHostName != null
@@ -2003,6 +2001,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ip = omRpcAdd.getAddress().getHostAddress();
     }
 
+    String hostname = omRpcAdd.getHostName();
+    int port = omRpcAdd.getPort();
     String subject;
     if (builder.hasDnsName()) {
       subject = UserGroupInformation.getCurrentUser().getShortUserName()
