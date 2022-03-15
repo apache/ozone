@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
+import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
+import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -834,10 +836,11 @@ public class SCMClientProtocolServer implements
     ContainerBalancer containerBalancer = scm.getContainerBalancer();
     containerBalancer.setConfig(cbc);
     try {
-      containerBalancer.start();
-    } catch (RuntimeException exception) {
+      containerBalancer.startBalancer();
+    } catch (IllegalContainerBalancerStateException |
+        InvalidContainerBalancerConfigurationException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.START_CONTAINER_BALANCER, null, exception));
+          SCMAction.START_CONTAINER_BALANCER, null, e));
       return false;
     }
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -850,7 +853,7 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_CONTAINER_BALANCER, null));
-    scm.getContainerBalancer().stop();
+    scm.getContainerBalancer().stopBalancer();
   }
 
   @Override

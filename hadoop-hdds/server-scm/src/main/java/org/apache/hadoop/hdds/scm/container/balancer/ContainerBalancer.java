@@ -155,7 +155,7 @@ public class ContainerBalancer implements SCMService {
     for (int i = 0; i < iterations && balancerRunning; i++) {
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
-        stop();
+        stopBalancer();
         return;
       }
 
@@ -164,7 +164,7 @@ public class ContainerBalancer implements SCMService {
       IterationResult iR = doIteration();
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        stop();
+        stopBalancer();
         return;
       }
 
@@ -188,7 +188,7 @@ public class ContainerBalancer implements SCMService {
         }
       }
     }
-    stop();
+    stopBalancer();
   }
 
   /**
@@ -711,24 +711,24 @@ public class ContainerBalancer implements SCMService {
   /**
    * Receives a notification for raft or safe mode related status changes.
    * Stops ContainerBalancer if it's running and the current SCM becomes a
-   * follower or is in safe mode.
+   * follower or enters safe mode.
    */
   @Override
   public void notifyStatusChanged() {
     if (!checkLeaderAndSafeMode()) {
       if (isBalancerRunning()) {
-        stopBalancer();
+        stopBalancingThread();
       }
     }
   }
 
   /**
-   * No use of this method, currently.
-   * @return true
+   * Checks if ContainerBalancer should run.
+   * @return false
    */
   @Override
   public boolean shouldRun() {
-    return true;
+    return false;
   }
 
   /**
@@ -740,26 +740,38 @@ public class ContainerBalancer implements SCMService {
   }
 
   /**
-   * Starts Container Balancer after checking its state and validating
-   * configurations.
-   * @throws RuntimeException if ContainerBalancer is not in a start-appropriate
-   * state or {@link ContainerBalancerConfiguration} config file is
-   * incorrectly configured
+   * Starts ContainerBalancer as an SCMService.
    */
   @Override
-  public void start() throws RuntimeException {
+  public void start() {
+    if (shouldRun()) {
+      startBalancingThread();
+    }
+  }
+
+  /**
+   * Starts Container Balancer after checking its state and validating
+   * configuration.
+   *
+   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
+   * not in a start-appropriate state
+   * @throws InvalidContainerBalancerConfigurationException if
+   * {@link ContainerBalancerConfiguration} config file is incorrectly
+   * configured
+   */
+  public void startBalancer() throws IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException {
     lock.lock();
     try {
       if (!canRun()) {
-        LOG.warn("Cannot start ContainerBalancer in the current state.");
-        throw new RuntimeException("Cannot start ContainerBalancer");
+        throw new IllegalContainerBalancerStateException("Cannot start " +
+            "ContainerBalancer in the current state.");
       }
       if (!validateConfiguration(this.config)) {
-        LOG.warn("Cannot start ContainerBalancer. " +
-            "ContainerBalancerConfiguration is incorrectly configured.");
-        throw new RuntimeException("Cannot start ContainerBalancer");
+        throw new InvalidContainerBalancerConfigurationException("Cannot " +
+            "start ContainerBalancer because the configuration is invalid.");
       }
-      startBalancer();
+      startBalancingThread();
     } finally {
       lock.unlock();
     }
@@ -768,7 +780,7 @@ public class ContainerBalancer implements SCMService {
   /**
    * Starts a new balancing thread asynchronously.
    */
-  private void startBalancer() {
+  private void startBalancingThread() {
     lock.lock();
     try {
       balancerRunning = true;
@@ -804,38 +816,47 @@ public class ContainerBalancer implements SCMService {
    */
   private boolean checkLeaderAndSafeMode() {
     if (!scmContext.isLeaderReady()) {
-      LOG.warn("Cannot run ContainerBalancer because SCM is not leader " +
-          "ready");
+      LOG.warn("SCM is not leader ready");
       return false;
     }
     if (scmContext.isInSafeMode()) {
-      LOG.warn("Cannot run ContainerBalancer because SCM is in safe mode");
+      LOG.warn("SCM is in safe mode");
       return false;
     }
     return true;
   }
 
   /**
-   * Stops ContainerBalancer.
+   * Stops the SCM service.
    */
   @Override
   public void stop() {
     stopBalancer();
   }
 
-  private void stopBalancer() {
+  /**
+   * Stops ContainerBalancer gracefully.
+   */
+  public void stopBalancer() {
     lock.lock();
     try {
-      // we should stop the balancer thread gracefully
       if (!isBalancerRunning()) {
         LOG.info("Container Balancer is not running.");
         return;
       }
+      stopBalancingThread();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void stopBalancingThread() {
+    lock.lock();
+    try {
       balancerRunning = false;
     } finally {
       lock.unlock();
     }
-
     // wait for currentBalancingThread to die
     if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
       currentBalancingThread.interrupt();

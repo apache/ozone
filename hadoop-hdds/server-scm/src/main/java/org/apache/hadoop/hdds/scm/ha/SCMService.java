@@ -67,12 +67,8 @@ public interface SCMService {
 
   /**
    * starts the SCM service.
-   * @throws RuntimeException Currently, {@link ContainerBalancer#start()}
-   * throws runtime exceptions.
    */
-  //TODO This should ideally throw checked exceptions and will need
-  // refactoring later.
-  void start() throws RuntimeException;
+  void start();
 
   /**
    * stops the SCM service.
