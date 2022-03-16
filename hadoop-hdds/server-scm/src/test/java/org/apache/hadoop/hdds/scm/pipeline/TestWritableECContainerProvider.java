@@ -296,8 +296,8 @@ public class TestWritableECContainerProvider {
     assertTrue(allocatedContainers.contains(newContainer));
     // Now get a new container where there is not enough space in the existing
     // and ensure a new container gets created.
-     newContainer = provider.getContainer(
-         128 * 1024 * 1024, repConfig, OWNER, new ExcludeList());
+    newContainer = provider.getContainer(
+        128 * 1024 * 1024, repConfig, OWNER, new ExcludeList());
     assertNotNull(newContainer);
     assertFalse(allocatedContainers.contains(newContainer));
     // The original pipelines should all be closed, triggered by the lack of
