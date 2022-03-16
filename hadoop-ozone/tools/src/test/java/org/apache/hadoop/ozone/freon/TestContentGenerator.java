@@ -38,14 +38,13 @@ public class TestContentGenerator {
       System.out.println(generator.getCopyBufferSize());
     }
     generator.write(output);
-    System.out.println("Write happened");
     Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());
   }
 
   @Test
   public void writeWithSmallerBuffers() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.ContentGeneratorBuilder(1024, 1024).copyBufferSize(
+        new ContentGenerator.ContentGeneratorBuilder(10000, 1024).copyBufferSize(
             3).build();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     generator.write(baos);

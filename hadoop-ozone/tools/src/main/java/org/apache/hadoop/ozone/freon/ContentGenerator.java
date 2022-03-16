@@ -48,17 +48,6 @@ public class ContentGenerator {
 
   private final byte[] buffer;
 
-  ContentGenerator(long keySize, int bufferSize) {
-    this(keySize, bufferSize, bufferSize);
-  }
-
-  ContentGenerator(long keySize, int bufferSize, int copyBufferSize) {
-    this.keySize = keySize;
-    this.bufferSize = bufferSize;
-    this.copyBufferSize = copyBufferSize;
-    buffer = RandomStringUtils.randomAscii(bufferSize)
-        .getBytes(StandardCharsets.UTF_8);
-  }
 
   ContentGenerator(ContentGeneratorBuilder contentgeneratorbuilder) {
     this.keySize = contentgeneratorbuilder.keySize;
@@ -105,7 +94,7 @@ public class ContentGenerator {
 
     private final long keySize; // Required
     private final int bufferSize; // Required
-    private int copyBufferSize; // Optional
+    private int copyBufferSize = 1024; // Optional Parameter Default Value set
 
     ContentGeneratorBuilder(long keysize, int buffersize)
     {

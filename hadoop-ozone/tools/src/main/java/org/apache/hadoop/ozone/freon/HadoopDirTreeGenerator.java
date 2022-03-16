@@ -111,8 +111,9 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       init();
       OzoneConfiguration configuration = createOzoneConfiguration();
       fileSystem = FileSystem.get(URI.create(rootPath), configuration);
-
-      contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
+      contentGenerator =
+          new ContentGenerator.ContentGeneratorBuilder(fileSizeInBytes,
+              bufferSize).build();
       timer = getMetrics().timer("file-create");
 
       runTests(this::createDir);

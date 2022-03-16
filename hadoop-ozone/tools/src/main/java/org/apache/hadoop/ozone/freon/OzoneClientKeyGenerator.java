@@ -91,7 +91,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    contentGenerator = new ContentGenerator(keySize, bufferSize);
+    contentGenerator = new ContentGenerator.ContentGeneratorBuilder(keySize, bufferSize).build();
     metadata = new HashMap<>();
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
