@@ -132,8 +132,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       boolean grpcBlockTokenEnabled, String omID) throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
-    int numBlocks = Math.min(preallocateBlocksMax,
-        (int) ((requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1));
+    int numBlocks = (int) Math.min(preallocateBlocksMax,
+        (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
