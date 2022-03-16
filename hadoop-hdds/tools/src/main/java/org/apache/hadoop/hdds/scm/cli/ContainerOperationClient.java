@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
@@ -408,9 +409,10 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationFactor factor) throws IOException {
+      HddsProtos.ReplicationType repType,
+      ReplicationConfig replicationConfig) throws IOException {
     return storageContainerLocationClient.listContainer(
-        startContainerID, count, state, factor);
+        startContainerID, count, state, repType, replicationConfig);
   }
 
   /**

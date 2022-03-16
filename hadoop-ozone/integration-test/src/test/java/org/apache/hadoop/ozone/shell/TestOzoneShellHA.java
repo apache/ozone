@@ -508,17 +508,17 @@ public class TestOzoneShellHA {
     execute(ozoneAdminShell, args);
 
     // Test case 3: list THREE replica container
-    String factor = "--factor=THREE";
+    String factor = "--replication=THREE";
     args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
-        factor};
+        factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
 
     // Test case 4: list ONE replica container
-    factor = "--factor=ONE";
+    factor = "--replication=ONE";
     args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
-        factor};
+        factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
   }
 

@@ -54,11 +54,11 @@ List containers with container state
                         Should Not contain   ${output}   OPEN
 
 List containers with replication factor ONE
-    ${output} =         Execute          ozone admin container list --factor=ONE
+    ${output} =         Execute          ozone admin container list -t RATIS -r ONE
                         Should Not contain   ${output}   THREE
 
 List containers with replication factor THREE
-    ${output} =         Execute          ozone admin container list --factor=THREE
+    ${output} =         Execute          ozone admin container list -t RATIS -r THREE
                         Should Not contain   ${output}   ONE
 
 Container info
