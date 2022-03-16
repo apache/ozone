@@ -21,12 +21,10 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.security.cert.X509Certificate;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.google.common.net.HostAndPort;
@@ -76,7 +74,6 @@ public class GrpcOmTransport implements OmTransport {
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
   // gRPC specific
-  private ManagedChannel channel;  
   private static List<X509Certificate> caCerts = null;
 
   private OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub client;
@@ -110,6 +107,7 @@ public class GrpcOmTransport implements OmTransport {
     this.conf = conf;
     this.host = new AtomicReference();
 
+    secConfig =  new SecurityConfig(conf);
     maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
         OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
 
@@ -141,6 +139,29 @@ public class GrpcOmTransport implements OmTransport {
           NettyChannelBuilder.forAddress(hp.getHost(), hp.getPort())
               .usePlaintext()
               .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+
+      if (secConfig.isGrpcTlsEnabled()) {
+        try {
+          SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
+          if (secConfig.isSecurityEnabled()) {
+            if (caCerts != null) {
+              sslContextBuilder.trustManager(caCerts);
+            } else {
+              LOG.error("x509Certicates empty");
+            }
+            channelBuilder.useTransportSecurity().
+                sslContext(sslContextBuilder.build());
+          } else {
+            LOG.error("ozone.security not enabled when TLS specified," +
+                " using plaintext");
+          }
+        } catch (Exception ex) {
+          LOG.error("cannot establish TLS for grpc om transport client");
+        }
+      } else {
+        channelBuilder.usePlaintext();
+      }
+
       channels.put(hostaddr, channelBuilder.build());
       clients.put(hostaddr,
           OzoneManagerServiceGrpc
@@ -150,31 +171,6 @@ public class GrpcOmTransport implements OmTransport {
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
-    if (secConfig.isGrpcTlsEnabled()) {
-      try {
-        SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-        if (secConfig.isSecurityEnabled()) {
-          if (caCerts != null) {
-            sslContextBuilder.trustManager(caCerts);
-          } else {
-            LOG.error("x509Certicates empty");
-          }
-          channelBuilder.useTransportSecurity().
-              sslContext(sslContextBuilder.build());
-        } else {
-          LOG.error("ozone.security not enabled when TLS specified," +
-              " using plaintext");
-        }
-      } catch (Exception ex) {
-        LOG.error("cannot establish TLS for grpc om transport client");
-      }
-    } else {
-      channelBuilder.usePlaintext();
-    }
-    channel = channelBuilder.build();
-    client = OzoneManagerServiceGrpc.newBlockingStub(channel);
-
-    
     retryPolicy = omFailoverProxyProvider.getRetryPolicy(maxFailovers);
     LOG.info("{}: started", CLIENT_NAME);
   }
