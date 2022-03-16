@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
-import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
-
 /**
  * Interface for background services in SCM, including ReplicationManager,
  * SCMBlockDeletingService and BackgroundPipelineCreator.
