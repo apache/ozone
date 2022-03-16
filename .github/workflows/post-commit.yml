@@ -72,7 +72,7 @@ jobs:
     strategy:
       matrix:
         java: [ 8, 11 ]
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -121,7 +121,7 @@ jobs:
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -203,7 +203,7 @@ jobs:
           - HA
           - MR
           - misc
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -278,7 +278,7 @@ jobs:
           - filesystem-hdds
           - ozone
           - flaky
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
