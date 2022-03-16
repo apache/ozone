@@ -168,18 +168,21 @@ public class TestOMKeyRequest {
         .setNodes(new ArrayList<>())
         .build();
 
-    AllocatedBlock allocatedBlock =
-        new AllocatedBlock.Builder()
-            .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID))
-            .setPipeline(pipeline).build();
-
-    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
-
-    allocatedBlocks.add(allocatedBlock);
+    AllocatedBlock.Builder blockBuilder = new AllocatedBlock.Builder()
+        .setPipeline(pipeline);
 
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
         any(ReplicationConfig.class),
-        anyString(), any(ExcludeList.class))).thenReturn(allocatedBlocks);
+        anyString(), any(ExcludeList.class))).thenAnswer(invocation -> {
+          int num = invocation.getArgument(1);
+          List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
+          for (int i = 0; i < num; i++) {
+            blockBuilder.setContainerBlockID(
+                new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
+            allocatedBlocks.add(blockBuilder.build());
+          }
+          return allocatedBlocks;
+        });
 
 
     volumeName = UUID.randomUUID().toString();

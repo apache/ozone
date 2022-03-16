@@ -24,6 +24,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
@@ -59,12 +62,33 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecuteWithNormalKey() throws Exception {
-    doPreExecute(createKeyRequest(false, 0));
+    ReplicationConfig ratis3Config =
+        ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
+    preExecuteTest(false, 0, ratis3Config);
+  }
+
+  @Test
+  public void testPreExecuteWithECKey() throws Exception {
+    ReplicationConfig ec3Plus2Config = new ECReplicationConfig("rs-3-2-1024k");
+    preExecuteTest(false, 0, ec3Plus2Config);
   }
 
   @Test
   public void testPreExecuteWithMultipartKey() throws Exception {
-    doPreExecute(createKeyRequest(true, 1));
+    ReplicationConfig ratis3Config =
+        ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
+    preExecuteTest(true, 1, ratis3Config);
+  }
+
+  private void preExecuteTest(boolean isMultipartKey, int partNumber,
+      ReplicationConfig repConfig) throws Exception {
+    long scmBlockSize = ozoneManager.getScmBlockSize();
+    for (int i = 0; i <= repConfig.getRequiredNodes(); i++) {
+      doPreExecute(createKeyRequest(isMultipartKey, partNumber,
+          scmBlockSize * i, repConfig, keyName));
+      doPreExecute(createKeyRequest(isMultipartKey, partNumber,
+          scmBlockSize * i + 1, repConfig, keyName));
+    }
   }
 
 
@@ -342,6 +366,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         modifiedOmRequest.getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+    int dataGroupSize = keyArgs.hasEcReplicationConfig() ?
+        keyArgs.getEcReplicationConfig().getData() : 1;
+    long blockSize = ozoneManager.getScmBlockSize();
+    long preAllocatedBlocks = Math.min(ozoneManager.getPreallocateBlocksMax(),
+        (keyArgs.getDataSize() - 1) / (blockSize * dataGroupSize) + 1);
+
     // Time should be set
     Assert.assertTrue(keyArgs.getModificationTime() > 0);
 
@@ -359,7 +389,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       List< OzoneManagerProtocolProtos.KeyLocation> keyLocations =
           keyArgs.getKeyLocationsList();
       // KeyLocation should be set.
-      Assert.assertTrue(keyLocations.size() == 1);
+      Assert.assertEquals(preAllocatedBlocks, keyLocations.size());
       Assert.assertEquals(CONTAINER_ID,
           keyLocations.get(0).getBlockID().getContainerBlockID()
               .getContainerID());
@@ -403,6 +433,36 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     if (isMultipartKey) {
       keyArgs.setDataSize(dataSize).setMultipartNumber(partNumber);
+    }
+
+    OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
+        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    return OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest).build();
+  }
+
+  private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+      long keyLength, ReplicationConfig repConfig, String keyName) {
+
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName).setIsMultipartKey(isMultipartKey)
+        .setType(repConfig.getReplicationType())
+        .setLatestVersionLocation(true)
+        .setDataSize(keyLength);
+
+    if (repConfig.getReplicationType() == EC) {
+      keyArgs.setEcReplicationConfig(
+          ((ECReplicationConfig) repConfig).toProto());
+    } else {
+      keyArgs.setFactor(ReplicationConfig.getLegacyFactor(repConfig));
+    }
+
+    if (isMultipartKey) {
+      keyArgs.setMultipartNumber(partNumber);
     }
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
