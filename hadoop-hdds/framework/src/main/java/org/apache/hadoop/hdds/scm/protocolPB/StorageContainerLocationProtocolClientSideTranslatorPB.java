@@ -21,6 +21,9 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
@@ -111,6 +114,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
@@ -357,18 +362,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count)
       throws IOException {
-    return listContainer(startContainerID, count, null, null);
+    return listContainer(startContainerID, count, null, null, null);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
-    return listContainer(startContainerID, count, state, null);
+    return listContainer(startContainerID, count, state, null, null);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
-      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig)
       throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
@@ -382,8 +389,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (state != null) {
       builder.setState(state);
     }
-    if (factor != null) {
-      builder.setFactor(factor);
+    if (replicationConfig != null) {
+      if (replicationConfig.getReplicationType() == EC) {
+        builder.setType(EC);
+        builder.setEcReplicationConfig(
+            ((ECReplicationConfig)replicationConfig).toProto());
+      } else {
+        builder.setType(replicationConfig.getReplicationType());
+        builder.setFactor(((ReplicatedReplicationConfig)replicationConfig)
+            .getReplicationFactor());
+      }
+    } else if (replicationType != null) {
+      builder.setType(replicationType);
     }
 
     SCMListContainerRequestProto request = builder.build();
@@ -398,6 +415,15 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
     }
     return containerList;
+  }
+
+  @Deprecated
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      throws IOException {
+    throw new UnsupportedOperationException("Should no longer be called from " +
+        "the client side");
   }
 
   /**
