@@ -115,8 +115,8 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     init();
 
     // We cannot have both Hsync and Hflush set to TRUE at the same time
-    if(hSync == true || hFlush == true){
-      if(hSync == hFlush){
+    if (hSync && hFlush) {
+      if (hSync == hFlush) {
         LOG.info("Both Hsync and Hflush cannot be set to TRUE");
         System.exit(1);
       }
@@ -145,7 +145,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     // Disabling the file system cache
     String disableCacheName = String.format("fs.%s.impl.disable.cache",
         uri.getScheme());
-    LOG.info("Disabling FS cache: "+disableCacheName);
+    LOG.info("Disabling FS cache: " + disableCacheName);
     configuration.setBoolean(disableCacheName, true);
 
     Path file = new Path(rootPath + "/" +
