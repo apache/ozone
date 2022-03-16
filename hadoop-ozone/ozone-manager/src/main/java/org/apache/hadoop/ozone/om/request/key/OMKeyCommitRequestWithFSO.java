@@ -141,6 +141,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
       // Update the block length for each block
+      List<OmKeyLocationInfo> allocatedLocationInfoList =
+          omKeyInfo.getLatestVersionLocations().getLocationList();
       omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
@@ -178,7 +180,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
-              locationInfoList.size() * scmBlockSize * factor;
+              allocatedLocationInfoList.size() * scmBlockSize * factor;
       // Subtract the size of blocks to be overwritten.
       if (keyToDelete != null) {
         correctedSpace -= keyToDelete.getDataSize() *
