@@ -38,11 +38,11 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +54,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Tests for ContainerStateManager.
  */
-@Ignore
+@Flaky("HDDS-1159")
 public class TestContainerStateManagerIntegration {
 
   private static final Logger LOG =
@@ -69,7 +69,7 @@ public class TestContainerStateManagerIntegration {
   private  Set<ContainerID> excludedContainerIDS;
 
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     numContainerPerOwnerInPipeline =
@@ -85,7 +85,7 @@ public class TestContainerStateManagerIntegration {
     excludedContainerIDS = new HashSet<>();
   }
 
-  @After
+  @AfterEach
   public void cleanUp() {
     if (cluster != null) {
       cluster.shutdown();
@@ -278,7 +278,7 @@ public class TestContainerStateManagerIntegration {
   }
 
   @Test
-  @Ignore("TODO:HDDS-1159")
+  @Flaky("TODO:HDDS-1159")
   public void testGetMatchingContainerMultipleThreads()
       throws IOException, InterruptedException {
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
