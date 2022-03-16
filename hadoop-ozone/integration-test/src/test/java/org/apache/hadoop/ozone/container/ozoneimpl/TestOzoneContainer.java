@@ -32,12 +32,13 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.migrationsupport.rules.EnableRuleMigrationSupport;
 import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
 import java.util.HashMap;
@@ -53,13 +54,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 /**
  * Tests ozone containers.
  */
-@Ignore
+@EnableRuleMigrationSupport
+@Flaky("HDDS-2263")
+@Timeout(300)
 public class TestOzoneContainer {
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();

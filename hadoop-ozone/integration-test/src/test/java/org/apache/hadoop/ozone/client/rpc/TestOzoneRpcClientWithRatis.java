@@ -37,10 +37,10 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -60,7 +60,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
@@ -78,7 +78,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
     shutdownCluster();
   }
