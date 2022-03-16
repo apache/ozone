@@ -208,8 +208,9 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @param keyName
    * @throws IOException
    */
-  protected void checkACLs(OzoneManager ozoneManager, String volumeName,
-      String bucketName, String keyName, IAccessAuthorizer.ACLType aclType)
+  protected void checkACLsWithFSO(OzoneManager ozoneManager, String volumeName,
+                                  String bucketName, String keyName,
+                                  IAccessAuthorizer.ACLType aclType)
       throws IOException {
 
     // TODO: Presently not populating sub-paths under a single bucket
@@ -226,11 +227,10 @@ public abstract class OMClientRequest implements RequestAuditor {
         .setKeyName(keyName)
         .setOzonePrefixPath(pathViewer).build();
 
-    boolean isDirectory = pathViewer.getOzoneFileStatus().isDirectory();
-
     RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setAclRights(aclType)
-        .setRecursiveAccessCheck(isDirectory); // recursive checks for a dir
+        // recursive checks for a dir with sub-directories or sub-files
+        .setRecursiveAccessCheck(pathViewer.isCheckRecursiveAccess());
 
     // check Acl
     if (ozoneManager.getAclsEnabled()) {

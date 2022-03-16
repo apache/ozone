@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -80,7 +80,7 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
@@ -134,7 +134,7 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
@@ -149,15 +149,15 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Create 3 pipelines
       Pipeline pipeline1 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 
@@ -232,7 +232,7 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
@@ -247,15 +247,15 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Create 3 pipelines
       Pipeline pipeline1 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.ONE));
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 

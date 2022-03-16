@@ -29,6 +29,7 @@ public class DBUpdatesWrapper {
 
   private List<byte[]> dataList = new ArrayList<>();
   private long currentSequenceNumber = -1;
+  private long latestSequenceNumber = -1;
 
   public void addWriteBatch(byte[] data, long sequenceNumber) {
     dataList.add(data);
@@ -47,6 +48,14 @@ public class DBUpdatesWrapper {
 
   public long getCurrentSequenceNumber() {
     return currentSequenceNumber;
+  }
+
+  public void setLatestSequenceNumber(long sequenceNumber) {
+    this.latestSequenceNumber = sequenceNumber;
+  }
+
+  public long getLatestSequenceNumber() {
+    return latestSequenceNumber;
   }
 }
 

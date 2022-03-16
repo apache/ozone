@@ -254,6 +254,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
+  private PlacementPolicy containerPlacementPolicy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
@@ -384,11 +385,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     initializeEventHandlers();
 
-    containerBalancer = new ContainerBalancer(scmNodeManager, containerManager,
-        replicationManager, configuration, scmContext, clusterMap,
-        ContainerPlacementPolicyFactory
-            .getPolicy(conf, scmNodeManager, clusterMap, true,
-                placementMetrics));
+    containerBalancer = new ContainerBalancer(this);
     LOG.info(containerBalancer.toString());
 
     // Emit initial safe mode status, as now handlers are registered.
@@ -592,7 +589,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     placementMetrics = SCMContainerPlacementMetrics.create();
-    PlacementPolicy containerPlacementPolicy =
+    containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
 
@@ -1633,10 +1630,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmSafeModeManager;
   }
 
-  @VisibleForTesting
   @Override
   public ReplicationManager getReplicationManager() {
     return replicationManager;
+  }
+
+  public PlacementPolicy getContainerPlacementPolicy() {
+    return containerPlacementPolicy;
   }
 
   @VisibleForTesting

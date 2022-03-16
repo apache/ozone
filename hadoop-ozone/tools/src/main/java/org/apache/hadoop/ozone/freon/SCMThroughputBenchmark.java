@@ -501,7 +501,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
       public void run() {
         while (totalBlockCounter.getAndIncrement() < totalBlocks) {
           doAllocateBlock(blockSize, 1,
-              new RatisReplicationConfig(ReplicationFactor.THREE));
+              RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
         }
       }
     }

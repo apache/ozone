@@ -70,7 +70,8 @@ public class TestRepeatedOmKeyInfoCodec {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setReplicationConfig(
-                new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+                RatisReplicationConfig
+                    .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
         .setKeyName(KEYNAME)

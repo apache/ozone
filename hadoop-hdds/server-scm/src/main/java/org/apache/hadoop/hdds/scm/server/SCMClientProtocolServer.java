@@ -261,7 +261,7 @@ public class SCMClientProtocolServer implements
 
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
-          new StandaloneReplicationConfig(ReplicationConfig
+          StandaloneReplicationConfig.getInstance(ReplicationConfig
               .getLegacyFactor(container.getReplicationConfig())),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
@@ -875,7 +875,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
+      String ipaddress, String uuid, int clientVersion) throws IOException {
 
     // check admin authorisation
     try {
@@ -900,7 +900,7 @@ public class SCMClientProtocolServer implements
     // get datanode usage info
     List<HddsProtos.DatanodeUsageInfoProto> infoList = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
-      infoList.add(getUsageInfoFromDatanodeDetails(node));
+      infoList.add(getUsageInfoFromDatanodeDetails(node, clientVersion));
     }
 
     return infoList;
@@ -913,7 +913,7 @@ public class SCMClientProtocolServer implements
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
-      DatanodeDetails node) {
+      DatanodeDetails node, int clientVersion) {
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
 
     long capacity = stat.getCapacity().get();
@@ -924,7 +924,7 @@ public class SCMClientProtocolServer implements
         .setCapacity(capacity)
         .setUsed(used)
         .setRemaining(remaining)
-        .setNode(node.toProto(node.getCurrentVersion()))
+        .setNode(node.toProto(clientVersion))
         .build();
   }
 
@@ -942,7 +942,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count)
+      boolean mostUsed, int count, int clientVersion)
       throws IOException, IllegalArgumentException {
 
     // check admin authorisation
@@ -969,7 +969,7 @@ public class SCMClientProtocolServer implements
 
     // return count number of DatanodeUsageInfoProto
     return datanodeUsageInfoList.stream()
-        .map(DatanodeUsageInfo::toProto)
+        .map(each -> each.toProto(clientVersion))
         .limit(count)
         .collect(Collectors.toList());
   }
