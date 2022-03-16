@@ -85,9 +85,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     long scmBlockSize = ozoneManager.getScmBlockSize();
     for (int i = 0; i <= repConfig.getRequiredNodes(); i++) {
       doPreExecute(createKeyRequest(isMultipartKey, partNumber,
-          scmBlockSize * i, repConfig, keyName));
+          scmBlockSize * i, repConfig));
       doPreExecute(createKeyRequest(isMultipartKey, partNumber,
-          scmBlockSize * i + 1, repConfig, keyName));
+          scmBlockSize * i + 1, repConfig));
     }
   }
 
@@ -445,7 +445,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
-      long keyLength, ReplicationConfig repConfig, String keyName) {
+      long keyLength, ReplicationConfig repConfig) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
