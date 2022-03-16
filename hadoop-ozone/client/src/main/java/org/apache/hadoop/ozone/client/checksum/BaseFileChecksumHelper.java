@@ -216,13 +216,11 @@ public abstract class BaseFileChecksumHelper {
         CrcComposer.newCrcComposer(DataChecksum.Type.CRC32, blockSizeHint);
     byte[] blockChecksumBytes = blockChecksumBuf.getData();
 
-    long sumBlockLengths = 0;
     for (int i = 0; i < keyLocationInfos.size(); ++i) {
       OmKeyLocationInfo block = keyLocationInfos.get(i);
       // For every LocatedBlock, we expect getBlockSize()
       // to accurately reflect the number of file bytes digested in the block
       // checksum.
-      sumBlockLengths += block.getLength();
       int blockCrc = CrcUtil.readInt(blockChecksumBytes, i * 4);
 
       crcComposer.update(blockCrc, block.getLength());
