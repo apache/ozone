@@ -52,6 +52,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
@@ -490,6 +492,29 @@ public class TestSCMContainerPlacementRackScatter {
     stat = policy.validateContainerPlacement(dns, 1);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
+  }
+
+  @Test
+  public void testExcludedNodesOverlapsOutOfServiceNodes() throws SCMException {
+    assumeTrue(datanodeCount == 6);
+
+    // DN 5 is out of service
+    dnInfos.get(5).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+
+    // SCM should have detected that DN 5 is dead
+    cluster.remove(datanodes.get(5));
+
+    // Here we still have 5 DNs, so pick 5 should be possible
+    int nodeNum = 5;
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+    // The DN 5 is out of service,
+    // but the client already has it in the excludeList.
+    // So there is an overlap.
+    excludedNodes.add(datanodes.get(5));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
+        excludedNodes, null, nodeNum, 0, 5);
+    Assert.assertEquals(nodeNum, datanodeDetails.size());
   }
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {

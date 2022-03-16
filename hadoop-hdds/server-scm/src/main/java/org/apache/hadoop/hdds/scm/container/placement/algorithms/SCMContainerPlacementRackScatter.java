@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -99,11 +98,17 @@ public final class SCMContainerPlacementRackScatter
       throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
-    int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
-    if (datanodeCount < nodesRequired + excludedNodesCount) {
+    List<Node> availableNodes = networkTopology.getNodes(
+        networkTopology.getMaxLevel());
+    int totalNodesCount = availableNodes.size();
+    if (excludedNodes != null) {
+      availableNodes.removeAll(excludedNodes);
+    }
+    if (availableNodes.size() < nodesRequired) {
       throw new SCMException("No enough datanodes to choose. " +
-          "TotalNode = " + datanodeCount +
+          "TotalNode = " + totalNodesCount +
+          " AvailableNode = " + availableNodes.size() +
           " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount, null);
     }
