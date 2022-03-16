@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FSDataOutputStream;
 
 /**
  * Utility class to write random keys from a limited buffer.
@@ -48,11 +49,22 @@ public class ContentGenerator {
 
   private final byte[] buffer;
 
+  /**
+   * Issue Hsync after every write ( Cannot be used with Hflush ).
+   */
+  private final boolean hSync;
 
-  ContentGenerator(Builder contentgeneratorbuilder) {
-    this.keySize = contentgeneratorbuilder.keySize;
-    this.bufferSize = contentgeneratorbuilder.bufferSize;
-    this.copyBufferSize = contentgeneratorbuilder.copyBufferSize;
+  /**
+   * Issue Hflush after every write ( Cannot be used with Hsync ).
+   */
+  private final boolean hFlush;
+
+  ContentGenerator(Builder objectBuild) {
+    this.keySize = objectBuild.keySize;
+    this.bufferSize = objectBuild.bufferSize;
+    this.copyBufferSize = objectBuild.copyBufferSize;
+    this.hSync = objectBuild.hSync;
+    this.hFlush = objectBuild.hFlush;
     buffer = RandomStringUtils.randomAscii(bufferSize)
         .getBytes(StandardCharsets.UTF_8);
   }
@@ -61,40 +73,63 @@ public class ContentGenerator {
    * Write the required bytes to the output stream.
    */
   public void write(OutputStream outputStream) throws IOException {
-    for (long nrRemaining = keySize;
-         nrRemaining > 0; nrRemaining -= bufferSize) {
+    for (long nrRemaining = keySize; nrRemaining > 0;
+         nrRemaining -= bufferSize) {
       int curSize = (int) Math.min(bufferSize, nrRemaining);
       if (copyBufferSize == 1) {
         for (int i = 0; i < curSize; i++) {
           outputStream.write(buffer[i]);
+          flushOrSync(outputStream);
         }
       } else {
         for (int i = 0; i < curSize; i += copyBufferSize) {
-          outputStream.write(buffer, i,
-              Math.min(copyBufferSize, curSize - i));
+          outputStream.write(buffer, i, Math.min(copyBufferSize, curSize - i));
+          flushOrSync(outputStream);
         }
       }
     }
-    System.out.println("Write happened2");
   }
 
+  private void flushOrSync(OutputStream outputStream) throws IOException {
+    if (outputStream instanceof FSDataOutputStream) {
+      if (hSync) {
+        ((FSDataOutputStream) outputStream).hsync();
+      } else if (hFlush) {
+        ((FSDataOutputStream) outputStream).hflush();
+      }
+    }
+  }
 
   public static class Builder {
 
-    private final long keySize; // Required
-    private final int bufferSize; // Required
-    private int copyBufferSize = 1024; // Optional Parameter Default Value set
+    private long keySize = 1024;
+    private int bufferSize = 1024;
+    private int copyBufferSize = 1024;
+    private boolean hSync = false;
+    private boolean hFlush = false;
 
-    Builder(long keysize, int buffersize)
-    {
+    public Builder keySize(long keysize){
       this.keySize = keysize;
-      this.bufferSize = buffersize;
+      return this;
     }
 
-    // Return an object of ContentGeneratorBuilder which will have optional
-    // parameter copyBufferSize Initialized
+    public Builder bufferSize(int bufferSize){
+      this.bufferSize = bufferSize;
+      return this;
+    }
+
     public Builder copyBufferSize(int copybuffersize){
       this.copyBufferSize = copybuffersize;
+      return this;
+    }
+
+    public Builder Hsync(boolean hsync){
+      this.hSync = hsync;
+      return this;
+    }
+
+    public Builder Hflush(boolean hflush){
+      this.hFlush = hflush;
       return this;
     }
 

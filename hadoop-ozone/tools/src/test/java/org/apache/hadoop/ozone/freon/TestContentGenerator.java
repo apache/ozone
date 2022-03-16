@@ -30,7 +30,7 @@ public class TestContentGenerator {
   @Test
   public void writeWrite() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder(1024, 1024).build();
+        new ContentGenerator.Builder().keySize(1024).bufferSize(1024).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     generator.write(output);
     Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());
@@ -39,8 +39,8 @@ public class TestContentGenerator {
   @Test
   public void writeWithSmallerBuffers() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder(10000, 1024).copyBufferSize(
-            3).build();
+        new ContentGenerator.Builder().keySize(10000).bufferSize(1024)
+            .copyBufferSize(3).build();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     generator.write(baos);
 
@@ -50,8 +50,9 @@ public class TestContentGenerator {
   @Test
   public void writeWithByteLevelWrite() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder(1024, 1024).copyBufferSize(
-            1).build();
+        new ContentGenerator.Builder().keySize(1024).bufferSize(1024)
+            .copyBufferSize(
+                1).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
@@ -61,8 +62,9 @@ public class TestContentGenerator {
   @Test
   public void writeWithSmallBuffer() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder(1024, 1024).copyBufferSize(
-            10).build();
+        new ContentGenerator.Builder().keySize(1024).bufferSize(1024)
+            .copyBufferSize(
+                10).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
@@ -72,7 +74,8 @@ public class TestContentGenerator {
   @Test
   public void writeWithDistinctSizes() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder(20, 8).copyBufferSize(3)
+        new ContentGenerator.Builder().keySize(20).bufferSize(8)
+            .copyBufferSize(3)
             .build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
