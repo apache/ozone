@@ -92,12 +92,16 @@ public class WritableECContainerProvider
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
+    // Bound this at a minimum of 1 byte in case a request is made for a very
+    // small size, which when divided by EC DataNum is zero.
+    long requiredSpace = Math.max(1, size / repConfig.getData());
     synchronized (this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
       if (openPipelineCount < providerConfig.getMinimumPipelines()) {
         try {
-          return allocateContainer(repConfig, size, owner, excludeList);
+          return allocateContainer(
+              repConfig, requiredSpace, owner, excludeList);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
               + "containers", repConfig, openPipelineCount, e);
@@ -109,7 +113,9 @@ public class WritableECContainerProvider
         excludeList.getDatanodes(), excludeList.getPipelineIds());
 
     PipelineRequestInformation pri =
-        PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
+        PipelineRequestInformation.Builder.getBuilder()
+            .setSize(requiredSpace)
+            .build();
     while (existingPipelines.size() > 0) {
       Pipeline pipeline =
           pipelineChoosePolicy.choosePipeline(existingPipelines, pri);
@@ -121,10 +127,8 @@ public class WritableECContainerProvider
       synchronized (pipeline.getId()) {
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
-          // TODO - For EC, what is the block size? If the client says 128MB,
-          //        is that 128MB / 6 (for EC-6-3?)
           if (containerInfo == null
-              || !containerHasSpace(containerInfo, size)) {
+              || !containerHasSpace(containerInfo, requiredSpace)) {
             // This is O(n), which isn't great if there are a lot of pipelines
             // and we keep finding pipelines without enough space.
             existingPipelines.remove(pipeline);
@@ -148,7 +152,7 @@ public class WritableECContainerProvider
     // allocate a new one and usePipelineManagerV2Impl.java it.
     try {
       synchronized (this) {
-        return allocateContainer(repConfig, size, owner, excludeList);
+        return allocateContainer(repConfig, requiredSpace, owner, excludeList);
       }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
