@@ -187,10 +187,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager.getOpenKeyTable(bucketLayout).get(openKey);
 
     Assert.assertNotNull(omKeyInfo);
+    Assert.assertNotNull(omKeyInfo.getLatestVersionLocations());
 
+    // As our data size is 100, and scmBlockSize is default to 1000, so we
+    // shall have only one block.
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
-    Assert.assertTrue(omKeyLocationInfoList.size() == 1);
+    Assert.assertEquals(1, omKeyLocationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
 
@@ -384,9 +387,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     if (!originalOMRequest.getCreateKeyRequest().getKeyArgs()
         .getIsMultipartKey()) {
 
-      // As our data size is 100, and scmBlockSize is default to 1000, so we
-      // shall have only one block.
-      List< OzoneManagerProtocolProtos.KeyLocation> keyLocations =
+      List<OzoneManagerProtocolProtos.KeyLocation> keyLocations =
           keyArgs.getKeyLocationsList();
       // KeyLocation should be set.
       Assert.assertEquals(preAllocatedBlocks, keyLocations.size());
@@ -403,7 +404,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       Assert.assertEquals(scmBlockSize, keyLocations.get(0).getLength());
     } else {
       // We don't create blocks for multipart key in createKey preExecute.
-      Assert.assertTrue(keyArgs.getKeyLocationsList().size() == 0);
+      Assert.assertEquals(0, keyArgs.getKeyLocationsList().size());
     }
 
     return modifiedOmRequest;
@@ -487,11 +488,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager);
 
 
-    keyName = "dir1/dir2/dir3/file1";
+    String keyName = "dir1/dir2/dir3/file1";
     createAndCheck(keyName);
 
     // Key with leading '/'.
-    String keyName = "/a/b/c/file1";
+    keyName = "/a/b/c/file1";
     createAndCheck(keyName);
 
     // Commit openKey entry.
