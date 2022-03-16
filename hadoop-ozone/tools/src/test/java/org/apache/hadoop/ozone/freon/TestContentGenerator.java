@@ -32,8 +32,13 @@ public class TestContentGenerator {
     ContentGenerator generator =
         new ContentGenerator.ContentGeneratorBuilder(1024, 1024).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
-
+    if(generator!=null){
+      System.out.println(generator.getKeySize());
+      System.out.println(generator.getBufferSize());
+      System.out.println(generator.getCopyBufferSize());
+    }
     generator.write(output);
+    System.out.println("Write happened");
     Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());
   }
 

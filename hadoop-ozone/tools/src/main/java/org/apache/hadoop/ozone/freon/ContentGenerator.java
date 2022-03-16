@@ -86,8 +86,20 @@ public class ContentGenerator {
         }
       }
     }
+    System.out.println("Write happened2");
   }
 
+  public long getKeySize() {
+    return keySize;
+  }
+
+  public int getBufferSize() {
+    return bufferSize;
+  }
+
+  public int getCopyBufferSize() {
+    return copyBufferSize;
+  }
 
   public static class ContentGeneratorBuilder{
 
