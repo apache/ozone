@@ -29,7 +29,8 @@ public class TestContentGenerator {
 
   @Test
   public void writeWrite() throws IOException {
-    ContentGenerator generator = new ContentGenerator(1024, 1024);
+    ContentGenerator generator =
+        new ContentGenerator.ContentGeneratorBuilder(1024, 1024).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
@@ -38,8 +39,9 @@ public class TestContentGenerator {
 
   @Test
   public void writeWithSmallerBuffers() throws IOException {
-    ContentGenerator generator = new ContentGenerator(10000, 1024, 3);
-
+    ContentGenerator generator =
+        new ContentGenerator.ContentGeneratorBuilder(1024, 1024).copyBufferSize(
+            3).build();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     generator.write(baos);
 
@@ -48,7 +50,9 @@ public class TestContentGenerator {
 
   @Test
   public void writeWithByteLevelWrite() throws IOException {
-    ContentGenerator generator = new ContentGenerator(1024, 1024, 1);
+    ContentGenerator generator =
+        new ContentGenerator.ContentGeneratorBuilder(1024, 1024).copyBufferSize(
+            1).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
@@ -57,7 +61,9 @@ public class TestContentGenerator {
 
   @Test
   public void writeWithSmallBuffer() throws IOException {
-    ContentGenerator generator = new ContentGenerator(1024, 1024, 10);
+    ContentGenerator generator =
+        new ContentGenerator.ContentGeneratorBuilder(1024, 1024).copyBufferSize(
+            10).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
@@ -66,7 +72,9 @@ public class TestContentGenerator {
 
   @Test
   public void writeWithDistinctSizes() throws IOException {
-    ContentGenerator generator = new ContentGenerator(20, 8, 3);
+    ContentGenerator generator =
+        new ContentGenerator.ContentGeneratorBuilder(20, 8).copyBufferSize(3)
+            .build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);

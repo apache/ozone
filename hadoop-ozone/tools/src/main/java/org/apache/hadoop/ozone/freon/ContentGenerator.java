@@ -31,13 +31,13 @@ public class ContentGenerator {
   /**
    * Size of the destination object (key or file).
    */
-  private long keySize;
+  private final long keySize;
 
   /**
    * Buffer for the pre-allocated content (will be reused if less than the
    * keySize).
    */
-  private int bufferSize;
+  private final int bufferSize;
 
   /**
    * Number of bytes to write in one call.
@@ -60,6 +60,14 @@ public class ContentGenerator {
         .getBytes(StandardCharsets.UTF_8);
   }
 
+  ContentGenerator(ContentGeneratorBuilder contentgeneratorbuilder) {
+    this.keySize = contentgeneratorbuilder.keySize;
+    this.bufferSize = contentgeneratorbuilder.bufferSize;
+    this.copyBufferSize = contentgeneratorbuilder.copyBufferSize;
+    buffer = RandomStringUtils.randomAscii(bufferSize)
+        .getBytes(StandardCharsets.UTF_8);
+  }
+
   /**
    * Write the required bytes to the output stream.
    */
@@ -77,6 +85,34 @@ public class ContentGenerator {
               Math.min(copyBufferSize, curSize - i));
         }
       }
+    }
+  }
+
+
+  public static class ContentGeneratorBuilder{
+
+    private final long keySize; // Required
+    private final int bufferSize; // Required
+    private int copyBufferSize; // Optional
+
+    ContentGeneratorBuilder(long keysize, int buffersize)
+    {
+      this.keySize = keysize;
+      this.bufferSize = buffersize;
+    }
+
+    // Return an object of ContentGeneratorBuilder which will have optional
+    // parameter copyBufferSize Initialized
+    public ContentGeneratorBuilder copyBufferSize(int copybuffersize){
+      this.copyBufferSize = copybuffersize;
+      return this;
+    }
+
+    //Return the final constructed builder object
+    public ContentGenerator build() {
+      ContentGenerator contentgenerator =  new ContentGenerator(this);
+    // validateBuilderObject(contentgenerator); For validating the builder object
+      return contentgenerator;
     }
   }
 

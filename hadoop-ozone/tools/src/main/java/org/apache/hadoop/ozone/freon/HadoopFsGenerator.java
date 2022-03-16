@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
+import org.apache.hadoop.ozone.freon.ContentGenerator.ContentGeneratorBuilder;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -89,7 +90,8 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     }
 
     contentGenerator =
-        new ContentGenerator(fileSize, bufferSize, copyBufferSize);
+        new ContentGenerator.ContentGeneratorBuilder(fileSize,
+            bufferSize).copyBufferSize(copyBufferSize).build();
 
     timer = getMetrics().timer("file-create");
 
