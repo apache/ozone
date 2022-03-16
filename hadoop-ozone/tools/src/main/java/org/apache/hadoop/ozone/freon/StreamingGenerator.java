@@ -91,7 +91,7 @@ public class StreamingGenerator extends BaseFreonGenerator
       }
       Path subDir = sourceDir.resolve(SUB_DIR_NAME);
       Files.createDirectories(subDir);
-      ContentGenerator contentGenerator = new ContentGenerator.ContentGeneratorBuilder(fileSize,
+      ContentGenerator contentGenerator = new ContentGenerator.Builder(fileSize,
           1024).build();
 
       for (int i = 0; i < numberOfFiles; i++) {

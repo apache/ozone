@@ -49,7 +49,7 @@ public class ContentGenerator {
   private final byte[] buffer;
 
 
-  ContentGenerator(ContentGeneratorBuilder contentgeneratorbuilder) {
+  ContentGenerator(Builder contentgeneratorbuilder) {
     this.keySize = contentgeneratorbuilder.keySize;
     this.bufferSize = contentgeneratorbuilder.bufferSize;
     this.copyBufferSize = contentgeneratorbuilder.copyBufferSize;
@@ -78,25 +78,14 @@ public class ContentGenerator {
     System.out.println("Write happened2");
   }
 
-  public long getKeySize() {
-    return keySize;
-  }
 
-  public int getBufferSize() {
-    return bufferSize;
-  }
-
-  public int getCopyBufferSize() {
-    return copyBufferSize;
-  }
-
-  public static class ContentGeneratorBuilder{
+  public static class Builder {
 
     private final long keySize; // Required
     private final int bufferSize; // Required
     private int copyBufferSize = 1024; // Optional Parameter Default Value set
 
-    ContentGeneratorBuilder(long keysize, int buffersize)
+    Builder(long keysize, int buffersize)
     {
       this.keySize = keysize;
       this.bufferSize = buffersize;
@@ -104,7 +93,7 @@ public class ContentGenerator {
 
     // Return an object of ContentGeneratorBuilder which will have optional
     // parameter copyBufferSize Initialized
-    public ContentGeneratorBuilder copyBufferSize(int copybuffersize){
+    public Builder copyBufferSize(int copybuffersize){
       this.copyBufferSize = copybuffersize;
       return this;
     }
