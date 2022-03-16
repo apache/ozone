@@ -994,6 +994,8 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testFSOBucketUsedBytes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     OzoneVolume volume = null;
     String value = "sample value";
     int valueLength = value.getBytes(UTF_8).length;
@@ -1013,6 +1015,13 @@ public abstract class TestOzoneRpcClientAbstract {
     writeKey(bucket, keyName, ONE, value, valueLength);
     Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    // pre-allocate more blocks than needed
+    int fakeValueLength = valueLength + blockSize;
+    writeKey(bucket, keyName, ONE, value, fakeValueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
 
     bucket.deleteKey(keyName);
     Assert.assertEquals(0L,
