@@ -1023,7 +1023,8 @@ public abstract class TestOzoneRpcClientAbstract {
     byte[] value = new byte[keyLength];
     int dataGroupSize = repConfig instanceof ECReplicationConfig ?
         ((ECReplicationConfig) repConfig).getData() : 1;
-    long preAllocatedBlocks = (keyLength - 1) / (blockSize * dataGroupSize) + 1;
+    long preAllocatedBlocks = Math.min(ozoneManager.getPreallocateBlocksMax(),
+        (keyLength - 1) / (blockSize * dataGroupSize) + 1);
     long preAllocatedSpace = preAllocatedBlocks * blockSize
         * repConfig.getRequiredNodes();
     long keyQuota = QuotaUtil.getReplicatedSize(keyLength, repConfig);
