@@ -990,6 +990,34 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testBucketUsedBytes() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    String keyName = UUID.randomUUID().toString();
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    bucket.deleteKey(keyName);
+    Assert.assertEquals(0L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+  }
+
+  // TODO: testBucketQuota overlaps with testBucketUsedBytes,
+  //       do cleanup when EC branch gets merged into master.
+  @Test
+  public void testBucketQuota() throws IOException {
     int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
