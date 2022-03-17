@@ -30,6 +30,7 @@ import static java.util.stream.Collectors.toMap;
  */
 public enum OzoneManagerVersion implements ComponentVersion {
   DEFAULT_VERSION(0, "Initial version"),
+  NEW_S3G_AUTH_SCHEME(1, "New S3G auth scheme support is present in OM."),
 
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
