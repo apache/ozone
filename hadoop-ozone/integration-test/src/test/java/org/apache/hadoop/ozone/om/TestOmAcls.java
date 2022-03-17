@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -41,6 +42,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import org.junit.AfterClass;
 import static org.junit.Assert.assertTrue;
+
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -58,7 +61,10 @@ public class TestOmAcls {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private static boolean aclAllow = true;
+  private static boolean volumeAclAllow = true;
+  private static boolean bucketAclAllow = true;
+  private static boolean keyAclAllow = true;
+  private static boolean prefixAclAllow = true;
   private static MiniOzoneCluster cluster = null;
   private static OMMetrics omMetrics;
   private static OzoneConfiguration conf;
@@ -108,13 +114,18 @@ public class TestOmAcls {
   }
 
   /**
-   * Tests the OM Initialization.
+   * Reset
    */
+  @Before
+  public void resetAcl() {
+    TestOmAcls.volumeAclAllow = true;
+    TestOmAcls.bucketAclAllow = true;
+    TestOmAcls.keyAclAllow = true;
+    TestOmAcls.prefixAclAllow = true;
+  }
 
   @Test
   public void testBucketCreationPermissionDenied() throws Exception {
-
-    TestOmAcls.aclAllow = true;
 
     String volumeName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
     String bucketName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
@@ -129,34 +140,31 @@ public class TestOmAcls {
     OzoneVolume volume =
         cluster.getClient().getObjectStore().getVolume(volumeName);
 
-    TestOmAcls.aclAllow = false;
+    TestOmAcls.bucketAclAllow= false;
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> volume.createBucket(bucketName));
 
     assertTrue(logCapturer.getOutput()
-        .contains("doesn't have READ permission to access volume"));
+        .contains("doesn't have CREATE permission to access bucket"));
   }
 
   @Test
   public void testFailureInKeyOp() throws Exception {
     final VolumeArgs createVolumeArgs;
 
-    TestOmAcls.aclAllow = true;
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     logCapturer.clearOutput();
 
-    TestOmAcls.aclAllow = false;
+    TestOmAcls.keyAclAllow = false;
 
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
-    assertTrue(logCapturer.getOutput().contains("doesn't have READ " +
-        "permission to access volume"));
+    assertTrue(logCapturer.getOutput().contains("doesn't have CREATE " +
+        "permission to access key"));
   }
 
   @Test
   public void testSetACLPermissionDenied() throws Exception {
-
-    TestOmAcls.aclAllow = true;
 
     String volumeName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
     String bucketName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
@@ -177,12 +185,12 @@ public class TestOmAcls {
 
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    TestOmAcls.aclAllow = false;
+    TestOmAcls.bucketAclAllow = false;
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> bucket.setAcl(new ArrayList<>()));
 
     assertTrue(logCapturer.getOutput()
-        .contains("doesn't have READ permission to access volume"));
+        .contains("doesn't have WRITE_ACL permission to access bucket"));
   }
 
   /**
@@ -192,7 +200,17 @@ public class TestOmAcls {
 
     @Override
     public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context) {
-      return TestOmAcls.aclAllow;
+      switch (((OzoneObjInfo) ozoneObject).getResourceType()) {
+        case VOLUME:
+          return TestOmAcls.volumeAclAllow;
+        case BUCKET:
+          return TestOmAcls.bucketAclAllow;
+        case KEY:
+          return TestOmAcls.keyAclAllow;
+        case PREFIX:
+          return TestOmAcls.prefixAclAllow;
+      }
+      return false;
     }
   }
 }
