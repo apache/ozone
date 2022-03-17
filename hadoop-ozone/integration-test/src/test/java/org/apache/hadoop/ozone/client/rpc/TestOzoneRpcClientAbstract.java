@@ -968,43 +968,28 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testBucketUsedBytes() throws IOException {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    OzoneVolume volume = null;
-    String value = "sample value";
-    int valueLength = value.getBytes(UTF_8).length;
-    store.createVolume(volumeName);
-    volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-    String keyName = UUID.randomUUID().toString();
-
-    writeKey(bucket, keyName, ONE, value, valueLength);
-    Assert.assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
-
-    writeKey(bucket, keyName, ONE, value, valueLength);
-    Assert.assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
-
-    bucket.deleteKey(keyName);
-    Assert.assertEquals(0L,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    bucketUsedBytesTestHelper(BucketLayout.OBJECT_STORE);
   }
 
   @Test
   public void testFSOBucketUsedBytes() throws IOException {
+    bucketUsedBytesTestHelper(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  private void bucketUsedBytesTestHelper(BucketLayout bucketLayout)
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     OzoneVolume volume = null;
     String value = "sample value";
     int valueLength = value.getBytes(UTF_8).length;
     store.createVolume(volumeName);
     volume = store.getVolume(volumeName);
-    BucketArgs bucketArgsFSO = BucketArgs.newBuilder()
-        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .build();
-    volume.createBucket(bucketName, bucketArgsFSO);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
     String keyName = UUID.randomUUID().toString();
 
@@ -1013,6 +998,12 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    // pre-allocate more blocks than needed
+    int fakeValueLength = valueLength + blockSize;
+    writeKey(bucket, keyName, ONE, value, fakeValueLength);
     Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
