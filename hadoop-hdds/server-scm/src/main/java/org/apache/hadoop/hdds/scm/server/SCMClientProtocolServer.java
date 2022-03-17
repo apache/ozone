@@ -291,8 +291,8 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerId) throws IOException {
+  public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId, int clientVersion) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
 
     Set<ContainerReplica> replicas = getScm().getContainerManager()
@@ -302,7 +302,7 @@ public class SCMClientProtocolServer implements
           HddsProtos.SCMContainerReplicaProto.newBuilder()
               .setContainerID(containerId)
               .setState(r.getState().toString())
-              .setDatanodeDetails(r.getDatanodeDetails().getProtoBufMessage())
+              .setDatanodeDetails(r.getDatanodeDetails().toProto(clientVersion))
               .setBytesUsed(r.getBytesUsed())
               .setPlaceOfBirth(r.getOriginDatanodeId().toString())
               .setKeyCount(r.getKeyCount())
