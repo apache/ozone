@@ -44,8 +44,6 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
-import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.RoutingTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -208,42 +206,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (isDatastreamPipelineMode) {
       return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
           .stream(message.getContent().asReadOnlyByteBuffer(),
-              getRoutingTable(pipeline));
+              StreamRoutingTable.getRoutingTable(pipeline));
     } else {
       return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
           .stream(message.getContent().asReadOnlyByteBuffer());
     }
-  }
-
-  public RoutingTable getRoutingTable(Pipeline pipeline) {
-    RaftPeerId primaryId = null;
-    List<RaftPeerId> raftPeers = new ArrayList<>();
-
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      final RaftPeerId raftPeerId = RaftPeerId.valueOf(dn.getUuidString());
-      try {
-        if (dn == pipeline.getFirstNode()) {
-          primaryId = raftPeerId;
-        }
-      } catch (IOException e) {
-        LOG.error("Can not get FirstNode from the pipeline: {} with " +
-            "exception: {}", pipeline.toString(), e.getLocalizedMessage());
-        return null;
-      }
-      raftPeers.add(raftPeerId);
-    }
-
-    RoutingTable.Builder builder = RoutingTable.newBuilder();
-    RaftPeerId previousId = primaryId;
-    for (RaftPeerId peerId : raftPeers) {
-      if (peerId.equals(primaryId)) {
-        continue;
-      }
-      builder.addSuccessor(previousId, peerId);
-      previousId = peerId;
-    }
-
-    return builder.build();
   }
 
   public BlockID getBlockID() {

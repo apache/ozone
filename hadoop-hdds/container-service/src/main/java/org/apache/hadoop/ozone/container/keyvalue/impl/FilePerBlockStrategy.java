@@ -78,12 +78,15 @@ public class FilePerBlockStrategy implements ChunkManager {
   private final long defaultReadBufferCapacity;
   private final VolumeSet volumeSet;
 
+  private final BlockManager blockManager;
+
   public FilePerBlockStrategy(boolean sync, BlockManager manager,
                               VolumeSet volSet) {
     doSyncWrite = sync;
     this.defaultReadBufferCapacity = manager == null ? 0 :
         manager.getDefaultReadBufferCapacity();
     this.volumeSet = volSet;
+    this.blockManager = manager;
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -101,10 +104,16 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID, ContainerMetrics metrics)
-          throws StorageContainerException {
+      Container container, BlockID blockID, boolean isSmallFile, long len,
+      ContainerMetrics metrics)
+      throws StorageContainerException {
     checkLayoutVersion(container);
     File chunkFile = getChunkFile(container, blockID, null);
+
+    if (isSmallFile) {
+      return new SmallFileStreamDataChannel(chunkFile, container, len, metrics);
+    }
+
     return new KeyValueStreamDataChannel(chunkFile,
         container.getContainerData(), metrics);
   }

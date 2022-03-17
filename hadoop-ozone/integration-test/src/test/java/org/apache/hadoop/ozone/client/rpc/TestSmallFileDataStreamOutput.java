@@ -20,20 +20,14 @@ package org.apache.hadoop.ozone.client.rpc;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
-import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
-import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
-import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
+import org.apache.hadoop.ozone.client.io.SmallFileDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
@@ -48,20 +42,19 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
- * Tests BlockDataStreamOutput class.
+ * Tests TestSmallFileDataStreamOutput class.
  */
-public class TestBlockDataStreamOutput {
+public class TestSmallFileDataStreamOutput {
 
   /**
-    * Set a timeout for each test.
-    */
+   * Set a timeout for each test.
+   */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public Timeout timeout = Timeout.seconds(1000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -89,6 +82,7 @@ public class TestBlockDataStreamOutput {
     blockSize = 2 * maxFlushSize;
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
@@ -104,18 +98,15 @@ public class TestBlockDataStreamOutput {
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setDataStreamBufferFlushize(maxFlushSize)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
-        .setDataStreamMinPacketSize(chunkSize)
-        .setDataStreamStreamWindowSize(5 * chunkSize)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
-    volumeName = "testblockoutputstream";
-    bucketName = volumeName;
+    volumeName = "testsmallfiledatastreamoutput";
+    bucketName = "testbucket1";
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
@@ -135,24 +126,30 @@ public class TestBlockDataStreamOutput {
   }
 
   @Test
-  public void testMultiChunkWrite() throws Exception {
-    testWrite(chunkSize + 50);
-    testWriteWithFailure(chunkSize + 50);
+  public void test2byteWrite() throws Exception {
+    testWrite(2);
   }
 
   @Test
-  public void testMultiBlockWrite() throws Exception {
-    testWrite(blockSize + 50);
-    testWriteWithFailure(blockSize + 50);
+  public void test2byteWriteWithFailure() throws Exception {
+    testWriteWithFailure(2);
+  }
+
+  @Test
+  public void testChunkSizeWrite() throws Exception {
+    testWrite(chunkSize);
+  }
+
+  @Test
+  public void testChunkSizeWriteWithFailure() throws Exception {
+    testWriteWithFailure(chunkSize);
   }
 
   private void testWrite(int dataLength) throws Exception {
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
+    byte[] data = ContainerTestHelper.getFixedLengthBytes(dataLength);
     key.write(ByteBuffer.wrap(data));
     // now close the stream, It will update the key length.
     key.close();
@@ -164,102 +161,37 @@ public class TestBlockDataStreamOutput {
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
     byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
+        ContainerTestHelper.getFixedLengthBytes(dataLength / 2);
     ByteBuffer b = ByteBuffer.wrap(data);
     key.write(b);
-    KeyDataStreamOutput keyDataStreamOutput =
-        (KeyDataStreamOutput) key.getByteBufStreamOutput();
-    ByteBufferStreamOutput stream =
-        keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
-    Assert.assertTrue(stream instanceof BlockDataStreamOutput);
-    TestHelper.waitForContainerClose(key, cluster);
+
+    Assert.assertTrue(
+        key.getByteBufStreamOutput() instanceof SmallFileDataStreamOutput);
+
+    waitForContainerClose(
+        ((SmallFileDataStreamOutput) key.getByteBufStreamOutput()).getBlockID()
+            .getContainerID());
+
     key.write(b);
     key.close();
-    String dataString = new String(data, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
-  }
 
-  @Test
-  public void testPutBlockAtBoundary() throws Exception {
-    int dataLength = 500;
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
-    long putBlockCount = metrics.getContainerOpCountMetrics(
-        ContainerProtos.Type.PutBlock);
-    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(
-        ContainerProtos.Type.PutBlock);
-    String keyName = getKeyName();
-    OzoneDataStreamOutput key = createKey(
-        keyName, ReplicationType.RATIS, 0);
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
-    key.write(ByteBuffer.wrap(data));
-    Assert.assertTrue(
-        metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            <= pendingPutBlockCount + 1);
-    key.close();
-    // Since data length is 500 , first putBlock will be at 400(flush boundary)
-    // and the other at 500
-    Assert.assertTrue(
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            == putBlockCount + 2);
     validateData(keyName, data);
   }
 
+  private void waitForContainerClose(Long cid)
+      throws Exception {
+    TestHelper
+        .waitForContainerClose(cluster, cid);
+  }
 
   private OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
+                                          long size) throws Exception {
     return TestHelper.createStreamKey(
         keyName, type, size, objectStore, volumeName, bucketName);
   }
+
   private void validateData(String keyName, byte[] data) throws Exception {
     TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
-
-
-  @Test
-  public void testMinPacketSize() throws Exception {
-    String keyName = getKeyName();
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
-    OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
-    long writeChunkCount =
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 2)
-            .getBytes(UTF_8);
-    key.write(ByteBuffer.wrap(data));
-    // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
-    Assert.assertEquals(writeChunkCount,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    key.write(ByteBuffer.wrap(data));
-    Assert.assertEquals(writeChunkCount + 1,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    // now close the stream, It will update the key length.
-    key.close();
-    String dataString = new String(data, UTF_8);
-    validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
-  }
-
-  @Test
-  public void testTotalAckDataLength() throws Exception {
-    int dataLength = 400;
-    String keyName = getKeyName();
-    OzoneDataStreamOutput key = createKey(
-        keyName, ReplicationType.RATIS, 0);
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
-    KeyDataStreamOutput keyDataStreamOutput =
-        (KeyDataStreamOutput) key.getByteBufStreamOutput();
-    BlockDataStreamOutputEntry stream =
-        keyDataStreamOutput.getStreamEntries().get(0);
-    key.write(ByteBuffer.wrap(data));
-    key.close();
-    Assert.assertEquals(dataLength, stream.getTotalAckDataLength());
-  }
-
 }

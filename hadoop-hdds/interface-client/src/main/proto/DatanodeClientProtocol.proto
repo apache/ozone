@@ -451,7 +451,7 @@ RPC */
 message PutSmallFileRequestProto {
   required PutBlockRequestProto block = 1;
   required ChunkInfo chunkInfo = 2;
-  required bytes data = 3;
+  optional bytes data = 3;
 }
 
 

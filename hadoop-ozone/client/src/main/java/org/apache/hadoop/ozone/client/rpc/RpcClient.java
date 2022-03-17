@@ -86,6 +86,7 @@ import org.apache.hadoop.ozone.client.io.OzoneCryptoInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.io.SmallFileDataStreamOutput;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -915,7 +916,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
-    return createDataStreamOutput(openKey, requestId, replicationConfig);
+    return createDataStreamOutput(openKey, requestId, replicationConfig, size);
   }
 
   private KeyProvider.KeyVersion getDEK(FileEncryptionInfo feInfo)
@@ -1522,7 +1523,7 @@ public class RpcClient implements ClientProtocol {
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
     return createDataStreamOutput(keySession, UUID.randomUUID().toString(),
-        replicationConfig);
+        replicationConfig, size);
   }
 
   @Override
@@ -1647,9 +1648,18 @@ public class RpcClient implements ClientProtocol {
           cryptoInputStreams);
     }
   }
+
   private OzoneDataStreamOutput createDataStreamOutput(OpenKeySession openKey,
-      String requestId, ReplicationConfig replicationConfig)
+      String requestId, ReplicationConfig replicationConfig, long size)
       throws IOException {
+    // size == 0, can be represented as borderless
+    if (size <= chunkSize && size != 0) {
+      SmallFileDataStreamOutput smallFileDataStreamOutput =
+          new SmallFileDataStreamOutput(openKey, xceiverClientManager,
+              ozoneManagerClient, clientConfig, unsafeByteBufferConversion);
+      return new OzoneDataStreamOutput(smallFileDataStreamOutput);
+    }
+
     KeyDataStreamOutput keyOutputStream =
         new KeyDataStreamOutput.Builder()
             .setHandler(openKey)

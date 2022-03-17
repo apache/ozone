@@ -112,8 +112,9 @@ public interface ChunkManager {
   }
 
   default StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID, ContainerMetrics metrics)
-          throws StorageContainerException {
+      Container container, BlockID blockID, boolean isSmallFile, long len,
+      ContainerMetrics metrics)
+      throws StorageContainerException {
     return null;
   }
 

@@ -83,10 +83,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID, ContainerMetrics metrics)
-          throws StorageContainerException {
+      Container container, BlockID blockID, boolean isSmallFile, long len,
+      ContainerMetrics metrics)
+      throws StorageContainerException {
     return selectHandler(container)
-            .getStreamDataChannel(container, blockID, metrics);
+        .getStreamDataChannel(container, blockID, isSmallFile, len, metrics);
   }
 
   @Override

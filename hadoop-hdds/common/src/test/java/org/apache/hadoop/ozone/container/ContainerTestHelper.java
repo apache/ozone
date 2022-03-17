@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -564,6 +565,13 @@ public final class ContainerTestHelper {
 
   public static String getFixedLengthString(String string, int length) {
     return String.format("%1$" + length + "s", string);
+  }
+
+  public static byte[] getFixedLengthBytes(int length) {
+    byte[] bytes = new byte[length];
+    Random random = new Random();
+    random.nextBytes(bytes);
+    return bytes;
   }
 
   /**

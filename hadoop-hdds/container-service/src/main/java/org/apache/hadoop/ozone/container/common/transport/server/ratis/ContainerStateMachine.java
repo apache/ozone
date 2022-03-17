@@ -62,6 +62,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
+import org.apache.hadoop.ozone.container.keyvalue.impl.SmallFileStreamDataChannel;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 
@@ -549,18 +551,44 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
+    if (stream == null) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "DataStream is null"));
+    }
+    final DataChannel dataChannel = stream.getDataChannel();
+    if (dataChannel.isOpen()) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "DataStream: " + stream + " is not closed properly"));
+    }
+
+    final CompletableFuture<ContainerCommandResponseProto> f;
+    if (dataChannel instanceof SmallFileStreamDataChannel) {
+      f = link(entry, (SmallFileStreamDataChannel) dataChannel);
+    } else if (dataChannel instanceof KeyValueStreamDataChannel) {
+      return CompletableFuture.completedFuture(null);
+    } else {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "Unexpected DataChannel " + dataChannel.getClass()));
+    }
+    return f.whenComplete((res, e) -> {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("PutBlock {} Term: {} Index: {}",
+            res.getResult(), entry.getTerm(), entry.getIndex());
+      }
+    });
+  }
+
+  private CompletableFuture<ContainerCommandResponseProto> link(
+      LogEntryProto entry, SmallFileStreamDataChannel smallFileChannel) {
     return CompletableFuture.supplyAsync(() -> {
-      if (stream == null) {
-        return JavaUtils.completeExceptionally(
-            new IllegalStateException("DataStream is null"));
-      }
-      if (stream.getDataChannel().isOpen()) {
-        return JavaUtils.completeExceptionally(
-            new IllegalStateException(
-                "DataStream: " + stream + " is not closed properly"));
-      } else {
-        return CompletableFuture.completedFuture(null);
-      }
+      final DispatcherContext context = new DispatcherContext.Builder()
+          .setTerm(entry.getTerm())
+          .setLogIndex(entry.getIndex())
+          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+          .setContainer2BCSIDMap(container2BCSIDMap)
+          .build();
+
+      return runCommand(smallFileChannel.getPutBlockRequest(), context);
     }, executor);
   }
 
