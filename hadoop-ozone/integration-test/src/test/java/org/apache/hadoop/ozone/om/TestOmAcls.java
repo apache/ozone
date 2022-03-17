@@ -114,7 +114,7 @@ public class TestOmAcls {
   }
 
   /**
-   * Reset
+   * Reset ACL.
    */
   @Before
   public void resetAcl() {
@@ -140,7 +140,7 @@ public class TestOmAcls {
     OzoneVolume volume =
         cluster.getClient().getObjectStore().getVolume(volumeName);
 
-    TestOmAcls.bucketAclAllow= false;
+    TestOmAcls.bucketAclAllow = false;
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> volume.createBucket(bucketName));
 
@@ -201,16 +201,17 @@ public class TestOmAcls {
     @Override
     public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context) {
       switch (((OzoneObjInfo) ozoneObject).getResourceType()) {
-        case VOLUME:
-          return TestOmAcls.volumeAclAllow;
-        case BUCKET:
-          return TestOmAcls.bucketAclAllow;
-        case KEY:
-          return TestOmAcls.keyAclAllow;
-        case PREFIX:
-          return TestOmAcls.prefixAclAllow;
+      case VOLUME:
+        return TestOmAcls.volumeAclAllow;
+      case BUCKET:
+        return TestOmAcls.bucketAclAllow;
+      case KEY:
+        return TestOmAcls.keyAclAllow;
+      case PREFIX:
+        return TestOmAcls.prefixAclAllow;
+      default:
+        return false;
       }
-      return false;
     }
   }
 }
