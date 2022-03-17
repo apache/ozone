@@ -33,9 +33,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.ratis.grpc.client.GrpcClientProtocolService;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
@@ -45,7 +42,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 /**
  * Test pipeline leader information is correctly used.
@@ -54,7 +53,7 @@ import org.slf4j.LoggerFactory;
 public class TestRatisPipelineLeader {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
-  private static final org.slf4j.Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestRatisPipelineLeader.class);
 
   @BeforeClass
@@ -96,9 +95,11 @@ public class TestRatisPipelineLeader {
     // Verify client connects to Leader without NotLeaderException
     XceiverClientRatis xceiverClientRatis =
         XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
-    Logger.getLogger(GrpcClientProtocolService.class).setLevel(Level.DEBUG);
+    final Logger log = LoggerFactory.getLogger(
+        "org.apache.ratis.grpc.server.GrpcClientProtocolService");
+    GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(GrpcClientProtocolService.LOG);
+        GenericTestUtils.LogCapturer.captureLogs(log);
     xceiverClientRatis.connect();
     ContainerProtocolCalls.createContainer(xceiverClientRatis, 1L, null);
     logCapturer.stopCapturing();
