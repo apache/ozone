@@ -16,12 +16,14 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.util.ArrayList;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -149,6 +151,38 @@ public class TestOmAcls {
         () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
     assertTrue(logCapturer.getOutput().contains("doesn't have READ " +
         "permission to access volume"));
+  }
+
+  @Test
+  public void testSetACLPermissionDenied() throws Exception {
+
+    TestOmAcls.aclAllow = true;
+
+    String volumeName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
+    String bucketName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner("user" + RandomStringUtils.randomNumeric(5))
+        .setAdmin("admin" + RandomStringUtils.randomNumeric(5))
+        .build();
+    BucketArgs createBucketArgs = BucketArgs.newBuilder()
+        .setOwner("user" + RandomStringUtils.randomNumeric(5))
+        .build();
+
+    cluster.getClient().getObjectStore().createVolume(volumeName,
+        createVolumeArgs);
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    volume.createBucket(bucketName, createBucketArgs);
+
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    TestOmAcls.aclAllow = false;
+    OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
+        () -> bucket.setAcl(new ArrayList<>()));
+
+    assertTrue(logCapturer.getOutput()
+        .contains("doesn't have READ permission to access volume"));
   }
 
   /**
