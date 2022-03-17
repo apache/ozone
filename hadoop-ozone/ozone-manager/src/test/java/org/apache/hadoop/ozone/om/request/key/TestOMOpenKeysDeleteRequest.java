@@ -18,21 +18,18 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
 import org.junit.Test;
-import com.google.common.base.Optional;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -62,7 +59,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteOpenKeysNotInTable() throws Exception {
-    OpenKeyBucket openKeys = makeOpenKeys(volumeName, bucketName, 5);
+    OpenKeyBucket openKeys = makeOpenKeys(volumeName, bucketName, 5, false);
     deleteOpenKeysFromCache(openKeys);
     assertNotInOpenKeyTable(openKeys);
   }
@@ -78,18 +75,18 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   @Test
   public void testDeleteSubsetOfOpenKeys() throws Exception {
     final String volume1 = "volume1";
-    final String volume2 = "bucket1";
-    final String bucket1 = "volume2";
+    final String volume2 = "volume2";
+    final String bucket1 = "bucket1";
     final String bucket2 = "bucket2";
 
-    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3);
-    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3);
+    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3, false);
+    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3, false);
 
-    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 3);
-    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3);
+    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 3, false);
+    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3, false);
 
-    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 3);
-    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3);
+    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 3, false);
+    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3, false);
 
     addToOpenKeyTableDB(
         v1b1KeysToKeep,
@@ -127,9 +124,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   @Test
   public void testDeleteSameKeyNameDifferentClient() throws Exception {
     OpenKeyBucket keysToKeep =
-        makeOpenKeys(volumeName, bucketName, keyName, 3);
+        makeOpenKeys(volumeName, bucketName, 3, true);
     OpenKeyBucket keysToDelete =
-        makeOpenKeys(volumeName, bucketName, keyName, 3);
+        makeOpenKeys(volumeName, bucketName, 3, true);
 
     addToOpenKeyTableDB(keysToKeep, keysToDelete);
     deleteOpenKeysFromCache(keysToDelete);
@@ -157,9 +154,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     Assert.assertEquals(metrics.getNumOpenKeysDeleted(), 0);
 
     OpenKeyBucket existentKeys =
-        makeOpenKeys(volumeName, bucketName, keyName, numExistentKeys);
+        makeOpenKeys(volumeName, bucketName, numExistentKeys, true);
     OpenKeyBucket nonExistentKeys =
-        makeOpenKeys(volumeName, bucketName, keyName, numNonExistentKeys);
+        makeOpenKeys(volumeName, bucketName, numNonExistentKeys, true);
 
     addToOpenKeyTableDB(existentKeys);
     deleteOpenKeysFromCache(existentKeys, nonExistentKeys);
@@ -221,6 +218,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     for (OpenKeyBucket openKeyBucket: openKeys) {
       String volume = openKeyBucket.getVolumeName();
       String bucket = openKeyBucket.getBucketName();
+      OMRequestTestUtils.addBucketToDB(volume, bucket, omMetadataManager);
 
       for (OpenKey openKey: openKeyBucket.getKeysList()) {
         if (keySize > 0) {
@@ -249,61 +247,27 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    *
    * @param volume The volume all open keys created will have.
    * @param bucket The bucket all open keys created will have.
-   * @param numKeys The number of keys with randomized key names and client
-   * IDs to create.
+   * @param numKeys The number of keys with randomized client IDs to create.
+   * @param fixedKeyName If set, get key name from the {@code keyName} field,
+   *                     otherwise, generate random key name.
    * @return A list of new open keys with size {@code numKeys}.
    */
   private OpenKeyBucket makeOpenKeys(String volume, String bucket,
-      int numKeys) {
+      int numKeys, boolean fixedKeyName) throws IOException {
 
     OpenKeyBucket.Builder keysPerBucketBuilder =
         OpenKeyBucket.newBuilder()
         .setVolumeName(volume)
         .setBucketName(bucket);
 
-    for (int i = 0; i < numKeys; i++) {
-      String keyName = UUID.randomUUID().toString();
-      long clientID = random.nextLong();
-
-      OpenKey openKey = OpenKey.newBuilder()
-          .setName(keyName)
-          .setClientID(clientID)
-          .build();
-      keysPerBucketBuilder.addKeys(openKey);
-    }
-
-    return keysPerBucketBuilder.build();
-  }
-
-  /**
-   * Constructs a list of {@link OpenKey} objects of size {@code numKeys}.
-   * The keys created will all have the same volume, bucket, and
-   * key names, but randomized client IDs. These keys are not added to the
-   * open key table.
-   *
-   * @param volume The volume all open keys created will have.
-   * @param bucket The bucket all open keys created will have.
-   * @param key The key name all open keys created will have.
-   * @param numKeys The number of keys with randomized key names and client
-   * IDs to create.
-   * @return A list of new open keys with size {@code numKeys}.
-   */
-  private OpenKeyBucket makeOpenKeys(String volume, String bucket,
-      String key, int numKeys) {
-
-    OpenKeyBucket.Builder keysPerBucketBuilder =
-        OpenKeyBucket.newBuilder()
-            .setVolumeName(volume)
-            .setBucketName(bucket);
+    OpenKey.Builder openKeyBuilder = OpenKey.newBuilder().setName(keyName);
 
     for (int i = 0; i < numKeys; i++) {
-      long clientID = random.nextLong();
-
-      OpenKey openKey = OpenKey.newBuilder()
-          .setName(key)
-          .setClientID(clientID)
-          .build();
-      keysPerBucketBuilder.addKeys(openKey);
+      openKeyBuilder.setClientID(random.nextLong());
+      if (!fixedKeyName) {
+        openKeyBuilder.setName(UUID.randomUUID().toString());
+      }
+      keysPerBucketBuilder.addKeys(openKeyBuilder.build());
     }
 
     return keysPerBucketBuilder.build();
@@ -388,32 +352,4 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
-  private void addVolumeToCacheAndDB(OmVolumeArgs volumeArgs) throws Exception {
-    String volumeKey = omMetadataManager.getVolumeKey(volumeArgs.getVolume());
-
-    omMetadataManager.getVolumeTable().addCacheEntry(
-        new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(volumeArgs), volumeArgs.getUpdateID())
-    );
-
-    omMetadataManager.getVolumeTable().put(volumeKey, volumeArgs);
-  }
-
-  private OmVolumeArgs getVolumeFromDB(String volume) throws Exception {
-    String volumeKey = omMetadataManager.getVolumeKey(volume);
-    return omMetadataManager.getVolumeTable().getSkipCache(volumeKey);
-  }
-
-  private OmVolumeArgs getVolumeFromCache(String volume) {
-    String volumeKey = omMetadataManager.getVolumeKey(volume);
-    CacheValue<OmVolumeArgs> value = omMetadataManager.getVolumeTable()
-        .getCacheValue(new CacheKey<>(volumeKey));
-
-    OmVolumeArgs result = null;
-    if (value != null) {
-      result = value.getCacheValue();
-    }
-
-    return result;
-  }
 }

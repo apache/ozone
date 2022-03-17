@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -126,8 +127,10 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteOpenKeys)
         .build();
 
+    Map<String, OmBucketInfo> bucketsToUpdate = new HashMap<>();
+
     OMOpenKeysDeleteResponse response = new OMOpenKeysDeleteResponse(omResponse,
-        keysToDelete, true);
+        keysToDelete, bucketsToUpdate, true);
 
     // Operations are only added to the batch by this method when status is OK.
     response.checkAndUpdateDB(omMetadataManager, batchOperation);
