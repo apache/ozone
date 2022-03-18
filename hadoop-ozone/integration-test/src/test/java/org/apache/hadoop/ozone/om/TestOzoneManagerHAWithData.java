@@ -467,20 +467,11 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // Get the latest snapshotIndex from the leader OM.
     long leaderOMSnaphsotIndex = leaderOM.getRatisSnapshotIndex();
 
-    // The recently started OM should be lagging behind the leader OM.
-    long followerOMLastAppliedIndex =
-        followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    Assert.assertTrue(
-        followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
-
     // Wait for the follower OM to catch up
     GenericTestUtils.waitFor(() -> {
       long lastAppliedIndex =
           followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-      if (lastAppliedIndex >= leaderOMSnaphsotIndex) {
-        return true;
-      }
-      return false;
+      return lastAppliedIndex >= leaderOMSnaphsotIndex;
     }, 100, 200000);
 
     // Do more transactions. The restarted OM should receive the
