@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -74,21 +75,23 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteSubsetOfOpenKeys() throws Exception {
-    final String volume1 = "volume1";
-    final String volume2 = "volume2";
-    final String bucket1 = "bucket1";
-    final String bucket2 = "bucket2";
+    final String volume1 = UUID.randomUUID().toString();
+    final String volume2 = UUID.randomUUID().toString();
+    final String bucket1 = UUID.randomUUID().toString();
+    final String bucket2 = UUID.randomUUID().toString();
+    final long keySize = 100;
 
-    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3, false);
-    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3, false);
+    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 1, false);
+    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 1, false);
 
-    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 3, false);
+    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 2, false);
     OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3, false);
 
-    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 3, false);
-    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3, false);
+    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 5, false);
+    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 8, false);
 
     addToOpenKeyTableDB(
+        keySize,
         v1b1KeysToKeep,
         v1b2KeysToKeep,
         v2b2KeysToKeep,
@@ -96,6 +99,13 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         v1b2KeysToDelete,
         v2b2KeysToDelete
     );
+
+    assertBucketUsedBytes(volume1, bucket1,
+        keySize * (v1b1KeysToDelete.getKeysCount() + v1b1KeysToKeep.getKeysCount()));
+    assertBucketUsedBytes(volume1, bucket2,
+        keySize * (v1b2KeysToDelete.getKeysCount() + v1b2KeysToKeep.getKeysCount()));
+    assertBucketUsedBytes(volume2, bucket2,
+        keySize * (v2b2KeysToDelete.getKeysCount() + v2b2KeysToKeep.getKeysCount()));
 
     deleteOpenKeysFromCache(
         v1b1KeysToDelete,
@@ -114,6 +124,13 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         v1b2KeysToKeep,
         v2b2KeysToKeep
     );
+
+    assertBucketUsedBytes(volume1, bucket1,
+        keySize * v1b1KeysToKeep.getKeysCount());
+    assertBucketUsedBytes(volume1, bucket2,
+        keySize * v1b2KeysToKeep.getKeysCount());
+    assertBucketUsedBytes(volume2, bucket2,
+        keySize * v2b2KeysToKeep.getKeysCount());
   }
 
   /**
@@ -123,16 +140,23 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteSameKeyNameDifferentClient() throws Exception {
-    OpenKeyBucket keysToKeep =
-        makeOpenKeys(volumeName, bucketName, 3, true);
-    OpenKeyBucket keysToDelete =
-        makeOpenKeys(volumeName, bucketName, 3, true);
+    final String volume = UUID.randomUUID().toString();
+    final String bucket = UUID.randomUUID().toString();
+    final long keySize = 100;
 
-    addToOpenKeyTableDB(keysToKeep, keysToDelete);
+    OpenKeyBucket keysToKeep =
+        makeOpenKeys(volume, bucket, 3, true);
+    OpenKeyBucket keysToDelete =
+        makeOpenKeys(volume, bucket, 3, true);
+
+    addToOpenKeyTableDB(keySize, keysToKeep, keysToDelete);
+    assertBucketUsedBytes(volume, bucket,
+        keySize * (keysToDelete.getKeysCount() + keysToKeep.getKeysCount()));
     deleteOpenKeysFromCache(keysToDelete);
 
     assertNotInOpenKeyTable(keysToDelete);
     assertInOpenKeyTable(keysToKeep);
+    assertBucketUsedBytes(volume, bucket, keySize * keysToKeep.getKeysCount());
   }
 
   /**
@@ -218,21 +242,24 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     for (OpenKeyBucket openKeyBucket: openKeys) {
       String volume = openKeyBucket.getVolumeName();
       String bucket = openKeyBucket.getBucketName();
-      OMRequestTestUtils.addBucketToDB(volume, bucket, omMetadataManager);
+      OmBucketInfo omBucketInfo =
+          OMRequestTestUtils.getBucketFromDB(volume, bucket, omMetadataManager);
+      if (omBucketInfo == null) {
+        OMRequestTestUtils.addBucketToDB(volume, bucket, omMetadataManager);
+        omBucketInfo = OMRequestTestUtils
+            .getBucketFromDB(volume, bucket, omMetadataManager);
+      }
 
       for (OpenKey openKey: openKeyBucket.getKeysList()) {
+        omBucketInfo.incrUsedNamespace(1);
+        OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket,
+            openKey.getName(), replicationType, replicationFactor);
         if (keySize > 0) {
-          OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket,
-              openKey.getName(), replicationType, replicationFactor);
-          OMRequestTestUtils.addKeyLocationInfo(keyInfo,  0, keySize);
-
-          OMRequestTestUtils.addKeyToTable(true, false,
-              keyInfo, openKey.getClientID(), 0L, omMetadataManager);
-        } else {
-          OMRequestTestUtils.addKeyToTable(true,
-              volume, bucket, openKey.getName(), openKey.getClientID(),
-              replicationType, replicationFactor, omMetadataManager);
+          OMRequestTestUtils.addKeyLocationInfo(keyInfo, 0, keySize);
+          omBucketInfo.incrUsedBytes(keySize);
         }
+        OMRequestTestUtils.addKeyToTable(true, false,
+            keyInfo, openKey.getClientID(), 0L, omMetadataManager);
       }
     }
 
@@ -289,6 +316,14 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       Assert.assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout())
           .isExist(keyName));
     }
+  }
+
+  private void assertBucketUsedBytes(String volumeName, String bucketName,
+      long usedBytes) {
+    OmBucketInfo omBucketInfo = OMRequestTestUtils.getBucketFromDB(
+        volumeName, bucketName, omMetadataManager);
+    Assert.assertNotNull(omBucketInfo);
+    Assert.assertEquals(usedBytes, omBucketInfo.getUsedBytes());
   }
 
   /**
