@@ -100,12 +100,12 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         v2b2KeysToDelete
     );
 
-    assertBucketUsedBytes(volume1, bucket1,
-        keySize * (v1b1KeysToDelete.getKeysCount() + v1b1KeysToKeep.getKeysCount()));
-    assertBucketUsedBytes(volume1, bucket2,
-        keySize * (v1b2KeysToDelete.getKeysCount() + v1b2KeysToKeep.getKeysCount()));
-    assertBucketUsedBytes(volume2, bucket2,
-        keySize * (v2b2KeysToDelete.getKeysCount() + v2b2KeysToKeep.getKeysCount()));
+    assertBucketUsedBytes(volume1, bucket1, keySize
+        * (v1b1KeysToDelete.getKeysCount() + v1b1KeysToKeep.getKeysCount()));
+    assertBucketUsedBytes(volume1, bucket2, keySize
+        * (v1b2KeysToDelete.getKeysCount() + v1b2KeysToKeep.getKeysCount()));
+    assertBucketUsedBytes(volume2, bucket2, keySize
+        * (v2b2KeysToDelete.getKeysCount() + v2b2KeysToKeep.getKeysCount()));
 
     deleteOpenKeysFromCache(
         v1b1KeysToDelete,
