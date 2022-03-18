@@ -60,7 +60,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteOpenKeysNotInTable() throws Exception {
-    OpenKeyBucket openKeys = makeOpenKeys(volumeName, bucketName, 5, false);
+    OpenKeyBucket openKeys = makeOpenKeys(volumeName, bucketName, 5);
     deleteOpenKeysFromCache(openKeys);
     assertNotInOpenKeyTable(openKeys);
   }
@@ -81,14 +81,14 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     final String bucket2 = UUID.randomUUID().toString();
     final long keySize = 100;
 
-    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 1, false);
-    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 1, false);
+    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 1);
+    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 1);
 
-    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 2, false);
-    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3, false);
+    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 2);
+    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3);
 
-    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 5, false);
-    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 8, false);
+    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 5);
+    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 8);
 
     addToOpenKeyTableDB(
         keySize,
@@ -264,6 +264,23 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     }
 
     assertInOpenKeyTable(openKeys);
+  }
+
+  /**
+   * Constructs a list of {@link OpenKeyBucket} objects of size {@code numKeys}.
+   * The keys created will all have the same volume and bucket, but
+   * randomized key names and client IDs. These keys are not added to the
+   * open key table.
+   *
+   * @param volume The volume all open keys created will have.
+   * @param bucket The bucket all open keys created will have.
+   * @param numKeys The number of keys with randomized key names and client
+   * IDs to create.
+   * @return A list of new open keys with size {@code numKeys}.
+   */
+  private OpenKeyBucket makeOpenKeys(String volume, String bucket,
+      int numKeys) throws IOException {
+    return makeOpenKeys(volume, bucket, numKeys, false);
   }
 
   /**
