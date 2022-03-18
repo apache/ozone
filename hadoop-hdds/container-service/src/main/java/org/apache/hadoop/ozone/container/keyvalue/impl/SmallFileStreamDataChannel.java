@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -47,7 +46,6 @@ public class SmallFileStreamDataChannel extends StreamDataChannelBase {
   private int writeLen = 0;
   private final List<ByteBuffer> metadata = new ArrayList<>();
   private int metadataLen = 0;
-  private boolean isClose = false;
   private ContainerProtos.ContainerCommandRequestProto putBlockRequest;
 
   SmallFileStreamDataChannel(File file, Container container, long dataLen,
@@ -67,8 +65,7 @@ public class SmallFileStreamDataChannel extends StreamDataChannelBase {
   public int write(ByteBuffer src) throws IOException {
     int srcLen = src.capacity();
 
-    if (!isClose && srcLen == 0) {
-      isClose = true;
+    if (srcLen == 0) {
       return 0;
     } else if (writeLen + srcLen > realLen) {
 
@@ -131,7 +128,8 @@ public class SmallFileStreamDataChannel extends StreamDataChannelBase {
 
     ContainerProtos.PutBlockRequestProto.Builder createBlockRequest =
         ContainerProtos.PutBlockRequestProto.newBuilder()
-            .setBlockData(putSmallFileReq.getBlock().getBlockData());
+            .setBlockData(putSmallFileReq.getBlock().getBlockData())
+            .setEof(true);
 
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto
@@ -144,7 +142,6 @@ public class SmallFileStreamDataChannel extends StreamDataChannelBase {
   }
 
   public ContainerProtos.ContainerCommandRequestProto getPutBlockRequest() {
-    Preconditions.checkArgument(isClose);
     return putBlockRequest;
   }
 }
