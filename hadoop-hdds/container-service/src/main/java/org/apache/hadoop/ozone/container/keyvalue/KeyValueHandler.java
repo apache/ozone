@@ -93,6 +93,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
@@ -215,7 +216,7 @@ public class KeyValueHandler extends Handler {
     case DeleteBlock:
       return handler.handleDeleteBlock(request, kvContainer);
     case ListBlock:
-      return handler.handleUnsupportedOp(request);
+      return handler.handleListBlock(request, kvContainer);
     case ReadChunk:
       return handler.handleReadChunk(request, kvContainer, dispatcherContext);
     case DeleteChunk:
@@ -544,6 +545,43 @@ public class KeyValueHandler extends Handler {
     }
 
     return getBlockLengthResponse(request, blockLength);
+  }
+
+  /**
+   * Handle List Block operation. Calls BlockManager to process the request.
+   */
+  ContainerCommandResponseProto handleListBlock(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+
+    if (!request.hasListBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed list block request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    List<BlockData> responseData;
+    List<ContainerProtos.BlockData> returnData = new ArrayList<>();
+    try {
+      int count = request.getListBlock().getCount();
+      long startLocalId = -1;
+      if (request.getListBlock().hasStartLocalID()) {
+        startLocalId = request.getListBlock().getStartLocalID();
+      }
+      responseData = blockManager.listBlock(kvContainer, startLocalId, count);
+      for (int i = 0; i < responseData.size(); i++) {
+        returnData.add(responseData.get(i).getProtoBufMessage());
+      }
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("List blocks failed", ex, IO_EXCEPTION),
+          request);
+    }
+
+    return getListBlockResponse(request, returnData);
   }
 
   /**
