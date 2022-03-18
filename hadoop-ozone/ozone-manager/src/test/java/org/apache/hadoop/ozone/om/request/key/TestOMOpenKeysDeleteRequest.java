@@ -81,14 +81,14 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     final String bucket2 = UUID.randomUUID().toString();
     final long keySize = 100;
 
-    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 1);
-    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 1);
+    OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3);
+    OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3);
 
-    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 2);
-    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3);
+    OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 3);
+    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 2);
 
-    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 5);
-    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 8);
+    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 2);
+    OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3);
 
     addToOpenKeyTableDB(
         keySize,
