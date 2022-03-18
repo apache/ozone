@@ -100,12 +100,16 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         v2b2KeysToDelete
     );
 
-    assertBucketUsedBytes(volume1, bucket1, keySize
-        * (v1b1KeysToDelete.getKeysCount() + v1b1KeysToKeep.getKeysCount()));
-    assertBucketUsedBytes(volume1, bucket2, keySize
-        * (v1b2KeysToDelete.getKeysCount() + v1b2KeysToKeep.getKeysCount()));
-    assertBucketUsedBytes(volume2, bucket2, keySize
-        * (v2b2KeysToDelete.getKeysCount() + v2b2KeysToKeep.getKeysCount()));
+    final int v1b1NumKeys =
+        v1b1KeysToDelete.getKeysCount() + v1b1KeysToKeep.getKeysCount();
+    final int v1b2NumKeys =
+        v1b2KeysToDelete.getKeysCount() + v1b2KeysToKeep.getKeysCount();
+    final int v2b2NumKeys =
+        v2b2KeysToDelete.getKeysCount() + v2b2KeysToKeep.getKeysCount();
+
+    assertBucketQuota(volume1, bucket1, v1b1NumKeys, v1b1NumKeys * keySize);
+    assertBucketQuota(volume1, bucket2, v1b2NumKeys, v1b2NumKeys * keySize);
+    assertBucketQuota(volume2, bucket2, v2b2NumKeys, v2b2NumKeys * keySize);
 
     deleteOpenKeysFromCache(
         v1b1KeysToDelete,
@@ -125,12 +129,13 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         v2b2KeysToKeep
     );
 
-    assertBucketUsedBytes(volume1, bucket1,
-        keySize * v1b1KeysToKeep.getKeysCount());
-    assertBucketUsedBytes(volume1, bucket2,
-        keySize * v1b2KeysToKeep.getKeysCount());
-    assertBucketUsedBytes(volume2, bucket2,
-        keySize * v2b2KeysToKeep.getKeysCount());
+    final int v1b1KeysLeft = v1b1KeysToKeep.getKeysCount();
+    final int v1b2KeysLeft = v1b2KeysToKeep.getKeysCount();
+    final int v2b2KeysLeft = v2b2KeysToKeep.getKeysCount();
+
+    assertBucketQuota(volume1, bucket1, v1b1KeysLeft, v1b1KeysLeft * keySize);
+    assertBucketQuota(volume1, bucket2, v1b2KeysLeft, v1b2KeysLeft * keySize);
+    assertBucketQuota(volume2, bucket2, v2b2KeysLeft, v2b2KeysLeft * keySize);
   }
 
   /**
@@ -150,13 +155,17 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         makeOpenKeys(volume, bucket, 3, true);
 
     addToOpenKeyTableDB(keySize, keysToKeep, keysToDelete);
-    assertBucketUsedBytes(volume, bucket,
-        keySize * (keysToDelete.getKeysCount() + keysToKeep.getKeysCount()));
+
+    final int numKeys = keysToDelete.getKeysCount() + keysToKeep.getKeysCount();
+    assertBucketQuota(volume, bucket, numKeys, numKeys * keySize);
+
     deleteOpenKeysFromCache(keysToDelete);
 
     assertNotInOpenKeyTable(keysToDelete);
     assertInOpenKeyTable(keysToKeep);
-    assertBucketUsedBytes(volume, bucket, keySize * keysToKeep.getKeysCount());
+
+    final int keysLeft = keysToKeep.getKeysCount();
+    assertBucketQuota(volume, bucket, keysLeft, keysLeft * keySize);
   }
 
   /**
@@ -335,11 +344,12 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     }
   }
 
-  private void assertBucketUsedBytes(String volumeName, String bucketName,
-      long usedBytes) {
+  private void assertBucketQuota(String volumeName, String bucketName,
+      int usedNamespace, long usedBytes) {
     OmBucketInfo omBucketInfo = OMRequestTestUtils.getBucketFromDB(
         volumeName, bucketName, omMetadataManager);
     Assert.assertNotNull(omBucketInfo);
+    Assert.assertEquals(usedNamespace, omBucketInfo.getUsedNamespace());
     Assert.assertEquals(usedBytes, omBucketInfo.getUsedBytes());
   }
 
