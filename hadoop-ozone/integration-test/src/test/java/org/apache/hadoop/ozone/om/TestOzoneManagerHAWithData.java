@@ -450,7 +450,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // the logs corresponding to atleast some of the missed transactions
     // should be purged. This will force the OM to install snapshot when
     // restarted.
-    long minNewTxIndex = followerOM1LastAppliedIndex + getLogPurgeGap() * 3L;
+    long minNewTxIndex = followerOM1LastAppliedIndex + getLogPurgeGap() * 10L;
     while (leaderOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
         < minNewTxIndex) {
       createKey(ozoneBucket);
@@ -468,7 +468,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // Wait for the follower OM to catch up
     GenericTestUtils.waitFor(() -> followerOM1.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex() >= leaderOMSnaphsotIndex,
-        100, 10000);
+        100, 200000);
 
     // Do more transactions. The restarted OM should receive the
     // new transactions. It's last applied tx index should increase from the
