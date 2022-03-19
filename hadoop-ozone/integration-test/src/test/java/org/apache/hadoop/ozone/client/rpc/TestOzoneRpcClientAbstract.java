@@ -122,7 +122,6 @@ import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -1022,7 +1021,7 @@ public abstract class TestOzoneRpcClientAbstract {
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
     ReplicationConfig[] repConfigs = new ReplicationConfig[]{
-        ReplicationConfig.fromTypeAndFactor(STAND_ALONE, ONE),
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
         new ECReplicationConfig("rs-3-2-1024k"),
     };
