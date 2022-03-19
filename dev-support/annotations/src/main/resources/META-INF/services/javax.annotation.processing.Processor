@@ -13,23 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-*** Settings ***
-Documentation       Test freon data generation commands
-Resource            ../ozone-lib/freon.robot
-Test Timeout        5 minutes
-
-*** Variables ***
-${PREFIX}    ${EMPTY}
-
-*** Test Cases ***
-Ozone Client Key Generator
-    Freon OCKG    prefix=ockg${PREFIX}
-
-OM Key Generator
-    Freon OMKG    prefix=omkg${PREFIX}
-
-OM Bucket Generator
-    Freon OMBG    prefix=ombg${PREFIX}
-
-DN Chunk Generator
-    Freon DCG     prefix=dcg${PREFIX}    n=100
+org.apache.ozone.annotations.RequestFeatureValidatorProcessor
