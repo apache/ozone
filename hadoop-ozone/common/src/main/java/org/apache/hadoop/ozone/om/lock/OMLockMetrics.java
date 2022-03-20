@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -30,12 +33,23 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Lock Metrics", context = OzoneConsts.OZONE)
-public class OMLockMetrics {
+public final class OMLockMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       OMLockMetrics.class.getSimpleName();
 
-  private @Metric MutableStat readLockWaitingTimeMsStat;
-  private @Metric MutableStat readLockHeldTimeMsStat;
+  private final MetricsRegistry registry;
+  private final MutableStat readLockWaitingTimeMsStat;
+  private final MutableStat readLockHeldTimeMsStat;
+
+  private OMLockMetrics() {
+    registry = new MetricsRegistry(SOURCE_NAME);
+    readLockWaitingTimeMsStat = registry.newStat("ReadLockWaitTime",
+        "Time (in milliseconds) spent waiting for aquiring the lock",
+        "Ops", "Time", true);
+    readLockHeldTimeMsStat = registry.newStat("ReadLockHeldTime",
+        "Time (in milliseconds) spent holding the lock",
+        "Ops", "Time", true);
+  }
 
   /**
    * Registers OMLockMetrics source.
@@ -114,5 +128,12 @@ public class OMLockMetrics {
    */
   public long getLongestReadLockHeldTimeMs() {
     return (long) readLockHeldTimeMsStat.lastStat().max();
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
+    readLockHeldTimeMsStat.snapshot(builder, all);
+    readLockWaitingTimeMsStat.snapshot(builder, all);
   }
 }
