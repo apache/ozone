@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -32,9 +31,9 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.Rule;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.migrationsupport.rules.EnableRuleMigrationSupport;
@@ -48,6 +47,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
@@ -55,7 +55,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
  * Tests ozone containers.
  */
 @EnableRuleMigrationSupport
-@Flaky("HDDS-2263")
 @Timeout(300)
 public class TestOzoneContainer {
 
@@ -67,14 +66,12 @@ public class TestOzoneContainer {
     long containerID = ContainerTestHelper.getTestContainerID();
     OzoneConfiguration conf = newOzoneConfiguration();
     OzoneContainer container = null;
-    MiniOzoneCluster cluster = null;
     try {
-      cluster = MiniOzoneCluster.newBuilder(conf).build();
-      cluster.waitForClusterToBeReady();
       // We don't start Ozone Container via data node, we will do it
       // independently in our test path.
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.getRoot().getPath());
+      conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
+      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
@@ -97,9 +94,6 @@ public class TestOzoneContainer {
       if (container != null) {
         container.stop();
       }
-      if (cluster != null) {
-        cluster.shutdown();
-      }
     }
   }
 
@@ -110,17 +104,14 @@ public class TestOzoneContainer {
     OzoneContainer container = null;
 
     try {
-      cluster = MiniOzoneCluster.newBuilder(conf).build();
-      cluster.waitForClusterToBeReady();
-
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.getRoot().getPath());
+      conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
+      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
       conf.setBoolean(
           OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
-
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       StateContext context = Mockito.mock(StateContext.class);
@@ -179,6 +170,7 @@ public class TestOzoneContainer {
 
       cluster = MiniOzoneCluster.newBuilder(conf)
           .setRandomContainerPort(false)
+          .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
 
@@ -237,10 +229,6 @@ public class TestOzoneContainer {
       // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
       // are deprecated
 
-      response = client.sendCommand(request);
-      Assert.assertNotNull(response);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
       //Update an existing container
       Map<String, String> containerUpdate = new HashMap<String, String>();
       containerUpdate.put("container_updated_key", "container_updated_value");
@@ -266,17 +254,19 @@ public class TestOzoneContainer {
     }
   }
 
+  @Disabled("HDDS-6473")
   @Test
   public void testBothGetandPutSmallFile() throws Exception {
     MiniOzoneCluster cluster = null;
     XceiverClientGrpc client = null;
     try {
       OzoneConfiguration conf = newOzoneConfiguration();
-      conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-          tempFolder.getRoot().getPath());
+      conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
+      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
       client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
           .setRandomContainerPort(false)
+          .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
       long containerID = ContainerTestHelper.getTestContainerID();
@@ -299,6 +289,8 @@ public class TestOzoneContainer {
       final ContainerProtos.ContainerCommandRequestProto smallFileRequest
           = ContainerTestHelper.getWriteSmallFileRequest(
           client.getPipeline(), blockId, 1024);
+      final byte[] requestBytes = smallFileRequest.getPutSmallFile().getData()
+          .toByteArray();
       ContainerProtos.ContainerCommandResponseProto response
           = client.sendCommand(smallFileRequest);
       Assert.assertNotNull(response);
@@ -307,9 +299,18 @@ public class TestOzoneContainer {
           = ContainerTestHelper.getReadSmallFileRequest(client.getPipeline(),
           smallFileRequest.getPutSmallFile().getBlock());
       response = client.sendCommand(getSmallFileRequest);
-      Assert.assertArrayEquals(
-          smallFileRequest.getPutSmallFile().getData().toByteArray(),
-          response.getGetSmallFile().getData().getData().toByteArray());
+
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      ContainerProtos.ReadChunkResponseProto chunkResponse =
+          response.getGetSmallFile().getData();
+      if (chunkResponse.hasDataBuffers()) {
+        Assert.assertArrayEquals(requestBytes,
+            chunkResponse.getDataBuffers().toByteArray());
+      } else {
+        Assert.assertArrayEquals(requestBytes,
+            chunkResponse.getData().toByteArray());
+      }
     } finally {
       if (client != null) {
         client.close();
@@ -329,11 +330,12 @@ public class TestOzoneContainer {
     try {
 
       OzoneConfiguration conf = newOzoneConfiguration();
-      conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-          tempFolder.getRoot().getPath());
+      conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
+      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
       client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
           .setRandomContainerPort(false)
+          .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
       client.connect();
@@ -389,11 +391,6 @@ public class TestOzoneContainer {
       int chunksCount = putBlockRequest.getPutBlock().getBlockData()
           .getChunksCount();
       ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
-
-      response = client.sendCommand(request);
-      Assert.assertNotNull(response);
-      Assert.assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO,
-          response.getResult());
     } finally {
       if (client != null) {
         client.close();
@@ -413,11 +410,12 @@ public class TestOzoneContainer {
         writeChunkRequest, putBlockRequest;
     try {
       OzoneConfiguration conf = newOzoneConfiguration();
-      conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-          tempFolder.getRoot().getPath());
+      conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
+      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
       client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
           .setRandomContainerPort(false)
+          .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
       client.connect();
@@ -509,11 +507,12 @@ public class TestOzoneContainer {
     XceiverClientGrpc client = null;
     try {
       OzoneConfiguration conf = newOzoneConfiguration();
-      conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-          tempFolder.getRoot().getPath());
+      conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
+      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
       client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
           .setRandomContainerPort(false)
+          .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
       long containerID = ContainerTestHelper.getTestContainerID();
