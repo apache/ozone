@@ -161,21 +161,13 @@ public class TestOzoneContainer {
       OzoneConfiguration conf = newOzoneConfiguration();
 
       // Start ozone container Via Datanode create.
-
-      Pipeline pipeline =
-          MockPipeline.createSingleNodePipeline();
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-          pipeline.getFirstNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
-
       cluster = MiniOzoneCluster.newBuilder(conf)
-          .setRandomContainerPort(false)
           .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
 
       // This client talks to ozone container via datanode.
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+      XceiverClientGrpc client = createClientForTesting(cluster);
 
       runTestOzoneContainerViaDataNode(containerID, client);
     } finally {
@@ -263,13 +255,13 @@ public class TestOzoneContainer {
       OzoneConfiguration conf = newOzoneConfiguration();
       conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
-      client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
-          .setRandomContainerPort(false)
           .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
       long containerID = ContainerTestHelper.getTestContainerID();
+
+      client = createClientForTesting(cluster);
       runTestBothGetandPutSmallFile(containerID, client);
     } finally {
       if (cluster != null) {
@@ -332,12 +324,12 @@ public class TestOzoneContainer {
       OzoneConfiguration conf = newOzoneConfiguration();
       conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
-      client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
-          .setRandomContainerPort(false)
           .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
+
+      client = createClientForTesting(cluster);
       client.connect();
 
       long containerID = ContainerTestHelper.getTestContainerID();
@@ -412,12 +404,12 @@ public class TestOzoneContainer {
       OzoneConfiguration conf = newOzoneConfiguration();
       conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
-      client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
-          .setRandomContainerPort(false)
           .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
+
+      client = createClientForTesting(cluster);
       client.connect();
 
       long containerID = ContainerTestHelper.getTestContainerID();
@@ -509,13 +501,13 @@ public class TestOzoneContainer {
       OzoneConfiguration conf = newOzoneConfiguration();
       conf.set(OZONE_METADATA_DIRS, tempFolder.newFolder().getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
-      client = createClientForTesting(conf);
       cluster = MiniOzoneCluster.newBuilder(conf)
-          .setRandomContainerPort(false)
           .setNumDatanodes(1)
           .build();
       cluster.waitForClusterToBeReady();
       long containerID = ContainerTestHelper.getTestContainerID();
+
+      client = createClientForTesting(cluster);
       runAsyncTests(containerID, client);
     } finally {
       if (cluster != null) {
@@ -525,16 +517,10 @@ public class TestOzoneContainer {
   }
 
   private static XceiverClientGrpc createClientForTesting(
-      OzoneConfiguration conf) throws Exception {
-    // Start ozone container Via Datanode create.
-    Pipeline pipeline =
-        MockPipeline.createSingleNodePipeline();
-    conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-        pipeline.getFirstNode()
-            .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
-
-    // This client talks to ozone container via datanode.
-    return new XceiverClientGrpc(pipeline, conf);
+      MiniOzoneCluster cluster) {
+    Pipeline pipeline = cluster.getStorageContainerManager()
+        .getPipelineManager().getPipelines().iterator().next();
+    return new XceiverClientGrpc(pipeline, cluster.getConf());
   }
 
   public static void createContainerForTesting(XceiverClientSpi client,
