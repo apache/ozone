@@ -378,45 +378,29 @@ public class TestOzoneManagerLock {
 
   private void testLockHoldCountUtil(OzoneManagerLock.Resource resource,
                                      String[] resourceName,
-                                     String resourceLockName) throws Exception {
+                                     String resourceLockName) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
     assertEquals(0, lock.getHoldCount(resourceLockName));
 
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceLockName));
+    for (int i = 1; i <= 5; i++) {
+      lock.acquireReadLock(resource, resourceName);
+      assertEquals(i, lock.getHoldCount(resourceLockName));
+    }
 
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceLockName));
+    for (int i = 4; i >= 0; i--) {
+      lock.releaseReadLock(resource, resourceName);
+      assertEquals(i, lock.getHoldCount(resourceLockName));
+    }
 
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(3, lock.getHoldCount(resourceLockName));
+    for (int i = 1; i <= 5; i++) {
+      lock.acquireWriteLock(resource, resourceName);
+      assertEquals(i, lock.getHoldCount(resourceLockName));
+    }
 
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceLockName));
-
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceLockName));
-
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(0, lock.getHoldCount(resourceLockName));
-
-    lock.acquireWriteLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceLockName));
-
-    lock.acquireWriteLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceLockName));
-
-    lock.acquireWriteLock(resource, resourceName);
-    assertEquals(3, lock.getHoldCount(resourceLockName));
-
-    lock.releaseWriteLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceLockName));
-
-    lock.releaseWriteLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceLockName));
-
-    lock.releaseWriteLock(resource, resourceName);
-    assertEquals(0, lock.getHoldCount(resourceLockName));
+    for (int i = 4; i >= 0; i--) {
+      lock.releaseWriteLock(resource, resourceName);
+      assertEquals(i, lock.getHoldCount(resourceLockName));
+    }
   }
 }
