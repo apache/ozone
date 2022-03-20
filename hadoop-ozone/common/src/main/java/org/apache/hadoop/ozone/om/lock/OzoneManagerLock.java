@@ -517,13 +517,7 @@ public class OzoneManagerLock {
     // This helps in maintaining lock related variables locally confined to a
     // given thread.
     private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
-        new ThreadLocal<LockUsageInfo>() {
-          @Override
-          public LockUsageInfo initialValue() {
-            LockUsageInfo readLockMetrics = new LockUsageInfo();
-            return readLockMetrics;
-          }
-        };
+        ThreadLocal.withInitial(LockUsageInfo::new);
 
     /**
      * Sets the time (ns) when the lock holding period begins specific to a
