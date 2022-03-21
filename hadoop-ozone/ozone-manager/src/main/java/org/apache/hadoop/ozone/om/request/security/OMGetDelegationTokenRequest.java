@@ -64,14 +64,13 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    // We need to populate user info in our request object.
+    OMRequest request = super.preExecute(ozoneManager);
+
     GetDelegationTokenRequestProto getDelegationTokenRequest =
-        getOmRequest().getGetDelegationTokenRequest();
+        request.getGetDelegationTokenRequest();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
-    Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.USERNAME,
-        getOmRequest().getUserInfo().getUserName());
-    auditMap.put(OzoneConsts.CLIENT_ID, getOmRequest().getClientId());
 
     Token<OzoneTokenIdentifier> token;
     try {
@@ -80,8 +79,8 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
           .getDelegationToken(new Text(getDelegationTokenRequest.getRenewer()));
     } catch (IOException ioe) {
       auditLog(auditLogger,
-          buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, ioe,
-              getOmRequest().getUserInfo()));
+          buildAuditMessage(OMAction.GET_DELEGATION_TOKEN,
+              new LinkedHashMap<>(), ioe, request.getUserInfo()));
       throw ioe;
     }
 
@@ -109,8 +108,8 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
                           .build())
                   .setTokenRenewInterval(ozoneManager.getDelegationTokenMgr()
                       .getTokenRenewInterval()))
-          .setCmdType(getOmRequest().getCmdType())
-          .setClientId(getOmRequest().getClientId());
+          .setCmdType(request.getCmdType())
+          .setClientId(request.getClientId());
 
 
     } else {
@@ -120,11 +119,11 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
               UpdateGetDelegationTokenRequest.newBuilder()
                   .setGetDelegationTokenResponse(
                       GetDelegationTokenResponseProto.newBuilder()))
-          .setCmdType(getOmRequest().getCmdType())
-          .setClientId(getOmRequest().getClientId());
+          .setCmdType(request.getCmdType())
+          .setClientId(request.getClientId());
     }
-    if (getOmRequest().hasTraceID()) {
-      omRequest.setTraceID(getOmRequest().getTraceID());
+    if (request.hasTraceID()) {
+      omRequest.setTraceID(request.getTraceID());
     }
     return omRequest.build();
   }

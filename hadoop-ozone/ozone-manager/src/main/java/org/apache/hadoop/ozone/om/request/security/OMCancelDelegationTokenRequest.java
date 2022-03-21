@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.security;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -43,7 +42,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.buildTokenAuditMap;
@@ -62,23 +60,26 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    // We need to populate user info in our request object.
+    OMRequest request =  super.preExecute(ozoneManager);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
-    Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.USERNAME,
-        getOmRequest().getUserInfo().getUserName());
-    auditMap.put(OzoneConsts.CLIENT_ID, getOmRequest().getClientId());
+    Map<String, String> auditMap = null;
 
     try {
+      Token<OzoneTokenIdentifier> token = OMPBHelper.convertToDelegationToken(
+          request.getCancelDelegationTokenRequest().getToken());
+      auditMap = buildTokenAuditMap(token);
+
       // Call OM to cancel token, this does check whether we can cancel token
       // or not. This does not remove token from DB/in-memory.
-      ozoneManager.cancelDelegationToken(getToken());
-      return super.preExecute(ozoneManager);
+      ozoneManager.cancelDelegationToken(token);
+      return request;
 
     } catch (IOException ioe) {
       auditLog(auditLogger,
-          buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, ioe,
-              getOmRequest().getUserInfo()));
+          buildAuditMessage(OMAction.CANCEL_DELEGATION_TOKEN, auditMap, ioe,
+              request.getUserInfo()));
       throw ioe;
     }
   }
