@@ -44,7 +44,7 @@ import java.util.concurrent.Callable;
 public class WriteFileThroughputBenchmark extends HadoopFsGenerator
     implements Callable<Void> {
 
-  @Option(names = {"-p", "--path"},
+  @Option(names = {"-P", "--path"},
       description = "Ozone filesystem path OFS scheme",
       defaultValue = "ofs://ozone1/volume1/bucket1")
   private String rootPath;
@@ -54,24 +54,24 @@ public class WriteFileThroughputBenchmark extends HadoopFsGenerator
       defaultValue = "1")
   private long fileSize;
 
-  @Option(names = {"-bl", "--block"},
+  @Option(names = {"-b", "--block"},
       description = "Specify the Block Size in MB",
       defaultValue = "128")
   private long blockSize;
 
-  @Option(names = {"-bu", "--buffer"},
+  @Option(names = {"-B", "--buffer"},
       description = "Size of buffer used store the generated " +
           "key content",
       defaultValue = "10240")
   private int bufferSize;
 
-  @Option(names = {"-th", "--throttle"},
+  @Option(names = {"-T", "--throttle"},
       description = "Specify the Max Write throughput in bytes/second - " +
           "Should not be used while benchmarking",
       defaultValue = "0")
   private int throttle;
 
-  @Option(names = {"-re", "--replication"},
+  @Option(names = {"-r", "--replication"},
       description = "Specify the Replication factor",
       defaultValue = "1")
   private short replication;
