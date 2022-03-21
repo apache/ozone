@@ -66,7 +66,8 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
   private int bufferSize;
 
   @Option(names = {"-th", "--throttle"},
-      description = "Specify the Max Write throughput in bytes/second",
+      description = "Specify the Max Write throughput in bytes/second - " +
+          "Should not be used while benchmarking",
       defaultValue = "0")
   private int throttle;
 
