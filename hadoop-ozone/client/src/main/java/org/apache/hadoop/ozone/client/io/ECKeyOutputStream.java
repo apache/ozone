@@ -160,16 +160,11 @@ public class ECKeyOutputStream extends KeyOutputStream {
             .getCurrentStreamEntry().getCurrentStreamIdx();
         int bufferRem =
             ecChunkBufferCache.dataBuffers[currentStreamIdx].remaining();
-        int expectedWriteLen = Math.min(rem, Math.min(bufferRem, ecChunkSize));
-        int oldPos =
-            ecChunkBufferCache.dataBuffers[currentStreamIdx].position();
-        int pos =
-            handleDataWrite(currentStreamIdx, b, off, expectedWriteLen,
-                oldPos + expectedWriteLen == ecChunkSize);
+        int writeLen = Math.min(rem, Math.min(bufferRem, ecChunkSize));
+        int pos = handleDataWrite(currentStreamIdx, b, off, writeLen);
         checkAndWriteParityCells(pos);
-        long writtenLength = pos - oldPos;
-        rem -= writtenLength;
-        off += writtenLength;
+        rem -= writeLen;
+        off += writeLen;
       } catch (Exception e) {
         markStreamClosed();
         throw new IOException(e.getMessage());
@@ -375,14 +370,9 @@ public class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private int handleDataWrite(int currIdx, byte[] b, int off, long len,
-      boolean isFullCell) {
-    int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, (int) len);
-
-    if (isFullCell) {
-      Preconditions.checkArgument(pos == ecChunkSize,
-          "When full cell passed, the pos: " + pos
-              + " should match to ec chunk size.");
+  private int handleDataWrite(int currIdx, byte[] b, int off, int len) {
+    int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, len);
+    if (pos == ecChunkSize) {
       handleOutputStreamWrite(currIdx, pos, false);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
