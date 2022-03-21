@@ -569,31 +569,31 @@ public class TestOmMetadataManager {
     Set<String> expiredKeys = new HashSet<>();
     for (int i = 0; i < numExpiredOpenKeys; i++) {
       OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-              bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE, 0L, expiredOpenKeyCreationTime);
+          bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE, 0L, expiredOpenKeyCreationTime);
 
       OMRequestTestUtils.addKeyToTable(true, false,
-              keyInfo, clientID, 0L, omMetadataManager);
+          keyInfo, clientID, 0L, omMetadataManager);
 
       String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
-              keyInfo.getKeyName(), clientID);
+          keyInfo.getKeyName(), clientID);
       expiredKeys.add(groupID);
     }
 
     // Add unexpired keys to open key table.
     for (int i = 0; i < numUnexpiredOpenKeys; i++) {
       OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-              bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE);
+          bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE);
 
       OMRequestTestUtils.addKeyToTable(true, false,
-              keyInfo, clientID, 0L, omMetadataManager);
+          keyInfo, clientID, 0L, omMetadataManager);
     }
 
     // Test retrieving fewer expired keys than actually exist.
     List<String> someExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(expireThreshold,
-                numExpiredOpenKeys - 1);
+        omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            numExpiredOpenKeys - 1);
 
     Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredKeys.size());
     for (String key: someExpiredKeys) {
@@ -602,8 +602,8 @@ public class TestOmMetadataManager {
 
     // Test attempting to retrieving more expired keys than actually exist.
     List<String> allExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(expireThreshold,
-                 numExpiredOpenKeys + 1);
+        omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            numExpiredOpenKeys + 1);
 
     Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
     for (String key: allExpiredKeys) {
@@ -612,8 +612,8 @@ public class TestOmMetadataManager {
 
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(expireThreshold,
-                numExpiredOpenKeys);
+        omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            numExpiredOpenKeys);
 
     Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
     for (String key: allExpiredKeys) {
