@@ -250,8 +250,7 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return StripeWriteStatus.SUCCESS;
   }
 
-  private void encodeAndWriteParityCells()
-      throws IOException {
+  private void encodeAndWriteParityCells() throws IOException {
     ECBlockOutputStreamEntry currentStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     boolean shouldClose = currentStreamEntry.getRemaining() <= 0;
@@ -366,13 +365,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
       throws IOException {
     int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, len);
 
-    // if this cell is full, send data to the OutputStream
+    // If current data cell is full, write its data to the data block
     if (pos == ecChunkSize) {
       handleOutputStreamWrite(currIdx, pos, false);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
 
-      // if this is last data cell in the stripe,
-      // compute and write the parity cells
+      // If this is the last data cell in current stripe,
+      // compute the parity cells and write them to the parity blocks
       if (currIdx == numDataBlks - 1) {
         encodeAndWriteParityCells();
       }
