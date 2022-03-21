@@ -137,7 +137,7 @@ public class TestKeyValueHandler {
     DispatcherContext context = new DispatcherContext.Builder().build();
     KeyValueHandler
         .dispatchRequest(handler, createContainerRequest, container, context);
-    Mockito.verify(handler, times(1)).handleListBlock(
+    Mockito.verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Read Container Request handling
@@ -203,7 +203,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
         .dispatchRequest(handler, listBlockRequest, container, context);
-    Mockito.verify(handler, times(2)).handleUnsupportedOp(
+    Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Read Chunk Request handling
