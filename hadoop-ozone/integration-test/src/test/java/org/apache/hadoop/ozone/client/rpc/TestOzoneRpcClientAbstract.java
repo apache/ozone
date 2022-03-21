@@ -102,6 +102,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -190,7 +191,7 @@ public abstract class TestOzoneRpcClientAbstract {
     //  for testZReadKeyWithUnhealthyContainerReplica.
     conf.set("ozone.scm.stale.node.interval", "10s");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
         .setClusterId(clusterId)
@@ -1005,6 +1006,71 @@ public abstract class TestOzoneRpcClientAbstract {
 
     writeKey(bucket, keyName, ONE, value, valueLength);
     Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    bucket.deleteKey(keyName);
+    Assert.assertEquals(0L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+  }
+
+  // TODO: testBucketQuota overlaps with testBucketUsedBytes,
+  //       do cleanup when EC branch gets merged into master.
+  @Test
+  public void testBucketQuota() throws IOException {
+    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    ReplicationConfig[] repConfigs = new ReplicationConfig[]{
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
+        new ECReplicationConfig("rs-3-2-1024k"),
+    };
+
+    for (ReplicationConfig repConfig : repConfigs) {
+      for (int i = 0; i <= repConfig.getRequiredNodes(); i++) {
+        bucketQuotaTestHelper(i * blockSize, repConfig);
+        bucketQuotaTestHelper(i * blockSize + 1, repConfig);
+      }
+    }
+  }
+
+  private void bucketQuotaTestHelper(int keyLength, ReplicationConfig repConfig)
+      throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    long blockSize = (long) ozoneManager.getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    byte[] value = new byte[keyLength];
+    int dataGroupSize = repConfig instanceof ECReplicationConfig ?
+        ((ECReplicationConfig) repConfig).getData() : 1;
+    long preAllocatedBlocks = Math.min(ozoneManager.getPreallocateBlocksMax(),
+        (keyLength - 1) / (blockSize * dataGroupSize) + 1);
+    long preAllocatedSpace = preAllocatedBlocks * blockSize
+        * repConfig.getRequiredNodes();
+    long keyQuota = QuotaUtil.getReplicatedSize(keyLength, repConfig);
+
+    OzoneOutputStream out = bucket.createKey(keyName, keyLength,
+        repConfig, new HashMap<>());
+    Assert.assertEquals(preAllocatedSpace,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    out.write(value);
+    out.close();
+    Assert.assertEquals(keyQuota,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    out = bucket.createKey(keyName, keyLength, repConfig, new HashMap<>());
+    Assert.assertEquals(keyQuota + preAllocatedSpace,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    out.write(value);
+    out.close();
+    Assert.assertEquals(keyQuota,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     bucket.deleteKey(keyName);
