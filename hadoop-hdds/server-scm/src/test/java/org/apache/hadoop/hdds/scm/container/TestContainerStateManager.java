@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -67,7 +67,7 @@ public class TestContainerStateManager {
   @Before
   public void init() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());

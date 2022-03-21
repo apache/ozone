@@ -15,24 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone;
+package org.apache.ozone.test.tag;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import org.junit.jupiter.api.Tag;
 
 /**
- * Versioning for protocol clients.
+ * Annotation to mark test classes or methods that take too much time.
+ * These are excluded from CI runs for each commit and run periodically.
  */
-public final class ClientVersions {
-
-  // old client, doesn't even send version number in requests
-  public static final int DEFAULT_VERSION = 0;
-
-  // DatanodeDetails#getFromProtobuf handles unknown types of ports
-  public static final int VERSION_HANDLES_UNKNOWN_DN_PORTS = 1;
-
-  // this should always point to the latest version
-  public static final int CURRENT_VERSION = VERSION_HANDLES_UNKNOWN_DN_PORTS;
-
-  private ClientVersions() {
-    // no instances
-  }
-
+@Target({ ElementType.TYPE, ElementType.METHOD })
+@Retention(RetentionPolicy.RUNTIME)
+@Tag("slow")
+public @interface Slow {
+  /**
+   * Description or Jira issue.
+   */
+  String value() default "";
 }

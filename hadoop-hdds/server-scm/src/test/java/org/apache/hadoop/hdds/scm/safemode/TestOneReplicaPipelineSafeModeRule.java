@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -92,7 +92,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     pipelineManager = PipelineManagerImpl.newPipelineManager(
         ozoneConfiguration,
-        MockSCMHAManager.getInstance(true),
+        SCMHAManagerStub.getInstance(true),
         mockNodeManager,
         scmMetadataStore.getPipelineTable(),
         eventQueue,

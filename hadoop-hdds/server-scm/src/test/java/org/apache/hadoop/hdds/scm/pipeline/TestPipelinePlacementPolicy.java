@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -55,7 +55,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -115,7 +115,7 @@ public class TestPipelinePlacementPolicy {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
         .setRatisServer(scmhaManager.getRatisServer())
@@ -289,7 +289,7 @@ public class TestPipelinePlacementPolicy {
             .setNodes(nodes)
             .build();
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-            ClientVersions.CURRENT_VERSION);
+            ClientVersion.CURRENT_VERSION);
         nodeManager.addPipeline(pipeline);
         stateManager.addPipeline(pipelineProto);
       } catch (SCMException e) {
@@ -689,7 +689,7 @@ public class TestPipelinePlacementPolicy {
               .build();
 
           pipelineProto = pipeline.getProtobufMessage(
-              ClientVersions.CURRENT_VERSION);
+              ClientVersion.CURRENT_VERSION);
           nodeManager.addPipeline(pipeline);
           stateManager.addPipeline(pipelineProto);
           pipelineCount++;
@@ -773,7 +773,7 @@ public class TestPipelinePlacementPolicy {
         .build();
 
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
   }

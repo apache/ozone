@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -281,7 +282,9 @@ public class TestS3MultipartResponse {
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID, OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.Status status,
-          List<OmKeyInfo> unUsedParts) {
+          List<OmKeyInfo> unUsedParts,
+          OmBucketInfo omBucketInfo,
+          RepeatedOmKeyInfo keysToDelete) {
 
 
     String multipartKey = omMetadataManager
@@ -300,7 +303,7 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
         multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout());
+        getBucketLayout(), omBucketInfo, keysToDelete);
   }
 
   private String getMultipartKey(long parentID, String keyName,

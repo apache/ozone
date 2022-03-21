@@ -41,11 +41,12 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +86,7 @@ import static org.junit.Assert.fail;
 /**
  * Test from the scmclient for decommission and maintenance.
  */
-
+@Flaky({"HDDS-6028", "HDDS-6049"})
 public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
@@ -104,7 +105,7 @@ public class TestDecommissionAndMaintenance {
 
   private static MiniOzoneClusterProvider clusterProvider;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int interval = 100;
@@ -134,14 +135,14 @@ public class TestDecommissionAndMaintenance {
     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 8);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws InterruptedException {
     if (clusterProvider != null) {
       clusterProvider.shutdown();
     }
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     cluster = clusterProvider.provide();
     setManagers();
@@ -149,7 +150,7 @@ public class TestDecommissionAndMaintenance {
     scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws InterruptedException, IOException {
     if (cluster != null) {
       clusterProvider.destroy(cluster);
