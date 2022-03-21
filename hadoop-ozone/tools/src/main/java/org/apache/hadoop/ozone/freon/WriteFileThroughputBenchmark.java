@@ -75,19 +75,20 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
       defaultValue = "1")
   private short replication;
 
-  @Option(names = {"--sync"},
-      description = "Optionally Issue hsync after every write " +
+  @Option(names = {"--flags"},
+      description = "Optionally issue hSync or hFlush after every write" +
           "Cannot be used with hflush",
       defaultValue = "false"
   )
-  private boolean hSync;
+  private String flag = "";
 
-  @Option(names = {"--flush"},
-      description = "Optionally Issue hsync after every write " +
-          "Cannot be used with hflush",
-      defaultValue = "false"
-  )
-  private boolean hFlush;
+  /**
+   * Type of flags.
+   */
+  public enum Flags {
+    hSync,
+    hFlush,
+  }
 
   // For Generating the content of the files
   private ContentGenerator contentGenerator;
@@ -114,14 +115,6 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
 
     init();
 
-    // We cannot have both Hsync and Hflush set to TRUE at the same time
-    if (hSync && hFlush) {
-      if (hSync == hFlush) {
-        LOG.info("Both Hsync and Hflush cannot be set to TRUE");
-        System.exit(1);
-      }
-    }
-
     LOG.info("NumFiles=" + getTestNo());
     LOG.info("Total FileSize=" + fileSize);
     LOG.info("BlockSize=" + blockSize);
@@ -129,10 +122,22 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     LOG.info("Replication=" + replication);
     LOG.info("Threads=" + getThreadNo());
     LOG.info("URI Scheme Used=" + uri.getScheme());
-    if (hSync) {
-      LOG.info("Hsync after every write= True");
-    } else if (hFlush) {
-      LOG.info("Hflush after every write= True");
+    LOG.info("Flag Chosen=" + flag);
+
+    // Choosing which flag is to be set
+    boolean flush = false;
+    boolean sync = false;
+    Flags type = Flags.valueOf(flag);
+    switch (type) {
+    case hSync:
+      sync = true;
+      break;
+    case hFlush:
+      flush = true;
+      break;
+    default:
+      throw new IllegalArgumentException(
+          flag + " is not a valid benchmarkType.");
     }
 
     // Initialize the configuration variable with
@@ -150,7 +155,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
 
     Path file = new Path(rootPath + "/" +
         generateObjectName(0));
-    FileSystem fileSystem =  FileSystem.get(configuration);
+    FileSystem fileSystem = FileSystem.get(configuration);
     fileSystem.mkdirs(file.getParent());
     // Checks whether output directory exists
     ensureOutputDirExists(createFS(), file);
@@ -158,7 +163,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     // Initialize the size of the file to be written in Bytes
     long filesizeinBytes = fileSize * 1_000_000_000;
     contentGenerator = new ContentGenerator(filesizeinBytes,
-        bufferSize, hSync, hFlush);
+        bufferSize, sync, flush);
 
     // Initializing the time it should take to write a file
     expectedIoTimeNs =
