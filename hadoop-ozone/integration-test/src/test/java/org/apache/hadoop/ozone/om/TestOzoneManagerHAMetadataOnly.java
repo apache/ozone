@@ -318,32 +318,34 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     }
   }
 
-  @Flaky("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     String adminName = userName;
     ObjectStore objectStore = getObjectStore();
 
+    String prefix = "vol-" + RandomStringUtils.randomNumeric(10) + "-";
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(adminName)
+        .build();
+
     Set<String> expectedVolumes = new TreeSet<>();
     for (int i = 0; i < 100; i++) {
-      String volumeName = "vol" + i;
+      String volumeName = prefix + i;
       expectedVolumes.add(volumeName);
-      VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-          .setOwner(userName)
-          .setAdmin(adminName)
-          .build();
       objectStore.createVolume(volumeName, createVolumeArgs);
     }
 
-    validateVolumesList(userName, expectedVolumes);
+    validateVolumesList(expectedVolumes,
+        objectStore.listVolumesByUser(userName, prefix, ""));
 
     // Stop leader OM, and then validate list volumes for user.
     stopLeaderOM();
     Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
 
-    validateVolumesList(userName, expectedVolumes);
-
+    validateVolumesList(expectedVolumes,
+        objectStore.listVolumesByUser(userName, prefix, ""));
   }
 
   @Test
@@ -460,13 +462,9 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   }
 
-  private void validateVolumesList(String userName,
-      Set<String> expectedVolumes) throws Exception {
-    ObjectStore objectStore = getObjectStore();
-
+  private void validateVolumesList(Set<String> expectedVolumes,
+      Iterator<? extends OzoneVolume> volumeIterator) throws Exception {
     int expectedCount = 0;
-    Iterator<? extends OzoneVolume> volumeIterator =
-        objectStore.listVolumesByUser(userName, "", "");
 
     while (volumeIterator.hasNext()) {
       OzoneVolume next = volumeIterator.next();
