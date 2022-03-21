@@ -24,6 +24,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
@@ -59,12 +62,33 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecuteWithNormalKey() throws Exception {
-    doPreExecute(createKeyRequest(false, 0));
+    ReplicationConfig ratis3Config =
+        ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
+    preExecuteTest(false, 0, ratis3Config);
+  }
+
+  @Test
+  public void testPreExecuteWithECKey() throws Exception {
+    ReplicationConfig ec3Plus2Config = new ECReplicationConfig("rs-3-2-1024k");
+    preExecuteTest(false, 0, ec3Plus2Config);
   }
 
   @Test
   public void testPreExecuteWithMultipartKey() throws Exception {
-    doPreExecute(createKeyRequest(true, 1));
+    ReplicationConfig ratis3Config =
+        ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
+    preExecuteTest(true, 1, ratis3Config);
+  }
+
+  private void preExecuteTest(boolean isMultipartKey, int partNumber,
+      ReplicationConfig repConfig) throws Exception {
+    long scmBlockSize = ozoneManager.getScmBlockSize();
+    for (int i = 0; i <= repConfig.getRequiredNodes(); i++) {
+      doPreExecute(createKeyRequest(isMultipartKey, partNumber,
+          scmBlockSize * i, repConfig));
+      doPreExecute(createKeyRequest(isMultipartKey, partNumber,
+          scmBlockSize * i + 1, repConfig));
+    }
   }
 
 
@@ -163,10 +187,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager.getOpenKeyTable(bucketLayout).get(openKey);
 
     Assert.assertNotNull(omKeyInfo);
+    Assert.assertNotNull(omKeyInfo.getLatestVersionLocations());
 
+    // As our data size is 100, and scmBlockSize is default to 1000, so we
+    // shall have only one block.
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
-    Assert.assertTrue(omKeyLocationInfoList.size() == 1);
+    Assert.assertEquals(1, omKeyLocationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
 
@@ -342,6 +369,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         modifiedOmRequest.getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+    int dataGroupSize = keyArgs.hasEcReplicationConfig() ?
+        keyArgs.getEcReplicationConfig().getData() : 1;
+    long blockSize = ozoneManager.getScmBlockSize();
+    long preAllocatedBlocks = Math.min(ozoneManager.getPreallocateBlocksMax(),
+        (keyArgs.getDataSize() - 1) / (blockSize * dataGroupSize) + 1);
+
     // Time should be set
     Assert.assertTrue(keyArgs.getModificationTime() > 0);
 
@@ -354,12 +387,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     if (!originalOMRequest.getCreateKeyRequest().getKeyArgs()
         .getIsMultipartKey()) {
 
-      // As our data size is 100, and scmBlockSize is default to 1000, so we
-      // shall have only one block.
-      List< OzoneManagerProtocolProtos.KeyLocation> keyLocations =
+      List<OzoneManagerProtocolProtos.KeyLocation> keyLocations =
           keyArgs.getKeyLocationsList();
       // KeyLocation should be set.
-      Assert.assertTrue(keyLocations.size() == 1);
+      Assert.assertEquals(preAllocatedBlocks, keyLocations.size());
       Assert.assertEquals(CONTAINER_ID,
           keyLocations.get(0).getBlockID().getContainerBlockID()
               .getContainerID());
@@ -373,7 +404,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       Assert.assertEquals(scmBlockSize, keyLocations.get(0).getLength());
     } else {
       // We don't create blocks for multipart key in createKey preExecute.
-      Assert.assertTrue(keyArgs.getKeyLocationsList().size() == 0);
+      Assert.assertEquals(0, keyArgs.getKeyLocationsList().size());
     }
 
     return modifiedOmRequest;
@@ -414,6 +445,36 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setCreateKeyRequest(createKeyRequest).build();
   }
 
+  private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+      long keyLength, ReplicationConfig repConfig) {
+
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName).setIsMultipartKey(isMultipartKey)
+        .setType(repConfig.getReplicationType())
+        .setLatestVersionLocation(true)
+        .setDataSize(keyLength);
+
+    if (repConfig.getReplicationType() == EC) {
+      keyArgs.setEcReplicationConfig(
+          ((ECReplicationConfig) repConfig).toProto());
+    } else {
+      keyArgs.setFactor(ReplicationConfig.getLegacyFactor(repConfig));
+    }
+
+    if (isMultipartKey) {
+      keyArgs.setMultipartNumber(partNumber);
+    }
+
+    OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
+        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    return OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest).build();
+  }
+
   @Test
   public void testKeyCreateWithFileSystemPathsEnabled() throws Exception {
 
@@ -427,11 +488,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager);
 
 
-    keyName = "dir1/dir2/dir3/file1";
+    String keyName = "dir1/dir2/dir3/file1";
     createAndCheck(keyName);
 
     // Key with leading '/'.
-    String keyName = "/a/b/c/file1";
+    keyName = "/a/b/c/file1";
     createAndCheck(keyName);
 
     // Commit openKey entry.
