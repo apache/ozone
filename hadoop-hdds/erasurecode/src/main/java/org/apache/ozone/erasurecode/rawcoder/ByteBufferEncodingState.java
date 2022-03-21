@@ -101,9 +101,7 @@ class ByteBufferEncodingState extends EncodingState {
       }
 
       if (buffer.remaining() != encodeLength) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("buffer remaining is " + buffer.remaining() + " encodelength is " + encodeLength);
-        }
+        LOG.debug("buffer remaining is {} encodelength is {}", buffer.remaining(), encodeLength);
         throw new HadoopIllegalArgumentException(
             "Invalid buffer, not of length " + encodeLength);
       }
