@@ -101,12 +101,12 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   @Option(names = {"-r", "--replication-type"},
       description = "Default replication type. Supported types are"
           + " RATIS, EC")
-  private static String replicationType="RATIS";
+  private static String replicationType = "RATIS";
 
   @Option(names = {"-l", "--layout"},
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
-  private static AllowedBucketLayouts allowedBucketLayout=
-      AllowedBucketLayouts.OBJECT_STORE;
+  private static AllowedBucketLayouts allowedBucketLayout =
+      AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
 
   private static MiniOzoneChaosCluster cluster;
   private static MiniOzoneLoadGenerator loadGenerator;

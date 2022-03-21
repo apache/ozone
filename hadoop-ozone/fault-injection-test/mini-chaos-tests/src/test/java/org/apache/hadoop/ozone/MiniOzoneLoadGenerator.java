@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * A Simple Load generator for testing.
  */
-public class MiniOzoneLoadGenerator {
+public final class MiniOzoneLoadGenerator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneLoadGenerator.class);
