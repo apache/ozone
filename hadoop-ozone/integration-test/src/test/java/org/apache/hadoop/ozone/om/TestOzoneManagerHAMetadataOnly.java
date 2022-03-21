@@ -234,7 +234,8 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     // Perform a manual failover of the proxy provider to move the
     // currentProxyIndex to a node other than the leader OM.
-    omFailoverProxyProvider.performFailoverToNextProxy();
+    omFailoverProxyProvider.selectNextOmProxy();
+    omFailoverProxyProvider.performFailover(null);
 
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
     Assert.assertNotEquals(leaderOMNodeId, newProxyNodeId);
@@ -305,7 +306,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
           OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 
       // Failover to the OM node that the objectStore points to
-      omFailoverProxyProvider.performFailoverIfRequired(
+      omFailoverProxyProvider.setNextOmProxy(
           ozoneManager.getOMNodeId());
 
       // A read request should result in the proxyProvider failing over to
