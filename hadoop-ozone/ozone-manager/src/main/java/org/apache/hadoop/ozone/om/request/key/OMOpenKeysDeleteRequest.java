@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -85,19 +86,25 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
+    Map<String, OmBucketInfo> updatedBuckets = new HashMap<>();
 
     try {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
-        Map<String, OmKeyInfo> deleted = updateOpenKeyTableCache(ozoneManager,
-            trxnLogIndex, openKeyBucket);
+        OmBucketInfo omBucketInfo = updateTableCachePerBucket(
+            ozoneManager, trxnLogIndex, openKeyBucket, deletedOpenKeys);
 
-        deletedOpenKeys.putAll(deleted);
+        if (omBucketInfo != null) {
+          String bucketKey = ozoneManager.getMetadataManager()
+              .getBucketKey(openKeyBucket.getVolumeName(),
+                  openKeyBucket.getBucketName());
+          updatedBuckets.put(bucketKey, omBucketInfo);
+        }
       }
 
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled());
+          deletedOpenKeys, updatedBuckets, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -137,20 +144,20 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
   }
 
-  private Map<String, OmKeyInfo> updateOpenKeyTableCache(
-      OzoneManager ozoneManager, long trxnLogIndex, OpenKeyBucket keysPerBucket)
-      throws IOException {
-
-    Map<String, OmKeyInfo> deletedKeys = new HashMap<>();
+  private OmBucketInfo updateTableCachePerBucket(OzoneManager ozoneManager,
+      long trxnLogIndex, OpenKeyBucket keysPerBucket,
+      Map<String, OmKeyInfo> deletedOpenKeys) throws IOException {
 
     boolean acquiredLock = false;
     String volumeName = keysPerBucket.getVolumeName();
     String bucketName = keysPerBucket.getBucketName();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmBucketInfo omBucketInfo;
 
     try {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       for (OpenKey key: keysPerBucket.getKeysList()) {
         String fullKeyName = omMetadataManager.getOpenKey(volumeName,
@@ -164,12 +171,17 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
         if (omKeyInfo != null) {
           // Set the UpdateID to current transactionLogIndex
           omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-          deletedKeys.put(fullKeyName, omKeyInfo);
+          deletedOpenKeys.put(fullKeyName, omKeyInfo);
 
-          // Update table cache.
+          // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-                  new CacheKey<>(fullKeyName),
-                  new CacheValue<>(Optional.absent(), trxnLogIndex));
+              new CacheKey<>(fullKeyName),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+          // Release quota, update bucketTable cache implicitly
+          long quotaReleased = sumBlockLengths(omKeyInfo);
+          omBucketInfo.incrUsedBytes(-quotaReleased);
+          omBucketInfo.incrUsedNamespace(-1L);
 
           ozoneManager.getMetrics().incNumOpenKeysDeleted();
           LOG.debug("Open key {} deleted.", fullKeyName);
@@ -189,7 +201,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    return deletedKeys;
+    return omBucketInfo;
   }
 
 }
