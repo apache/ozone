@@ -232,7 +232,7 @@ public final class ContainerCommandResponseBuilders {
       // V0 has all response data in a single ByteBuffer
       ByteString combinedData = ByteString.EMPTY;
       for (ByteString buffer : dataBuffers) {
-        combinedData.concat(buffer);
+        combinedData = combinedData.concat(buffer);
       }
       readChunk = ReadChunkResponseProto.newBuilder()
           .setChunkData(info)
