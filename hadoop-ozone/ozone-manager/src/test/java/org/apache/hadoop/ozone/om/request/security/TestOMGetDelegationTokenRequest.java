@@ -63,11 +63,13 @@ public class TestOMGetDelegationTokenRequest extends
   private static final String CHECK_RESPONSE = "";
 
   @Before
-  public void setupGetDelegationToken() {
+  public void setupGetDelegationToken() throws IOException {
     secretManager = Mockito.mock(OzoneDelegationTokenSecretManager.class);
     when(ozoneManager.getDelegationTokenMgr()).thenReturn(secretManager);
     when(ozoneManager.getAuditLogger()).thenReturn(new AuditLogger(
         AuditLoggerType.OMLOGGER));
+    when(ozoneManager.getVersionManager()).thenReturn(
+        new OMLayoutVersionManager());
 
     setupToken();
     setupRequest();
@@ -127,8 +129,6 @@ public class TestOMGetDelegationTokenRequest extends
   public void testPreExecuteWithNonNullToken() throws Exception {
     /* Let token of ozoneManager.getDelegationToken() is nonNull. */
     when(ozoneManager.getDelegationToken(tester)).thenReturn(token);
-    when(ozoneManager.getVersionManager()).thenReturn(
-        new OMLayoutVersionManager());
 
     long tokenRenewInterval = 1000L;
     when(ozoneManager.getDelegationTokenMgr().getTokenRenewInterval())
@@ -159,8 +159,6 @@ public class TestOMGetDelegationTokenRequest extends
   public void testPreExecuteWithNullToken() throws Exception {
     /* Let token of ozoneManager.getDelegationToken() is Null. */
     when(ozoneManager.getDelegationToken(tester)).thenReturn(null);
-    when(ozoneManager.getVersionManager()).thenReturn(
-        new OMLayoutVersionManager());
 
     modifiedRequest = omGetDelegationTokenRequest.preExecute(ozoneManager);
     verifyUnchangedRequest();
@@ -177,8 +175,6 @@ public class TestOMGetDelegationTokenRequest extends
   public void testValidateAndUpdateCacheWithNonNullToken() throws Exception {
     /* Let token of ozoneManager.getDelegationToken() is nonNull. */
     when(ozoneManager.getDelegationToken(tester)).thenReturn(token);
-    when(ozoneManager.getVersionManager()).thenReturn(
-        new OMLayoutVersionManager());
 
     /* Mock OzoneDelegationTokenSecretManager#updateToken() to
      * get specific renewTime for verifying OMClientResponse returned by
@@ -201,8 +197,6 @@ public class TestOMGetDelegationTokenRequest extends
   public void testValidateAndUpdateCacheWithNullToken() throws Exception {
     /* Let token of ozoneManager.getDelegationToken() is Null. */
     when(ozoneManager.getDelegationToken(tester)).thenReturn(null);
-    when(ozoneManager.getVersionManager()).thenReturn(
-        new OMLayoutVersionManager());
 
     OMClientResponse clientResponse = setValidateAndUpdateCache();
 
@@ -223,8 +217,6 @@ public class TestOMGetDelegationTokenRequest extends
      * OzoneTokenIdentifier#readProtoBuf(). */
     Token<OzoneTokenIdentifier> exceptToken = new Token<>();
     when(ozoneManager.getDelegationToken(tester)).thenReturn(exceptToken);
-    when(ozoneManager.getVersionManager()).thenReturn(
-        new OMLayoutVersionManager());
 
     OMClientResponse clientResponse = setValidateAndUpdateCache();
 
