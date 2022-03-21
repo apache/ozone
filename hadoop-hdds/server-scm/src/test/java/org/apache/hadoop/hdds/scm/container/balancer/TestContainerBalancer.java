@@ -258,9 +258,6 @@ public class TestContainerBalancer {
     Assert.assertTrue(metrics.getNumDatanodesInvolvedInLatestIteration() > 0);
     Assert.assertFalse(
         metrics.getNumDatanodesInvolvedInLatestIteration() > number);
-    Assert.assertEquals(
-        ContainerBalancer.IterationResult.MAX_DATANODES_TO_INVOLVE_REACHED,
-        containerBalancer.getIterationResult());
     containerBalancer.stop();
   }
 
@@ -321,10 +318,6 @@ public class TestContainerBalancer {
         .getDataSizeMovedGBInLatestIteration();
     Assert.assertTrue(size > 0);
     Assert.assertFalse(size > 10);
-    Assert.assertEquals(
-        ContainerBalancer.IterationResult.MAX_SIZE_TO_MOVE_REACHED,
-        containerBalancer.getIterationResult());
-
     containerBalancer.stop();
   }
 
@@ -631,7 +624,7 @@ public class TestContainerBalancer {
 
     /*
     Now, limit maxSizeToMovePerIteration but fail all container moves. The
-    result should still be ITERATION_COMPLETED, not MAX_SIZE_TO_MOVE_REACHED.
+    result should still be ITERATION_COMPLETED.
      */
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
