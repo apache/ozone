@@ -41,7 +41,7 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class WriteFileThroughputBenchmark extends BaseFreonGenerator
+public class WriteFileThroughputBenchmark extends HadoopFsGenerator
     implements Callable<Void> {
 
   @Option(names = {"-p", "--path"},
@@ -99,7 +99,7 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
   private URI uri;
 
   // variable to check if the user wants a delay
-  private boolean isThrottled;
+  private boolean isThrottled = false;
 
   private long expectedIoTimeNs;
 
@@ -165,6 +165,10 @@ public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     long filesizeinBytes = fileSize * 1_000_000_000;
     contentGenerator = new ContentGenerator(filesizeinBytes,
         bufferSize, sync, flush);
+
+    if (throttle > 0) {
+      isThrottled = true;
+    }
 
     // Initializing the time it should take to write a file
     expectedIoTimeNs =
