@@ -41,7 +41,7 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class WriteFileThroughputBenchmark extends HadoopFsGenerator
+public class WriteFileThroughputBenchmark extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"-P", "--path"},
@@ -66,7 +66,7 @@ public class WriteFileThroughputBenchmark extends HadoopFsGenerator
   private int bufferSize;
 
   @Option(names = {"-T", "--throttle"},
-      description = "Specify the Max Write throughput in bytes/second - " +
+      description = "Specify the Max Write throughput in bytes/second " +
           "Should not be used while benchmarking",
       defaultValue = "0")
   private int throttle;
@@ -79,9 +79,9 @@ public class WriteFileThroughputBenchmark extends HadoopFsGenerator
   @Option(names = {"--flags"},
       description = "Optionally issue hSync or hFlush after every write" +
           "Cannot be used with hflush",
-      defaultValue = "false"
+      defaultValue = "None"
   )
-  private String flag = "";
+  private String flag;
 
   /**
    * Type of flags.
@@ -89,6 +89,7 @@ public class WriteFileThroughputBenchmark extends HadoopFsGenerator
   public enum Flags {
     hSync,
     hFlush,
+    None,
   }
 
   // For Generating the content of the files
@@ -135,6 +136,8 @@ public class WriteFileThroughputBenchmark extends HadoopFsGenerator
       break;
     case hFlush:
       flush = true;
+      break;
+    case None:
       break;
     default:
       throw new IllegalArgumentException(
