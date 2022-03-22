@@ -69,9 +69,7 @@ public class ContentGenerator {
         .getBytes(StandardCharsets.UTF_8);
   }
 
-  /**
-   * Write the required bytes to the output stream.
-   */
+
   public void write(OutputStream outputStream) throws IOException {
     for (long nrRemaining = keySize; nrRemaining > 0;
          nrRemaining -= bufferSize) {
@@ -81,7 +79,9 @@ public class ContentGenerator {
           outputStream.write(buffer[i]);
           flushOrSync(outputStream);
         }
-      } else {
+      } else {  /**
+       * Write the required bytes to the output stream.
+       */
         for (int i = 0; i < curSize; i += copyBufferSize) {
           outputStream.write(buffer, i, Math.min(copyBufferSize, curSize - i));
           flushOrSync(outputStream);
@@ -136,7 +136,6 @@ public class ContentGenerator {
     //Return the final constructed builder object
     public ContentGenerator build() {
       ContentGenerator contentgenerator =  new ContentGenerator(this);
-    // validateBuilderObject(contentgenerator); For validating the builder object
       return contentgenerator;
     }
   }
