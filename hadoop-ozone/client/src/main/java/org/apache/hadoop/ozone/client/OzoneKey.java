@@ -118,13 +118,8 @@ public class OzoneKey {
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.name = keyName;
-    this.dataSize = size;
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.replicationConfig = replicationConfig;
+    this(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, replicationConfig);
     this.metadata.putAll(metadata);
   }
   /**
