@@ -25,7 +25,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
@@ -182,9 +184,9 @@ public final class RatisHelper {
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
-  public static RaftClient newRaftClient(RaftPeer leader,
-      ConfigurationSource conf, GrpcTlsConfig tlsConfig) {
-    return newRaftClient(getRpcType(conf), leader,
+  public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient(
+      ConfigurationSource conf) {
+    return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
   }
 
