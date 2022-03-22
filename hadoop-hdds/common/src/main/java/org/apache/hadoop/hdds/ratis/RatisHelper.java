@@ -256,9 +256,11 @@ public final class RatisHelper {
   public static Parameters setServerTlsConf(
       GrpcTlsConfig serverConf, GrpcTlsConfig clientConf) {
     final Parameters parameters = new Parameters();
-    GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
-    GrpcConfigKeys.TLS.setConf(parameters, serverConf);
-    setAdminTlsConf(parameters, serverConf);
+    if (serverConf != null) {
+      GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
+      GrpcConfigKeys.TLS.setConf(parameters, serverConf);
+      setAdminTlsConf(parameters, serverConf);
+    }
     setClientTlsConf(parameters, clientConf);
     return parameters;
   }
