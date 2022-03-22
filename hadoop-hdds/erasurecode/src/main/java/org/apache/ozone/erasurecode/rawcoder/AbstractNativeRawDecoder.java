@@ -54,10 +54,6 @@ abstract class AbstractNativeRawDecoder extends RawErasureDecoder {
       throws IOException {
     decoderLock.readLock().lock();
     try {
-      if (nativeCoder == 0) {
-        throw new IOException(String.format("%s closed",
-            getClass().getSimpleName()));
-      }
       int[] inputOffsets = new int[decodingState.inputs.length];
       int[] outputOffsets = new int[decodingState.outputs.length];
 

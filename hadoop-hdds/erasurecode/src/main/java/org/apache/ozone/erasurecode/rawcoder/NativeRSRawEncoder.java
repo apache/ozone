@@ -19,6 +19,10 @@ package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
+import org.apache.hadoop.io.erasurecode.rawcoder.HadoopNativeECAccessorUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,47 +33,36 @@ import java.nio.ByteBuffer;
 @InterfaceAudience.Private
 public class NativeRSRawEncoder extends AbstractNativeRawEncoder {
 
-  static {
-    ErasureCodeNative.checkNativeCodeLoaded();
-  }
+  private org.apache.hadoop.io.erasurecode.rawcoder.NativeRSRawEncoder
+      hadoopNativeRSRawEncoder;
+  public static final Logger LOG =
+      LoggerFactory.getLogger(NativeRSRawEncoder.class);
 
   public NativeRSRawEncoder(ECReplicationConfig ecReplicationConfig) {
     super(ecReplicationConfig);
-    encoderLock.writeLock().lock();
-    try {
-      initImpl(ecReplicationConfig.getData(), ecReplicationConfig.getParity());
-    } finally {
-      encoderLock.writeLock().unlock();
-    }
+    hadoopNativeRSRawEncoder =
+        new org.apache.hadoop.io.erasurecode.rawcoder.NativeRSRawEncoder(
+            new ErasureCoderOptions(ecReplicationConfig.getData(),
+                ecReplicationConfig.getParity()));
+    LOG.info("Using the Native ISA-l Library........");
   }
 
   @Override
-  protected void performEncodeImpl(
-          ByteBuffer[] inputs, int[] inputOffsets, int dataLen,
-          ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
-    encodeImpl(inputs, inputOffsets, dataLen, outputs, outputOffsets);
+  protected void performEncodeImpl(ByteBuffer[] inputs, int[] inputOffsets,
+      int dataLen, ByteBuffer[] outputs, int[] outputOffsets)
+      throws IOException {
+    HadoopNativeECAccessorUtil
+        .performEncodeImpl(hadoopNativeRSRawEncoder, inputs,
+            inputOffsets, dataLen, outputs, outputOffsets);
   }
 
   @Override
   public void release() {
-    encoderLock.writeLock().lock();
-    try {
-      destroyImpl();
-    } finally {
-      encoderLock.writeLock().unlock();
-    }
+    hadoopNativeRSRawEncoder.release();
   }
 
   @Override
   public boolean preferDirectBuffer() {
-    return true;
+    return hadoopNativeRSRawEncoder.preferDirectBuffer();
   }
-
-  private native void initImpl(int numDataUnits, int numParityUnits);
-
-  private native void encodeImpl(ByteBuffer[] inputs, int[] inputOffsets,
-                                 int dataLen, ByteBuffer[] outputs,
-                                 int[] outputOffsets) throws IOException;
-
-  private native void destroyImpl();
 }
