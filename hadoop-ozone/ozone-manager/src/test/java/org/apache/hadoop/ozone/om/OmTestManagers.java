@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -41,6 +42,7 @@ public final class OmTestManagers {
   private OzoneManager om;
   private KeyManager keyManager;
   private OMMetadataManager metadataManager;
+  private KeyProviderCryptoExtension kmsProvider;
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private PrefixManager prefixManager;
@@ -116,7 +118,16 @@ public final class OmTestManagers {
         .getInternalState(om, "bucketManager");
     prefixManager = (PrefixManagerImpl)HddsWhiteboxTestUtils
         .getInternalState(om, "prefixManager");
+  }
 
+  //initializing and returning a mock kmsProvider
+  public KeyProviderCryptoExtension kmsProviderInit() {
+    kmsProvider = Mockito.mock(KeyProviderCryptoExtension.class);
+
+    HddsWhiteboxTestUtils.setInternalState(om,
+            "kmsProvider", kmsProvider);
+
+    return kmsProvider;
   }
 
 }
