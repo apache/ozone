@@ -118,7 +118,7 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
@@ -2963,7 +2963,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw omEx;
     }
 
-    final Table<String, OmDBTenantInfo> tenantStateTable =
+    final Table<String, OmDBTenantState> tenantStateTable =
         metadataManager.getTenantStateTable();
 
     // Won't iterate cache here, mainly because we can't acquire a read lock
@@ -2972,16 +2972,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // are flushed to the table. This should be acceptable for a list tenant
     // request.
 
-    final TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
+    final TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
         iterator = tenantStateTable.iterator();
 
     final List<TenantInfo> tenantInfoList = new ArrayList<>();
 
     // Iterate table
     while (iterator.hasNext()) {
-      final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
+      final Table.KeyValue<String, OmDBTenantState> dbEntry = iterator.next();
       final String tenantId = dbEntry.getKey();
-      final OmDBTenantInfo omDBTenantInfo = dbEntry.getValue();
+      final OmDBTenantState omDBTenantInfo = dbEntry.getValue();
       assert (tenantId.equals(omDBTenantInfo.getTenantId()));
       tenantInfoList.add(TenantInfo.newBuilder()
           .setTenantId(omDBTenantInfo.getTenantId())
@@ -3125,7 +3125,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (optionalTenantId.isPresent()) {
         final String tenantId = optionalTenantId.get();
 
-        OmDBTenantInfo tenantInfo =
+        OmDBTenantState tenantInfo =
             metadataManager.getTenantStateTable().get(tenantId);
         if (tenantInfo != null) {
           s3Volume = tenantInfo.getBucketNamespaceName();

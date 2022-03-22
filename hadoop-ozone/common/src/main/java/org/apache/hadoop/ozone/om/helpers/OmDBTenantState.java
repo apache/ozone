@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * This class is used for storing Ozone tenant info.
+ * This class is used for storing Ozone tenant state info.
  */
-public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
+public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   /**
    * Name of the tenant.
    */
@@ -39,7 +39,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
    */
   private final List<String> policyIds;
 
-  public OmDBTenantInfo(String tenantId,
+  public OmDBTenantState(String tenantId,
       String bucketNamespaceName, List<String> policyIds) {
     this.tenantId = tenantId;
     this.bucketNamespaceName = bucketNamespaceName;
@@ -54,7 +54,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    OmDBTenantInfo that = (OmDBTenantInfo) o;
+    OmDBTenantState that = (OmDBTenantState) o;
     return Objects.equals(tenantId, that.tenantId)
         && Objects.equals(bucketNamespaceName, that.bucketNamespaceName)
         && Objects.equals(policyIds, that.policyIds);
@@ -66,7 +66,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
   }
 
   @Override
-  public int compareTo(OmDBTenantInfo o) {
+  public int compareTo(OmDBTenantState o) {
     return this.getTenantId().compareTo(o.getTenantId());
   }
 
@@ -102,7 +102,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
   /**
    * Convert protobuf to OmDBTenantInfo.
    */
-  public static OmDBTenantInfo getFromProtobuf(
+  public static OmDBTenantState getFromProtobuf(
       OzoneManagerProtocolProtos.TenantInfo proto) {
     return new Builder()
         .setTenantId(proto.getTenantId())
@@ -138,8 +138,8 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
       return this;
     }
 
-    public OmDBTenantInfo build() {
-      return new OmDBTenantInfo(tenantId, bucketNamespaceName, policyIds);
+    public OmDBTenantState build() {
+      return new OmDBTenantState(tenantId, bucketNamespaceName, policyIds);
     }
   }
 }

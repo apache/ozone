@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,27 +30,27 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Codec to encode OmDBTenantInfo as byte array.
  */
-public class OmDBTenantInfoCodec implements Codec<OmDBTenantInfo> {
+public class OmDBTenantInfoCodec implements Codec<OmDBTenantState> {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmDBTenantInfoCodec.class);
 
   @Override
-  public byte[] toPersistedFormat(OmDBTenantInfo object) throws IOException {
+  public byte[] toPersistedFormat(OmDBTenantState object) throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
     return object.getProtobuf().toByteArray();
   }
 
   @Override
-  public OmDBTenantInfo fromPersistedFormat(byte[] rawData)
+  public OmDBTenantState fromPersistedFormat(byte[] rawData)
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OmDBTenantInfo.getFromProtobuf(
+    return OmDBTenantState.getFromProtobuf(
         OzoneManagerProtocolProtos.TenantInfo.parseFrom(rawData));
   }
 
   @Override
-  public OmDBTenantInfo copyObject(OmDBTenantInfo object) {
+  public OmDBTenantState copyObject(OmDBTenantState object) {
     // Note: Not really a "copy". from OMTransactionInfoCodec
     return object;
   }

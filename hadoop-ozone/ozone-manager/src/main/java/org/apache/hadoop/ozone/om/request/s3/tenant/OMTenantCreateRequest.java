@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
@@ -302,7 +302,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
       policyIdsList.add(bucketPolicyId);
 
-      final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
+      final OmDBTenantState omDBTenantInfo = new OmDBTenantState(
           tenantId, bucketNamespaceName, policyIdsList);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),

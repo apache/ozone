@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -108,7 +108,7 @@ public final class OMTenantRequestHelper {
   public static String getTenantVolumeName(OMMetadataManager omMetadataManager,
                                            String tenantId) throws IOException {
 
-    final OmDBTenantInfo tenantInfo =
+    final OmDBTenantState tenantInfo =
         omMetadataManager.getTenantStateTable().get(tenantId);
 
     if (tenantInfo == null) {

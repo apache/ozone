@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
 import org.apache.http.auth.BasicUserPrincipal;
@@ -68,7 +68,7 @@ public class TestOMMultiTenantManagerImpl {
 
     // Note: policyIds is initialized with an empty list here.
     //  Expand if needed.
-    final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
+    final OmDBTenantState omDBTenantInfo = new OmDBTenantState(
         tenantName, bucketNamespaceName, new ArrayList<>());
 
     omMetadataManager.getTenantStateTable().put(tenantName, omDBTenantInfo);

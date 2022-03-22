@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.s3.tenant;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -45,12 +45,12 @@ public class OMTenantCreateResponse extends OMClientResponse {
 
   private OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
-  private OmDBTenantInfo omTenantInfo;
+  private OmDBTenantState omTenantInfo;
 
   public OMTenantCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmVolumeArgs omVolumeArgs,
       @Nonnull OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo,
-      @Nonnull OmDBTenantInfo omTenantInfo
+      @Nonnull OmDBTenantState omTenantInfo
   ) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
@@ -88,7 +88,7 @@ public class OMTenantCreateResponse extends OMClientResponse {
   }
 
   @VisibleForTesting
-  public OmDBTenantInfo getOmDBTenantInfo() {
+  public OmDBTenantState getOmDBTenantInfo() {
     return omTenantInfo;
   }
 }

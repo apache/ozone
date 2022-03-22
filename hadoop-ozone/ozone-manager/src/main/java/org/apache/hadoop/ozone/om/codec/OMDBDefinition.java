@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -208,13 +208,13 @@ public class OMDBDefinition implements DBDefinition {
                     OmDBUserPrincipalInfo.class,  // List of accessIds
                     new OmDBUserPrincipalInfoCodec());
 
-  public static final DBColumnFamilyDefinition<String, OmDBTenantInfo>
+  public static final DBColumnFamilyDefinition<String, OmDBTenantState>
             TENANT_STATE_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TENANT_STATE_TABLE,
                     String.class,  // tenantId (tenant name)
                     new StringCodec(),
-                    OmDBTenantInfo.class,
+                    OmDBTenantState.class,
                     new OmDBTenantInfoCodec());
 
   // End tables for S3 multi-tenancy
