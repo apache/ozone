@@ -321,13 +321,12 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   @Test
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
-    String adminName = userName;
     ObjectStore objectStore = getObjectStore();
 
     String prefix = "vol-" + RandomStringUtils.randomNumeric(10) + "-";
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
-        .setAdmin(adminName)
+        .setAdmin(userName)
         .build();
 
     Set<String> expectedVolumes = new TreeSet<>();
@@ -463,7 +462,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   private void validateVolumesList(Set<String> expectedVolumes,
-      Iterator<? extends OzoneVolume> volumeIterator) throws Exception {
+      Iterator<? extends OzoneVolume> volumeIterator) {
     int expectedCount = 0;
 
     while (volumeIterator.hasNext()) {
