@@ -21,14 +21,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.hadoop.crypto.CipherSuite;
-import org.apache.hadoop.crypto.CryptoProtocolVersion;
-import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -36,7 +31,6 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.base.Preconditions;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,47 +95,6 @@ public class BucketManagerImpl implements BucketManager {
    * -> Else update MetadataDB with VolumeInfo.
    */
 
-  @Nullable
-  public BucketEncryptionKeyInfo.Builder createBucketEncryptionKeyInfoBuilder(
-      BucketEncryptionKeyInfo bek) throws IOException {
-    BucketEncryptionKeyInfo.Builder bekb = null;
-    if (bek != null) {
-      if (kmsProvider == null) {
-        throw new OMException("Invalid KMS provider, check configuration " +
-            CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-            OMException.ResultCodes.INVALID_KMS_PROVIDER);
-      }
-      if (bek.getKeyName() == null) {
-        throw new OMException("Bucket encryption key needed.", OMException
-            .ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-      }
-      // Talk to KMS to retrieve the bucket encryption key info.
-      KeyProvider.Metadata metadata = getKMSProvider().getMetadata(
-          bek.getKeyName());
-      if (metadata == null) {
-        throw new OMException("Bucket encryption key " + bek.getKeyName()
-            + " doesn't exist.",
-            OMException.ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-      }
-      // If the provider supports pool for EDEKs, this will fill in the pool
-      kmsProvider.warmUpEncryptedKeys(bek.getKeyName());
-      bekb = new BucketEncryptionKeyInfo.Builder()
-          .setKeyName(bek.getKeyName())
-          .setVersion(CryptoProtocolVersion.ENCRYPTION_ZONES)
-          .setSuite(CipherSuite.convert(metadata.getCipher()));
-    }
-    return bekb;
-  }
-
-  private void commitBucketInfoToDB(OmBucketInfo omBucketInfo)
-      throws IOException {
-    String dbBucketKey =
-        metadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-            omBucketInfo.getBucketName());
-    metadataManager.getBucketTable().put(dbBucketKey,
-        omBucketInfo);
-  }
-
   /**
    * Returns Bucket Information.
    *
@@ -193,11 +146,6 @@ public class BucketManagerImpl implements BucketManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
-  }
-
-  private void commitDeleteBucketInfoToOMDB(String dbBucketKey)
-      throws IOException {
-    metadataManager.getBucketTable().delete(dbBucketKey);
   }
 
   /**
