@@ -79,7 +79,7 @@ public class TestS3GatewayMetrics {
 
     long oriMetric = metrics.getHeadBucketSuccess();
 
-    Response response = bucketEndpoint.head(bucketName);
+    bucketEndpoint.head(bucketName);
 
     long curMetric = metrics.getHeadBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -107,7 +107,7 @@ public class TestS3GatewayMetrics {
 
     long oriMetric = metrics.getHeadKeySuccess();
 
-    Response response = keyEndpoint.head(bucketName, "key1");
+    keyEndpoint.head(bucketName, "key1");
 
     long curMetric = metrics.getHeadKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
