@@ -52,18 +52,18 @@ public final class OmDBAccessIdInfo {
    * e.g. OzoneConsts.TENANT_ROLE_USER, OzoneConsts.TENANT_ROLE_ADMIN,
    *      or other custom role names.
    */
-  private final Set<String> roleIds;
+  private final Set<String> roleNames;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmDBAccessIdInfo.class);
 
   public OmDBAccessIdInfo(String tenantId, String userPrincipal,
-      boolean isAdmin, boolean isDelegatedAdmin, Set<String> roleId) {
+      boolean isAdmin, boolean isDelegatedAdmin, Set<String> roleName) {
     this.tenantId = tenantId;
     this.userPrincipal = userPrincipal;
     this.isAdmin = isAdmin;
     this.isDelegatedAdmin = isDelegatedAdmin;
-    this.roleIds = roleId;
+    this.roleNames = roleName;
   }
 
   public String getTenantId() {
@@ -79,7 +79,7 @@ public final class OmDBAccessIdInfo {
         .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
         .setIsDelegatedAdmin(isDelegatedAdmin)
-        .addAllRoleIds(roleIds)
+        .addAllRoleNames(roleNames)
         .build();
   }
 
@@ -94,7 +94,7 @@ public final class OmDBAccessIdInfo {
         .setUserPrincipal(infoProto.getUserPrincipal())
         .setIsAdmin(infoProto.getIsAdmin())
         .setIsDelegatedAdmin(infoProto.getIsDelegatedAdmin())
-        .setRoleIds(infoProto.getRoleIdsList())
+        .setRoleNames(infoProto.getRoleNamesList())
         .build();
   }
 
@@ -110,24 +110,26 @@ public final class OmDBAccessIdInfo {
     return isDelegatedAdmin;
   }
 
-  public Set<String> getRoleIdsSet() {
-    return roleIds;
+  public Set<String> getRoleNamesSet() {
+    return roleNames;
   }
 
-  public OmDBAccessIdInfo addRoleId(String roleId) {
-    if (roleIds.contains(roleId)) {
-      LOG.warn("Role ID '" + roleId + "' already exists. Ignored addRoleId");
+  public OmDBAccessIdInfo addRoleName(String roleName) {
+    if (roleNames.contains(roleName)) {
+      LOG.warn("Role name '" + roleName + "' already exists. "
+          + "Ignored addRoleName");
     } else {
-      roleIds.add(roleId);
+      roleNames.add(roleName);
     }
     return this;
   }
 
-  public OmDBAccessIdInfo removeRoleId(String roleId) {
-    if (roleIds.contains(roleId)) {
-      roleIds.remove(roleId);
+  public OmDBAccessIdInfo removeRoleName(String roleName) {
+    if (roleNames.contains(roleName)) {
+      roleNames.remove(roleName);
     } else {
-      LOG.warn("Role ID '" + roleId + "' doesn't exist. Ignored removeRoleId");
+      LOG.warn("Role name '" + roleName + "' doesn't exist. "
+          + "Ignored removeRoleName");
     }
     return this;
   }
@@ -139,7 +141,7 @@ public final class OmDBAccessIdInfo {
   public static final class Builder {
     private String tenantId;
     private String userPrincipal;
-    private Set<String> roleIds;
+    private Set<String> roleNames;
     private boolean isAdmin;
     private boolean isDelegatedAdmin;
 
@@ -163,28 +165,28 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
-    public Builder setRoleIds(Set<String> roleIds) {
-      this.roleIds = roleIds;
+    public Builder setRoleNames(Set<String> roleNames) {
+      this.roleNames = roleNames;
       return this;
     }
 
-    public Builder setRoleIds(List<String> roleIds) {
+    public Builder setRoleNames(List<String> roleNames) {
       // Convert list to set
-      this.roleIds = new HashSet<>(roleIds);
+      this.roleNames = new HashSet<>(roleNames);
       return this;
     }
 
-    public Builder addRoleId(String roleId) {
-      if (roleIds == null) {
-        roleIds = new HashSet<>();
+    public Builder addRoleName(String roleName) {
+      if (roleNames == null) {
+        roleNames = new HashSet<>();
       }
-      this.roleIds.add(roleId);
+      this.roleNames.add(roleName);
       return this;
     }
 
     public OmDBAccessIdInfo build() {
       return new OmDBAccessIdInfo(
-          tenantId, userPrincipal, isAdmin, isDelegatedAdmin, roleIds);
+          tenantId, userPrincipal, isAdmin, isDelegatedAdmin, roleNames);
     }
   }
 }

@@ -1423,7 +1423,7 @@ message ExtendedAccessIdInfo {
     optional string userPrincipal = 2;
     optional bool isAdmin = 3;
     optional bool isDelegatedAdmin = 4;
-    repeated string roleIds = 5;
+    repeated string roleNames = 5;
 }
 
 // For `tenant user info` to store access ID along with its tenant-related info

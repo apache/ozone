@@ -289,7 +289,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           .setUserPrincipal(userPrincipal)
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
-          .addRoleId(userRoleId)
+          .addRoleName(userRoleId)
           .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),

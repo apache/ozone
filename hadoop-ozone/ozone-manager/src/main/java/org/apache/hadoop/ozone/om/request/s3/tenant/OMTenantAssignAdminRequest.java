@@ -192,8 +192,9 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       assert (dbAccessIdInfo.getTenantId().equals(tenantId));
 
       // Add the admin role to dbAccessIdInfo
-      final String adminRoleId = OMMultiTenantManager.getAdminRoleId(tenantId);
-      dbAccessIdInfo.addRoleId(adminRoleId);
+      final String adminRoleName =
+          OMMultiTenantManager.getAdminRoleName(tenantId);
+      dbAccessIdInfo.addRoleName(adminRoleName);
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
@@ -202,7 +203,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
               .setUserPrincipal(dbAccessIdInfo.getUserPrincipal())
               .setIsAdmin(true)
               .setIsDelegatedAdmin(delegated)
-              .setRoleIds(dbAccessIdInfo.getRoleIdsSet())
+              .setRoleNames(dbAccessIdInfo.getRoleNamesSet())
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),

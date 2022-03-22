@@ -235,7 +235,7 @@ public interface OMMultiTenantManager {
    * @param tenantId tenant name
    * @return admin role name. e.g. tenant1-AdminRole
    */
-  static String getAdminRoleId(String tenantId) {
+  static String getAdminRoleName(String tenantId) {
     return tenantId + OzoneConsts.TENANT_ROLE_ADMIN_SUFFIX;
   }
 

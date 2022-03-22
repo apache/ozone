@@ -145,15 +145,13 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     final Map<String, String> auditMap = new HashMap<>();
     final OMMetadataManager omMetadataManager =
         ozoneManager.getMetadataManager();
-    final OMMultiTenantManager omMultiTenantManager =
-        ozoneManager.getMultiTenantManager();
 
     final TenantRevokeAdminRequest request =
         getOmRequest().getTenantRevokeAdminRequest();
     final String accessId = request.getAccessId();
     final String tenantId = request.getTenantId();
 
-    boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
+    boolean acquiredVolumeLock = false;
     IOException exception = null;
 
     String volumeName = null;
@@ -176,8 +174,9 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       assert (dbAccessIdInfo.getTenantId().equals(tenantId));
 
       // Remove the admin role from dbAccessIdInfo
-      final String adminRoleId = OMMultiTenantManager.getAdminRoleId(tenantId);
-      dbAccessIdInfo.removeRoleId(adminRoleId);
+      final String adminRoleId =
+          OMMultiTenantManager.getAdminRoleName(tenantId);
+      dbAccessIdInfo.removeRoleName(adminRoleId);
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
@@ -186,7 +185,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
               .setUserPrincipal(dbAccessIdInfo.getUserPrincipal())
               .setIsAdmin(false)
               .setIsDelegatedAdmin(false)
-              .setRoleIds(dbAccessIdInfo.getRoleIdsSet())
+              .setRoleNames(dbAccessIdInfo.getRoleNamesSet())
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
