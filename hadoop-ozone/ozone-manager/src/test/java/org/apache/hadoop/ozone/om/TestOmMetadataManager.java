@@ -555,7 +555,7 @@ public class TestOmMetadataManager {
     // old as the minimum expiration time.
     final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
         OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
-        OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.toMillis(),
+        OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT,
         TimeUnit.MILLISECONDS);
 
     final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
