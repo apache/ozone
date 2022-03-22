@@ -2986,9 +2986,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       tenantInfoList.add(TenantInfo.newBuilder()
           .setTenantId(omDBTenantInfo.getTenantId())
           .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
-          .setAccountNamespaceName(omDBTenantInfo.getAccountNamespaceName())
-          .setUserPolicyGroupName(omDBTenantInfo.getUserPolicyGroupName())
-          .setBucketNamespaceName(omDBTenantInfo.getBucketPolicyGroupName())
+          .addAllPolicyIds(omDBTenantInfo.getPolicyIds())
           .build());
     }
 
@@ -3861,10 +3859,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isAclEnabled) {
       UserGroupInformation ugi = Server.getRemoteUser();
       if (getS3Auth() != null) {
-        ugi = UserGroupInformation
-            .createRemoteUser(
-                OzoneAclUtils.accessIdToUserPrincipal(
-                    getS3Auth().getAccessId()));
+        ugi = UserGroupInformation.createRemoteUser(
+            OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId()));
       }
       InetAddress remoteIp = Server.getRemoteIp();
       resolved = resolveBucketLink(requested, new HashSet<>(),

@@ -24,6 +24,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import com.google.common.base.Optional;
@@ -64,15 +65,12 @@ public class TestOMMultiTenantManagerImpl {
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
 
     final String bucketNamespaceName = tenantName;
-    final String accountNamespaceName = tenantName;
-    final String userPolicyGroupName =
-        tenantName + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
-    final String bucketPolicyGroupName =
-        tenantName + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
 
+    // Note: policyIds is initialized with an empty list here.
+    //  Expand if needed.
     final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
-        tenantName, bucketNamespaceName, accountNamespaceName,
-        userPolicyGroupName, bucketPolicyGroupName);
+        tenantName, bucketNamespaceName, new ArrayList<>());
+
     omMetadataManager.getTenantStateTable().put(tenantName, omDBTenantInfo);
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",

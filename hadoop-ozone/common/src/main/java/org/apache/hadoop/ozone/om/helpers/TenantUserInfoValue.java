@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 
 import java.util.List;
 import java.util.Objects;
@@ -49,13 +49,14 @@ public class TenantUserInfoValue {
   }
 
   public static TenantUserInfoValue fromProtobuf(
-      TenantUserInfo tenantUserInfo) {
+      TenantGetUserInfoResponse tenantUserInfo) {
     return new TenantUserInfoValue(tenantUserInfo.getUserPrincipal(),
         tenantUserInfo.getAccessIdInfoList());
   }
 
-  public TenantUserInfo getProtobuf() {
-    final TenantUserInfo.Builder builder = TenantUserInfo.newBuilder();
+  public TenantGetUserInfoResponse getProtobuf() {
+    final TenantGetUserInfoResponse.Builder builder =
+        TenantGetUserInfoResponse.newBuilder();
     builder.setUserPrincipal(this.userPrincipal);
     accessIdInfoList.forEach(builder::addAccessIdInfo);
     return builder.build();

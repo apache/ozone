@@ -130,20 +130,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
             TENANT_NOT_EMPTY);
       }
 
-      // Invalidate cache entries
+      // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      final String userPolicyGroupName = dbTenantInfo.getUserPolicyGroupName();
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(userPolicyGroupName),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      final String bucketPolicyGroupName =
-          dbTenantInfo.getBucketPolicyGroupName();
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(bucketPolicyGroupName),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
       // Decrement volume refCount
@@ -182,8 +171,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
       omClientResponse = new OMTenantDeleteResponse(
           omResponse.setDeleteTenantResponse(deleteTenantResponse).build(),
-          volumeName, omVolumeArgs, tenantId, userPolicyGroupName,
-          bucketPolicyGroupName);
+          volumeName, omVolumeArgs, tenantId);
 
     } catch (IOException ex) {
       exception = ex;

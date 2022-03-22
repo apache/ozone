@@ -71,11 +71,9 @@ public class TenantListHandler extends TenantHandler {
         out().format(longFormat ? "%-17s" : "%s%n",
             tenantInfo.getTenantId());
         if (longFormat) {
-          out().format("%-17s%-17s%-17s%s%n",
+          out().format("%-17s%-17s%n",
               tenantInfo.getBucketNamespaceName(),
-              tenantInfo.getAccountNamespaceName(),
-              tenantInfo.getUserPolicyGroupName(),
-              tenantInfo.getBucketPolicyGroupName());
+              tenantInfo.getPolicyIdsList());
         }
       });
     } catch (IOException e) {

@@ -1105,7 +1105,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final TenantGetUserInfoResponse resp = handleError(omResponse)
         .getTenantGetUserInfoResponse();
 
-    return TenantUserInfoValue.fromProtobuf(resp.getTenantUserInfo());
+    return TenantUserInfoValue.fromProtobuf(resp);
   }
 
   @Override

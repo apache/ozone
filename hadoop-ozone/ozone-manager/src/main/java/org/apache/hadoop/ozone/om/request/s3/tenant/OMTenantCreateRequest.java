@@ -54,7 +54,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -157,8 +159,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .setOwnerName(owner)
         .build();
 
-    // TODO: Shall we check volume existence here as well?
-
     // Generate volume modification time
     long initialTime = Time.now();
     final VolumeInfo updatedVolumeInfo = volumeInfo.toBuilder()
@@ -181,7 +181,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantDefaultPolicyName(tenantDefaultPolicies)
-                .setTenantId(tenantId))
+                .setTenantId(tenantId)
+                .setVolumeName(volumeName))
         .setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         // TODO: Can the three lines below be ignored?
@@ -231,6 +232,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
+    Preconditions.checkState(request.getVolumeName().equals(volumeName),
+        "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
     IOException exception = null;
 
@@ -289,36 +292,27 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Create tenant
       // Add to tenantStateTable. Redundant assignment for clarity
       final String bucketNamespaceName = volumeName;
-      final String accountNamespaceName = tenantId;  // TODO: Double check
-      final String userPolicyGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
+      final List<String> policyIdsList = new ArrayList<>();
+      // Populate policy ID list
+      // TODO: Check if both policies are actually used. Remove if not
+      policyIdsList.add(tenantDefaultPolicies);
       final String bucketPolicyGroupName =
           tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
+      final String bucketPolicyId =
+          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
+      policyIdsList.add(bucketPolicyId);
+
       final OmDBTenantInfo omDBTenantInfo = new OmDBTenantInfo(
-          tenantId, bucketNamespaceName, accountNamespaceName,
-          userPolicyGroupName, bucketPolicyGroupName);
+          tenantId, bucketNamespaceName, policyIdsList);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
           new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
 
-      // Add to tenantPolicyTable
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(userPolicyGroupName),
-          new CacheValue<>(Optional.of(tenantDefaultPolicies),
-              transactionLogIndex));
-      final String bucketPolicyId =
-          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(bucketPolicyGroupName),
-          new CacheValue<>(Optional.of(bucketPolicyId), transactionLogIndex));
-
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder()
               .build());
-      omClientResponse = new OMTenantCreateResponse(
-          omResponse.build(),
-          omVolumeArgs, volumeList,
-          omDBTenantInfo, tenantDefaultPolicies, bucketPolicyId);
+      omClientResponse = new OMTenantCreateResponse(omResponse.build(),
+          omVolumeArgs, volumeList, omDBTenantInfo);
 
     } catch (IOException ex) {
       // Error handling. Clean up Ranger policies when necessary.

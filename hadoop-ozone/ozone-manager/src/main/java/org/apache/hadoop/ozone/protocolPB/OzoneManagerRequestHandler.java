@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -386,7 +387,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     TenantUserInfoValue ret = impl.tenantGetUserInfo(userPrincipal);
     // Note impl.tenantGetUserInfo() throws if errs
     if (ret != null) {
-      resp.setTenantUserInfo(ret.getProtobuf());
+      Preconditions.checkState(userPrincipal.equals(ret.getUserPrincipal()),
+          "Result's userPrincipal doesn't match TenantGetUserInfoRequest's");
+      resp.setUserPrincipal(userPrincipal);
+      resp.addAllAccessIdInfo(ret.getAccessIdInfoList());
     }
 
     return resp.build();

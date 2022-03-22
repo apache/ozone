@@ -386,7 +386,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * {@inheritDoc}
    */
   public boolean isTenantAdmin(UserGroupInformation callerUgi,
-      String tenantId, Boolean delegated) {
+      String tenantId, boolean delegated) {
     if (callerUgi == null) {
       return false;
     } else {
@@ -403,7 +403,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * Internal isTenantAdmin method that takes a username String instead of UGI.
    */
   private boolean isTenantAdmin(String username, String tenantId,
-      Boolean delegated) {
+      boolean delegated) {
     if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantId)) {
       return false;
     }
@@ -421,6 +421,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       for (final String accessId : principalInfo.getAccessIds()) {
         final OmDBAccessIdInfo accessIdInfo =
             omMetadataManager.getTenantAccessIdTable().get(accessId);
+        // accessIdInfo could be null since we may not have a lock on the tenant
+        if (accessIdInfo == null) {
+          return false;
+        }
         if (tenantId.equals(accessIdInfo.getTenantId())) {
           if (!delegated) {
             return accessIdInfo.getIsAdmin();
@@ -618,7 +622,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return policy;
   }
 
-  // TODO: Fine-tune this once we have bucket ownership.
+  // TODO: This policy doesn't seem necessary as the bucket-level policy has
+  //  already granted the key-level access.
+  //  Not sure if that is the intended behavior in Ranger though.
+  //  Still, could add this KeyAccess policy as well in Ranger, doesn't hurt.
   private AccessPolicy newDefaultKeyAccessPolicy(String volumeName,
       String bucketName) throws IOException {
     AccessPolicy policy = new RangerAccessPolicy(

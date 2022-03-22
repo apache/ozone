@@ -186,7 +186,7 @@ public interface OMMultiTenantManager {
    *                  admin, delegated or not
    */
   boolean isTenantAdmin(UserGroupInformation callerUgi, String tenantId,
-      Boolean delegated);
+      boolean delegated);
 
   /**
    * Check if a tenant exists.

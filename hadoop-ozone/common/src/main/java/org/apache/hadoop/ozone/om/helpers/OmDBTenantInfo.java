@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -30,30 +31,19 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
    */
   private final String tenantId;
   /**
-   * Name of the bucket namespace (volume name).
+   * Name of the bucket namespace (volume).
    */
   private final String bucketNamespaceName;
   /**
-   * Name of the account namespace.
+   * Name of the bucket policies.
    */
-  private final String accountNamespaceName;
-  /**
-   * Name of the user policy group.
-   */
-  private final String userPolicyGroupName;
-  /**
-   * Name of the bucket policy group.
-   */
-  private final String bucketPolicyGroupName;
+  private final List<String> policyIds;
 
   public OmDBTenantInfo(String tenantId,
-      String bucketNamespaceName, String accountNamespaceName,
-      String userPolicyGroupName, String bucketPolicyGroupName) {
+      String bucketNamespaceName, List<String> policyIds) {
     this.tenantId = tenantId;
     this.bucketNamespaceName = bucketNamespaceName;
-    this.accountNamespaceName = accountNamespaceName;
-    this.userPolicyGroupName = userPolicyGroupName;
-    this.bucketPolicyGroupName = bucketPolicyGroupName;
+    this.policyIds = policyIds;
   }
 
   @Override
@@ -67,15 +57,12 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     OmDBTenantInfo that = (OmDBTenantInfo) o;
     return Objects.equals(tenantId, that.tenantId)
         && Objects.equals(bucketNamespaceName, that.bucketNamespaceName)
-        && Objects.equals(accountNamespaceName, that.accountNamespaceName)
-        && Objects.equals(userPolicyGroupName, that.userPolicyGroupName)
-        && Objects.equals(bucketPolicyGroupName, that.bucketPolicyGroupName);
+        && Objects.equals(policyIds, that.policyIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tenantId, bucketNamespaceName, accountNamespaceName,
-        userPolicyGroupName, bucketPolicyGroupName);
+    return Objects.hash(tenantId, bucketNamespaceName, policyIds);
   }
 
   @Override
@@ -97,16 +84,8 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     return bucketNamespaceName;
   }
 
-  public String getAccountNamespaceName() {
-    return accountNamespaceName;
-  }
-
-  public String getUserPolicyGroupName() {
-    return userPolicyGroupName;
-  }
-
-  public String getBucketPolicyGroupName() {
-    return bucketPolicyGroupName;
+  public List<String> getPolicyIds() {
+    return policyIds;
   }
 
   /**
@@ -116,9 +95,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     return OzoneManagerProtocolProtos.TenantInfo.newBuilder()
         .setTenantId(tenantId)
         .setBucketNamespaceName(bucketNamespaceName)
-        .setAccountNamespaceName(accountNamespaceName)
-        .setUserPolicyGroupName(userPolicyGroupName)
-        .setBucketPolicyGroupName(bucketPolicyGroupName)
+        .addAllPolicyIds(policyIds)
         .build();
   }
 
@@ -130,9 +107,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
     return new Builder()
         .setTenantId(proto.getTenantId())
         .setBucketNamespaceName(proto.getBucketNamespaceName())
-        .setAccountNamespaceName(proto.getAccountNamespaceName())
-        .setUserPolicyGroupName(proto.getUserPolicyGroupName())
-        .setBucketPolicyGroupName(proto.getBucketPolicyGroupName())
+        .setPolicyIdsList(proto.getPolicyIdsList())
         .build();
   }
 
@@ -143,9 +118,7 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
   public static final class Builder {
     private String tenantId;
     private String bucketNamespaceName;
-    private String accountNamespaceName;
-    private String userPolicyGroupName;
-    private String bucketPolicyGroupName;
+    private List<String> policyIds;
 
     private Builder() {
     }
@@ -160,24 +133,13 @@ public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
       return this;
     }
 
-    public Builder setAccountNamespaceName(String accountNamespaceName) {
-      this.accountNamespaceName = accountNamespaceName;
-      return this;
-    }
-
-    public Builder setUserPolicyGroupName(String userPolicyGroupName) {
-      this.userPolicyGroupName = userPolicyGroupName;
-      return this;
-    }
-
-    public Builder setBucketPolicyGroupName(String bucketPolicyGroupName) {
-      this.bucketPolicyGroupName = bucketPolicyGroupName;
+    public Builder setPolicyIdsList(List<String> policyIds) {
+      this.policyIds = policyIds;
       return this;
     }
 
     public OmDBTenantInfo build() {
-      return new OmDBTenantInfo(tenantId, bucketNamespaceName,
-          accountNamespaceName, userPolicyGroupName, bucketPolicyGroupName);
+      return new OmDBTenantInfo(tenantId, bucketNamespaceName, policyIds);
     }
   }
 }

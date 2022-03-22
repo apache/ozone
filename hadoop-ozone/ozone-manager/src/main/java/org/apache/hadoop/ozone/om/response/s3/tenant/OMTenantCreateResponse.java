@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_POLICY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
@@ -40,30 +39,23 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
  */
 @CleanupTableInfo(cleanupTables = {
     TENANT_STATE_TABLE,
-    TENANT_POLICY_TABLE,
     VOLUME_TABLE
 })
 public class OMTenantCreateResponse extends OMClientResponse {
 
   private OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
-
   private OmDBTenantInfo omTenantInfo;
-  private String userPolicyId, bucketPolicyId;
 
   public OMTenantCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmVolumeArgs omVolumeArgs,
       @Nonnull OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo,
-      @Nonnull OmDBTenantInfo omTenantInfo,
-      @Nonnull String userPolicyId,
-      @Nonnull String bucketPolicyId
+      @Nonnull OmDBTenantInfo omTenantInfo
   ) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;
     this.omTenantInfo = omTenantInfo;
-    this.userPolicyId = userPolicyId;
-    this.bucketPolicyId = bucketPolicyId;
   }
 
   /**
@@ -82,16 +74,6 @@ public class OMTenantCreateResponse extends OMClientResponse {
     final String tenantId = omTenantInfo.getTenantId();
     omMetadataManager.getTenantStateTable().putWithBatch(
         batchOperation, tenantId, omTenantInfo);
-
-    final String userPolicyGroupName =
-        omTenantInfo.getUserPolicyGroupName();
-    omMetadataManager.getTenantPolicyTable().putWithBatch(
-        batchOperation, userPolicyGroupName, userPolicyId);
-
-    final String bucketPolicyGroupName =
-        omTenantInfo.getBucketPolicyGroupName();
-    omMetadataManager.getTenantPolicyTable().putWithBatch(
-        batchOperation, bucketPolicyGroupName, bucketPolicyId);
 
     // From OMVolumeCreateResponse
     String dbVolumeKey =

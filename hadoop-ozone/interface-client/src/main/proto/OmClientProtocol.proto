@@ -1409,9 +1409,7 @@ message SetS3SecretResponse {
 message TenantInfo {
     optional string tenantId = 1;
     optional string bucketNamespaceName = 2;
-    optional string accountNamespaceName = 3;
-    optional string userPolicyGroupName = 4;
-    optional string bucketPolicyGroupName = 5;
+    repeated string policyIds = 3;
 }
 
 message TenantUserPrincipalInfo {
@@ -1434,11 +1432,6 @@ message TenantAccessIdInfo {
     optional string tenantId = 2;
     optional bool isAdmin = 3;
     optional bool isDelegatedAdmin = 4;
-}
-
-message TenantUserInfo {
-    optional string userPrincipal = 1;
-    repeated TenantAccessIdInfo accessIdInfo = 2;
 }
 
 // For `tenant user list` to store all access IDs assigned to the tenant
@@ -1467,7 +1460,8 @@ message TenantListUserRequest {
 }
 
 message TenantGetUserInfoResponse {
-    optional TenantUserInfo tenantUserInfo = 1;
+    optional string userPrincipal = 1;
+    repeated TenantAccessIdInfo accessIdInfo = 2;
 }
 
 message TenantListUserResponse {

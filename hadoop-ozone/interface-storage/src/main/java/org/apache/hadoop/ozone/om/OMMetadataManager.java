@@ -365,8 +365,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmDBTenantInfo> getTenantStateTable();
 
-  Table<String, String> getTenantPolicyTable();
-
   /**
    * Gets the OM Meta table.
    * @return meta table reference.

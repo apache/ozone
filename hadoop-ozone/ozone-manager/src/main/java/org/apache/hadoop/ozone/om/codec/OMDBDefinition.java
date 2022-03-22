@@ -212,19 +212,10 @@ public class OMDBDefinition implements DBDefinition {
             TENANT_STATE_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TENANT_STATE_TABLE,
-                    String.class,
+                    String.class,  // tenantId (tenant name)
                     new StringCodec(),
                     OmDBTenantInfo.class,
                     new OmDBTenantInfoCodec());
-
-  public static final DBColumnFamilyDefinition<String, String>
-            TENANT_POLICY_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.TENANT_POLICY_TABLE,
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
 
   // End tables for S3 multi-tenancy
 
@@ -246,8 +237,7 @@ public class OMDBDefinition implements DBDefinition {
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
-        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
-        TENANT_POLICY_TABLE };
+        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE};
   }
 }
 
