@@ -341,15 +341,14 @@ public final class OzoneConsts {
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";
-  public static final String TENANT_ID_ROLE_DELIMITER = "-";
   public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
   public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
   // Predefined tenant roles
   // Tenant user role. All tenant users are assigned this role by default
-  public static final String TENANT_ROLE_USER = "user";
+  public static final String TENANT_ROLE_USER_SUFFIX = "-UserRole";
   // Tenant admin role. All tenant admins are assigned this role
-  public static final String TENANT_ROLE_ADMIN = "admin";
+  public static final String TENANT_ROLE_ADMIN_SUFFIX = "-AdminRole";
 
   // For OM metrics saving to a file
   public static final String OM_METRICS_FILE = "omMetrics";

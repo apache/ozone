@@ -21,6 +21,7 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
@@ -219,6 +220,24 @@ public interface OMMultiTenantManager {
    * @return String tenant name
    */
   Optional<String> getTenantForAccessID(String accessID) throws IOException;
+
+  /**
+   * Get user role name given tenant name.
+   * @param tenantId tenant name
+   * @return user role name. e.g. tenant1-UserRole
+   */
+  static String getUserRoleId(String tenantId) {
+    return tenantId + OzoneConsts.TENANT_ROLE_USER_SUFFIX;
+  }
+
+  /**
+   * Get admin role name given tenant name.
+   * @param tenantId tenant name
+   * @return admin role name. e.g. tenant1-AdminRole
+   */
+  static String getAdminRoleId(String tenantId) {
+    return tenantId + OzoneConsts.TENANT_ROLE_ADMIN_SUFFIX;
+  }
 
   /**
    * Given a user, make him an admin of the corresponding Tenant.

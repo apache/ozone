@@ -75,7 +75,8 @@ public class TestOMMultiTenantManagerImpl {
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
         new OmDBAccessIdInfo(tenantName, "seed-user1", false, false,
-            new HashSet<String>() {{ add(OzoneConsts.TENANT_ROLE_USER); }}));
+            new HashSet<String>() {{
+              add(tenantName + OzoneConsts.TENANT_ROLE_USER_SUFFIX); }}));
 
     OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
     Mockito.when(ozoneManager.getMetadataManager())
