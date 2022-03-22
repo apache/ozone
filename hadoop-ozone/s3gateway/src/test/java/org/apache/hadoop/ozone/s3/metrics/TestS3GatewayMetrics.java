@@ -34,8 +34,6 @@ import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
 import org.junit.Before;
 import org.junit.Test;
 
-import javax.ws.rs.core.Response;
-
 import java.util.HashMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
