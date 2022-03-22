@@ -212,27 +212,70 @@ public final class RatisHelper {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
     }
-    final RaftProperties properties = new RaftProperties();
-
-    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    final RaftProperties properties = newRaftProperties(rpcType);
 
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
 
-    RaftClient.Builder builder =  RaftClient.newBuilder()
+    return RaftClient.newBuilder()
         .setRaftGroup(group)
         .setLeaderId(leader)
         .setProperties(properties)
-        .setRetryPolicy(retryPolicy);
+        .setParameters(setClientTlsConf(rpcType, tlsConfig))
+        .setRetryPolicy(retryPolicy)
+        .build();
+  }
 
+  public static Parameters setClientTlsConf(RpcType rpcType,
+      GrpcTlsConfig tlsConfig) {
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
       Parameters parameters = new Parameters();
-      GrpcConfigKeys.Admin.setTlsConf(parameters, tlsConfig);
-      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
-      builder.setParameters(parameters);
+      setAdminTlsConf(parameters, tlsConfig);
+      setClientTlsConf(parameters, tlsConfig);
+      return parameters;
     }
-    return builder.build();
+    return null;
+  }
+
+  private static void setAdminTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Admin.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  private static void setClientTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  public static Parameters setServerTlsConf(
+      GrpcTlsConfig serverConf, GrpcTlsConfig clientConf) {
+    final Parameters parameters = new Parameters();
+    GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
+    GrpcConfigKeys.TLS.setConf(parameters, serverConf);
+    setAdminTlsConf(parameters, serverConf);
+    setClientTlsConf(parameters, clientConf);
+    return parameters;
+  }
+
+  public static Parameters setServerTlsConf(GrpcTlsConfig tlsConf) {
+    return setServerTlsConf(tlsConf, tlsConf);
+  }
+
+  public static RaftProperties newRaftProperties(RpcType rpcType) {
+    final RaftProperties properties = new RaftProperties();
+    setRpcType(properties, rpcType);
+    return properties;
+  }
+
+  public static RaftProperties setRpcType(RaftProperties properties,
+      RpcType rpcType) {
+    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    return properties;
   }
 
   /**
