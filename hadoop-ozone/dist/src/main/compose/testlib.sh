@@ -442,12 +442,12 @@ execute_debug_tests() {
   local datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
   docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
 
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v CORRUPT_REPLICA:0 debug/ozone-debug-corrupt-block.robot
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
 
   docker stop "${container}"
 
   wait_for_datanode "${container}" STALE 60
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v CORRUPT_REPLICA:0 -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
 
   wait_for_datanode "${container}" DEAD 60
   execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-dead-datanode.robot

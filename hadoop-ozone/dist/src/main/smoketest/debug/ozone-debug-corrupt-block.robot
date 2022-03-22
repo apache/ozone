@@ -20,11 +20,11 @@ Resource            ../lib/os.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 *** Variables ***
-${PREFIX}           ${EMPTY}
-${VOLUME}           cli-debug-volume${PREFIX}
-${BUCKET}           cli-debug-bucket
-${TESTFILE}         testfile
-${CORRUPT_REPLICA}  0
+${PREFIX}              ${EMPTY}
+${VOLUME}              cli-debug-volume${PREFIX}
+${BUCKET}              cli-debug-bucket
+${TESTFILE}            testfile
+${CORRUPT_DATANODE}    ozone_datanode_1.ozone_default
 
 *** Test Cases ***
 Test ozone debug read-replicas with corrupt block replica
@@ -38,7 +38,9 @@ Test ozone debug read-replicas with corrupt block replica
     ${md5sum} =                         Execute     md5sum testfile | awk '{print $1}'
 
     FOR    ${replica}    IN RANGE    3
-        IF    '${replica}' == '${CORRUPT_REPLICA}'
+        ${datanode} =    Set Variable    ${json}[blocks][0][replicas][${replica}][hostname]
+
+        IF    '${datanode}' == '${CORRUPT_DATANODE}'
             Verify Corrupt Replica   ${json}    ${replica}    ${md5sum}
             Should Contain           ${json}[blocks][0][replicas][${replica}][exception]    Checksum mismatch
         ELSE
