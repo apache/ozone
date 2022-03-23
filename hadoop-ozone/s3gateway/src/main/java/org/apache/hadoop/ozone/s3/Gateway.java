@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
@@ -54,6 +54,7 @@ public class Gateway extends GenericCli {
 
   private S3GatewayHttpServer httpServer;
   private S3GatewayMetrics metrics;
+  private OzoneConfiguration ozoneConfiguration;
 
   public static void main(String[] args) throws Exception {
     new Gateway().run(args);
@@ -61,7 +62,7 @@ public class Gateway extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    ozoneConfiguration = createOzoneConfiguration();
     TracingUtil.initTracing("S3gateway", ozoneConfiguration);
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     UserGroupInformation.setConfiguration(ozoneConfiguration);
@@ -88,7 +89,7 @@ public class Gateway extends GenericCli {
 
     LOG.info("Starting Ozone S3 gateway");
     httpServer.start();
-    DefaultMetricsSystem.initialize("S3Gateway");
+    HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");
   }
 
   public void stop() throws Exception {
