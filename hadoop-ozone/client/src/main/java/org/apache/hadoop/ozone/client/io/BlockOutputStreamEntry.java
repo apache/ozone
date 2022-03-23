@@ -22,8 +22,10 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -263,6 +265,11 @@ public class BlockOutputStreamEntry extends OutputStream {
   @VisibleForTesting
   public OutputStream getOutputStream() {
     return this.outputStream;
+  }
+
+  ContainerProtos.BlockData.Builder getOutputStreamContainerBlockDataData() {
+    return ((RatisBlockOutputStream)getOutputStream())
+        .getContainerBlockDataData();
   }
 
   @VisibleForTesting

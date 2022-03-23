@@ -352,13 +352,11 @@ public class BlockOutputStreamEntryPool {
    */
   public static class ReplicatedFileChecksumCommitHelper extends
       ReplicatedFileChecksumHelper {
-    long length;
-    List<BlockOutputStreamEntry> streamEntries;
+    private List<BlockOutputStreamEntry> streamEntries;
     ReplicatedFileChecksumCommitHelper(
         long len,
         List<BlockOutputStreamEntry> entries) {
-      super();
-      this.length = len;
+      super(len);
       this.streamEntries = entries;
     }
 
@@ -372,9 +370,8 @@ public class BlockOutputStreamEntryPool {
       long currentLength = 0;
       for (BlockOutputStreamEntry entry : streamEntries) {
         ContainerProtos.BlockData.Builder blockData =
-            ((RatisBlockOutputStream)entry.getOutputStream())
-                .getContainerBlockDataData();
-        List<ContainerProtos.ChunkInfo>  chunkInfoList =
+            entry.getOutputStreamContainerBlockDataData();
+        List<ContainerProtos.ChunkInfo> chunkInfoList =
             blockData.getChunksList();
         currentLength += entry.getLength();
         if (currentLength > getLength()) {

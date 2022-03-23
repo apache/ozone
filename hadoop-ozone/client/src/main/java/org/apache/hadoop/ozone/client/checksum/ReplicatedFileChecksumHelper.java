@@ -49,7 +49,11 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
   private int blockIdx;
 
   public ReplicatedFileChecksumHelper() {
+    super();
+  }
 
+  public ReplicatedFileChecksumHelper(long len) {
+    super(len);
   }
 
   public ReplicatedFileChecksumHelper(

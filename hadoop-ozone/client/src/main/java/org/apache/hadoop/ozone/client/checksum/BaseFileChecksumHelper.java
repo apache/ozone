@@ -70,6 +70,10 @@ public abstract class BaseFileChecksumHelper {
     this.length = 0;
   }
 
+  BaseFileChecksumHelper(long len) {
+    this.length = len;
+  }
+
   // initialization
   BaseFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName,
