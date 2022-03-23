@@ -37,4 +37,18 @@ public class HadoopNativeECAccessorUtil {
     decoder.performDecodeImpl(inputs, inputOffsets, dataLen, erased, outputs,
         outputOffsets);
   }
+
+  public static void performEncodeImpl(NativeXORRawEncoder encoder,
+                                       ByteBuffer[] inputs, int[] inputOffsets, int dataLen,
+                                       ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
+    encoder.performEncodeImpl(inputs, inputOffsets, dataLen, outputs,
+        outputOffsets);
+  }
+
+  public static void performDecodeImpl(NativeXORRawDecoder decoder,
+                                       ByteBuffer[] inputs, int[] inputOffsets, int dataLen, int[] erased,
+                                       ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
+    decoder.performDecodeImpl(inputs, inputOffsets, dataLen, erased, outputs,
+        outputOffsets);
+  }
 }
