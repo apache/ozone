@@ -470,7 +470,7 @@ public final class OzoneConfigKeys {
       "ozone.client.required.om.version.min";
 
   public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT =
-      OzoneManagerVersion.NEW_S3G_AUTH_SCHEME.name();
+      OzoneManagerVersion.S3G_PERSISTENT_CONNECTIONS.name();
 
   /**
    * There is no need to instantiate this class.
