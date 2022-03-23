@@ -75,8 +75,6 @@ public class TestOzoneContainer {
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
-      conf.setBoolean(
-          OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       StateContext context = Mockito.mock(StateContext.class);
@@ -109,8 +107,6 @@ public class TestOzoneContainer {
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
-      conf.setBoolean(
-          OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       StateContext context = Mockito.mock(StateContext.class);
