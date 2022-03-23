@@ -707,104 +707,104 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public boolean isBucketEmpty(String volume, String bucket)
       throws IOException {
-    String keyPrefix = getBucketKey(volume, bucket);
-    OmBucketInfo omBucketInfo = getBucketTable().get(keyPrefix);
+    String bucketKey = getBucketKey(volume, bucket);
+    OmBucketInfo omBucketInfo = getBucketTable().get(bucketKey);
+    String bucketId = String.valueOf(omBucketInfo.getObjectID());
     BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
 
-    // FSO Bucket
+    // keyPrefix is different in case of fileTable and keyTable.
+    // 1. For OBS and LEGACY buckets:
+    //    the entries are present in the keyTable and are of the
+    //    format <bucketKey>/<key-name>
+    // 2. For FSO buckets:
+    //    - TOP-LEVEL DIRECTORY would be of the format <bucket ID>/dirName
+    //      inside the dirTable.
+    //    - TOP-LEVEL FILE (a file directly placed under the bucket without
+    //      any sub paths) would be of the format <bucket ID>/fileName inside
+    //      the fileTable.
+    String keyPrefix =
+        bucketLayout.isFileSystemOptimized() ? bucketId : bucketKey;
+
+    // Check key/file Table
+    Table<String, OmKeyInfo> table = getKeyTable(bucketLayout);
+
+    // First check in table cache.
+    if (isKeyPresentInTableCache(keyPrefix, table)) {
+      return false;
+    }
+    // check in table
+    if (isKeyPresentInTable(keyPrefix, table)) {
+      return false; // we found at least one key with this vol/bucket
+    }
+
+    // Check dirTable as well in case of FSO bucket.
     if (bucketLayout.isFileSystemOptimized()) {
-      String bucketId = String.valueOf(omBucketInfo.getObjectID());
-      // We want to check if there are any directories or files
-      // that are present under this bucket.
-      // In buckets with FSO layout, the metadata entry for a
-      //  1. TOP-LEVEL DIRECTORY would be of the format <bucket ID>/dirName
-      //     inside the dirTable.
-      //  2. TOP-LEVEL FILE (a file directly placed under the bucket without
-      //     any sub paths) would be of the format <bucket ID>/fileName inside
-      //     the fileTable.
-
-      // Iterate over the keyTable and fileTable
-      for (Table table : new Table[]{dirTable, fileTable}) {
-        // First check in the fileTable and dirTable cache
-        Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
-            table.cacheIterator();
-        while (iterator.hasNext()) {
-          Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
-              iterator.next();
-          String key = entry.getKey().getCacheKey();
-          OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
-          if (key.startsWith(bucketId) && omKeyInfo != null) {
-            return false;
-          }
-        }
-
-        // Check in the table
-        try (
-            TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                keyIter = table.iterator()) {
-          KeyValue<String, OmKeyInfo> kv = keyIter.seek(bucketId);
-
-          if (kv != null) {
-            // Check the entry in db is not marked for delete. This can happen
-            // while entry is marked for delete, but it is not flushed to DB.
-            CacheValue<OmKeyInfo> cacheValue =
-                table.getCacheValue(new CacheKey(kv.getKey()));
-            if (cacheValue != null) {
-              if (kv.getKey().startsWith(bucketId)
-                  && cacheValue.getCacheValue() != null) {
-                return false; // we found at least one file/dir under this
-                // bucket
-              }
-            } else {
-              if (kv.getKey().startsWith(bucketId)) {
-                return false; // we found at least one file/dir under this
-                // bucket.
-              }
-            }
-          }
-        }
+      // First check in dirTable cache
+      if (isKeyPresentInTableCache(keyPrefix, dirTable)) {
+        return false;
       }
-    } else {
-      // OBS or LEGACY bucket
-      // First check in key table cache.
-      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
-          ((TypedTable<String, OmKeyInfo>) keyTable).cacheIterator();
-      while (iterator.hasNext()) {
-        Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
-            iterator.next();
-        String key = entry.getKey().getCacheKey();
-        OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
-        // Making sure that entry is not for delete key request.
-        if (key.startsWith(keyPrefix) && omKeyInfo != null) {
-          return false;
-        }
-      }
-      try (
-          TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> keyIter =
-              keyTable.iterator()) {
-        KeyValue<String, OmKeyInfo> kv = keyIter.seek(keyPrefix);
-
-        if (kv != null) {
-          // Check the entry in db is not marked for delete. This can happen
-          // while entry is marked for delete, but it is not flushed to DB.
-          CacheValue<OmKeyInfo> cacheValue =
-              keyTable.getCacheValue(new CacheKey(kv.getKey()));
-          if (cacheValue != null) {
-            if (kv.getKey().startsWith(keyPrefix)
-                && cacheValue.getCacheValue() != null) {
-              return false; // we found at least one key with this vol/bucket
-              // prefix.
-            }
-          } else {
-            if (kv.getKey().startsWith(keyPrefix)) {
-              return false; // we found at least one key with this vol/bucket
-              // prefix.
-            }
-          }
-        }
-      }
+      // Check in the table
+      return !isKeyPresentInTable(keyPrefix, dirTable);
     }
     return true;
+  }
+
+
+  /**
+   * Checks if a key starting with a given keyPrefix exists in the table cache.
+   *
+   * @param keyPrefix - key prefix to be searched.
+   * @param table     - table to be searched.
+   * @return true if the key is present in the cache.
+   */
+  private boolean isKeyPresentInTableCache(String keyPrefix,
+                                           Table table) {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
+        table.cacheIterator();
+    while (iterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
+          iterator.next();
+      String key = entry.getKey().getCacheKey();
+      OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
+      // Making sure that entry is not for delete key request.
+      if (key.startsWith(keyPrefix) && omKeyInfo != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Checks if a key starts with the given prefix is present in the table.
+   *
+   * @param keyPrefix - Prefix to check for
+   * @param table     - Table to check in
+   * @return true if the key is present in the table
+   * @throws IOException
+   */
+  private boolean isKeyPresentInTable(String keyPrefix,
+                                      Table<String, OmKeyInfo> table)
+      throws IOException {
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+             keyIter = table.iterator()) {
+      KeyValue<String, OmKeyInfo> kv = keyIter.seek(keyPrefix);
+
+      if (kv != null) {
+        // Check the entry in db is not marked for delete. This can happen
+        // while entry is marked for delete, but it is not flushed to DB.
+        CacheValue<OmKeyInfo> cacheValue =
+            table.getCacheValue(new CacheKey(kv.getKey()));
+        if (cacheValue != null) {
+          // we found at least one key with this prefix.
+          return kv.getKey().startsWith(keyPrefix)
+              && cacheValue.getCacheValue() != null;
+        } else {
+          // we found at least one key with this prefix.
+          return kv.getKey().startsWith(keyPrefix);
+        }
+      }
+      return false;
+    }
   }
 
   /**
