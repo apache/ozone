@@ -24,7 +24,6 @@ ${PREFIX}           ${EMPTY}
 ${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
-${CORRUPT_REPLICA}  0
 ${STALE_DATANODE}   ozone_datanode_1.ozone_default
 
 *** Test Cases ***
@@ -39,7 +38,9 @@ Test ozone debug read-replicas with one datanode STALE
     ${md5sum} =                    Execute     md5sum testfile | awk '{print $1}'
 
     FOR    ${replica}    IN RANGE    3
-        IF    '${replica}' == '${CORRUPT_REPLICA}'
+        ${datanode} =    Set Variable    ${json}[blocks][0][replicas][${replica}][hostname]
+
+        IF    '${datanode}' == '${STALE_DATANODE}'
             Verify Stale Replica     ${json}    ${replica}
         ELSE
             Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
