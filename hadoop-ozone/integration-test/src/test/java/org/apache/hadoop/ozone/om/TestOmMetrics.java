@@ -255,7 +255,7 @@ public class TestOmMetrics {
   @Test
   public void testKeyOps() throws Exception {
     // This test needs a cluster with DNs and SCM to wait on safemode
-    clusterBuilder.setNumDatanodes(3);
+    clusterBuilder.setNumDatanodes(5);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
     startCluster();
     String volumeName = UUID.randomUUID().toString();
@@ -282,8 +282,7 @@ public class TestOmMetrics {
         new ECReplicationConfig("rs-3-2-1024K"));
     doKeyOps(keyArgs);
     omMetrics = getMetrics("OMMetrics");
-    // TODO: Below assert should be with 14L. Wait until HDDS-6411 committed.
-    assertCounter("NumKeyOps", 13L, omMetrics);
+    assertCounter("NumKeyOps", 14L, omMetrics);
 
     keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
@@ -318,9 +317,8 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    //TODO: it should be 28 below
-    assertCounter("NumKeyOps", 27L, omMetrics);
-    assertCounter("NumKeyAllocate", 5L, omMetrics);
+    assertCounter("NumKeyOps", 28L, omMetrics);
+    assertCounter("NumKeyAllocate", 6L, omMetrics);
     assertCounter("NumKeyLookup", 3L, omMetrics);
     assertCounter("NumKeyDeletes", 4L, omMetrics);
     assertCounter("NumKeyLists", 3L, omMetrics);
@@ -328,12 +326,11 @@ public class TestOmMetrics {
     assertCounter("NumInitiateMultipartUploads", 3L, omMetrics);
 
     assertCounter("NumKeyAllocateFails", 1L, omMetrics);
-    // TODO: revert this
-    /*assertCounter("NumKeyLookupFails", 2L, omMetrics);
+    assertCounter("NumKeyLookupFails", 1L, omMetrics);
     assertCounter("NumKeyDeleteFails", 1L, omMetrics);
     assertCounter("NumKeyListFails", 1L, omMetrics);
     assertCounter("NumTrashKeyListFails", 1L, omMetrics);
-    assertCounter("NumInitiateMultipartUploadFails", 1L, omMetrics);*/
+    assertCounter("NumInitiateMultipartUploadFails", 1L, omMetrics);
 
 
     assertCounter("NumKeys", 2L, omMetrics);
