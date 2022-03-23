@@ -356,16 +356,25 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public synchronized void close() {
-    for (BlockExtendedInputStream stream : blockStreams) {
-      if (stream != null) {
+    closeStreams();
+    closed = true;
+  }
+
+  protected synchronized void closeStreams() {
+    for (int i = 0; i < blockStreams.length; i++) {
+      if (blockStreams[i] != null) {
         try {
-          stream.close();
+          blockStreams[i].close();
+          blockStreams[i] = null;
         } catch (IOException e) {
-          LOG.error("Failed to close stream {}", stream, e);
+          LOG.error("Failed to close stream {}", blockStreams[i], e);
         }
       }
     }
-    closed = true;
+    // If the streams have been closed outside of a close() call, then it may
+    // be due to freeing resources. If they are reopened, then we will need to
+    // seek the stream to its expected position when the next read is attempted.
+    seeked = true;
   }
 
   @Override

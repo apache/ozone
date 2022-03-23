@@ -142,6 +142,55 @@ public class TestECBlockReconstructedInputStream {
         b.clear();
         long read = stream.read(b);
         Assert.assertEquals(-1, read);
+        // Seek back to zero and read again to ensure the buffers are
+        // re-allocated after being freed at the end of block.
+        stream.seek(0);
+        read = stream.read(b);
+        Assert.assertEquals(readBufferSize, read);
+        dataGenerator = new SplittableRandom(randomSeed);
+        ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
+      }
+    }
+  }
+
+
+  @Test
+  public void testReadDataWithUnbuffer() throws IOException {
+    // Read buffer is 16kb + 5 bytes so it does not align with stripes exactly
+    int readBufferSize = random.nextInt(1024 * 16 + 5);
+    // 3 stripes and a partial chunk
+    int blockLength = repConfig.getEcChunkSize() * repConfig.getData() * 3
+        + repConfig.getEcChunkSize() - 1;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(),
+        repConfig.getEcChunkSize() * 4);
+    ECStreamTestUtil.randomFill(dataBufs, repConfig.getEcChunkSize(),
+        dataGenerator, blockLength);
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+    addDataStreamsToFactory(dataBufs, parity);
+
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
+    try (ECBlockReconstructedStripeInputStream stripeStream
+             = createStripeInputStream(dnMap, blockLength)) {
+      try (ECBlockReconstructedInputStream stream =
+               new ECBlockReconstructedInputStream(repConfig, bufferPool,
+                   stripeStream)) {
+        ByteBuffer b = ByteBuffer.allocate(readBufferSize);
+        int totalRead = 0;
+        dataGenerator = new SplittableRandom(randomSeed);
+        while (totalRead < blockLength) {
+          int expectedRead = Math.min(blockLength - totalRead, readBufferSize);
+          long read = stream.read(b);
+          totalRead += read;
+          Assert.assertEquals(expectedRead, read);
+          ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
+          b.clear();
+          stream.unbuffer();
+        }
+        // Next read should be EOF
+        b.clear();
+        long read = stream.read(b);
+        Assert.assertEquals(-1, read);
       }
     }
   }
