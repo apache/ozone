@@ -106,7 +106,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               commitKeyRequest.getClientID());
 
 
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
 
@@ -122,7 +121,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String fileName = OzoneFSUtils.getFileName(keyName);
-      omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       long bucketId = omBucketInfo.getObjectID();
       long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
           keyName, omMetadataManager, "Cannot create file : " + keyName
@@ -142,6 +141,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
       // Update the block length for each block
+      List<OmKeyLocationInfo> allocatedLocationInfoList =
+          omKeyInfo.getLatestVersionLocations().getLocationList();
       omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
@@ -179,7 +180,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
-              locationInfoList.size() * scmBlockSize * factor;
+          allocatedLocationInfoList.size() * scmBlockSize * factor;
       // Subtract the size of blocks to be overwritten.
       if (keyToDelete != null) {
         correctedSpace -= keyToDelete.getDataSize() *

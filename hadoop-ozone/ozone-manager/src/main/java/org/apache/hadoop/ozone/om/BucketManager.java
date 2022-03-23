@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 
 import java.io.IOException;
@@ -26,12 +25,6 @@ import java.util.List;
  * BucketManager handles all the bucket level operations.
  */
 public interface BucketManager extends IOzoneAcl {
-  /**
-   * Creates a bucket.
-   * @param bucketInfo - OmBucketInfo for creating bucket.
-   */
-  void createBucket(OmBucketInfo bucketInfo) throws IOException;
-
 
   /**
    * Returns Bucket Information.
@@ -40,21 +33,6 @@ public interface BucketManager extends IOzoneAcl {
    */
   OmBucketInfo getBucketInfo(String volumeName, String bucketName)
       throws IOException;
-
-  /**
-   * Sets bucket property from args.
-   * @param args - BucketArgs.
-   * @throws IOException
-   */
-  void setBucketProperty(OmBucketArgs args) throws IOException;
-
-  /**
-   * Deletes an existing empty bucket from volume.
-   * @param volumeName - Name of the volume.
-   * @param bucketName - Name of the bucket.
-   * @throws IOException
-   */
-  void deleteBucket(String volumeName, String bucketName) throws IOException;
 
   /**
    * Returns a list of buckets represented by {@link OmBucketInfo}

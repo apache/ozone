@@ -31,12 +31,13 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 
 /**
  * This class tests MiniOzoneHAClusterImpl.
@@ -70,7 +71,8 @@ public class TestMiniOzoneOMHACluster {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
+    conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
+        2, TimeUnit.SECONDS);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)

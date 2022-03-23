@@ -23,12 +23,6 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env 4
 
-#Due to the limitation of the current auditparser test, it should be the
-#first test in a clean cluster.
-
-#Disabling for now, audit parser tool during parse getting exception.
-#execute_robot_test om auditparser
-
 execute_robot_test scm basic/basic.robot
 
 execute_robot_test scm topology/cli.robot

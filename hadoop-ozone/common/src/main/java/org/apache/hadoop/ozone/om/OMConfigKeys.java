@@ -83,6 +83,21 @@ public final class OMConfigKeys {
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
 
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.open.key.cleanup.service.interval";
+  public static final String
+      OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT = "24h";
+
+  public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD =
+      "ozone.om.open.key.expire.threshold";
+  public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT =
+      "7d";
+
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.open.key.cleanup.limit.per.task";
+  public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      1000;
+
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";

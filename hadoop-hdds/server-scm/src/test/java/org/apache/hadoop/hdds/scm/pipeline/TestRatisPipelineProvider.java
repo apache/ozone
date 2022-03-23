@@ -31,13 +31,13 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -86,7 +86,7 @@ public class TestRatisPipelineProvider {
         conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 10);
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
-    SCMHAManager scmhaManager = MockSCMHAManager.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
         maxPipelinePerNode);
     stateManager = PipelineStateManagerImpl.newBuilder()
@@ -125,14 +125,14 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(RatisReplicationConfig
         .getInstance(factor));
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
@@ -177,7 +177,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
 
     factor = HddsProtos.ReplicationFactor.ONE;
@@ -186,7 +186,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
@@ -264,7 +264,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
 
@@ -326,7 +326,7 @@ public class TestRatisPipelineProvider {
         .setId(PipelineID.randomId())
         .build();
     HddsProtos.Pipeline pipelineProto = openPipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION);
+        ClientVersion.CURRENT_VERSION);
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);

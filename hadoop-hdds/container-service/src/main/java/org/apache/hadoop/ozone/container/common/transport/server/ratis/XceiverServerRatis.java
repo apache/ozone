@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -108,7 +109,7 @@ import org.apache.ratis.util.TraditionalBinaryPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.DatanodeVersions.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
@@ -187,7 +188,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
-    if (datanodeDetails.getInitialVersion() >= SEPARATE_RATIS_PORTS_AVAILABLE) {
+    if (DatanodeVersion.fromProtoValue(datanodeDetails.getInitialVersion())
+        .compareTo(SEPARATE_RATIS_PORTS_AVAILABLE) >= 0) {
       adminPort = determinePort(
           OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
           OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);

@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -259,7 +259,7 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
@@ -285,7 +285,7 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
@@ -310,7 +310,7 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
@@ -342,7 +342,7 @@ public class TestSCMSafeModeManager {
     PipelineManagerImpl pipelineManager =
         PipelineManagerImpl.newPipelineManager(
             conf,
-            MockSCMHAManager.getInstance(true),
+            SCMHAManagerStub.getInstance(true),
             mockNodeManager,
             scmMetadataStore.getPipelineTable(),
             queue,
@@ -596,7 +596,7 @@ public class TestSCMSafeModeManager {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
@@ -661,7 +661,7 @@ public class TestSCMSafeModeManager {
     PipelineManagerImpl pipelineManager =
         PipelineManagerImpl.newPipelineManager(
             config,
-            MockSCMHAManager.getInstance(true),
+            SCMHAManagerStub.getInstance(true),
             nodeManager,
             scmMetadataStore.getPipelineTable(),
             queue,

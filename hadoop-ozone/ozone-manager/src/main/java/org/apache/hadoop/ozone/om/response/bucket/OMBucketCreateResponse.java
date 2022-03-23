@@ -33,11 +33,12 @@ import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
 /**
  * Response for CreateBucket request.
  */
-@CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
+@CleanupTableInfo(cleanupTables = {BUCKET_TABLE, VOLUME_TABLE})
 public final class OMBucketCreateResponse extends OMClientResponse {
 
   private final OmBucketInfo omBucketInfo;

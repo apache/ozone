@@ -29,13 +29,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import javax.annotation.Nonnull;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for CreateKey request - prefix layout.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE,
+    BUCKET_TABLE})
 public class OMKeyCreateResponseWithFSO extends OMFileCreateResponseWithFSO {
 
   public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse,

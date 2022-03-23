@@ -99,6 +99,7 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -111,7 +112,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -155,7 +155,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     try {
       Builder builder = ScmContainerLocationRequest.newBuilder()
           .setCmdType(type)
-          .setVersion(CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT_VERSION)
           .setTraceID(TracingUtil.exportCurrentSpan());
       builderConsumer.accept(builder);
       ScmContainerLocationRequest wrapper = builder.build();
@@ -425,7 +425,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    *
    * @param opState The operation state of the node
    * @param nodeState The health of the node
-   * @param clientVersion
    * @return List of Datanodes.
    */
   @Override
@@ -874,7 +873,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
+      String ipaddress, String uuid, int clientVersion) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
@@ -900,7 +899,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count) throws IOException {
+      boolean mostUsed, int count, int clientVersion) throws IOException {
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
             .setMostUsed(mostUsed)
