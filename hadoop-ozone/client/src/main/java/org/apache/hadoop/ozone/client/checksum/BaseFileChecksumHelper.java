@@ -220,14 +220,13 @@ public abstract class BaseFileChecksumHelper {
     return keyLocationInfos == null || keyLocationInfos.isEmpty();
   }
 
-  protected FileChecksum createEmptyMd5Checksum() {
+  protected static FileChecksum createEmptyMd5Checksum() {
     // Explicitly specified here in case the default DataOutputBuffer
     // buffer length value is changed in future.
     final int lenOfZeroBytes = 32;
     byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
     MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-    fileChecksum =  new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
-    return fileChecksum;
+    return new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
   }
 
   /**
