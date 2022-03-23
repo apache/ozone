@@ -318,8 +318,9 @@ public class OzoneBucketStub extends OzoneBucket {
     List<PartInfo> partInfoList = new ArrayList<>();
 
     if (partList.get(key) == null) {
-      return new OzoneMultipartUploadPartListParts(ReplicationType.RATIS,
-          ReplicationFactor.ONE, 0, false);
+      return new OzoneMultipartUploadPartListParts(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          0, false);
     } else {
       Map<Integer, Part> partMap = partList.get(key);
       Iterator<Map.Entry<Integer, Part>> partIterator =

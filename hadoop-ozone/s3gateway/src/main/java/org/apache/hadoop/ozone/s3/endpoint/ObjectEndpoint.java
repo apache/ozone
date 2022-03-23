@@ -712,9 +712,8 @@ public class ObjectEndpoint extends EndpointBase {
       listPartsResponse.setPartNumberMarker(partNumberMarker);
       listPartsResponse.setTruncated(false);
 
-      listPartsResponse.setStorageClass(S3StorageType.fromReplicationType(
-          ozoneMultipartUploadPartListParts.getReplicationType(),
-          ozoneMultipartUploadPartListParts.getReplicationFactor()).toString());
+      listPartsResponse.setStorageClass(S3StorageType.fromReplicationConfig(
+          ozoneMultipartUploadPartListParts.getReplicationConfig()).toString());
 
       if (ozoneMultipartUploadPartListParts.isTruncated()) {
         listPartsResponse.setTruncated(

@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -620,10 +622,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 3);
 
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
-    Assert.assertEquals(3,
-        ozoneMultipartUploadPartListParts.getPartInfoList().size());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     verifyPartNamesInDB(volumeName, bucketName, keyName, partsMap,
         ozoneMultipartUploadPartListParts, uploadID);
@@ -722,8 +723,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 2);
 
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     Assert.assertEquals(2,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
@@ -821,8 +823,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     Assert.assertEquals(0,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     // As we don't have any parts with greater than partNumberMarker and list
     // is not truncated, so it should return false here.

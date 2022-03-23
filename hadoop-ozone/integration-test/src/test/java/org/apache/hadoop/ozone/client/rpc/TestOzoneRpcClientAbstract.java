@@ -2979,10 +2979,9 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 3);
 
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
-    Assert.assertEquals(3,
-        ozoneMultipartUploadPartListParts.getPartInfoList().size());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     Assert.assertEquals(partsMap.get(ozoneMultipartUploadPartListParts
             .getPartInfoList().get(0).getPartNumber()),
@@ -3030,8 +3029,9 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 2);
 
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     Assert.assertEquals(2,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
@@ -3131,8 +3131,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     Assert.assertEquals(0,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
-    Assert.assertEquals(RATIS,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     // As we don't have any parts with greater than partNumberMarker and list
     // is not truncated, so it should return false here.
