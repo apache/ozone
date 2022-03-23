@@ -1518,7 +1518,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   /**
-   * Do nothing for favicon.ico
+   * Do nothing for favicon.ico.
    */
   public static class IconServlet extends HttpServlet {
     private static final long serialVersionUID = -1L;
