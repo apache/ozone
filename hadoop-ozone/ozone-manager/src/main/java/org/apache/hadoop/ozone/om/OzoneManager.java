@@ -2896,6 +2896,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // so failure metrics is not handled. In future if there is any need to
     // handle exception in this method, we need to incorporate
     // metrics.incNumGetServiceListFails()
+    AUDIT.logReadSuccess(
+        buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
+            new LinkedHashMap<>()));
     return services;
   }
 

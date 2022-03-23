@@ -18,13 +18,18 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
@@ -177,4 +182,21 @@ public final class OzoneManagerUtils {
     }
     return bucketInfo;
   }
+
+  /**
+   * Builds an audit map based on the Delegation Token passed to the method.
+   * @param token Delegation Token
+   * @return AuditMap
+   */
+  public static Map<String, String> buildTokenAuditMap(
+      Token<OzoneTokenIdentifier> token) {
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.DELEGATION_TOKEN_KIND,
+        token.getKind() == null ? "" : token.getKind().toString());
+    auditMap.put(OzoneConsts.DELEGATION_TOKEN_SERVICE,
+        token.getService() == null ? "" : token.getService().toString());
+
+    return auditMap;
+  }
+
 }
