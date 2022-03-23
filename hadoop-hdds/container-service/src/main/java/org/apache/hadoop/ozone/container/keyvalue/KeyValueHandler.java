@@ -561,7 +561,6 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    List<BlockData> responseData;
     List<ContainerProtos.BlockData> returnData = new ArrayList<>();
     try {
       int count = request.getListBlock().getCount();
@@ -569,7 +568,7 @@ public class KeyValueHandler extends Handler {
       if (request.getListBlock().hasStartLocalID()) {
         startLocalId = request.getListBlock().getStartLocalID();
       }
-      responseData = blockManager.listBlock(kvContainer, startLocalId, count);
+      List<BlockData> responseData = blockManager.listBlock(kvContainer, startLocalId, count);
       for (int i = 0; i < responseData.size(); i++) {
         returnData.add(responseData.get(i).getProtoBufMessage());
       }
