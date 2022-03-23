@@ -221,9 +221,10 @@ public class RpcClient implements ClientProtocol {
                   s.getProtobuf().getOMVersion());
             }
           }
-          throw new RuntimeException("OmVersion expected "
-              + minOmVersion
-              + ", not found in ServiceList");
+          throw new RuntimeException(
+              "Minimum OzoneManager version required is: " + minOmVersion
+              + ", in the service list there are not enough Ozone Managers"
+              + " meet the criteria.");
         }
       }
       String caCertPem = null;
@@ -293,16 +294,16 @@ public class RpcClient implements ClientProtocol {
     return xceiverClientManager;
   }
 
-  static boolean validateOmVersion(OzoneManagerVersion expectedVersion,
+  static boolean validateOmVersion(OzoneManagerVersion minimumVersion,
                                    List<ServiceInfo> serviceInfoList) {
-    if (expectedVersion == OzoneManagerVersion.FUTURE_VERSION) {
+    if (minimumVersion == OzoneManagerVersion.FUTURE_VERSION) {
       // A FUTURE_VERSION should not be expected ever.
       throw new IllegalArgumentException("Configuration error, expected "
           + "OzoneManager version config evaluates to a future version.");
     }
     // if expected version is unset or is the default, then any OM would do fine
-    if (expectedVersion == null
-        || expectedVersion == OzoneManagerVersion.DEFAULT_VERSION) {
+    if (minimumVersion == null
+        || minimumVersion == OzoneManagerVersion.DEFAULT_VERSION) {
       return true;
     }
 
@@ -312,7 +313,7 @@ public class RpcClient implements ClientProtocol {
         OzoneManagerVersion omv =
             OzoneManagerVersion
                 .fromProtoValue(s.getProtobuf().getOMVersion());
-        if (expectedVersion.compareTo(omv) > 0) {
+        if (minimumVersion.compareTo(omv) > 0) {
           return false;
         } else {
           found = true;
