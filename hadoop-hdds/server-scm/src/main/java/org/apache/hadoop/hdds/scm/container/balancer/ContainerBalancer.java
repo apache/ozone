@@ -619,10 +619,9 @@ public class ContainerBalancer {
    *
    * @param source the source datanode
    * @param moveSelection the selected container to move and target datanode
-   * @return false if an exception occurred, the move completed
-   * exceptionally, or the move completed with a result other than
-   * ReplicationManager.MoveResult.COMPLETED. Returns true if the move
-   * completed with MoveResult.COMPLETED or move is not yet done
+   * @return false if an exception occurred or the move completed with a
+   * result other than ReplicationManager.MoveResult.COMPLETED. Returns true
+   * if the move completed with MoveResult.COMPLETED or move is not yet done
    */
   private boolean moveContainer(DatanodeDetails source,
                                 ContainerMoveSelection moveSelection) {
@@ -641,7 +640,7 @@ public class ContainerBalancer {
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
         LOG.info("Container move for container {} from source {} to target {}" +
-                "completed exceptionally",
+                "failed with exceptions",
             container.toString(),
             source.getUuidString(),
             moveSelection.getTargetNode().getUuidString());
