@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
  * the class of Hadoop Native EC.
  */
 @InterfaceAudience.Private
-public class HadoopNativeECAccessorUtil {
+public final class HadoopNativeECAccessorUtil {
   public static void performEncodeImpl(NativeRSRawEncoder encoder,
       ByteBuffer[] inputs, int[] inputOffsets, int dataLen,
       ByteBuffer[] outputs, int[] outputOffsets) throws IOException {

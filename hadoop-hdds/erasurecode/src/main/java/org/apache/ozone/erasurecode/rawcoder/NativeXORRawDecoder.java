@@ -44,7 +44,7 @@ public class NativeXORRawDecoder extends AbstractNativeRawDecoder {
 
   @Override
   protected void performDecodeImpl(ByteBuffer[] inputs, int[] inputOffsets,
-                                   int dataLen, int[] erased, ByteBuffer[] outputs, int[] outputOffsets)
+      int dataLen, int[] erased, ByteBuffer[] outputs, int[] outputOffsets)
       throws IOException {
     HadoopNativeECAccessorUtil
         .performDecodeImpl(hadoopNativeXORRawDecoder, inputs,

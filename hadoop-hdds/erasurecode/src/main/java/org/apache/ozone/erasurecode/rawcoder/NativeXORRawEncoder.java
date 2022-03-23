@@ -49,7 +49,7 @@ public class NativeXORRawEncoder extends AbstractNativeRawEncoder {
 
   @Override
   protected void performEncodeImpl(ByteBuffer[] inputs, int[] inputOffsets,
-                                   int dataLen, ByteBuffer[] outputs, int[] outputOffsets)
+      int dataLen, ByteBuffer[] outputs, int[] outputOffsets)
       throws IOException {
     HadoopNativeECAccessorUtil
         .performEncodeImpl(hadoopNativeXORRawEncoder, inputs,
