@@ -35,7 +35,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
    */
   private final String bucketNamespaceName;
   /**
-   * Name of the bucket policies.
+   * Bucket policy IDs stored as Strings.
    */
   private final List<String> policyIds;
 
