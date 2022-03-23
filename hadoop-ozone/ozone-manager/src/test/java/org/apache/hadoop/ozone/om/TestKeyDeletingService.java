@@ -104,7 +104,7 @@ public class TestKeyDeletingService {
    */
 
   @Test(timeout = 30000)
-  public void checkIfDeleteServiceisDeletingKeys()
+  public void checkIfDeleteServiceIsDeletingKeys()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
     OzoneConfiguration conf = createConfAndInitValues();
@@ -200,6 +200,51 @@ public class TestKeyDeletingService {
     Assert.assertEquals(keyDeletingService.getDeletedKeyCount().get(), 0);
   }
 
+  @Test(timeout = 30000)
+  public void checkDeletionForKeysWithMultipleVersions()
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
+    OzoneConfiguration conf = createConfAndInitValues();
+    OmTestManagers omTestManagers = new OmTestManagers(conf);
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+
+    String volumeName = String.format("volume%s",
+        RandomStringUtils.randomAlphanumeric(5));
+    String bucketName = String.format("bucket%s",
+        RandomStringUtils.randomAlphanumeric(5));
+
+    // Create Volume and Bucket with versioning enabled
+    createVolumeAndBucket(keyManager, volumeName, bucketName, true);
+
+    String keyName = String.format("key%s",
+        RandomStringUtils.randomAlphanumeric(5));
+    OmKeyArgs keyArgs1 = createAndCommitKey(keyManager, volumeName, bucketName,
+        keyName, 1);
+    OmKeyArgs keyArgs2 = createAndCommitKey(keyManager, volumeName, bucketName,
+        keyName, 2);
+
+    // Delete the key
+    writeClient.deleteKey(keyArgs2);
+
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) keyManager.getDeletingService();
+    GenericTestUtils.waitFor(
+        () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
+        1000, 10000);
+    Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
+    Assert.assertEquals(
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), 0);
+
+    // The 1st version of the key has 1 block and the 2nd version has 2
+    // blocks. Hence, the ScmBlockClient should have received atleast 3
+    // blocks for deletion from the KeyDeletionService
+    ScmBlockLocationTestingClient scmBlockTestingClient =
+        (ScmBlockLocationTestingClient) omTestManagers.getScmBlockClient();
+    Assert.assertTrue(scmBlockTestingClient.getNumberOfDeletedBlocks() >= 3);
+  }
+
   private void createAndDeleteKeys(KeyManager keyManager, int keyCount,
       int numBlocks) throws IOException {
     for (int x = 0; x < keyCount; x++) {
@@ -209,43 +254,57 @@ public class TestKeyDeletingService {
           RandomStringUtils.randomAlphanumeric(5));
       String keyName = String.format("key%s",
           RandomStringUtils.randomAlphanumeric(5));
-      String volumeBytes =
-          keyManager.getMetadataManager().getVolumeKey(volumeName);
-      String bucketBytes =
-          keyManager.getMetadataManager().getBucketKey(volumeName, bucketName);
-      // cheat here, just create a volume and bucket entry so that we can
-      // create the keys, we put the same data for key and value since the
-      // system does not decode the object
-      OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
-          OmVolumeArgs.newBuilder()
-              .setOwnerName("o")
-              .setAdminName("a")
-              .setVolume(volumeName)
-              .build());
 
-      OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
-          OmBucketInfo.newBuilder().setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .build());
+      // Create Volume and Bucket
+      createVolumeAndBucket(keyManager, volumeName, bucketName, false);
 
-      OmKeyArgs arg =
-          new OmKeyArgs.Builder()
-              .setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .setKeyName(keyName)
-              .setAcls(Collections.emptyList())
-              .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-                  HddsProtos.ReplicationFactor.ONE))
-              .setLocationInfoList(new ArrayList<>())
-              .build();
-      //Open, Commit and Delete the Keys in the Key Manager.
-      OpenKeySession session = writeClient.openKey(arg);
-      for (int i = 0; i < numBlocks; i++) {
-        arg.addLocationInfo(
-            writeClient.allocateBlock(arg, session.getId(), new ExcludeList()));
-      }
-      writeClient.commitKey(arg, session.getId());
-      writeClient.deleteKey(arg);
+      // Create the key
+      OmKeyArgs keyArg = createAndCommitKey(keyManager, volumeName, bucketName,
+          keyName, numBlocks);
+
+      // Delete the key
+      writeClient.deleteKey(keyArg);
     }
+  }
+
+  private void createVolumeAndBucket(KeyManager keyManager, String volumeName,
+      String bucketName, boolean isVersioningEnabled) throws IOException{
+    // cheat here, just create a volume and bucket entry so that we can
+    // create the keys, we put the same data for key and value since the
+    // system does not decode the object
+    OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+        OmVolumeArgs.newBuilder()
+            .setOwnerName("o")
+            .setAdminName("a")
+            .setVolume(volumeName)
+            .build());
+
+    OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setIsVersionEnabled(isVersioningEnabled)
+            .build());
+  }
+
+  private OmKeyArgs createAndCommitKey(KeyManager keyManager, String volumeName,
+      String bucketName, String keyName, int numBlocks) throws IOException {
+    OmKeyArgs keyArg =
+        new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+            .setLocationInfoList(new ArrayList<>())
+            .build();
+    //Open and Commit the Key in the Key Manager.
+    OpenKeySession session = writeClient.openKey(keyArg);
+    for (int i = 0; i < numBlocks; i++) {
+      keyArg.addLocationInfo(
+          writeClient.allocateBlock(keyArg, session.getId(), new ExcludeList()));
+    }
+    writeClient.commitKey(keyArg, session.getId());
+    return keyArg;
   }
 }

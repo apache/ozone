@@ -1117,6 +1117,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             keyBlocksList.add(keyBlocks);
             currentCount++;
           }
+          for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
+            // Add all blocks from all versions of the key to the deletion list
+            for (OmKeyLocationInfoGroup keyLocations :
+                info.getKeyLocationVersions()) {
+              List<BlockID> item = keyLocations.getLocationList().stream()
+                  .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+                  .collect(Collectors.toList());
+              BlockGroup keyBlocks = BlockGroup.newBuilder()
+                  .setKeyName(kv.getKey())
+                  .addAllBlockIDs(item)
+                  .build();
+              keyBlocksList.add(keyBlocks);
+            }
+            currentCount++;
+          }
         }
       }
     }

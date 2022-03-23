@@ -44,6 +44,7 @@ public final class OmTestManagers {
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private PrefixManager prefixManager;
+  private ScmBlockLocationProtocol scmBlockClient;
 
   public OzoneManager getOzoneManager() {
     return om;
@@ -66,6 +67,9 @@ public final class OmTestManagers {
   public KeyManager getKeyManager() {
     return keyManager;
   }
+  public ScmBlockLocationProtocol getScmBlockClient() {
+    return scmBlockClient;
+  }
 
   public OmTestManagers(OzoneConfiguration conf)
       throws AuthenticationException, IOException {
@@ -80,10 +84,8 @@ public final class OmTestManagers {
       containerClient =
           Mockito.mock(StorageContainerLocationProtocol.class);
     }
-    if (blockClient == null) {
-      blockClient =
-          new ScmBlockLocationTestingClient(null, null, 0);
-    }
+    scmBlockClient = blockClient != null ? blockClient :
+        new ScmBlockLocationTestingClient(null, null, 0);
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);
@@ -97,7 +99,7 @@ public final class OmTestManagers {
 
     keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "keyManager");
-    ScmClient scmClient = new ScmClient(blockClient, containerClient);
+    ScmClient scmClient = new ScmClient(scmBlockClient, containerClient);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
