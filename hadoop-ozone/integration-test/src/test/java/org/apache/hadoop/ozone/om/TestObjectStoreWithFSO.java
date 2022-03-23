@@ -213,6 +213,79 @@ public class TestObjectStoreWithFSO {
             dirPathC.getObjectID(), true);
   }
 
+  /**
+   * Tests bucket deletion behaviour. Buckets should not be allowed to be
+   * deleted if they contain files or directories under them.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testBucketWithKeyDelete() throws Exception {
+    // Create temporary volume and bucket for this test.
+    OzoneBucket testBucket = TestDataUtil
+        .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    String testVolumeName = testBucket.getVolumeName();
+    String testBucketName = testBucket.getName();
+
+    String parent = "a/b/c/";
+    String file = "key" + RandomStringUtils.randomNumeric(5);
+    String key = parent + file;
+
+    OzoneClient client = cluster.getClient();
+
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume ozoneVolume = objectStore.getVolume(testVolumeName);
+    assertEquals(ozoneVolume.getName(), testVolumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(testBucketName);
+    assertEquals(ozoneBucket.getName(), testBucketName);
+
+    Table<String, OmKeyInfo> openFileTable =
+        cluster.getOzoneManager().getMetadataManager()
+            .getOpenKeyTable(getBucketLayout());
+
+    // before file creation
+    verifyKeyInFileTable(openFileTable, file, 0, true);
+
+    // Create a key.
+    ozoneBucket.createKey(key, 10).close();
+
+    try {
+      // Try to delete the bucket while a key is present under it.
+      ozoneVolume.deleteBucket(testBucketName);
+      fail("Bucket Deletion should fail, since bucket is not empty.");
+    } catch (IOException ioe) {
+      // Do nothing
+    }
+
+    // Delete the key (this only deletes the file)
+    ozoneBucket.deleteKey(key);
+    try {
+      // Try to delete the bucket while intermediate dirs are present under it.
+      ozoneVolume.deleteBucket(testBucketName);
+      fail("Bucket Deletion should fail, since bucket still contains " +
+          "intermediate directories");
+    } catch (IOException ioe) {
+      // Do nothing
+    }
+
+    // Delete last level of directories.
+    ozoneBucket.deleteDirectory(parent, true);
+    try {
+      // Try to delete the bucket while dirs are present under it.
+      ozoneVolume.deleteBucket(testBucketName);
+      fail("Bucket Deletion should fail, since bucket still contains " +
+          "intermediate directories");
+    } catch (IOException ioe) {
+      // Do nothing
+    }
+
+    // Delete all the intermediate directories
+    ozoneBucket.deleteDirectory("a/", true);
+    ozoneVolume.deleteBucket(testBucketName);
+    // Cleanup the Volume.
+    cluster.getClient().getObjectStore().deleteVolume(testVolumeName);
+  }
+
   @Test
   public void testLookupKey() throws Exception {
     String parent = "a/b/c/";
