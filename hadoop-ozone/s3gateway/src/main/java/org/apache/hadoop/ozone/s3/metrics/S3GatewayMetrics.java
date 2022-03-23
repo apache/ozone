@@ -116,7 +116,6 @@ public final class S3GatewayMetrics implements MetricsSource {
   }
 
   @Override
-  @SuppressWarnings("SuspiciousMethodCalls")
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
 
@@ -168,7 +167,7 @@ public final class S3GatewayMetrics implements MetricsSource {
   }
 
   public void incGetBucketFailure() {
-    getBucketSuccess.incr();
+    getBucketFailure.incr();
   }
 
   public void incListS3BucketsSuccess() {
