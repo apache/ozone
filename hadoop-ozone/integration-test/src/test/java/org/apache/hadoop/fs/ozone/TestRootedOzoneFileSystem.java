@@ -1459,8 +1459,6 @@ public class TestRootedOzoneFileSystem {
     FileStatus[] fStatus = getFs().listStatus(dirPath);
     assertEquals("Renamed failed", 1, fStatus.length);
 
-    // We cannot delete a non-empty bucket.
-    getFs().delete(dirPath, true);
     getFs().delete(getBucketPath(), true);
   }
 
@@ -1482,11 +1480,6 @@ public class TestRootedOzoneFileSystem {
     assertTrue("Renamed failed", getFs().rename(file1Destin, abcRootPath));
     assertTrue("Renamed filed: /a/b/c/file1", getFs().exists(new Path(
         abcRootPath, "file1")));
-
-    // We cannot delete a non-empty bucket.
-    getFs().delete(dirPath, true);
-    getFs().delete(new Path(getBucketPath() + "/a/"), true);
-    getFs().delete(file1Destin, true);
     getFs().delete(getBucketPath(), true);
   }
 

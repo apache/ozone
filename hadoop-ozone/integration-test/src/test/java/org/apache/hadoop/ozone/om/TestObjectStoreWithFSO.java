@@ -248,6 +248,8 @@ public class TestObjectStoreWithFSO {
 
     // Create a key.
     ozoneBucket.createKey(key, 10).close();
+    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
 
     try {
       // Try to delete the bucket while a key is present under it.
@@ -259,6 +261,8 @@ public class TestObjectStoreWithFSO {
 
     // Delete the key (this only deletes the file)
     ozoneBucket.deleteKey(key);
+    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
     try {
       // Try to delete the bucket while intermediate dirs are present under it.
       ozoneVolume.deleteBucket(testBucketName);
@@ -270,6 +274,8 @@ public class TestObjectStoreWithFSO {
 
     // Delete last level of directories.
     ozoneBucket.deleteDirectory(parent, true);
+    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
     try {
       // Try to delete the bucket while dirs are present under it.
       ozoneVolume.deleteBucket(testBucketName);
@@ -281,6 +287,8 @@ public class TestObjectStoreWithFSO {
 
     // Delete all the intermediate directories
     ozoneBucket.deleteDirectory("a/", true);
+    Assert.assertTrue(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
     ozoneVolume.deleteBucket(testBucketName);
     // Cleanup the Volume.
     cluster.getClient().getObjectStore().deleteVolume(testVolumeName);
