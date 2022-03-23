@@ -100,7 +100,6 @@ public class TestOzoneContainer {
   @Test
   public void testOzoneContainerStart() throws Exception {
     OzoneConfiguration conf = newOzoneConfiguration();
-    MiniOzoneCluster cluster = null;
     OzoneContainer container = null;
 
     try {
@@ -139,9 +138,6 @@ public class TestOzoneContainer {
     } finally {
       if (container != null) {
         container.stop();
-      }
-      if (cluster != null) {
-        cluster.shutdown();
       }
     }
   }
