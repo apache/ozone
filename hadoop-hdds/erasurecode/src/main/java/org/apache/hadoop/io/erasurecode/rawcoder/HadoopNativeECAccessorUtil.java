@@ -22,6 +22,9 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
+/**
+ * the class of Hadoop Native EC.
+ */
 @InterfaceAudience.Private
 public class HadoopNativeECAccessorUtil {
   public static void performEncodeImpl(NativeRSRawEncoder encoder,
@@ -39,15 +42,15 @@ public class HadoopNativeECAccessorUtil {
   }
 
   public static void performEncodeImpl(NativeXORRawEncoder encoder,
-                                       ByteBuffer[] inputs, int[] inputOffsets, int dataLen,
-                                       ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
+      ByteBuffer[] inputs, int[] inputOffsets, int dataLen,
+      ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
     encoder.performEncodeImpl(inputs, inputOffsets, dataLen, outputs,
         outputOffsets);
   }
 
   public static void performDecodeImpl(NativeXORRawDecoder decoder,
-                                       ByteBuffer[] inputs, int[] inputOffsets, int dataLen, int[] erased,
-                                       ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
+     ByteBuffer[] inputs, int[] inputOffsets, int dataLen, int[] erased,
+     ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
     decoder.performDecodeImpl(inputs, inputOffsets, dataLen, erased, outputs,
         outputOffsets);
   }
