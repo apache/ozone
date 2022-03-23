@@ -49,9 +49,12 @@ public class HadoopNativeECAccessorUtil {
   }
 
   public static void performDecodeImpl(NativeXORRawDecoder decoder,
-     ByteBuffer[] inputs, int[] inputOffsets, int dataLen, int[] erased,
-     ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
+      ByteBuffer[] inputs, int[] inputOffsets, int dataLen, int[] erased,
+      ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
     decoder.performDecodeImpl(inputs, inputOffsets, dataLen, erased, outputs,
         outputOffsets);
+  }
+
+  private HadoopNativeECAccessorUtil() {
   }
 }
