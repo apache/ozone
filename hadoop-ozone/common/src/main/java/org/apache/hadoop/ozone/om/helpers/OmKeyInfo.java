@@ -713,8 +713,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentObjectID(parentObjectID)
-        .setFileName(fileName)
-        .setFileChecksum(fileChecksum);
+        .setFileName(fileName);
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(
@@ -728,6 +727,10 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     if (metadata != null) {
       metadata.forEach((k, v) -> builder.addMetadata(k, v));
+    }
+
+    if (fileChecksum != null) {
+      builder.setFileChecksum(fileChecksum);
     }
 
     return builder.build();

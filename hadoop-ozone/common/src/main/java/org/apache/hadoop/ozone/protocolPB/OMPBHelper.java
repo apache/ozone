@@ -223,9 +223,19 @@ public final class OMPBHelper {
     try {
       switch (proto.getChecksumType()) {
       case MD5CRC:
-        return convertMD5MD5FileChecksum(proto.getMd5Crc());
+        if (proto.hasMd5Crc()) {
+          return convertMD5MD5FileChecksum(proto.getMd5Crc());
+        } else {
+          LOG.warn("The field md5Crc is not set.");
+          return null;
+        }
       case COMPOSITE_CRC:
-        return convertCompositeCrcChecksum(proto.getCompositeCrc());
+        if (proto.hasCompositeCrc()) {
+          return convertCompositeCrcChecksum(proto.getCompositeCrc());
+        } else {
+          LOG.warn("The field CompositeCrc is not set.");
+          return null;
+        }
       default:
         return null;
       }
@@ -337,25 +347,25 @@ public final class OMPBHelper {
     }
 
     try {
-      MD5MD5Crc32FileChecksumProto c1 = null;
-      CompositeCrcFileChecksumProto c2 = null;
-      FileChecksumTypeProto type = null;
       if (checksum instanceof MD5MD5CRC32FileChecksum) {
-        c1 = convert((MD5MD5CRC32FileChecksum) checksum);
-        type = FileChecksumTypeProto.MD5CRC;
+        MD5MD5Crc32FileChecksumProto c1 =
+            convert((MD5MD5CRC32FileChecksum) checksum);
 
         return FileChecksumProto.newBuilder()
-            .setChecksumType(type)
+            .setChecksumType(FileChecksumTypeProto.MD5CRC)
             .setMd5Crc(c1)
             .build();
       } else if (checksum instanceof CompositeCrcFileChecksum) {
-        c2 = convert((CompositeCrcFileChecksum) checksum);
-        type = FileChecksumTypeProto.COMPOSITE_CRC;
+        CompositeCrcFileChecksumProto c2 =
+            convert((CompositeCrcFileChecksum) checksum);
 
         return FileChecksumProto.newBuilder()
-            .setChecksumType(type)
+            .setChecksumType(FileChecksumTypeProto.COMPOSITE_CRC)
             .setCompositeCrc(c2)
             .build();
+      } else {
+        LOG.warn("Unsupported file checksum runtime type " +
+            checksum.getClass().getName());
       }
     } catch (IOException ioe) {
       LOG.warn(
