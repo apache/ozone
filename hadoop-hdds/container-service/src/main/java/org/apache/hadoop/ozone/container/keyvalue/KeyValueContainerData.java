@@ -350,7 +350,9 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   public KeyPrefixFilter getUnprefixedKeyFilter() {
-    return new KeyPrefixFilter().addFilter(containerPrefix() + "#", true);
+    String schemaPrefix = containerPrefix();
+    return new KeyPrefixFilter().addFilter(
+        schemaPrefix == null ? "#" : schemaPrefix + "#", true);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {
@@ -368,11 +370,11 @@ public class KeyValueContainerData extends ContainerData {
 
   /**
    * Schema v3 use containerID as key prefix,
-   * for other schemas just return empty.
+   * for other schemas just return null.
    * @return
    */
   public String containerPrefix() {
-    return "";
+    return null;
   }
 
   /**

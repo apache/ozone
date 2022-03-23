@@ -285,9 +285,11 @@ public class TestKeyValueBlockIterator {
             blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX));
 
     // Test arbitrary filter.
+    String schemaPrefix = containerData.containerPrefix();
     MetadataKeyFilters.KeyPrefixFilter secondFilter =
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(containerData.containerPrefix() + secondPrefix);
+            .addFilter(schemaPrefix == null ?
+                secondPrefix : schemaPrefix + secondPrefix);
     testWithFilter(secondFilter, blockIDs.get(secondPrefix));
   }
 
@@ -383,6 +385,7 @@ public class TestKeyValueBlockIterator {
       // prefix.
       Table<String, BlockData> blockDataTable =
               metadataStore.getStore().getBlockDataTable();
+      String schemaPrefix = containerData.containerPrefix();
 
       for (Map.Entry<String, Integer> entry: prefixCounts.entrySet()) {
         String prefix = entry.getKey();
@@ -394,8 +397,8 @@ public class TestKeyValueBlockIterator {
           blockIndex++;
           BlockData blockData = new BlockData(blockID);
           blockData.setChunks(chunkList);
-          String blockKey = containerData.containerPrefix() + prefix +
-              blockID.getLocalID();
+          String blockKey = (schemaPrefix == null ? "" : schemaPrefix) +
+              prefix + blockID.getLocalID();
           blockDataTable.put(blockKey, blockData);
           blockIDs.get(prefix).add(blockID.getLocalID());
         }

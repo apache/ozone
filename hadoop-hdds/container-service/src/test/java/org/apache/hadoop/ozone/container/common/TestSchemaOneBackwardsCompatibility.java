@@ -177,7 +177,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
       // Test rangeKVs.
       List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
-              deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100);
+              deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100,
+                  cData.containerPrefix());
 
       for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
         assertFalse(kv.getKey().contains(prefix));
@@ -185,7 +186,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
       // Test sequentialRangeKVs.
       deletedBlocks = deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(),
-          100);
+          100, cData.containerPrefix());
 
       for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
         assertFalse(kv.getKey().contains(prefix));
@@ -330,7 +331,8 @@ public class TestSchemaOneBackwardsCompatibility {
       // Read blocks that were already deleted before the upgrade.
       List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
               refCountedDB.getStore().getDeletedBlocksTable()
-                  .getRangeKVs(cData.startKeyEmpty(), 100);
+                  .getRangeKVs(cData.startKeyEmpty(), 100,
+                      cData.containerPrefix());
 
       Set<String> preUpgradeBlocks = new HashSet<>();
 
@@ -391,7 +393,7 @@ public class TestSchemaOneBackwardsCompatibility {
       // Test decoding keys from the database.
       List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
           blockDataTable.getRangeKVs(cData.startKeyEmpty(), 100,
-              cData.getUnprefixedKeyFilter());
+              cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
       List<String> decodedKeys = new ArrayList<>();
 
@@ -434,7 +436,7 @@ public class TestSchemaOneBackwardsCompatibility {
       // Test decoding keys from the database.
       List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
           blockDataTable.getRangeKVs(cData.startKeyEmpty(), 100,
-              cData.getDeletingBlockKeyFilter());
+              cData.containerPrefix(), cData.getDeletingBlockKeyFilter());
 
       List<String> decodedKeys = new ArrayList<>();
 
@@ -502,7 +504,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
       // Test decoding keys from the database.
       List<? extends Table.KeyValue<String, ChunkInfoList>> chunkInfoKeyValues =
-          deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100);
+          deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100,
+              cData.containerPrefix());
 
       List<String> decodedKeys = new ArrayList<>();
 
@@ -600,7 +603,8 @@ public class TestSchemaOneBackwardsCompatibility {
           throws IOException {
     return refCountedDB.getStore().getDeletedBlocksTable()
             .getRangeKVs(cData.startKeyEmpty(), 100,
-                    cData.getUnprefixedKeyFilter()).size();
+                cData.containerPrefix(),
+                cData.getUnprefixedKeyFilter()).size();
   }
 
   private int countDeletingBlocks(DBHandle refCountedDB,
@@ -608,7 +612,8 @@ public class TestSchemaOneBackwardsCompatibility {
           throws IOException {
     return refCountedDB.getStore().getBlockDataTable()
             .getRangeKVs(cData.startKeyEmpty(), 100,
-                    cData.getDeletingBlockKeyFilter()).size();
+                cData.containerPrefix(),
+                cData.getDeletingBlockKeyFilter()).size();
   }
 
   private int countUnprefixedBlocks(DBHandle refCountedDB,
@@ -616,7 +621,8 @@ public class TestSchemaOneBackwardsCompatibility {
           throws IOException {
     return refCountedDB.getStore().getBlockDataTable()
             .getRangeKVs(cData.startKeyEmpty(), 100,
-                    cData.getUnprefixedKeyFilter()).size();
+                cData.containerPrefix(),
+                cData.getUnprefixedKeyFilter()).size();
   }
 
   /**

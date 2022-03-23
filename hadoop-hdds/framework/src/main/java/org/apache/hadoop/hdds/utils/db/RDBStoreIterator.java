@@ -82,8 +82,7 @@ public class RDBStoreIterator
   @Override
   public boolean hasNext() {
     return rocksDBIterator.isValid() &&
-        (prefix == null || Arrays.equals(
-            Arrays.copyOf(rocksDBIterator.key(), prefix.length), prefix));
+        (prefix == null || startsWith(prefix, rocksDBIterator.key()));
   }
 
   @Override
@@ -138,5 +137,26 @@ public class RDBStoreIterator
   @Override
   public void close() throws IOException {
     rocksDBIterator.close();
+  }
+
+  private static boolean startsWith(byte[] prefix, byte[] value) {
+    if (prefix == null) {
+      return true;
+    }
+    if (value == null) {
+      return false;
+    }
+
+    int length = prefix.length;
+    if (value.length < length) {
+      return false;
+    }
+
+    for (int i = 0; i < length; i++) {
+      if (value[i] != prefix[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }

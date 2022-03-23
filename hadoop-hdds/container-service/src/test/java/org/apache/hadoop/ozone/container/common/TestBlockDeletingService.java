@@ -376,7 +376,8 @@ public class TestBlockDeletingService {
       KeyValueContainerData data) throws IOException {
     if (data.getSchemaVersion().equals(SCHEMA_V1)) {
       return meta.getStore().getBlockDataTable()
-          .getRangeKVs(null, 100, data.getDeletingBlockKeyFilter())
+          .getRangeKVs(null, 100, data.containerPrefix(),
+              data.getDeletingBlockKeyFilter())
           .size();
     } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
       int pendingBlocks = 0;

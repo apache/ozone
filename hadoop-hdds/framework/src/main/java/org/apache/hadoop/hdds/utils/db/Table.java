@@ -162,12 +162,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       throws IOException;
 
   /**
-   * Set the fixed key prefix length.
-   * @param length
-   */
-  void setFixedPrefixLength(int length);
-
-  /**
    * Returns the Name of this Table.
    * @return - Table Name.
    * @throws IOException on failure.
@@ -242,6 +236,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    *
    * @param startKey a start key.
    * @param count max number of entries to return.
+   * @param prefix fixed key schema specific prefix
    * @param filters customized one or more
    * {@link MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database or an empty list if the
@@ -250,7 +245,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @throws IllegalArgumentException if count is less than 0.
    */
   List<? extends KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey,
-          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          int count, KEY prefix,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
 
   /**
@@ -263,6 +259,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    *
    * @param startKey a start key.
    * @param count max number of entries to return.
+   * @param prefix fixed key schema specific prefix
    * @param filters customized one or more
    * {@link MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database.
@@ -270,7 +267,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @throws IllegalArgumentException
    */
   List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey,
-          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          int count, KEY prefix,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
 
   /**

@@ -107,7 +107,8 @@ public class TestStorageContainerManagerHelper {
 
       List<? extends Table.KeyValue<String, BlockData>> kvs =
           db.getStore().getBlockDataTable()
-              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE, filter);
+              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                  cData.containerPrefix(), filter);
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
         pendingDeletionBlocks
@@ -134,7 +135,7 @@ public class TestStorageContainerManagerHelper {
       List<? extends Table.KeyValue<String, BlockData>> kvs =
           db.getStore().getBlockDataTable()
               .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
-                  cData.getUnprefixedKeyFilter());
+                  cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
         allBlocks.add(Long.valueOf(entry.getKey()));

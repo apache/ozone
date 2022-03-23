@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.StringUtils;
 
@@ -57,7 +56,6 @@ class RDBTable implements Table<byte[], byte[]> {
   private final ColumnFamilyHandle handle;
   private final WriteOptions writeOptions;
   private final RDBMetrics rdbMetrics;
-  private int prefixLength;
 
   /**
    * Constructs a TableStore.
@@ -72,7 +70,6 @@ class RDBTable implements Table<byte[], byte[]> {
     this.handle = handle;
     this.writeOptions = writeOptions;
     this.rdbMetrics = rdbMetrics;
-    this.prefixLength = 0;
   }
 
   /**
@@ -224,11 +221,6 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void setFixedPrefixLength(int length) {
-    this.prefixLength = length;
-  }
-
-  @Override
   public String getName() throws IOException {
     try {
       return StringUtils.bytes2String(this.getHandle().getName());
@@ -254,26 +246,26 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, false, filters);
+    return getRangeKVs(startKey, count, false, prefix, filters);
   }
 
   @Override
   public List<ByteArrayKeyValue> getSequentialRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, true, filters);
+    return getRangeKVs(startKey, count, true, prefix, filters);
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, boolean sequential,
+      int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
     List<ByteArrayKeyValue> result = new ArrayList<>();
     long start = System.currentTimeMillis();
-    byte[] prefix = (startKey != null && prefixLength > 0) ?
-        ArrayUtils.subarray(startKey, 0, prefixLength) : null;
 
     if (count < 0) {
       throw new IllegalArgumentException(
@@ -283,7 +275,8 @@ class RDBTable implements Table<byte[], byte[]> {
       if (startKey == null) {
         it.seekToFirst();
       } else {
-        if (startKey.length > prefixLength && get(startKey) == null) {
+        if ((prefix == null || startKey.length > prefix.length)
+            && get(startKey) == null) {
           // Key not found, return empty list
           return result;
         }

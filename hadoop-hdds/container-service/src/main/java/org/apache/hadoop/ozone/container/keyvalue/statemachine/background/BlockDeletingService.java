@@ -317,7 +317,9 @@ public class BlockDeletingService extends BackgroundService {
         KeyPrefixFilter filter = containerData.getDeletingBlockKeyFilter();
         List<? extends Table.KeyValue<String, BlockData>> toDeleteBlocks =
             blockDataTable
-                .getSequentialRangeKVs(null, (int) blocksToDelete, filter);
+                .getSequentialRangeKVs(containerData.startKeyEmpty(),
+                    (int) blocksToDelete, containerData.containerPrefix(),
+                    filter);
         if (toDeleteBlocks.isEmpty()) {
           LOG.debug("No under deletion block found in container : {}",
               containerData.getContainerID());

@@ -60,7 +60,7 @@ public class TestRDBTableStore {
   private final List<String> prefixedFamilies = Arrays.asList(
       "PrefixFirst"
   );
-  private static final int PREFIX_LENGTH = 12;
+  private static final int PREFIX_LENGTH = 8;
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
   private RDBStore rdbStore = null;
@@ -487,9 +487,6 @@ public class TestRDBTableStore {
     List<Map<String, String>> testData = generateKVs(testPrefixes, blockCount);
 
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst")) {
-      // should set prefixLength so we could extract prefix
-      // from the startKey
-      testTable.setFixedPrefixLength(PREFIX_LENGTH);
 
       // write data
       populatePrefixedTable(testTable, testData);
@@ -500,13 +497,13 @@ public class TestRDBTableStore {
       // test start at first
       byte[] startKey = samplePrefix;
       List<? extends Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
-          .getRangeKVs(startKey, 3);
+          .getRangeKVs(startKey, 3, samplePrefix);
       Assert.assertEquals(3, rangeKVs.size());
 
       // test start with a middle key
       startKey = StringUtils.string2Bytes(
           StringUtils.bytes2String(samplePrefix) + "3");
-      rangeKVs = testTable.getRangeKVs(startKey, blockCount);
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount, samplePrefix);
       Assert.assertEquals(2, rangeKVs.size());
 
       // test with a filter
@@ -515,13 +512,14 @@ public class TestRDBTableStore {
           .addFilter(StringUtils.bytes2String(samplePrefix) + "1");
       startKey = StringUtils.string2Bytes(
           StringUtils.bytes2String(samplePrefix));
-      rangeKVs = testTable.getRangeKVs(startKey, blockCount, filter1);
+      rangeKVs = testTable.getRangeKVs(startKey, blockCount,
+          samplePrefix, filter1);
       Assert.assertEquals(1, rangeKVs.size());
 
       // test start with a non-exist key
       startKey = StringUtils.string2Bytes(
           StringUtils.bytes2String(samplePrefix) + 123);
-      rangeKVs = testTable.getRangeKVs(startKey, 10);
+      rangeKVs = testTable.getRangeKVs(startKey, 10, samplePrefix);
       Assert.assertEquals(0, rangeKVs.size());
     }
   }
