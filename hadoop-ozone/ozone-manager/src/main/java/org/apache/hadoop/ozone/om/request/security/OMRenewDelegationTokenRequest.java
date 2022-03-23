@@ -76,10 +76,14 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
           renewDelegationTokenRequest.getToken());
       auditMap = buildTokenAuditMap(token);
 
+      OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
+          readProtoBuf(token.getIdentifier());
+      auditMap.put(OzoneConsts.DELEGATION_TOKEN_RENEWER,
+          ozoneTokenIdentifier.getRenewer() == null ? "" :
+              ozoneTokenIdentifier.getRenewer().toString());
+
       // Call OM to renew token
-      renewTime = ozoneManager.renewDelegationToken(
-          OMPBHelper.convertToDelegationToken(
-              renewDelegationTokenRequest.getToken()));
+      renewTime = ozoneManager.renewDelegationToken(token);
     } catch (IOException ioe) {
       auditLog(auditLogger,
           buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, ioe,

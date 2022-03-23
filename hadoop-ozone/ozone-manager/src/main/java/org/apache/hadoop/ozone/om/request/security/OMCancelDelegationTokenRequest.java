@@ -90,9 +90,10 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    Token<OzoneTokenIdentifier> token = getToken();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
-    Map<String, String> auditMap = buildTokenAuditMap(getToken());
+    Map<String, String> auditMap = buildTokenAuditMap(token);
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -102,7 +103,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
 
     try {
       ozoneTokenIdentifier =
-          OzoneTokenIdentifier.readProtoBuf(getToken().getIdentifier());
+          OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
 
       // Remove token from in-memory.
       ozoneManager.getDelegationTokenMgr().removeToken(ozoneTokenIdentifier);
