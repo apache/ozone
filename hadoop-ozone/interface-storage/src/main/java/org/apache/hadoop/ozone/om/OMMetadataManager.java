@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -262,10 +263,10 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @param count The maximum number of open keys to return.
    * @param expireThreshold The threshold of open key expire age.
-   * @return a list of {@link String} representing names of open expired keys.
+   * @return a {@link List} of {@link OmOpenKeyInfo}, the expired open keys.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(Duration expireThreshold, int count)
+  List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold, int count)
       throws IOException;
 
   /**

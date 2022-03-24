@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -43,6 +44,7 @@ import java.util.TreeSet;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
@@ -591,34 +593,28 @@ public class TestOmMetadataManager {
     }
 
     // Test retrieving fewer expired keys than actually exist.
-    List<String> someExpiredKeys =
+    List<OmOpenKeyInfo> someExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
             numExpiredOpenKeys - 1);
-
     Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredKeys.size());
-    for (String key: someExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+    Assert.assertTrue(expiredKeys.containsAll(someExpiredKeys.stream()
+        .map(OmOpenKeyInfo::toString).collect(Collectors.toList())));
 
     // Test attempting to retrieving more expired keys than actually exist.
-    List<String> allExpiredKeys =
+    List<OmOpenKeyInfo> allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
             numExpiredOpenKeys + 1);
-
     Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
-    for (String key: allExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+    Assert.assertTrue(expiredKeys.containsAll(allExpiredKeys.stream()
+        .map(OmOpenKeyInfo::toString).collect(Collectors.toList())));
 
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
             numExpiredOpenKeys);
-
     Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
-    for (String key: allExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+    Assert.assertTrue(expiredKeys.containsAll(allExpiredKeys.stream()
+        .map(OmOpenKeyInfo::toString).collect(Collectors.toList())));
   }
 
   private void addKeysToOM(String volumeName, String bucketName,

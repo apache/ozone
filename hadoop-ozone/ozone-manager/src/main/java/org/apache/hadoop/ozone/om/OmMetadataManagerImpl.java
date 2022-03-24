@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -1190,28 +1191,35 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(Duration expireThreshold,
+  public List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold,
       int count) throws IOException {
+    List<OmOpenKeyInfo> expiredKeys = new ArrayList<>();
+
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
-    List<String> expiredKeys = Lists.newArrayList();
-
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         keyValueTableIterator = getOpenKeyTable(getBucketLayout()).iterator()) {
 
-      final long queryTime = Instant.now().toEpochMilli();
+      final long expiredCreationTimestamp =
+          Instant.now().minus(expireThreshold).toEpochMilli();
 
       while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String openKey = openKeyValue.getKey();
-        OmKeyInfo openKeyInfo = openKeyValue.getValue();
+        long clientID = Long.parseLong(
+            openKey.substring(openKey.lastIndexOf(OM_KEY_PREFIX) + 1));
+        OmKeyInfo omKeyInfo = openKeyValue.getValue();
 
-        final long openKeyAgeMillis = queryTime - openKeyInfo.getCreationTime();
-        final Duration openKeyAge = Duration.ofMillis(openKeyAgeMillis);
-
-        if (openKeyAge.compareTo(expireThreshold) >= 0) {
-          expiredKeys.add(openKey);
+        if (omKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
+          expiredKeys.add(OmOpenKeyInfo.newBuilder()
+              .setKeyName(omKeyInfo.getKeyName())
+              .setBucketName(omKeyInfo.getBucketName())
+              .setVolumeName(omKeyInfo.getVolumeName())
+              .setClientID(clientID)
+              .setParentID(omKeyInfo.getParentObjectID())
+              .setBucketLayout(getBucketLayout())
+              .build());
         }
       }
     }

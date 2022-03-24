@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -579,7 +580,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(Duration expireThreshold,
+  public List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold,
       int count) throws IOException {
     return metadataManager.getExpiredOpenKeys(expireThreshold, count);
   }
