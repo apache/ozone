@@ -34,8 +34,6 @@ class ByteBufferEncodingState extends EncodingState {
   ByteBuffer[] inputs;
   ByteBuffer[] outputs;
   boolean usingDirectBuffer;
-  public static final Logger LOG =
-      LoggerFactory.getLogger(ByteBufferEncodingState.class);
 
   ByteBufferEncodingState(RawErasureEncoder encoder,
                           ByteBuffer[] inputs, ByteBuffer[] outputs) {
