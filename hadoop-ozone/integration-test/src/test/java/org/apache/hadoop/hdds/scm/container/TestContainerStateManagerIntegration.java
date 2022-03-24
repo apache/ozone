@@ -51,10 +51,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+
 /**
  * Tests for ContainerStateManager.
  */
-@Flaky("HDDS-1159")
 public class TestContainerStateManagerIntegration {
 
   private static final Logger LOG =
@@ -72,6 +73,7 @@ public class TestContainerStateManagerIntegration {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
     numContainerPerOwnerInPipeline =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
@@ -278,7 +280,7 @@ public class TestContainerStateManagerIntegration {
   }
 
   @Test
-  @Flaky("TODO:HDDS-1159")
+  @Flaky("HDDS-1159")
   public void testGetMatchingContainerMultipleThreads()
       throws IOException, InterruptedException {
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
@@ -397,9 +399,9 @@ public class TestContainerStateManagerIntegration {
 
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());
-    Set<ContainerReplica> replicaSet;
-    containerStateManager.getContainerReplicas(containerID);
-    Assert.fail();
+    Set<ContainerReplica> replicaSet =
+        containerStateManager.getContainerReplicas(containerID);
+    Assert.assertNull(replicaSet);
 
     ContainerWithPipeline container = scm.getClientProtocolServer()
         .allocateContainer(
