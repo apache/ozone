@@ -256,6 +256,7 @@ public final class RatisHelper {
       GrpcTlsConfig tlsConfig) {
     if (tlsConfig != null) {
       GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+      NettyConfigKeys.DataStream.Client.setTlsConf(parameters, tlsConfig);
     }
   }
 
@@ -266,6 +267,8 @@ public final class RatisHelper {
       GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
       GrpcConfigKeys.TLS.setConf(parameters, serverConf);
       setAdminTlsConf(parameters, serverConf);
+
+      NettyConfigKeys.DataStream.Server.setTlsConf(parameters, serverConf);
     }
     setClientTlsConf(parameters, clientConf);
     return parameters;
