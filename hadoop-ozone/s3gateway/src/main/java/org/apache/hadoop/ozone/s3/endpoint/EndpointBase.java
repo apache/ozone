@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,9 +75,9 @@ public abstract class EndpointBase {
   @PostConstruct
   public void initialization() {
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
-    getClient().getObjectStore().
-        getClientProxy().
-        setTheadLocalS3Auth(s3Auth);
+    getClient().getObjectStore()
+        .getClientProxy()
+        .setThreadLocalS3Auth(s3Auth);
     init();
   }
 
@@ -197,5 +198,10 @@ public abstract class EndpointBase {
 
   public OzoneClient getClient() {
     return client;
+  }
+
+  @VisibleForTesting
+  public S3GatewayMetrics getMetrics() {
+    return S3GatewayMetrics.create();
   }
 }

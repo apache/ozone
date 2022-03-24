@@ -29,14 +29,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .BucketEncryptionInfoProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CipherSuiteProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CryptoProtocolVersionProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .FileEncryptionInfoProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CipherSuiteProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CryptoProtocolVersionProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileEncryptionInfoProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
@@ -45,6 +43,9 @@ import org.apache.hadoop.security.token.Token;
  * Utilities for converting protobuf classes.
  */
 public final class OMPBHelper {
+
+  public static final ByteString REDACTED =
+      ByteString.copyFromUtf8("<redacted>");
 
   private OMPBHelper() {
     /** Hidden constructor */
@@ -246,4 +247,24 @@ public final class OMPBHelper {
   }
 
 
+  public static OMRequest processForDebug(OMRequest msg) {
+    return msg;
+  }
+
+  public static OMResponse processForDebug(OMResponse msg) {
+    if (msg == null) {
+      return null;
+    }
+
+    if (msg.hasDbUpdatesResponse()) {
+      OMResponse.Builder builder = msg.toBuilder();
+
+      builder.getDbUpdatesResponseBuilder()
+          .clearData().addData(REDACTED);
+
+      return builder.build();
+    }
+
+    return msg;
+  }
 }

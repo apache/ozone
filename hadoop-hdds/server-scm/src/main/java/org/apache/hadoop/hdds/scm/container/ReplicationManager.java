@@ -78,6 +78,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -86,7 +87,6 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 
 import com.google.protobuf.GeneratedMessage;
@@ -900,7 +900,7 @@ public class ReplicationManager implements SCMService {
 
       try {
         moveScheduler.startMove(cid.getProtobuf(),
-            mp.getProtobufMessage(CURRENT_VERSION));
+            mp.getProtobufMessage(ClientVersion.CURRENT_VERSION));
       } catch (IOException e) {
         LOG.warn("Exception while starting move {}", cid);
         ret.complete(MoveResult.FAIL_CAN_NOT_RECORD_TO_DB);

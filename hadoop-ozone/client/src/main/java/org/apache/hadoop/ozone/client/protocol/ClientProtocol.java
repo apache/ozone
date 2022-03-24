@@ -773,7 +773,7 @@ public interface ClientProtocol {
    * of the S3 API implementation within Ozone.
    * @param s3Auth authentication information for each S3 API call.
    */
-  void setTheadLocalS3Auth(S3Auth s3Auth);
+  void setThreadLocalS3Auth(S3Auth s3Auth);
 
   /**
    * Gets the S3 Authentication information that is attached to the thread.
@@ -784,7 +784,7 @@ public interface ClientProtocol {
   /**
    * Clears the S3 Authentication information attached to the thread.
    */
-  void clearTheadLocalS3Auth();
+  void clearThreadLocalS3Auth();
 
   /**
    * Sets the owner of bucket.

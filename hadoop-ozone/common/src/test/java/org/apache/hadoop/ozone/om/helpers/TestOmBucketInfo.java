@@ -134,13 +134,17 @@ public class TestOmBucketInfo {
     Assert.assertNull(recovered.getDefaultReplicationConfig());
 
     // EC Config
-    omBucketInfo =
-        OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
-            .setCreationTime(Time.now()).setIsVersionEnabled(false)
-            .setStorageType(StorageType.ARCHIVE).setAcls(Collections
-            .singletonList(new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-                "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
-                OzoneAcl.AclScope.ACCESS))).setDefaultReplicationConfig(
+    omBucketInfo = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setCreationTime(Time.now())
+        .setIsVersionEnabled(false)
+        .setStorageType(StorageType.ARCHIVE)
+        .setAcls(Collections.singletonList(new OzoneAcl(
+            IAccessAuthorizer.ACLIdentityType.USER,
+            "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
+            OzoneAcl.AclScope.ACCESS)))
+        .setDefaultReplicationConfig(
             new DefaultReplicationConfig(ReplicationType.EC,
                 new ECReplicationConfig(3, 2))).build();
     protobuf = omBucketInfo.getProtobuf();

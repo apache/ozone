@@ -99,7 +99,7 @@ public class Node2ObjectsMap<T> {
   Set<T> getObjects(UUID datanode) {
     Preconditions.checkNotNull(datanode);
     final Set<T> s = dn2ObjectMap.get(datanode);
-    return s != null ? Collections.unmodifiableSet(s) : Collections.emptySet();
+    return s != null ? new HashSet<>(s) : Collections.emptySet();
   }
 
   public ReportResult.ReportResultBuilder<T> newBuilder() {

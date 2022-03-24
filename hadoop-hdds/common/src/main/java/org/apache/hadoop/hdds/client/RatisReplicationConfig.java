@@ -25,15 +25,45 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
 import java.util.Objects;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+
 /**
  * Replication configuration for EC replication.
  */
-public class RatisReplicationConfig implements ReplicatedReplicationConfig {
+public final class RatisReplicationConfig
+    implements ReplicatedReplicationConfig {
 
   private final ReplicationFactor replicationFactor;
   private static final ReplicationType REPLICATION_TYPE = ReplicationType.RATIS;
 
-  public RatisReplicationConfig(ReplicationFactor replicationFactor) {
+  private static final RatisReplicationConfig RATIS_ONE_CONFIG =
+      new RatisReplicationConfig(ONE);
+
+  private static final RatisReplicationConfig RATIS_THREE_CONFIG =
+      new RatisReplicationConfig(THREE);
+
+  /**
+   * Get an instance of Ratis Replication Config with the requested factor.
+   * The same static instance will be returned for all requests for the same
+   * factor.
+   * @param factor Replication Factor requested
+   * @return RatisReplicationConfig object of the requested factor
+   */
+  public static RatisReplicationConfig getInstance(ReplicationFactor factor) {
+    if (factor == ONE) {
+      return RATIS_ONE_CONFIG;
+    } else if (factor == THREE) {
+      return RATIS_THREE_CONFIG;
+    }
+    return new RatisReplicationConfig(factor);
+  }
+
+  /**
+   * Use the static getInstance method rather than the private constructor.
+   * @param replicationFactor
+   */
+  private RatisReplicationConfig(ReplicationFactor replicationFactor) {
     this.replicationFactor = replicationFactor;
   }
 

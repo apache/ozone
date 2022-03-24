@@ -40,7 +40,7 @@ public class TestContainerInfo {
   @Test
   public void getProtobufMessageEC() throws IOException {
     ContainerInfo container =
-        createContainerInfo(new RatisReplicationConfig(THREE));
+        createContainerInfo(RatisReplicationConfig.getInstance(THREE));
     HddsProtos.ContainerInfoProto proto = container.getProtobuf();
 
     // No EC Config

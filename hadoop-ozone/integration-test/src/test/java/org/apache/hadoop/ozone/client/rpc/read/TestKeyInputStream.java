@@ -408,7 +408,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(getVolumeName())
         .setBucketName(getBucketName())
         .setKeyName(keyName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
     OmKeyInfo keyInfo = getCluster().getOzoneManager().lookupKey(keyArgs);
 

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -41,7 +42,6 @@ import java.util.List;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 
 /**
@@ -51,21 +51,21 @@ public class TestOmKeyInfo {
 
   @Test
   public void protobufConversion() {
-    OmKeyInfo key =
-        createOmKeyInfo(new RatisReplicationConfig(ReplicationFactor.THREE));
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
-    OmKeyInfo keyAfterSerialization =
-        OmKeyInfo.getFromProtobuf(key.getProtobuf(CURRENT_VERSION));
+    OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
+        key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
     Assert.assertEquals(key, keyAfterSerialization);
   }
 
   @Test
   public void getProtobufMessageEC() {
-    OmKeyInfo key =
-        createOmKeyInfo(new RatisReplicationConfig(ReplicationFactor.THREE));
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     OzoneManagerProtocolProtos.KeyInfo omKeyProto =
-        key.getProtobuf(CURRENT_VERSION);
+        key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
     // No EC Config
     Assert.assertFalse(omKeyProto.hasEcReplicationConfig());
@@ -81,7 +81,7 @@ public class TestOmKeyInfo {
 
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
-    omKeyProto = key.getProtobuf(CURRENT_VERSION);
+    omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
     Assert.assertEquals(3, omKeyProto.getEcReplicationConfig().getData());
     Assert.assertEquals(2, omKeyProto.getEcReplicationConfig().getParity());
@@ -133,7 +133,7 @@ public class TestOmKeyInfo {
         .setModificationTime(Time.now())
         .setDataSize(100L)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .setOmKeyLocationInfos(
@@ -197,7 +197,7 @@ public class TestOmKeyInfo {
   Pipeline getPipeline() {
     return Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.EMPTY_LIST)
         .setState(Pipeline.PipelineState.OPEN)

@@ -167,7 +167,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       // indexed from 1 to N, however the data locations are stored in the
       // dataLocations array indexed from zero.
       Pipeline pipeline = Pipeline.newBuilder()
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE))
           .setNodes(Arrays.asList(dataLocations[locationIndex]))
           .setId(PipelineID.randomId())
@@ -182,7 +182,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setPartNumber(blockInfo.getPartNumber())
           .build();
       stream = streamFactory.create(
-          new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
+          StandaloneReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.ONE),
           blkInfo, pipeline,
           blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
           refreshFunction);

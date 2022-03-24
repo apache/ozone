@@ -221,8 +221,9 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *  state acts like a wildcard returning all nodes in that state.
    * @param opState The node operational state
    * @param state The node health
-   * @param clientVersion
+   * @param clientVersion Client's version number
    * @return List of Datanodes.
+   * @see org.apache.hadoop.ozone.ClientVersions
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
@@ -376,24 +377,28 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *
    * @param ipaddress datanode IP address String
    * @param uuid datanode UUID String
+   * @param clientVersion Client's version number
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
+   * @see org.apache.hadoop.ozone.ClientVersions
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException;
+      String ipaddress, String uuid, int clientVersion) throws IOException;
 
   /**
    * Get usage information of most or least used datanodes.
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for
+   * @param clientVersion Client's version number
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
+   * @see org.apache.hadoop.ozone.ClientVersions
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count) throws IOException;
+      boolean mostUsed, int count, int clientVersion) throws IOException;
 
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException;

@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -211,7 +212,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
@@ -2821,7 +2821,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ServiceInfo.Builder omServiceInfoBuilder = ServiceInfo.newBuilder()
         .setNodeType(HddsProtos.NodeType.OM)
         .setHostname(omRpcAddress.getHostName())
-        .setOmClientProtocolVersion(OZONE_OM_CLIENT_PROTOCOL_VERSION)
+        .setOmVersion(OzoneManagerVersion.CURRENT)
         .addServicePort(ServicePort.newBuilder()
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
@@ -2865,7 +2865,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             // For now assume peer is at the same version.
             // This field needs to be fetched from peer when rolling upgrades
             // are implemented.
-            .setOmClientProtocolVersion(OZONE_OM_CLIENT_PROTOCOL_VERSION)
+            .setOmVersion(OzoneManagerVersion.CURRENT)
             .addServicePort(ServicePort.newBuilder()
                 .setType(ServicePort.Type.RPC)
                 .setValue(peerNode.getRpcPort())
@@ -2904,6 +2904,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // so failure metrics is not handled. In future if there is any need to
     // handle exception in this method, we need to incorporate
     // metrics.incNumGetServiceListFails()
+    AUDIT.logReadSuccess(
+        buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
+            new LinkedHashMap<>()));
     return services;
   }
 
@@ -3505,6 +3508,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .getUpdatesSince(dbUpdatesRequest.getSequenceNumber(), limitCount);
     DBUpdates dbUpdates = new DBUpdates(updatesSince.getData());
     dbUpdates.setCurrentSequenceNumber(updatesSince.getCurrentSequenceNumber());
+    dbUpdates.setLatestSequenceNumber(updatesSince.getLatestSequenceNumber());
     return dbUpdates;
   }
 

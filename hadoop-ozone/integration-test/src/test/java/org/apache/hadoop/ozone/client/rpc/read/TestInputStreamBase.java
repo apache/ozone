@@ -171,7 +171,7 @@ public abstract class TestInputStreamBase {
   }
 
   byte[] writeKey(String keyName, int dataLength) throws Exception {
-    ReplicationConfig repConfig = new RatisReplicationConfig(THREE);
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
     return writeKey(keyName, repConfig, dataLength);
   }
 
@@ -190,7 +190,7 @@ public abstract class TestInputStreamBase {
 
   byte[] writeRandomBytes(String keyName, int dataLength)
       throws Exception {
-    ReplicationConfig repConfig = new RatisReplicationConfig(THREE);
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
     return writeRandomBytes(keyName, repConfig, dataLength);
   }
 

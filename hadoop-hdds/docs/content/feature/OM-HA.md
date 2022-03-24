@@ -35,7 +35,7 @@ This document explain the HA setup of Ozone Manager (OM) HA, please check [this 
 
 A single Ozone Manager uses [RocksDB](https://github.com/facebook/rocksdb/) to persist metadata (volumes, buckets, keys) locally. HA version of Ozone Manager does exactly the same but all the data is replicated with the help of the RAFT consensus algorithm to follower Ozone Manager instances.
 
-{{< image src="HA-OM.png">}}
+![HA OM](HA-OM.png)
 
 Client connects to the Leader Ozone Manager which process the request and schedule the replication with RAFT. When the request is replicated to all the followers the leader can return with the response.
 
@@ -106,7 +106,7 @@ Raft can guarantee the replication of any request if the request is persisted to
 
 RocksDB instance are updated by a background thread with batching transactions (so called "double buffer" as when one of the buffers is used to commit the data the other one collects all the new requests for the next commit.) To make all data available for the next request even if the background process is not yet wrote them the key data is cached in the memory.
 
-{{< image src="HA-OM-doublebuffer.png">}}
+![HA - OM Double Buffer](HA-OM-doublebuffer.png)
 
 The details of this approach discussed in a separated [design doc]({{< ref "design/omha.md" >}}) but it's integral part of the OM HA design.
 

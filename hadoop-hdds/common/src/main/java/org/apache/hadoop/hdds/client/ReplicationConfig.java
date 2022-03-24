@@ -46,9 +46,9 @@ public interface ReplicationConfig {
   ) {
     switch (type) {
     case RATIS:
-      return new RatisReplicationConfig(factor);
+      return RatisReplicationConfig.getInstance(factor);
     case STAND_ALONE:
-      return new StandaloneReplicationConfig(factor);
+      return StandaloneReplicationConfig.getInstance(factor);
     default:
       throw new UnsupportedOperationException(
           "Not supported replication: " + type);

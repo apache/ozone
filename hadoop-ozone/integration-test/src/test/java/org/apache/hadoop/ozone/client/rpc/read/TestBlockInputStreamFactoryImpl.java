@@ -48,7 +48,7 @@ public class TestBlockInputStreamFactoryImpl {
   public void testNonECGivesBlockInputStream() {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =
-        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE);
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
 
     OmKeyLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
         1024 * 1024 * 10);

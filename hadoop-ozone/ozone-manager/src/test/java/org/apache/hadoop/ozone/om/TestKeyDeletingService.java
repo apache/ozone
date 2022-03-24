@@ -234,7 +234,7 @@ public class TestKeyDeletingService {
               .setBucketName(bucketName)
               .setKeyName(keyName)
               .setAcls(Collections.emptyList())
-              .setReplicationConfig(new StandaloneReplicationConfig(
+              .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                   HddsProtos.ReplicationFactor.ONE))
               .setLocationInfoList(new ArrayList<>())
               .build();

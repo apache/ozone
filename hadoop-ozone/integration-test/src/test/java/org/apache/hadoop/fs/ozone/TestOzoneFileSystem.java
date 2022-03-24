@@ -588,7 +588,7 @@ public class TestOzoneFileSystem {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setAcls(Collections.emptyList())
-        .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setLocationInfoList(new ArrayList<>())
         .build();
 
@@ -1235,7 +1235,7 @@ public class TestOzoneFileSystem {
     // Rechecking the same steps with changing to Ratis again to check the
     // behavior is consistent.
     bucket.setReplicationConfig(
-        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
 
     createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key3"),
         ReplicationType.EC);
