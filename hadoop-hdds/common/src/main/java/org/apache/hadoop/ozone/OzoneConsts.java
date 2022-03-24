@@ -343,7 +343,7 @@ public final class OzoneConsts {
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";
   public static final String DEFAULT_TENANT_USER_POLICY_SUFFIX = "-users";
   public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX = "-buckets";
-  public static final String DEFAULT_TENANT_POLICY_ID_SUFFIX = "-default";
+  public static final String DEFAULT_TENANT_POLICY_NAME_SUFFIX = "-default";
   // Predefined tenant roles
   // Tenant user role. All tenant users are assigned this role by default
   public static final String TENANT_ROLE_USER_SUFFIX = "-UserRole";

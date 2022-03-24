@@ -298,9 +298,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       policyNamesList.add(tenantDefaultPolicies);
       final String bucketPolicyGroupName =
           tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
-      final String bucketPolicyId =
-          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
-      policyNamesList.add(bucketPolicyId);
+      final String bucketPolicyName =
+          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_NAME_SUFFIX;
+      policyNamesList.add(bucketPolicyName);
 
       final OmDBTenantState omDBTenantInfo = new OmDBTenantState(
           tenantId, bucketNamespaceName, policyNamesList);
