@@ -16,9 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -69,7 +66,6 @@ public class TestContainerStateManagerIntegration {
   private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private int numContainerPerOwnerInPipeline;
-  private  Set<ContainerID> excludedContainerIDS;
 
 
   @BeforeEach
@@ -86,7 +82,6 @@ public class TestContainerStateManagerIntegration {
     containerManager = scm.getContainerManager();
     containerStateManager = containerManager
         .getContainerStateManager();
-    excludedContainerIDS = new HashSet<>();
   }
 
   @AfterEach
@@ -104,7 +99,7 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline(), excludedContainerIDS);
+            container1.getPipeline());
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
     Assert.assertEquals(OzoneConsts.OZONE, info.getOwner());
@@ -132,7 +127,7 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline(), excludedContainerIDS);
+            container1.getPipeline());
     Assert.assertNotNull(info);
 
     String newContainerOwner = "OZONE_NEW";
@@ -141,7 +136,7 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), newContainerOwner);
     ContainerInfo info2 = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, newContainerOwner,
-            container1.getPipeline(), excludedContainerIDS);
+            container1.getPipeline());
     Assert.assertNotNull(info2);
 
     Assert.assertNotEquals(info.containerID(), info2.containerID());
@@ -213,7 +208,7 @@ public class TestContainerStateManagerIntegration {
     for (int i = 1; i < numContainerPerOwnerInPipeline; i++) {
       ContainerInfo info = containerManager
           .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-              container1.getPipeline(), excludedContainerIDS);
+              container1.getPipeline());
       Assert.assertTrue(info.getContainerID() > cid);
       cid = info.getContainerID();
     }
@@ -222,63 +217,9 @@ public class TestContainerStateManagerIntegration {
     // next container should be the same as first container
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline(), excludedContainerIDS);
+            container1.getPipeline());
     Assert.assertEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
-  }
-
-  @Test
-  public void testGetMatchingContainerWithExcludedList() throws IOException {
-    long cid;
-    ContainerWithPipeline container1 = scm.getClientProtocolServer().
-        allocateContainer(SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
-    cid = container1.getContainerInfo().getContainerID();
-
-    // each getMatchingContainer call allocates a container in the
-    // pipeline till the pipeline has numContainerPerOwnerInPipeline number of
-    // containers.
-    for (int i = 1; i < numContainerPerOwnerInPipeline; i++) {
-      ContainerInfo info = containerManager
-          .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-              container1.getPipeline(), excludedContainerIDS);
-      Assert.assertTrue(info.getContainerID() > cid);
-      cid = info.getContainerID();
-    }
-
-    // At this point there are already three containers in the pipeline.
-    // next container should be the same as first container
-    ContainerInfo info = containerManager
-        .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline(),
-            new HashSet<>(Collections.singletonList(ContainerID.valueOf(1))));
-    Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
-        info.getContainerID());
-  }
-
-
-  @Test
-  public void testCreateContainerLogicWithExcludedList() throws IOException {
-    long cid;
-    ContainerWithPipeline container1 = scm.getClientProtocolServer().
-        allocateContainer(SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
-    cid = container1.getContainerInfo().getContainerID();
-
-    for (int i = 1; i < numContainerPerOwnerInPipeline; i++) {
-      ContainerInfo info = containerManager
-          .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-              container1.getPipeline(), excludedContainerIDS);
-      Assert.assertTrue(info.getContainerID() > cid);
-      cid = info.getContainerID();
-    }
-
-    ContainerInfo info = containerManager
-        .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline(),
-            new HashSet<>(Arrays.asList(ContainerID.valueOf(1),
-                ContainerID.valueOf(2), ContainerID.valueOf(3))));
-    Assert.assertEquals(info.getContainerID(), 4);
   }
 
   @Test
@@ -298,7 +239,7 @@ public class TestContainerStateManagerIntegration {
       CompletableFuture.supplyAsync(() -> {
         ContainerInfo info = containerManager
             .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-                container1.getPipeline(), excludedContainerIDS);
+                container1.getPipeline());
         container2MatchedCount
             .compute(info.getContainerID(), (k, v) -> v == null ? 1L : v + 1);
         return null;
