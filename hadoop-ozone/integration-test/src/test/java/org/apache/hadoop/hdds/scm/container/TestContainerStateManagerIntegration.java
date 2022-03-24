@@ -49,6 +49,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
@@ -288,6 +290,8 @@ public class TestContainerStateManagerIntegration {
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
     Map<Long, Long> container2MatchedCount = new ConcurrentHashMap<>();
 
+    Executor executor = Executors.newFixedThreadPool(4);
+
     // allocate blocks using multiple threads
     int numBlockAllocates = 100000;
     for (int i = 0; i < numBlockAllocates; i++) {
@@ -298,7 +302,7 @@ public class TestContainerStateManagerIntegration {
         container2MatchedCount
             .compute(info.getContainerID(), (k, v) -> v == null ? 1L : v + 1);
         return null;
-      });
+      }, executor);
     }
 
     // make sure pipeline has has numContainerPerOwnerInPipeline number of
