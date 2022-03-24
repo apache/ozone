@@ -142,7 +142,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   private synchronized void initializeRule(boolean refresh) {
     int pipelineCount = pipelineManager.getPipelines(
-        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         Pipeline.PipelineState.OPEN).size();
 
     healthyPipelineThresholdCount = Math.max(minHealthyPipelines,

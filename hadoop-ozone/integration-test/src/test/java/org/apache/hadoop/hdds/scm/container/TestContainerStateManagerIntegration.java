@@ -38,11 +38,11 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +54,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Tests for ContainerStateManager.
  */
-@Ignore
+@Flaky("HDDS-1159")
 public class TestContainerStateManagerIntegration {
 
   private static final Logger LOG =
@@ -69,7 +69,7 @@ public class TestContainerStateManagerIntegration {
   private  Set<ContainerID> excludedContainerIDS;
 
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     numContainerPerOwnerInPipeline =
@@ -85,7 +85,7 @@ public class TestContainerStateManagerIntegration {
     excludedContainerIDS = new HashSet<>();
   }
 
-  @After
+  @AfterEach
   public void cleanUp() {
     if (cluster != null) {
       cluster.shutdown();
@@ -278,7 +278,7 @@ public class TestContainerStateManagerIntegration {
   }
 
   @Test
-  @Ignore("TODO:HDDS-1159")
+  @Flaky("TODO:HDDS-1159")
   public void testGetMatchingContainerMultipleThreads()
       throws IOException, InterruptedException {
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
@@ -398,7 +398,7 @@ public class TestContainerStateManagerIntegration {
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());
     Set<ContainerReplica> replicaSet;
-    containerStateManager.getContainerReplicas(containerID.getProtobuf());
+    containerStateManager.getContainerReplicas(containerID);
     Assert.fail();
 
     ContainerWithPipeline container = scm.getClientProtocolServer()
@@ -419,44 +419,44 @@ public class TestContainerStateManagerIntegration {
         .setContainerState(ContainerReplicaProto.State.OPEN)
         .setDatanodeDetails(dn2)
         .build();
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Test 3: Remove one replica node and then test
-    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.removeContainerReplica(id, replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(1, replicaSet.size());
     Assert.assertFalse(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Test 3: Remove second replica node and then test
-    containerStateManager.removeContainerReplica(id.getProtobuf(), replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.removeContainerReplica(id, replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(0, replicaSet.size());
     Assert.assertFalse(replicaSet.contains(replicaOne));
     Assert.assertFalse(replicaSet.contains(replicaTwo));
 
     // Test 4: Re-insert dn1
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(1, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertFalse(replicaSet.contains(replicaTwo));
 
     // Re-insert dn2
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaTwo);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));
 
     // Re-insert dn1
-    containerStateManager.updateContainerReplica(id.getProtobuf(), replicaOne);
-    replicaSet = containerStateManager.getContainerReplicas(id.getProtobuf());
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    replicaSet = containerStateManager.getContainerReplicas(id);
     Assert.assertEquals(2, replicaSet.size());
     Assert.assertTrue(replicaSet.contains(replicaOne));
     Assert.assertTrue(replicaSet.contains(replicaTwo));

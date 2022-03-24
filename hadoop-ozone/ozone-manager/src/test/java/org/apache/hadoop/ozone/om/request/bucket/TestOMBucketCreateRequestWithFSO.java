@@ -45,11 +45,15 @@ public class TestOMBucketCreateRequestWithFSO
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
+    Assert.assertEquals(0, omMetrics.getNumFSOBucketCreates());
+
     OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
         bucketName);
 
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
+
+    Assert.assertEquals(1, omMetrics.getNumFSOBucketCreates());
   }
 
   private OMBucketCreateRequest doPreExecute(String volumeName,

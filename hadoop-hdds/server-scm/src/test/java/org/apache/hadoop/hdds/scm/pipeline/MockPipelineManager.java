@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -82,7 +82,7 @@ public class MockPipelineManager implements PipelineManager {
         .build();
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersions.CURRENT_VERSION));
+        ClientVersion.CURRENT_VERSION));
     return pipeline;
   }
 

@@ -196,10 +196,10 @@ public class TestECKeyOutputStream {
   @Test
   public void testCreateRatisKeyAndWithECBucketDefaults() throws Exception {
     OzoneBucket bucket = getOzoneBucket();
-    try (OzoneOutputStream out = bucket
-        .createKey("testCreateRatisKeyAndWithECBucketDefaults", 2000,
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
-            new HashMap<>())) {
+    try (OzoneOutputStream out = bucket.createKey(
+        "testCreateRatisKeyAndWithECBucketDefaults", 2000,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);

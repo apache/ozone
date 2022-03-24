@@ -84,7 +84,8 @@ public class Hadoop3OmTransport implements OmTransport {
 
         // Failover to the OM node returned by OMResponse leaderOMNodeId if
         // current proxy is not pointing to that node.
-        omFailoverProxyProvider.performFailoverIfRequired(leaderOmId);
+        omFailoverProxyProvider.setNextOmProxy(leaderOmId);
+        omFailoverProxyProvider.performFailover(null);
       }
       return omResponse;
     } catch (ServiceException e) {

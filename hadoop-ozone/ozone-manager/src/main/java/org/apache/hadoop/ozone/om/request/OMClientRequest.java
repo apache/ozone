@@ -40,7 +40,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.*;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -205,8 +208,9 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @param keyName
    * @throws IOException
    */
-  protected void checkACLs(OzoneManager ozoneManager, String volumeName,
-      String bucketName, String keyName, IAccessAuthorizer.ACLType aclType)
+  protected void checkACLsWithFSO(OzoneManager ozoneManager, String volumeName,
+                                  String bucketName, String keyName,
+                                  IAccessAuthorizer.ACLType aclType)
       throws IOException {
 
     // TODO: Presently not populating sub-paths under a single bucket
@@ -223,11 +227,10 @@ public abstract class OMClientRequest implements RequestAuditor {
         .setKeyName(keyName)
         .setOzonePrefixPath(pathViewer).build();
 
-    boolean isDirectory = pathViewer.getOzoneFileStatus().isDirectory();
-
     RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setAclRights(aclType)
-        .setRecursiveAccessCheck(isDirectory); // recursive checks for a dir
+        // recursive checks for a dir with sub-directories or sub-files
+        .setRecursiveAccessCheck(pathViewer.isCheckRecursiveAccess());
 
     // check Acl
     if (ozoneManager.getAclsEnabled()) {

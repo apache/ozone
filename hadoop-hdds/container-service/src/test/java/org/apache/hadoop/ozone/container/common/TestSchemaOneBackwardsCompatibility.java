@@ -587,7 +587,7 @@ public class TestSchemaOneBackwardsCompatibility {
   private void checkContainerData(KeyValueContainerData kvData) {
     assertTrue(kvData.isClosed());
     assertEquals(TestDB.SCHEMA_VERSION, kvData.getSchemaVersion());
-    assertEquals(TestDB.KEY_COUNT, kvData.getKeyCount());
+    assertEquals(TestDB.KEY_COUNT, kvData.getBlockCount());
     assertEquals(TestDB.BYTES_USED, kvData.getBytesUsed());
     assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
             kvData.getNumPendingDeletionBlocks());

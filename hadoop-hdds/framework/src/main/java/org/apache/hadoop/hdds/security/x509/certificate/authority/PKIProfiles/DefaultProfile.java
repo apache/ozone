@@ -79,22 +79,22 @@ public class DefaultProfile implements PKIProfile {
   // Map that handles all the Extensions lookup and validations.
   protected static final Map<ASN1ObjectIdentifier, BiFunction<Extension,
       PKIProfile, Boolean>> EXTENSIONS_MAP = Stream.of(
-      new SimpleEntry<>(Extension.keyUsage, VALIDATE_KEY_USAGE),
-      new SimpleEntry<>(Extension.subjectAlternativeName, VALIDATE_SAN),
-      new SimpleEntry<>(Extension.authorityKeyIdentifier,
-          VALIDATE_AUTHORITY_KEY_IDENTIFIER),
-      new SimpleEntry<>(Extension.extendedKeyUsage,
-          VALIDATE_EXTENDED_KEY_USAGE),
-      // Ozone certs are issued only for the use of Ozone.
-      // However, some users will discover that this is a full scale CA
-      // and decide to mis-use these certs for other purposes.
-      // To discourage usage of these certs for other purposes, we can leave
-      // the Ozone Logo inside these certs. So if a browser is used to
-      // connect these logos will show up.
-      // https://www.ietf.org/rfc/rfc3709.txt
-      new SimpleEntry<>(Extension.logoType, VALIDATE_LOGO_TYPE))
-      .collect(Collectors.toMap(SimpleEntry::getKey,
-          SimpleEntry::getValue));
+          new SimpleEntry<>(Extension.keyUsage, VALIDATE_KEY_USAGE),
+          new SimpleEntry<>(Extension.subjectAlternativeName, VALIDATE_SAN),
+          new SimpleEntry<>(Extension.authorityKeyIdentifier,
+              VALIDATE_AUTHORITY_KEY_IDENTIFIER),
+          new SimpleEntry<>(Extension.extendedKeyUsage,
+              VALIDATE_EXTENDED_KEY_USAGE),
+          // Ozone certs are issued only for the use of Ozone.
+          // However, some users will discover that this is a full scale CA
+          // and decide to mis-use these certs for other purposes.
+          // To discourage usage of these certs for other purposes, we can leave
+          // the Ozone Logo inside these certs. So if a browser is used to
+          // connect these logos will show up.
+          // https://www.ietf.org/rfc/rfc3709.txt
+          new SimpleEntry<>(Extension.logoType, VALIDATE_LOGO_TYPE))
+          .collect(Collectors.toMap(SimpleEntry::getKey,
+              SimpleEntry::getValue));
   // If we decide to add more General Names, we should add those here and
   // also update the logic in validateGeneralName function.
   private static final KeyPurposeId[] EXTENDED_KEY_USAGE = {

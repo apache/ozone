@@ -32,8 +32,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -108,7 +108,7 @@ public class TestWritableECContainerProvider {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
@@ -222,8 +222,8 @@ public class TestWritableECContainerProvider {
 
   @Test
   public void testUnableToCreateAnyPipelinesReturnsNull() throws IOException {
-    pipelineManager =
-        new MockPipelineManager(dbStore, scmhaManager, nodeManager) {
+    pipelineManager = new MockPipelineManager(
+        dbStore, scmhaManager, nodeManager) {
       @Override
       public Pipeline createPipeline(ReplicationConfig repConf,
           List<DatanodeDetails> excludedNodes,
@@ -242,8 +242,8 @@ public class TestWritableECContainerProvider {
   @Test
   public void testExistingPipelineReturnedWhenNewCannotBeCreated()
       throws IOException {
-    pipelineManager =
-        new MockPipelineManager(dbStore, scmhaManager, nodeManager) {
+    pipelineManager = new MockPipelineManager(
+        dbStore, scmhaManager, nodeManager) {
 
       private boolean throwError = false;
 
@@ -313,8 +313,8 @@ public class TestWritableECContainerProvider {
       throws IOException {
     // Ensure PM throws PNF exception when we ask for the containers in the
     // pipeline
-    pipelineManager =
-        new MockPipelineManager(dbStore, scmhaManager, nodeManager) {
+    pipelineManager = new MockPipelineManager(
+        dbStore, scmhaManager, nodeManager) {
 
       @Override
       public NavigableSet<ContainerID> getContainersInPipeline(

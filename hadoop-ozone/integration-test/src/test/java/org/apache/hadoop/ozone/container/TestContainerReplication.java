@@ -162,7 +162,7 @@ public class TestContainerReplication {
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
         .setKeyName(KEY)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();

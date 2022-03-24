@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.security.KerberosInfo;
@@ -158,4 +159,15 @@ public interface SCMSecurityProtocol {
    */
   long revokeCertificates(List<String> certIds, int reason, long revocationTime)
       throws IOException;
+
+  /**
+   * Get SCM signed certificate.
+   *
+   * @param nodeDetails - Node Details.
+   * @param certSignReq  - Certificate signing request.
+   * @return String      - pem encoded SCM signed
+   *                         certificate.
+   */
+  String getCertificate(NodeDetailsProto nodeDetails,
+      String certSignReq) throws IOException;
 }

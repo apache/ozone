@@ -70,16 +70,16 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(mockNodeManager,
             new EventPublisher() {
-          @Override
-          public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void fireEvent(
-              EVENT_TYPE event, PAYLOAD payload) {
-            Assert.assertEquals(event, NODE_REPORT);
-            eventReceived.incrementAndGet();
-            Assert.assertEquals(nodeReport,
-                ((NodeReportFromDatanode)payload).getReport());
+              @Override
+              public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+                  EVENT event, PAYLOAD payload) {
+                Assert.assertEquals(event, NODE_REPORT);
+                eventReceived.incrementAndGet();
+                Assert.assertEquals(nodeReport,
+                    ((NodeReportFromDatanode)payload).getReport());
 
-          }
-        });
+              }
+            });
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
@@ -113,24 +113,24 @@ public class TestSCMDatanodeHeartbeatDispatcher {
         new SCMDatanodeHeartbeatDispatcher(
             mockNodeManager,
             new EventPublisher() {
-          @Override
-          public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void fireEvent(
-              EVENT_TYPE event, PAYLOAD payload) {
-            Assert.assertTrue(
-                event.equals(CONTAINER_REPORT)
-                    || event.equals(CMD_STATUS_REPORT));
+              @Override
+              public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+                  EVENT event, PAYLOAD payload) {
+                Assert.assertTrue(
+                    event.equals(CONTAINER_REPORT)
+                        || event.equals(CMD_STATUS_REPORT));
 
-            if (payload instanceof ContainerReportFromDatanode) {
-              Assert.assertEquals(containerReport,
-                  ((ContainerReportFromDatanode) payload).getReport());
-            }
-            if (payload instanceof CommandStatusReportFromDatanode) {
-              Assert.assertEquals(commandStatusReport,
-                  ((CommandStatusReportFromDatanode) payload).getReport());
-            }
-            eventReceived.incrementAndGet();
-          }
-        });
+                if (payload instanceof ContainerReportFromDatanode) {
+                  Assert.assertEquals(containerReport,
+                      ((ContainerReportFromDatanode) payload).getReport());
+                }
+                if (payload instanceof CommandStatusReportFromDatanode) {
+                  Assert.assertEquals(commandStatusReport,
+                      ((CommandStatusReportFromDatanode) payload).getReport());
+                }
+                eventReceived.incrementAndGet();
+              }
+            });
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
 

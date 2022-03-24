@@ -91,8 +91,9 @@ public class TestOmMultipartKeyInfo {
 
   private static Stream<ReplicationConfig> replicationConfigs() {
     return Stream.of(
-        new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE),
-        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
+        StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         new ECReplicationConfig(3, 2)
     );
   }
