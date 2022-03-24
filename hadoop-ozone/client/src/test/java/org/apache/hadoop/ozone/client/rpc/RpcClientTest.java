@@ -20,19 +20,24 @@ package org.apache.hadoop.ozone.client.rpc;
 
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.validateOmVersion;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Run RPC Client tests.
  */
+@RunWith(Parameterized.class)
 public class RpcClientTest {
   private enum ValidateOmVersionTestCases {
     NULL_EXPECTED_NO_OM(
@@ -42,176 +47,186 @@ public class RpcClientTest {
         true), // Should validation pass
     NULL_EXPECTED_ONE_OM(
         null,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
+        OzoneManagerVersion.CURRENT,
         null,
         true),
     NULL_EXPECTED_TWO_OM(
         null,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.CURRENT,
         true),
-    NULL_EXPECTED_TWO_OM_SECOND_MISMATCH(
+    NULL_EXPECTED_ONE_DEFAULT_ONE_CURRENT_OM(
         null,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "invalid",
-        true),
-    NULL_EXPECTED_TWO_OM_BOTH_MISMATCH(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        true
+    ),
+    NULL_EXPECTED_ONE_CURRENT_ONE_FUTURE_OM(
+      null,
+      OzoneManagerVersion.CURRENT,
+      OzoneManagerVersion.FUTURE_VERSION,
+      true
+    ),
+    NULL_EXPECTED_TWO_FUTURE_OM(
         null,
-        "invalid",
-        "invalid",
-        true),
-    NULL_EXPECTED_TWO_OM_FIRST_MISMATCH(
-        null,
-        "invalid",
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        true),
-    EMPTY_EXPECTED_NO_OM(
-        "",
-        null,
-        null,
-        true),
-    EMPTY_EXPECTED_ONE_OM(
-        "",
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        null,
-        true),
-    EMPTY_EXPECTED_TWO_OM(
-        "",
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        true),
-    EMPTY_EXPECTED_TWO_OM_MISMATCH(
-        "",
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "invalid",
-        true),
-    EMPTY_EXPECTED_TWO_OM_BOTH_MISMATCH(
-        "",
-        "invalid",
-        "invalid",
-        true),
-    VALID_EXPECTED_NO_OM(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        null,
-        null,
-        false),
-    VALID_EXPECTED_ONE_OM(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        null,
-        true),
-    VALID_EXPECTED_TWO_OM(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        true),
-    VALID_EXPECTED_TWO_OM_SECOND_LOWER(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "1.0.1",
-        false),
-    VALID_EXPECTED_TWO_OM_SECOND_HIGHER(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "100.0.1",
-        true),
-    VALID_EXPECTED_TWO_OM_FIRST_OM_LOWER(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "1.0.1",
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        false),
-    VALID_EXPECTED_TWO_OM_FIRST_OM_HIGHER(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "10.0.1",
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        true),
-    VALID_EXPECTED_TWO_OM_BOTH_LOWER(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "1.0.1",
-        "1.9.1",
-        false),
-    VALID_EXPECTED_ONE_OM_HIGHER_VERSION(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "100.0.1",
-        null,
-        true),
-    VALID_EXPECTED_TWO_OM_HIGHER_VERSION(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "100.0.1",
-        "100.0.1",
-        true),
-    VALID_EXPECTED_ONE_OM_LOWER_VERSION(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "1.0.1",
-        null,
-        false),
-    VALID_EXPECTED_TWO_OM_LOWER_VERSION(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "1.0.1",
-        "1.0.1",
-        false),
-    VALID_EXPECTED_TWO_OM_ONE_LOWER_VERSION(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "1.0.1",
-        "2.0.1",
-        false),
-    VALID_EXPECTED_TWO_OM_SECOND_EMPTY(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "1.0.1",
-        "",
-        false),
-    VALID_EXPECTED_TWO_OM_FIRST_EMPTY(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "",
-        "1.0.1",
-        false),
-    VALID_EXPECTED_TWO_OM_BOTH_EMPTY(
-        OZONE_OM_CLIENT_PROTOCOL_VERSION,
-        "",
-        "",
-        false),;
+        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.FUTURE_VERSION,
+        true
+    ),
 
-    private static final List<ValidateOmVersionTestCases>
-        TEST_CASES = new LinkedList<>();
+    DEFAULT_EXPECTED_NO_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        null,
+        null,
+        true),
+    DEFAULT_EXPECTED_ONE_DEFAULT_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        null,
+        true),
+    DEFAULT_EXPECTED_ONE_CURRENT_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.CURRENT,
+        null,
+        true),
+    DEFAULT_EXPECTED_ONE_FUTURE_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.FUTURE_VERSION,
+        null,
+        true),
+    DEFAULT_EXPECTED_TWO_DEFAULT_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        true),
+    DEFAULT_EXPECTED_TWO_CURRENT_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.CURRENT,
+        true),
+    DEFAULT_EXPECTED_TWO_FUTURE_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.FUTURE_VERSION,
+        true),
+    DEFAULT_EXPECTED_ONE_DEFAULT_ONE_CURRENT_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.CURRENT,
+        true),
+    DEFAULT_EXPECTED_ONE_DEFAULT_ONE_FUTURE_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.FUTURE_VERSION,
+        true),
+    DEFAULT_EXPECTED_ONE_CURRENT_ONE_FUTURE_OM(
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.FUTURE_VERSION,
+        true),
 
-    static {
-      for (ValidateOmVersionTestCases t : values()) {
-        TEST_CASES.add(t);
-      }
-    }
-    private final String expectedVersion;
-    private final String om1Version;
-    private final String om2Version;
+    CURRENT_EXPECTED_NO_OM(
+        OzoneManagerVersion.CURRENT,
+        null,
+        null,
+        false),
+    CURRENT_EXPECTED_ONE_DEFAULT_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        null,
+        false),
+    CURRENT_EXPECTED_ONE_CURRENT_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.CURRENT,
+        null,
+        true),
+    CURRENT_EXPECTED_ONE_FUTURE_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.FUTURE_VERSION,
+        null,
+        true),
+    CURRENT_EXPECTED_TWO_DEFAULT_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        false),
+    CURRENT_EXPECTED_TWO_CURRENT_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.CURRENT,
+        true),
+    CURRENT_EXPECTED_TWO_FUTURE_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.FUTURE_VERSION,
+        true),
+    CURRENT_EXPECTED_ONE_DEFAULT_ONE_CURRENT_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.CURRENT,
+        false),
+    CURRENT_EXPECTED_ONE_DEFAULT_ONE_FUTURE_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.DEFAULT_VERSION,
+        OzoneManagerVersion.FUTURE_VERSION,
+        false),
+    CURRENT_EXPECTED_ONE_CURRENT_ONE_FUTURE_OM(
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.CURRENT,
+        OzoneManagerVersion.FUTURE_VERSION,
+        true);
+
+    private final OzoneManagerVersion expectedVersion;
+    private final OzoneManagerVersion om1Version;
+    private final OzoneManagerVersion om2Version;
     private final boolean validation;
-    ValidateOmVersionTestCases(String expectedVersion,
-                               String om1Version,
-                               String om2Version,
-                               boolean validation) {
+
+    ValidateOmVersionTestCases(
+        OzoneManagerVersion expectedVersion,
+        OzoneManagerVersion om1Version,
+        OzoneManagerVersion om2Version,
+        boolean validation) {
       this.expectedVersion = expectedVersion;
       this.om1Version = om1Version;
       this.om2Version = om2Version;
       this.validation = validation;
     }
-
   }
+
+  @Parameterized.Parameters(name = "{0}")
+  public static Iterable<ValidateOmVersionTestCases> parameters() {
+    return Arrays.asList(ValidateOmVersionTestCases.values());
+  }
+
+  private ValidateOmVersionTestCases testCase;
+
+  public RpcClientTest(ValidateOmVersionTestCases testCase) {
+    this.testCase = testCase;
+  }
+
   @Test
   public void testValidateOmVersion() {
-    for (ValidateOmVersionTestCases t: ValidateOmVersionTestCases.TEST_CASES) {
-      List<ServiceInfo> serviceInfoList = new LinkedList<>();
-      ServiceInfo.Builder b1 = new ServiceInfo.Builder();
-      ServiceInfo.Builder b2 = new ServiceInfo.Builder();
-      b1.setNodeType(HddsProtos.NodeType.OM).setHostname("localhost");
-      b2.setNodeType(HddsProtos.NodeType.OM).setHostname("localhost");
-      if (t.om1Version != null) {
-        b1.setOmClientProtocolVersion(t.om1Version);
-        serviceInfoList.add(b1.build());
-      }
-      if (t.om2Version != null) {
-        b2.setOmClientProtocolVersion(t.om2Version);
-        serviceInfoList.add(b2.build());
-      }
-      Assert.assertEquals("Running test " + t, t.validation,
-          validateOmVersion(t.expectedVersion, serviceInfoList));
+    List<ServiceInfo> serviceInfoList = new LinkedList<>();
+    ServiceInfo.Builder b1 = new ServiceInfo.Builder();
+    ServiceInfo.Builder b2 = new ServiceInfo.Builder();
+    b1.setNodeType(HddsProtos.NodeType.OM).setHostname("localhost");
+    b2.setNodeType(HddsProtos.NodeType.OM).setHostname("localhost");
+    if (testCase.om1Version != null) {
+      b1.setOmVersion(testCase.om1Version);
+      serviceInfoList.add(b1.build());
     }
+    if (testCase.om2Version != null) {
+      b2.setOmVersion(testCase.om2Version);
+      serviceInfoList.add(b2.build());
+    }
+    Assert.assertEquals("Running test " + testCase, testCase.validation,
+        validateOmVersion(testCase.expectedVersion, serviceInfoList));
+  }
+
+  @Test
+  public void testFutureVersionShouldNotBeAnExpectedVersion() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> validateOmVersion(OzoneManagerVersion.FUTURE_VERSION, null));
   }
 }
