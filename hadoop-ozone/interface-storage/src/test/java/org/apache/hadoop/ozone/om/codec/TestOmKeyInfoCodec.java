@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
@@ -49,6 +50,15 @@ public class TestOmKeyInfoCodec {
   private static final String BUCKET = "ozone";
   private static final String KEYNAME =
       "user/root/terasort/10G-input-6/part-m-00037";
+
+  private static FileChecksum checksum = createEmptyChecksum();
+
+  private static FileChecksum createEmptyChecksum() {
+    final int lenOfZeroBytes = 32;
+    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
+    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
+    return new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+  }
 
   private OmKeyInfo getKeyInfo(int chunkNum) {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -64,11 +74,6 @@ public class TestOmKeyInfoCodec {
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
         OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
 
-    final int lenOfZeroBytes = 32;
-    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
-    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-    FileChecksum checksum =
-        new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
     return new OmKeyInfo.Builder()
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
@@ -105,6 +110,7 @@ public class TestOmKeyInfoCodec {
       assertNull(key.getLatestVersionLocations().getLocationList().get(0)
           .getPipeline());
       assertNotNull(key.getFileChecksum());
+      assertEquals(key.getFileChecksum(), checksum);
     } catch (IOException e) {
       fail("Should success");
     }
