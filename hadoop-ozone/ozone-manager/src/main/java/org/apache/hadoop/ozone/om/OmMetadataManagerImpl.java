@@ -73,6 +73,8 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -1193,33 +1195,49 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(Duration expireThreshold,
-      int count) throws IOException {
+  public List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold,
+      int limit) throws IOException {
+    Map<String, OpenKeyBucket.Builder> expiredKeys = new HashMap<>();
+
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
-    List<String> expiredKeys = Lists.newArrayList();
-
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         keyValueTableIterator = getOpenKeyTable(getBucketLayout()).iterator()) {
 
-      final long queryTime = Instant.now().toEpochMilli();
+      final long expiredCreationTimestamp =
+          Instant.now().minus(expireThreshold).toEpochMilli();
 
-      while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
+      OpenKey.Builder builder = OpenKey.newBuilder();
+
+      int count = 0;
+      while (count < limit && keyValueTableIterator.hasNext()) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
-        String openKey = openKeyValue.getKey();
+        String dbOpenKeyName = openKeyValue.getKey();
+        long clientID = Long.parseLong(dbOpenKeyName.substring(
+            dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX) + 1));
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
-        final long openKeyAgeMillis = queryTime - openKeyInfo.getCreationTime();
-        final Duration openKeyAge = Duration.ofMillis(openKeyAgeMillis);
-
-        if (openKeyAge.compareTo(expireThreshold) >= 0) {
-          expiredKeys.add(openKey);
+        if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
+          final String volume = openKeyInfo.getVolumeName();
+          final String bucket = openKeyInfo.getBucketName();
+          final String mapKey = volume + OM_KEY_PREFIX + bucket;
+          if (!expiredKeys.containsKey(mapKey)) {
+            expiredKeys.put(mapKey,
+                OpenKeyBucket.newBuilder()
+                    .setVolumeName(volume)
+                    .setBucketName(bucket));
+          }
+          builder.setName(openKeyInfo.getKeyName())
+              .setClientID(clientID);
+          expiredKeys.get(mapKey).addKeys(builder.build());
+          count++;
         }
       }
     }
 
-    return expiredKeys;
+    return expiredKeys.values().stream().map(OpenKeyBucket.Builder::build)
+        .collect(Collectors.toList());
   }
 
   @Override

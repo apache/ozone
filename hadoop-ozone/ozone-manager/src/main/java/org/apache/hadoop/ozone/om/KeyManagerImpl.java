@@ -86,6 +86,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -582,9 +583,9 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(Duration expireThreshold,
-      int count) throws IOException {
-    return metadataManager.getExpiredOpenKeys(expireThreshold, count);
+  public List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold,
+      int limit) throws IOException {
+    return metadataManager.getExpiredOpenKeys(expireThreshold, limit);
   }
 
   @Override

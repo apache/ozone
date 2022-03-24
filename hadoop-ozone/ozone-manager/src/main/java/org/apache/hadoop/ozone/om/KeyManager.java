@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -121,13 +122,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
-   * @param count The maximum number of expired open keys to return.
+   * @param limit The maximum number of expired open keys to return.
    * @param expireThreshold The threshold of open key expiration age.
-   * @return a list of {@link String} representing the names of expired
-   * open keys.
+   * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(Duration expireThreshold, int count)
+  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int limit)
       throws IOException;
 
   /**

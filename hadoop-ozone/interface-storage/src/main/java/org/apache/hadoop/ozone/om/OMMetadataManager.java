@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -260,12 +261,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
-   * @param count The maximum number of open keys to return.
+   * @param limit The maximum number of open keys to return.
    * @param expireThreshold The threshold of open key expire age.
-   * @return a list of {@link String} representing names of open expired keys.
+   * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(Duration expireThreshold, int count)
+  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int limit)
       throws IOException;
 
   /**
