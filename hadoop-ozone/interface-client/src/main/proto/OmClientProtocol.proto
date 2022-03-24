@@ -1409,7 +1409,7 @@ message SetS3SecretResponse {
 message TenantInfo {
     optional string tenantId = 1;
     optional string bucketNamespaceName = 2;
-    repeated string policyIds = 3;
+    repeated string policyNames = 3;
 }
 
 message TenantUserPrincipalInfo {

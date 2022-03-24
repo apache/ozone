@@ -292,18 +292,18 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Create tenant
       // Add to tenantStateTable. Redundant assignment for clarity
       final String bucketNamespaceName = volumeName;
-      final List<String> policyIdsList = new ArrayList<>();
+      final List<String> policyNamesList = new ArrayList<>();
       // Populate policy ID list
       // TODO: Check if both policies are actually used. Remove if not
-      policyIdsList.add(tenantDefaultPolicies);
+      policyNamesList.add(tenantDefaultPolicies);
       final String bucketPolicyGroupName =
           tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
       final String bucketPolicyId =
           bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_ID_SUFFIX;
-      policyIdsList.add(bucketPolicyId);
+      policyNamesList.add(bucketPolicyId);
 
       final OmDBTenantState omDBTenantInfo = new OmDBTenantState(
-          tenantId, bucketNamespaceName, policyIdsList);
+          tenantId, bucketNamespaceName, policyNamesList);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
           new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));

@@ -2986,7 +2986,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       tenantInfoList.add(TenantInfo.newBuilder()
           .setTenantId(omDBTenantInfo.getTenantId())
           .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
-          .addAllPolicyIds(omDBTenantInfo.getPolicyIds())
+          .addAllPolicyNames(omDBTenantInfo.getPolicyNames())
           .build());
     }
 

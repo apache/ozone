@@ -66,7 +66,7 @@ public class TestOMMultiTenantManagerImpl {
 
     final String bucketNamespaceName = tenantName;
 
-    // Note: policyIds is initialized with an empty list here.
+    // Note: policyNames is initialized with an empty list here.
     //  Expand if needed.
     final OmDBTenantState omDBTenantInfo = new OmDBTenantState(
         tenantName, bucketNamespaceName, new ArrayList<>());

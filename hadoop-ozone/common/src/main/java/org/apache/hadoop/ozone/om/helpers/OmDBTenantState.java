@@ -35,15 +35,15 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
    */
   private final String bucketNamespaceName;
   /**
-   * Bucket policy IDs stored as Strings.
+   * Bucket policy names stored as Strings.
    */
-  private final List<String> policyIds;
+  private final List<String> policyNames;
 
   public OmDBTenantState(String tenantId,
-      String bucketNamespaceName, List<String> policyIds) {
+      String bucketNamespaceName, List<String> policyNames) {
     this.tenantId = tenantId;
     this.bucketNamespaceName = bucketNamespaceName;
-    this.policyIds = policyIds;
+    this.policyNames = policyNames;
   }
 
   @Override
@@ -57,12 +57,12 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     OmDBTenantState that = (OmDBTenantState) o;
     return Objects.equals(tenantId, that.tenantId)
         && Objects.equals(bucketNamespaceName, that.bucketNamespaceName)
-        && Objects.equals(policyIds, that.policyIds);
+        && Objects.equals(policyNames, that.policyNames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tenantId, bucketNamespaceName, policyIds);
+    return Objects.hash(tenantId, bucketNamespaceName, policyNames);
   }
 
   @Override
@@ -84,8 +84,8 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     return bucketNamespaceName;
   }
 
-  public List<String> getPolicyIds() {
-    return policyIds;
+  public List<String> getPolicyNames() {
+    return policyNames;
   }
 
   /**
@@ -95,7 +95,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     return OzoneManagerProtocolProtos.TenantInfo.newBuilder()
         .setTenantId(tenantId)
         .setBucketNamespaceName(bucketNamespaceName)
-        .addAllPolicyIds(policyIds)
+        .addAllPolicyNames(policyNames)
         .build();
   }
 
@@ -107,7 +107,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     return new Builder()
         .setTenantId(proto.getTenantId())
         .setBucketNamespaceName(proto.getBucketNamespaceName())
-        .setPolicyIdsList(proto.getPolicyIdsList())
+        .setPolicyNamesList(proto.getPolicyNamesList())
         .build();
   }
 
@@ -118,7 +118,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   public static final class Builder {
     private String tenantId;
     private String bucketNamespaceName;
-    private List<String> policyIds;
+    private List<String> policyNames;
 
     private Builder() {
     }
@@ -133,13 +133,13 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
       return this;
     }
 
-    public Builder setPolicyIdsList(List<String> policyIds) {
-      this.policyIds = policyIds;
+    public Builder setPolicyNamesList(List<String> policyNames) {
+      this.policyNames = policyNames;
       return this;
     }
 
     public OmDBTenantState build() {
-      return new OmDBTenantState(tenantId, bucketNamespaceName, policyIds);
+      return new OmDBTenantState(tenantId, bucketNamespaceName, policyNames);
     }
   }
 }
