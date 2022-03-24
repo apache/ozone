@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -206,7 +207,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (isDatastreamPipelineMode) {
       return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
           .stream(message.getContent().asReadOnlyByteBuffer(),
-              StreamRoutingTable.getRoutingTable(pipeline));
+              RatisHelper.getRoutingTable(pipeline));
     } else {
       return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
           .stream(message.getContent().asReadOnlyByteBuffer());

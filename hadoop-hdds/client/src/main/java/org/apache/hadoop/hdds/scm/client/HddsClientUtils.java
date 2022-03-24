@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -28,10 +30,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.function.ConsumerWithIOException;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -271,6 +275,22 @@ public final class HddsClientUtils {
     return t;
   }
 
+  /**
+   * Checks if the provided exception signifies retry failure in ratis client.
+   * In case of retry failure, ratis client throws RaftRetryFailureException
+   * and all succeeding operations are failed with AlreadyClosedException.
+   */
+  public static boolean checkForRetryFailure(Throwable t) {
+    return t instanceof RaftRetryFailureException
+        || t instanceof AlreadyClosedException;
+  }
+
+  // Every container specific exception from datatnode will be seen as
+  // StorageContainerException
+  public static boolean checkIfContainerToExclude(Throwable t) {
+    return t instanceof StorageContainerException;
+  }
+
   public static RetryPolicy createRetryPolicy(int maxRetryCount,
       long retryInterval) {
     // retry with fixed sleep between retries
@@ -297,6 +317,54 @@ public final class HddsClientUtils {
         .put(Exception.class, createRetryPolicy(maxRetryCount, retryInterval));
     return policyMap;
   }
+
+  public static void streamRetryHandle(
+      IOException exception,
+      Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap,
+      AtomicInteger retryCount,
+      ConsumerWithIOException<IOException> setExceptionAndThrow)
+      throws IOException {
+    RetryPolicy retryPolicy = retryPolicyMap
+        .get(HddsClientUtils.checkForException(exception).getClass());
+    if (retryPolicy == null) {
+      retryPolicy = retryPolicyMap.get(Exception.class);
+    }
+    RetryPolicy.RetryAction action = null;
+    try {
+      action = retryPolicy.shouldRetry(exception, retryCount.get(), 0, true);
+    } catch (Exception e) {
+      setExceptionAndThrow.accept(new IOException(e));
+    }
+    if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
+      String msg = "";
+      if (action.reason != null) {
+        msg = "Retry request failed. " + action.reason;
+        //LOG.error(msg, exception);
+      }
+      setExceptionAndThrow.accept(new IOException(msg, exception));
+    }
+
+    // Throw the exception if the thread is interrupted
+    if (Thread.currentThread().isInterrupted()) {
+      //LOG.warn("Interrupted while trying for retry");
+      setExceptionAndThrow.accept(exception);
+    }
+    Preconditions.checkArgument(
+        action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
+    if (action.delayMillis > 0) {
+      try {
+        Thread.sleep(action.delayMillis);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        IOException ioe = (IOException) new InterruptedIOException(
+            "Interrupted: action=" + action + ", retry policy=" + retryPolicy)
+            .initCause(e);
+        setExceptionAndThrow.accept(ioe);
+      }
+    }
+    retryCount.incrementAndGet();
+  }
+
 
   public static List<Class<? extends Exception>> getExceptionList() {
     return EXCEPTION_LIST;

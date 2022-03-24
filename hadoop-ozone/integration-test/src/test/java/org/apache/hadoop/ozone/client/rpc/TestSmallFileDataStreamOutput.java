@@ -149,7 +149,7 @@ public class TestSmallFileDataStreamOutput {
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
-    byte[] data = ContainerTestHelper.getFixedLengthBytes(dataLength);
+    byte[] data = ContainerTestHelper.generateData(dataLength, true);
     key.write(ByteBuffer.wrap(data));
     // now close the stream, It will update the key length.
     key.close();
@@ -161,7 +161,7 @@ public class TestSmallFileDataStreamOutput {
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
     byte[] data =
-        ContainerTestHelper.getFixedLengthBytes(dataLength / 2);
+        ContainerTestHelper.generateData(dataLength / 2, true);
     ByteBuffer b = ByteBuffer.wrap(data);
     key.write(b);
 

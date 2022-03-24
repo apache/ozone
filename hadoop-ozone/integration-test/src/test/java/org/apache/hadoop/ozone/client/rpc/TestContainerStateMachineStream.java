@@ -163,7 +163,7 @@ public class TestContainerStateMachineStream {
         "ozone-stream-test.txt", ReplicationType.RATIS, size, objectStore,
         volumeName, bucketName);
 
-    byte[] data = ContainerTestHelper.getFixedLengthBytes((int) size);
+    byte[] data = ContainerTestHelper.generateData((int) size, true);
     key.write(ByteBuffer.wrap(data));
     key.flush();
 
@@ -196,7 +196,7 @@ public class TestContainerStateMachineStream {
         "ozone-stream-test-small-file.txt", ReplicationType.RATIS, size,
         objectStore, volumeName, bucketName);
 
-    byte[] data = ContainerTestHelper.getFixedLengthBytes((int) size);
+    byte[] data = ContainerTestHelper.generateData((int) size, true);
     key.write(ByteBuffer.wrap(data));
     key.flush();
 

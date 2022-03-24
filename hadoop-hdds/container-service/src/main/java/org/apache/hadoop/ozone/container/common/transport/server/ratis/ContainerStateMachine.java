@@ -563,7 +563,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     final CompletableFuture<ContainerCommandResponseProto> f;
     if (dataChannel instanceof SmallFileStreamDataChannel) {
-      f = link(entry, (SmallFileStreamDataChannel) dataChannel);
+      f = runCommandAsync(((SmallFileStreamDataChannel) dataChannel)
+          .getPutBlockRequest(), entry);
     } else if (dataChannel instanceof KeyValueStreamDataChannel) {
       return CompletableFuture.completedFuture(null);
     } else {
@@ -578,8 +579,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     });
   }
 
-  private CompletableFuture<ContainerCommandResponseProto> link(
-      LogEntryProto entry, SmallFileStreamDataChannel smallFileChannel) {
+  private CompletableFuture<ContainerCommandResponseProto> runCommandAsync(
+      ContainerCommandRequestProto requestProto, LogEntryProto entry) {
     return CompletableFuture.supplyAsync(() -> {
       final DispatcherContext context = new DispatcherContext.Builder()
           .setTerm(entry.getTerm())
@@ -588,7 +589,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           .setContainer2BCSIDMap(container2BCSIDMap)
           .build();
 
-      return runCommand(smallFileChannel.getPutBlockRequest(), context);
+      return runCommand(requestProto, context);
     }, executor);
   }
 

@@ -23,17 +23,16 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.StreamBuffer;
-import org.apache.hadoop.hdds.scm.storage.StreamRoutingTable;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -45,13 +44,11 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
-import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
-import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -61,6 +58,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -95,10 +93,12 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
   private long versionID;
   private final Token<OzoneBlockTokenIdentifier> token;
 
+  private static final ByteString EMPTY_DATA = ByteString.copyFrom(new byte[0]);
+
   // error handler
   private final ExcludeList excludeList;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
-  private int retryCount;
+  private AtomicInteger retryCount;
 
   private final AtomicReference<CompletableFuture<Boolean>> responseFuture =
       new AtomicReference<>();
@@ -123,7 +123,8 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
     this.openKeySession = handler;
 
     this.keyLocationInfo = handler.getKeyInfo().getLatestVersionLocations()
-        .getLocationList(handler.getOpenVersion()).get(0);
+        .getBlocksLatestVersionOnly().get(0);
+
     this.blockID = new AtomicReference<>(keyLocationInfo.getBlockID());
     this.versionID = keyLocationInfo.getCreateVersion();
 
@@ -140,7 +141,7 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
 
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
-    this.retryCount = 0;
+    this.retryCount = new AtomicInteger(0);
 
     this.excludeList = new ExcludeList();
 
@@ -182,9 +183,6 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
     }
     assert writtenDataLength + 1 <= realFileLen;
     retryBuffers.add(new StreamBuffer(bb.duplicate()));
-    checkOpen();
-    DataStreamOutput out = maybeInitStream();
-    writeToContainer(out, bb);
     writtenDataLength++;
   }
 
@@ -203,9 +201,6 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
     }
     assert writtenDataLength + len <= realFileLen;
     retryBuffers.add(new StreamBuffer(bb.duplicate(), off, len));
-    checkOpen();
-    DataStreamOutput out = maybeInitStream();
-    writeToContainer(out, bb);
     writtenDataLength += len;
   }
 
@@ -216,16 +211,17 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
   @Override
   public void close() throws IOException {
     boolean retry = false;
+    ByteString blockData = null;
     while (true) {
       try {
         checkOpen();
         DataStreamOutput out = maybeInitStream();
-        if (retry) {
-          insideRetry(out);
+        if (!retry) {
+          blockData = getBlockData(retryBuffers);
         }
 
         ContainerProtos.ContainerCommandRequestProto putSmallFileRequest =
-            getPutSmallFileRequest();
+            getPutSmallFileRequest(blockData);
         putSmallFileToContainer(putSmallFileRequest, out);
 
         handleWriteMetaData(out);
@@ -237,32 +233,6 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
       break;
     }
     cleanup(false);
-  }
-
-  private void writeToContainer(DataStreamOutput out, ByteBuffer buf) {
-    out.writeAsync(buf).whenCompleteAsync((r, e) -> {
-      if (e != null || !r.isSuccess()) {
-        String msg =
-            "write to stream result is not success, " +
-                "failed to putSmallFile into block " + getBlockID();
-        if (!this.responseFuture.get().isDone()) {
-          this.responseFuture.get()
-              .completeExceptionally(new IOException(msg, e));
-        }
-        LOG.warn(msg);
-      } else {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("write to container success block id: {} write len: {}",
-              getBlockID(), buf.capacity());
-        }
-      }
-    }, this.responseExecutor.get());
-  }
-
-  private void insideRetry(DataStreamOutput out) {
-    for (StreamBuffer retryBuffer : retryBuffers) {
-      writeToContainer(out, retryBuffer.duplicate());
-    }
   }
 
   private void handleWriteMetaData(DataStreamOutput out) throws IOException {
@@ -304,10 +274,11 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
   private void handleException(IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
     Preconditions.checkNotNull(t);
-    boolean retryFailure = checkForRetryFailure(t);
+    boolean retryFailure = HddsClientUtils.checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
-      containerExclusionException = checkIfContainerToExclude(t);
+      containerExclusionException =
+          HddsClientUtils.checkIfContainerToExclude(t);
     }
 
     long totalSuccessfulFlushedData = 0L;
@@ -318,7 +289,7 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
         LOG.debug(
             "Encountered exception {}. The last committed block length is {}, "
                 + "uncommitted data length is {} retry count {}", exception,
-            totalSuccessfulFlushedData, bufferedDataLen, retryCount);
+            totalSuccessfulFlushedData, bufferedDataLen, retryCount.get());
       }
       excludeList
           .addConatinerId(ContainerID.valueOf(getBlockID().getContainerID()));
@@ -328,7 +299,7 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
               + "The last committed block length is {}, "
               + "uncommitted data length is {} retry count {}", exception,
           xceiverClient.getPipeline(), totalSuccessfulFlushedData,
-          bufferedDataLen, retryCount);
+          bufferedDataLen, retryCount.get());
       excludeList.addPipeline(xceiverClient.getPipeline().getId());
     }
     allocateNewBlock();
@@ -339,72 +310,9 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
     if (bufferedDataLen > 0) {
       // If the data is still cached in the underlying stream, we need to
       // allocate new block and write this data in the datanode.
-      handleRetry(exception);
-      // reset the retryCount after handling the exception
-      // retryCount = 0;
+      HddsClientUtils.streamRetryHandle(exception, retryPolicyMap, retryCount,
+          this::setExceptionAndThrow);
     }
-  }
-
-  private void handleRetry(IOException exception) throws IOException {
-    RetryPolicy retryPolicy = retryPolicyMap
-        .get(HddsClientUtils.checkForException(exception).getClass());
-    if (retryPolicy == null) {
-      retryPolicy = retryPolicyMap.get(Exception.class);
-    }
-    RetryPolicy.RetryAction action = null;
-    try {
-      action = retryPolicy.shouldRetry(exception, retryCount, 0, true);
-    } catch (Exception e) {
-      setExceptionAndThrow(new IOException(e));
-    }
-    if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
-      String msg = "";
-      if (action.reason != null) {
-        msg = "Retry request failed. " + action.reason;
-        LOG.error(msg, exception);
-      }
-      setExceptionAndThrow(new IOException(msg, exception));
-    }
-
-    // Throw the exception if the thread is interrupted
-    if (Thread.currentThread().isInterrupted()) {
-      LOG.warn("Interrupted while trying for retry");
-      setExceptionAndThrow(exception);
-    }
-    Preconditions.checkArgument(
-        action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
-    if (action.delayMillis > 0) {
-      try {
-        Thread.sleep(action.delayMillis);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        IOException ioe = (IOException) new InterruptedIOException(
-            "Interrupted: action=" + action + ", retry policy=" + retryPolicy)
-            .initCause(e);
-        setExceptionAndThrow(ioe);
-      }
-    }
-    retryCount++;
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Retrying Write request. Already tried {} time(s); " +
-          "retry policy is {} ", retryCount, retryPolicy);
-    }
-  }
-
-  /**
-   * Checks if the provided exception signifies retry failure in ratis client.
-   * In case of retry failure, ratis client throws RaftRetryFailureException
-   * and all succeeding operations are failed with AlreadyClosedException.
-   */
-  private boolean checkForRetryFailure(Throwable t) {
-    return t instanceof RaftRetryFailureException
-        || t instanceof AlreadyClosedException;
-  }
-
-  // Every container specific exception from datatnode will be seen as
-  // StorageContainerException
-  private boolean checkIfContainerToExclude(Throwable t) {
-    return t instanceof StorageContainerException;
   }
 
   private void cleanup(boolean invalidateClient) {
@@ -429,8 +337,14 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
-  private ContainerProtos.ContainerCommandRequestProto getPutSmallFileRequest()
-      throws IOException {
+  private static ByteString getBlockData(List<StreamBuffer> buffers) {
+    List<ByteString> byteStrings = new ArrayList<>();
+    buffers.forEach(c -> byteStrings.add(ByteString.copyFrom(c.duplicate())));
+    return ByteString.copyFrom(byteStrings);
+  }
+
+  private ContainerProtos.ContainerCommandRequestProto getPutSmallFileRequest(
+      ByteString blockData) throws IOException {
     // new checksum
     ByteBuffer checksumBuffer = ByteBuffer.allocate((int) writtenDataLength);
     retryBuffers.forEach(c -> checksumBuffer.put(c.duplicate()));
@@ -439,18 +353,27 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
         (new Checksum(config.getChecksumType(), config.getBytesPerChecksum()))
             .computeChecksum(checksumBuffer).getProtoBufMessage();
 
+    return generatePutSmallFileRequest(writtenDataLength, checksumData,
+        ContainerProtos.Type.PutSmallFile, blockData);
+  }
+
+  private ContainerProtos.ContainerCommandRequestProto
+        generatePutSmallFileRequest(long len,
+                              ContainerProtos.ChecksumData checksumData,
+                              ContainerProtos.Type type, ByteString blockData)
+      throws IOException {
     ContainerProtos.ChunkInfo chunk =
         ContainerProtos.ChunkInfo.newBuilder()
             .setChunkName(getBlockID().getLocalID() + "_chunk_0")
             .setOffset(0)
-            .setLen(writtenDataLength)
+            .setLen(len)
             .setChecksumData(checksumData)
             .build();
 
     ContainerProtos.BlockData containerBlockData =
         ContainerProtos.BlockData.newBuilder()
             .setBlockID(getBlockID().getDatanodeBlockIDProtobuf())
-            .addChunks(chunk)
+            .setSize(len)
             .build();
     ContainerProtos.PutBlockRequestProto.Builder createBlockRequest =
         ContainerProtos.PutBlockRequestProto.newBuilder()
@@ -460,54 +383,13 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
         ContainerProtos.PutSmallFileRequestProto.newBuilder()
             .setChunkInfo(chunk)
             .setBlock(createBlockRequest)
+            .setData(blockData)
             .build();
 
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.PutSmallFile)
-            .setContainerID(getBlockID().getContainerID())
-            .setDatanodeUuid(id)
-            .setPutSmallFile(putSmallFileRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    return builder.build();
-  }
-
-  private ContainerProtos.ContainerCommandRequestProto
-      getStreamInitPutSmallFileRequest() throws IOException {
-
-    ContainerProtos.BlockData containerBlockData =
-        ContainerProtos.BlockData.newBuilder()
-            .setBlockID(getBlockID().getDatanodeBlockIDProtobuf())
-            .setSize(this.keyArgs.getDataSize())
-            .build();
-    ContainerProtos.PutBlockRequestProto.Builder createBlockRequest =
-        ContainerProtos.PutBlockRequestProto.newBuilder()
-            .setBlockData(containerBlockData);
-    // fake checksum
-    Checksum checksum =
-        new Checksum(config.getChecksumType(), config.getBytesPerChecksum());
-    ContainerProtos.ChunkInfo chunk =
-        ContainerProtos.ChunkInfo.newBuilder()
-            .setChunkName(getBlockID().getLocalID() + "_chunk_0")
-            .setOffset(0)
-            .setLen(0)
-            .setChecksumData(
-                checksum.computeChecksum(new byte[0]).getProtoBufMessage())
-            .build();
-
-    ContainerProtos.PutSmallFileRequestProto putSmallFileRequest =
-        ContainerProtos.PutSmallFileRequestProto.newBuilder()
-            .setChunkInfo(chunk)
-            .setBlock(createBlockRequest)
-            .build();
-
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.StreamInit)
+            .setCmdType(type)
             .setContainerID(getBlockID().getContainerID())
             .setDatanodeUuid(id)
             .setPutSmallFile(putSmallFileRequest);
@@ -557,8 +439,15 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
   private DataStreamOutput maybeInitStream() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null &&
         dataStreamOutput == null) {
+      // fake checksum
+      Checksum checksum =
+          new Checksum(config.getChecksumType(), config.getBytesPerChecksum());
+      ContainerProtos.ChecksumData checksumData =
+          checksum.computeChecksum(new byte[0]).getProtoBufMessage();
+
       ContainerProtos.ContainerCommandRequestProto streamInitRequest =
-          getStreamInitPutSmallFileRequest();
+          generatePutSmallFileRequest(keyArgs.getDataSize(), checksumData,
+              ContainerProtos.Type.StreamInit, EMPTY_DATA);
       dataStreamOutput = sendStreamHeader(streamInitRequest);
     }
     return dataStreamOutput;
@@ -572,7 +461,7 @@ public class SmallFileDataStreamOutput implements ByteBufferStreamOutput {
     if (isDatastreamPipelineMode) {
       return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
           .stream(message.getContent().asReadOnlyByteBuffer(),
-              StreamRoutingTable.getRoutingTable(xceiverClient.getPipeline()));
+              RatisHelper.getRoutingTable(xceiverClient.getPipeline()));
     } else {
       return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
           .stream(message.getContent().asReadOnlyByteBuffer());
