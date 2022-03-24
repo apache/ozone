@@ -23,6 +23,7 @@ scrape_configs:
      - targets:
         - "scm:9876"
         - "om:9874"
+        - "s3g:9878"
         - "ozone_datanode_1:9882"
         - "ozone_datanode_2:9882"
         - "ozone_datanode_3:9882"
