@@ -1104,19 +1104,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
           RepeatedOmKeyInfo infoList = kv.getValue();
-          // Get block keys as a list.
-          for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
-            OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
-            List<BlockID> item = latest.getLocationList().stream()
-                .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
-                .collect(Collectors.toList());
-            BlockGroup keyBlocks = BlockGroup.newBuilder()
-                .setKeyName(kv.getKey())
-                .addAllBlockIDs(item)
-                .build();
-            keyBlocksList.add(keyBlocks);
-            currentCount++;
-          }
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :

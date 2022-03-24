@@ -218,15 +218,15 @@ public class TestKeyDeletingService {
     // Create Volume and Bucket with versioning enabled
     createVolumeAndBucket(keyManager, volumeName, bucketName, true);
 
+    // Create 2 versions of the same key
     String keyName = String.format("key%s",
         RandomStringUtils.randomAlphanumeric(5));
-    OmKeyArgs keyArgs1 = createAndCommitKey(keyManager, volumeName, bucketName,
+    OmKeyArgs keyArgs = createAndCommitKey(keyManager, volumeName, bucketName,
         keyName, 1);
-    OmKeyArgs keyArgs2 = createAndCommitKey(keyManager, volumeName, bucketName,
-        keyName, 2);
+    createAndCommitKey(keyManager, volumeName, bucketName, keyName, 2);
 
     // Delete the key
-    writeClient.deleteKey(keyArgs2);
+    writeClient.deleteKey(keyArgs);
 
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
@@ -234,8 +234,8 @@ public class TestKeyDeletingService {
         () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
         1000, 10000);
     Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
-    Assert.assertEquals(
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), 0);
+    Assert.assertEquals(0,
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
 
     // The 1st version of the key has 1 block and the 2nd version has 2
     // blocks. Hence, the ScmBlockClient should have received atleast 3
@@ -268,7 +268,7 @@ public class TestKeyDeletingService {
   }
 
   private void createVolumeAndBucket(KeyManager keyManager, String volumeName,
-      String bucketName, boolean isVersioningEnabled) throws IOException{
+      String bucketName, boolean isVersioningEnabled) throws IOException {
     // cheat here, just create a volume and bucket entry so that we can
     // create the keys, we put the same data for key and value since the
     // system does not decode the object
@@ -301,8 +301,8 @@ public class TestKeyDeletingService {
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = writeClient.openKey(keyArg);
     for (int i = 0; i < numBlocks; i++) {
-      keyArg.addLocationInfo(
-          writeClient.allocateBlock(keyArg, session.getId(), new ExcludeList()));
+      keyArg.addLocationInfo(writeClient.allocateBlock(keyArg, session.getId(),
+          new ExcludeList()));
     }
     writeClient.commitKey(keyArg, session.getId());
     return keyArg;
