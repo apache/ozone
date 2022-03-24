@@ -568,7 +568,8 @@ public class KeyValueHandler extends Handler {
       if (request.getListBlock().hasStartLocalID()) {
         startLocalId = request.getListBlock().getStartLocalID();
       }
-      List<BlockData> responseData = blockManager.listBlock(kvContainer, startLocalId, count);
+      List<BlockData> responseData =
+          blockManager.listBlock(kvContainer, startLocalId, count);
       for (int i = 0; i < responseData.size(); i++) {
         returnData.add(responseData.get(i).getProtoBufMessage());
       }
