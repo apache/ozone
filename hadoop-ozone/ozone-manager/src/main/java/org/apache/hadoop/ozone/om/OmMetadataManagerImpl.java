@@ -789,22 +789,39 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
              keyIter = table.iterator()) {
       KeyValue<String, OmKeyInfo> kv = keyIter.seek(keyPrefix);
 
-      if (kv != null) {
+      // Iterate through all the entries in the table which start with
+      // the current bucket's prefix.
+      while (kv != null && kv.getKey().startsWith(keyPrefix)) {
         // Check the entry in db is not marked for delete. This can happen
         // while entry is marked for delete, but it is not flushed to DB.
         CacheValue<OmKeyInfo> cacheValue =
             table.getCacheValue(new CacheKey(kv.getKey()));
-        if (cacheValue != null) {
+
+        // Case 1: We found an entry, but no cache entry.
+        if (cacheValue == null) {
           // we found at least one key with this prefix.
-          return kv.getKey().startsWith(keyPrefix)
-              && cacheValue.getCacheValue() != null;
-        } else {
-          // we found at least one key with this prefix.
-          return kv.getKey().startsWith(keyPrefix);
+          return true;
         }
+
+        // Case 2a:
+        // We found a cache entry and cache value is not null.
+        if (cacheValue.getCacheValue() != null) {
+          return true;
+        }
+
+        // Case 2b:
+        // Cache entry is present but cache value is null, hence this key is
+        // marked for deletion.
+        // However, we still need to iterate through the rest of the prefix
+        // range to check for other keys with the same prefix that might still
+        // be present.
+        if (!keyIter.hasNext()) {
+          break;
+        }
+        kv = keyIter.next();
       }
-      return false;
     }
+    return false;
   }
 
   /**

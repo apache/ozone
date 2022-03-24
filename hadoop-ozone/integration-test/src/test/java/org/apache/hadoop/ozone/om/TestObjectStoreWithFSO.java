@@ -220,7 +220,7 @@ public class TestObjectStoreWithFSO {
    * @throws Exception
    */
   @Test
-  public void testBucketWithKeyDelete() throws Exception {
+  public void testDeleteBucketWithKeys() throws Exception {
     // Create temporary volume and bucket for this test.
     OzoneBucket testBucket = TestDataUtil
         .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
