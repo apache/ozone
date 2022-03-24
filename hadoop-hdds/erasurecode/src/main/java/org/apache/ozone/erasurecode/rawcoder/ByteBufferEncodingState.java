@@ -98,7 +98,8 @@ class ByteBufferEncodingState extends EncodingState {
 
       if (buffer.remaining() != encodeLength) {
         throw new HadoopIllegalArgumentException(
-            "Invalid buffer, not of length " + encodeLength);
+            "Invalid buffer remaining " + buffer.remaining()
+                + ", not of length " + encodeLength);
       }
       if (buffer.isDirect() != usingDirectBuffer) {
         throw new HadoopIllegalArgumentException(
