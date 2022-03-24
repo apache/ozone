@@ -43,8 +43,8 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 
@@ -118,8 +118,8 @@ public class OzoneClientProducer {
     // S3 Gateway should always set the S3 Auth.
     ozoneConfiguration.setBoolean(S3Auth.S3_AUTH_CHECK, true);
     // Set the expected OM version if not set via config.
-    ozoneConfiguration.setIfUnset(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION);
+    ozoneConfiguration.setIfUnset(OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
+        OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT);
     String omServiceID = OmUtils.getOzoneManagerServiceId(ozoneConfiguration);
     if (omServiceID == null) {
       return OzoneClientFactory.getRpcClient(ozoneConfiguration);

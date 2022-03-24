@@ -30,6 +30,8 @@ import static java.util.stream.Collectors.toMap;
  */
 public enum OzoneManagerVersion implements ComponentVersion {
   DEFAULT_VERSION(0, "Initial version"),
+  S3G_PERSISTENT_CONNECTIONS(1,
+      "New S3G persistent connection support is present in OM."),
 
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");

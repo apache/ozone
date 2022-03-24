@@ -1192,7 +1192,7 @@ message ServiceInfo {
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
-    optional string OMProtocolVersion = 5;
+    optional int32 OMVersion = 5 [default = 0];
 }
 
 message MultipartInfoInitiateRequest {
