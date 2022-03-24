@@ -104,6 +104,7 @@ public class BucketEndpoint extends EndpointBase {
 
     if (aclMarker != null) {
       S3BucketAcl result = getAcl(bucketName);
+      getMetrics().incGetAclSuccess();
       return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
     }
 
@@ -148,6 +149,7 @@ public class BucketEndpoint extends EndpointBase {
         ozoneKeyIterator = bucket.listKeys(prefix);
       }
     } catch (OMException ex) {
+      getMetrics().incGetBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
@@ -223,6 +225,7 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(false);
     }
 
+    getMetrics().incGetBucketSuccess();
     response.setKeyCount(
         response.getCommonPrefixes().size() + response.getContents().size());
     return Response.ok(response).build();
@@ -239,9 +242,11 @@ public class BucketEndpoint extends EndpointBase {
     try {
       String location = createS3Bucket(bucketName);
       LOG.info("Location is {}", location);
+      getMetrics().incCreateBucketSuccess();
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
     } catch (OMException exception) {
+      getMetrics().incCreateBucketFailure();
       if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
         throw newError(S3ErrorTable.INVALID_BUCKET_NAME, bucketName, exception);
       }
@@ -262,6 +267,7 @@ public class BucketEndpoint extends EndpointBase {
     try {
       ozoneMultipartUploadList = bucket.listMultipartUploads(prefix);
     } catch (OMException exception) {
+      getMetrics().incListMultipartUploadsFailure();
       if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
@@ -279,6 +285,7 @@ public class BucketEndpoint extends EndpointBase {
             S3StorageType.fromReplicationType(upload.getReplicationType(),
                 upload.getReplicationFactor())
         )));
+    getMetrics().incListMultipartUploadsSuccess();
     return Response.ok(result).build();
   }
   /**
@@ -291,6 +298,7 @@ public class BucketEndpoint extends EndpointBase {
   public Response head(@PathParam("bucket") String bucketName)
       throws OS3Exception, IOException {
     getBucket(bucketName);
+    getMetrics().incHeadBucketSuccess();
     return Response.ok().build();
   }
 
@@ -307,6 +315,7 @@ public class BucketEndpoint extends EndpointBase {
     try {
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
+      getMetrics().incDeleteBucketFailure();
       if (ex.getResult() == ResultCodes.BUCKET_NOT_EMPTY) {
         throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
@@ -318,6 +327,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     }
 
+    getMetrics().incDeleteBucketSuccess();
     return Response
         .status(HttpStatus.SC_NO_CONTENT)
         .build();
@@ -398,6 +408,7 @@ public class BucketEndpoint extends EndpointBase {
           new S3BucketAcl.AccessControlList(grantList));
       return result;
     } catch (OMException ex) {
+      getMetrics().incGetAclFailure();
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
@@ -497,6 +508,7 @@ public class BucketEndpoint extends EndpointBase {
         volume.addAcl(acl);
       }
     } catch (OMException exception) {
+      getMetrics().incPutAclFailure();
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
       } else if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
@@ -506,6 +518,7 @@ public class BucketEndpoint extends EndpointBase {
           exception);
       throw exception;
     }
+    getMetrics().incPutAclSuccess();
     return Response.status(HttpStatus.SC_OK).build();
   }
 
