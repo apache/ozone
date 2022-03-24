@@ -44,6 +44,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
+
 /**
  * Class that implements handshake with SCM.
  */
@@ -146,9 +148,15 @@ public class RunningDatanodeState implements DatanodeState {
         // the thread in executor from DatanodeStateMachine for a long time,
         // so that it won't affect the communication between datanode and
         // other EndpointStateMachine.
+        long heartbeatFrequency;
+        if (endpoint.getAddress().equals(getReconAddresses(conf))) {
+          heartbeatFrequency = context.getReconHeartbeatFrequency();
+        } else {
+          heartbeatFrequency = context.getHeartbeatFrequency();
+        }
         ecs.submit(() -> endpoint.getExecutorService()
             .submit(endpointTask)
-            .get(context.getHeartbeatFrequency(), TimeUnit.MILLISECONDS));
+            .get(heartbeatFrequency, TimeUnit.MILLISECONDS));
       } else {
         // This can happen if a task is taking more time than the timeOut
         // specified for the task in await, and when it is completed the task

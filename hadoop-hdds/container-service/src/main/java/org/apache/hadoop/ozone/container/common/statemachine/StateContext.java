@@ -65,6 +65,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.GeneratedMessage;
 import static java.lang.Math.min;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -149,6 +150,7 @@ public class StateContext {
    */
   private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
 
+  private final AtomicLong reconHeartbeatFrequency = new AtomicLong(2000);
   /**
    * Constructs a StateContext.
    *
@@ -892,5 +894,16 @@ public class StateContext {
   @VisibleForTesting
   public GeneratedMessage getCRLStatusReport() {
     return crlStatusReport.get();
+  }
+
+  public void configureReconHeartbeatFrequency() {
+    reconHeartbeatFrequency.set(getReconHeartbeatInterval(conf));
+  }
+
+  /**
+   * Return current Datanode to Recon heartbeat frequency in ms.
+   */
+  public long getReconHeartbeatFrequency() {
+    return reconHeartbeatFrequency.get();
   }
 }
