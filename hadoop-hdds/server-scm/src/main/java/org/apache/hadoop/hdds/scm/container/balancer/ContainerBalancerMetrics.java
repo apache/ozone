@@ -40,9 +40,9 @@ public final class ContainerBalancerMetrics {
       " in the latest iteration.")
   private MutableCounterLong dataSizeMovedGBInLatestIteration;
 
-  @Metric(about = "Number of containers that Container Balancer moved" +
-      " in the latest iteration.")
-  private MutableCounterLong numMovedContainersInLatestIteration;
+  @Metric(about = "Number of container moves performed by Container Balancer " +
+      "in the latest iteration.")
+  private MutableCounterLong numContainerMovesInLatestIteration;
 
   @Metric(about = "Number of iterations that Container Balancer has run for.")
   private MutableCounterLong numIterations;
@@ -56,6 +56,14 @@ public final class ContainerBalancerMetrics {
 
   @Metric(about = "Number of unbalanced datanodes.")
   private MutableCounterLong numDatanodesUnbalanced;
+
+  @Metric(about = "Total number of container moves across all iterations of " +
+      "Container Balancer.")
+  private MutableCounterLong totalNumContainerMoves;
+
+  @Metric(about = "Total data size in GB moved across all iterations of " +
+      "Container Balancer.")
+  private MutableCounterLong totalSizeMovedGB;
 
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
@@ -92,21 +100,21 @@ public final class ContainerBalancerMetrics {
   }
 
   /**
-   * Gets the number of containers moved by Container Balancer in the latest
-   * iteration.
-   * @return number of containers
+   * Gets the number of container moves performed by Container Balancer in the
+   * latest iteration.
+   * @return number of container moves
    */
-  public long getNumMovedContainersInLatestIteration() {
-    return numMovedContainersInLatestIteration.value();
+  public long getNumContainerMovesInLatestIteration() {
+    return numContainerMovesInLatestIteration.value();
   }
 
-  public void incrementNumMovedContainersInLatestIteration(long valueToAdd) {
-    this.numMovedContainersInLatestIteration.incr(valueToAdd);
+  public void incrementNumContainerMovesInLatestIteration(long valueToAdd) {
+    this.numContainerMovesInLatestIteration.incr(valueToAdd);
   }
 
-  public void resetNumMovedContainersInLatestIteration() {
-    numMovedContainersInLatestIteration.incr(
-        -getNumMovedContainersInLatestIteration());
+  public void resetNumContainerMovesInLatestIteration() {
+    numContainerMovesInLatestIteration.incr(
+        -getNumContainerMovesInLatestIteration());
   }
 
   /**
@@ -169,5 +177,21 @@ public final class ContainerBalancerMetrics {
 
   public void resetNumDatanodesUnbalanced() {
     numDatanodesUnbalanced.incr(-getNumDatanodesUnbalanced());
+  }
+
+  public long getTotalNumContainerMoves() {
+    return totalNumContainerMoves.value();
+  }
+
+  public void incrementTotalNumContainerMoves(long valueToAdd) {
+    totalNumContainerMoves.incr(valueToAdd);
+  }
+
+  public long getTotalSizeMovedGB() {
+    return totalSizeMovedGB.value();
+  }
+
+  public void incrementTotalSizeMovedGB(long valueToAdd) {
+    totalSizeMovedGB.incr(valueToAdd);
   }
 }
