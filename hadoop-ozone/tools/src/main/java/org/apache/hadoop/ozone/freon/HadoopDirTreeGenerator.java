@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
     aliases = "dfs-tree-generator",
     description =
         "Create nested directories and create given number of files in each " +
-                "dir in any dfs compatible file system.",
+            "dir in any dfs compatible file system.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -73,8 +73,8 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   private long fileSizeInBytes;
 
   @Option(names = {"-b", "--buffer"},
-          description = "Size of buffer used to generated the file content.",
-          defaultValue = "1024")
+      description = "Size of buffer used to generated the file content.",
+      defaultValue = "1024")
   private int bufferSize;
 
   @Option(names = {"-s", "--span"},
@@ -155,14 +155,14 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       createSubDirRecursively(dir, 1, 1);
     }
     String message = "Successfully created directories & files. Total Dirs " +
-            "Count=" + totalDirsCnt.get() + ", Total Files Count=" +
-            timer.getCount();
+        "Count=" + totalDirsCnt.get() + ", Total Files Count=" +
+        timer.getCount();
     print(message);
   }
 
   private void createSubDirRecursively(String parent, int depthIndex,
                                        int spanIndex)
-          throws Exception {
+      throws Exception {
     if (depthIndex < depth) {
       String depthSubDir = makeDirWithGivenNumberOfFiles(parent);
       ++depthIndex;
@@ -182,7 +182,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("SpanSubDir:{}, depthIndex:{}, spanIndex:{} +", levelSubDir,
-                depthIndex, spanIndex);
+            depthIndex, spanIndex);
       }
       // only non-leaf nodes will be iterated recursively..
       if (depthIndex < depth) {
@@ -192,7 +192,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   }
 
   private String makeDirWithGivenNumberOfFiles(String parent)
-          throws Exception {
+      throws Exception {
     String dir = RandomStringUtils.randomAlphanumeric(length);
     dir = parent.toString().concat("/").concat(dir);
     fileSystem.mkdirs(new Path(dir));
@@ -204,7 +204,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
   private void createFile(String dir, long counter) throws Exception {
     String fileName = dir.concat("/").concat(RandomStringUtils.
-            randomAlphanumeric(length));
+        randomAlphanumeric(length));
     Path file = new Path(fileName);
     if (LOG.isDebugEnabled()) {
       LOG.debug("FilePath:{}", file);

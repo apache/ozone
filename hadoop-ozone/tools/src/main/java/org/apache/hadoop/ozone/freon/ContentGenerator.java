@@ -108,34 +108,34 @@ public class ContentGenerator {
     private boolean hSync = false;
     private boolean hFlush = false;
 
-    public Builder keySize(long keysize){
+    public Builder keySize(long keysize) {
       this.keySize = keysize;
       return this;
     }
 
-    public Builder bufferSize(int bufferSize){
+    public Builder bufferSize(int bufferSize) {
       this.bufferSize = bufferSize;
       return this;
     }
 
-    public Builder copyBufferSize(int copybuffersize){
+    public Builder copyBufferSize(int copybuffersize) {
       this.copyBufferSize = copybuffersize;
       return this;
     }
 
-    public Builder Hsync(boolean hsync){
+    public Builder Hsync(boolean hsync) {
       this.hSync = hsync;
       return this;
     }
 
-    public Builder Hflush(boolean hflush){
+    public Builder Hflush(boolean hflush) {
       this.hFlush = hflush;
       return this;
     }
 
     //Return the final constructed builder object
     public ContentGenerator build() {
-      ContentGenerator contentgenerator =  new ContentGenerator(this);
+      ContentGenerator contentgenerator = new ContentGenerator(this);
       return contentgenerator;
     }
   }
