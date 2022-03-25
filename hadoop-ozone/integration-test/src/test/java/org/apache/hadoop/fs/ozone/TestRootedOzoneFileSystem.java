@@ -1095,6 +1095,10 @@ public class TestRootedOzoneFileSystem {
     // Create test volume, bucket and key
     fs.mkdirs(dirPath3);
     // Delete volume recursively
+
+    // HDDS-6414: We can't delete a bucket that contains files or directories,
+    // so, clean up the bucket first.
+    Assert.assertTrue(fs.delete(dirPath3, true));
     Assert.assertTrue(fs.delete(volumePath3, true));
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr3));
@@ -1455,7 +1459,9 @@ public class TestRootedOzoneFileSystem {
     assertTrue("Renamed failed: /dir/file1", getFs().exists(file1Destin));
     FileStatus[] fStatus = getFs().listStatus(dirPath);
     assertEquals("Renamed failed", 1, fStatus.length);
-    getFs().delete(getBucketPath(), true);
+
+    // HDDS-6414: cleanup sub-paths
+    getFs().delete(dirPath, true);
   }
 
 
@@ -1476,7 +1482,10 @@ public class TestRootedOzoneFileSystem {
     assertTrue("Renamed failed", getFs().rename(file1Destin, abcRootPath));
     assertTrue("Renamed filed: /a/b/c/file1", getFs().exists(new Path(
         abcRootPath, "file1")));
-    getFs().delete(getBucketPath(), true);
+
+    // HDDS-6414: cleanup sub-paths
+    getFs().delete(new Path(getBucketPath() + "/a/"), true);
+    getFs().delete(file1Destin, true);
   }
 
   /**
@@ -1512,7 +1521,9 @@ public class TestRootedOzoneFileSystem {
         new Path(getBucketPath() + root + "/file2");
     assertTrue("Rename failed",
         getFs().exists(expectedFilePathAfterRename));
-    getFs().delete(getBucketPath(), true);
+
+    // HDDS-6414: cleanup sub-paths
+    getFs().delete(destRootPath, true);
   }
 
   /**
@@ -1538,6 +1549,9 @@ public class TestRootedOzoneFileSystem {
     } catch (IllegalArgumentException e) {
       //expected
     }
+
+    // cleanup
+    fs.delete(sourceRoot, true);
   }
 
   /**
