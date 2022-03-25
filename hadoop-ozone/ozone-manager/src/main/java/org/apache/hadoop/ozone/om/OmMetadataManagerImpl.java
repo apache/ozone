@@ -1192,7 +1192,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold,
-      int count) throws IOException {
+      int limit) throws IOException {
     List<OmOpenKeyInfo> expiredKeys = new ArrayList<>();
 
     // Only check for expired keys in the open key table, not its cache.
@@ -1204,7 +1204,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       final long expiredCreationTimestamp =
           Instant.now().minus(expireThreshold).toEpochMilli();
 
-      while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
+      while (keyValueTableIterator.hasNext() && expiredKeys.size() < limit) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String openKey = openKeyValue.getKey();
         long clientID = Long.parseLong(

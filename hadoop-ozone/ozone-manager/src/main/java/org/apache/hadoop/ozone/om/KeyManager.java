@@ -119,15 +119,15 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns the names of up to {@code count} open keys whose age is
+   * Returns the names of up to {@code limit} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
-   * @param count The maximum number of expired open keys to return.
+   * @param limit The maximum number of expired open keys to return.
    * @param expireThreshold The threshold of open key expiration age.
    * @return a {@link List} of {@link OmOpenKeyInfo}, the expired open keys.
    * @throws IOException
    */
-  List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold, int count)
+  List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold, int limit)
       throws IOException;
 
   /**

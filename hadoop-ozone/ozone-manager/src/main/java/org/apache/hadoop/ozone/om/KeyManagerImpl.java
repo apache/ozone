@@ -581,8 +581,8 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold,
-      int count) throws IOException {
-    return metadataManager.getExpiredOpenKeys(expireThreshold, count);
+      int limit) throws IOException {
+    return metadataManager.getExpiredOpenKeys(expireThreshold, limit);
   }
 
   @Override
