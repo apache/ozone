@@ -45,17 +45,17 @@ public class OMTenantCreateResponse extends OMClientResponse {
 
   private OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
-  private OmDBTenantState omTenantInfo;
+  private OmDBTenantState omTenantState;
 
   public OMTenantCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmVolumeArgs omVolumeArgs,
       @Nonnull OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo,
-      @Nonnull OmDBTenantState omTenantInfo
+      @Nonnull OmDBTenantState omTenantState
   ) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;
-    this.omTenantInfo = omTenantInfo;
+    this.omTenantState = omTenantState;
   }
 
   /**
@@ -71,9 +71,9 @@ public class OMTenantCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    final String tenantId = omTenantInfo.getTenantId();
+    final String tenantId = omTenantState.getTenantId();
     omMetadataManager.getTenantStateTable().putWithBatch(
-        batchOperation, tenantId, omTenantInfo);
+        batchOperation, tenantId, omTenantState);
 
     // From OMVolumeCreateResponse
     String dbVolumeKey =
@@ -88,7 +88,7 @@ public class OMTenantCreateResponse extends OMClientResponse {
   }
 
   @VisibleForTesting
-  public OmDBTenantState getOmDBTenantInfo() {
-    return omTenantInfo;
+  public OmDBTenantState getOmDBTenantState() {
+    return omTenantState;
   }
 }

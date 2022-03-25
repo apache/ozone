@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
@@ -417,8 +417,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     final ListTenantResponse.Builder resp = ListTenantResponse.newBuilder();
 
-    TenantInfoList ret = impl.listTenant();
-    resp.addAllTenantInfo(ret.getTenantInfoList());
+    TenantStateList ret = impl.listTenant();
+    resp.addAllTenantState(ret.getTenantStateList());
 
     return resp.build();
   }

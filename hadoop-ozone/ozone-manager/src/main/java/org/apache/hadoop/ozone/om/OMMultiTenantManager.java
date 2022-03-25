@@ -80,7 +80,7 @@ public interface OMMultiTenantManager {
    * @return Tenant interface.
    * @throws IOException
    */
-  Tenant getTenantInfo(String tenantID) throws IOException;
+  Tenant getTenant(String tenantID) throws IOException;
 
   /**
    * Given a TenantID String, deactivate the Tenant. If the Tenant has active
@@ -226,7 +226,7 @@ public interface OMMultiTenantManager {
    * @param tenantId tenant name
    * @return user role name. e.g. tenant1-UserRole
    */
-  static String getUserRoleId(String tenantId) {
+  static String getUserRoleName(String tenantId) {
     return tenantId + OzoneConsts.TENANT_ROLE_USER_SUFFIX;
   }
 

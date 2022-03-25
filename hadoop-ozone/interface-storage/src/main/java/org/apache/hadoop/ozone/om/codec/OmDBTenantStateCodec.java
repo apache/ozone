@@ -28,11 +28,11 @@ import java.io.IOException;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Codec to encode OmDBTenantInfo as byte array.
+ * Codec to encode OmDBTenantState as byte array.
  */
-public class OmDBTenantInfoCodec implements Codec<OmDBTenantState> {
+public class OmDBTenantStateCodec implements Codec<OmDBTenantState> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmDBTenantInfoCodec.class);
+      LoggerFactory.getLogger(OmDBTenantStateCodec.class);
 
   @Override
   public byte[] toPersistedFormat(OmDBTenantState object) throws IOException {
@@ -46,7 +46,7 @@ public class OmDBTenantInfoCodec implements Codec<OmDBTenantState> {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
     return OmDBTenantState.getFromProtobuf(
-        OzoneManagerProtocolProtos.TenantInfo.parseFrom(rawData));
+        OzoneManagerProtocolProtos.TenantState.parseFrom(rawData));
   }
 
   @Override

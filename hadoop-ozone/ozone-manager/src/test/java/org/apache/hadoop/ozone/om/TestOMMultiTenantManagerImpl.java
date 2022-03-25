@@ -68,10 +68,10 @@ public class TestOMMultiTenantManagerImpl {
 
     // Note: policyNames is initialized with an empty list here.
     //  Expand if needed.
-    final OmDBTenantState omDBTenantInfo = new OmDBTenantState(
+    final OmDBTenantState omDBTenantState = new OmDBTenantState(
         tenantName, bucketNamespaceName, new ArrayList<>());
 
-    omMetadataManager.getTenantStateTable().put(tenantName, omDBTenantInfo);
+    omMetadataManager.getTenantStateTable().put(tenantName, omDBTenantState);
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
         new OmDBAccessIdInfo(tenantName, "seed-user1", false, false,

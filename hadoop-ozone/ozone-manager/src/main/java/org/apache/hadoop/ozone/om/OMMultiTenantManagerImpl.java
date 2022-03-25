@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
-import org.apache.hadoop.ozone.om.multitenant.CachedTenantInfo;
+import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
@@ -95,7 +95,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final OMMetadataManager omMetadataManager;
   private final OzoneConfiguration conf;
   private final ReentrantReadWriteLock controlPathLock;
-  private final Map<String, CachedTenantInfo> tenantCache;
+  private final Map<String, CachedTenantState> tenantCache;
 
   OMMultiTenantManagerImpl(OzoneManager ozoneManager, OzoneConfiguration conf)
       throws IOException {
@@ -204,7 +204,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         tenant.addTenantAccessPolicy(tenantBucketCreatePolicy);
       }
 
-      tenantCache.put(tenantID, new CachedTenantInfo(tenantID));
+      tenantCache.put(tenantID, new CachedTenantState(tenantID));
     } catch (Exception e) {
       try {
         removeTenantAccessFromAuthorizer(tenant);
@@ -219,7 +219,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public Tenant getTenantInfo(String tenantID) throws IOException {
+  public Tenant getTenant(String tenantID) throws IOException {
     // Todo : fix this.
     return null;
   }
@@ -280,10 +280,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
       LOG.info("Adding user '{}' to tenant '{}' in-memory state.",
           principal.getName(), tenantId);
-      CachedTenantInfo cachedTenantInfo =
+      CachedTenantState cachedTenantState =
           tenantCache.getOrDefault(tenantId,
-              new CachedTenantInfo(tenantId));
-      cachedTenantInfo.getTenantUsers().add(userAccessIdPair);
+              new CachedTenantState(tenantId));
+      cachedTenantState.getTenantUsers().add(userAccessIdPair);
 
       final OzoneTenantRolePrincipal roleTenantAllUsers =
           OzoneTenantRolePrincipal.getUserRole(tenantId);
@@ -456,13 +456,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
 
     List<TenantUserAccessId> userAccessIds = new ArrayList<>();
-    CachedTenantInfo cachedTenantInfo = tenantCache.get(tenantID);
-    if (cachedTenantInfo == null) {
+    CachedTenantState cachedTenantState = tenantCache.get(tenantID);
+    if (cachedTenantState == null) {
       throw new IOException("Inconsistent in memory Tenant cache '" + tenantID
           + "' not found in cache, but present in OM DB!");
     }
 
-    cachedTenantInfo.getTenantUsers().stream()
+    cachedTenantState.getTenantUsers().stream()
         .filter(
             k -> StringUtils.isEmpty(prefix) || k.getKey().startsWith(prefix))
         .forEach(
@@ -691,9 +691,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         String tenantId = value.getTenantId();
         String user = value.getUserPrincipal();
 
-        CachedTenantInfo cachedTenantInfo = tenantCache
-            .computeIfAbsent(tenantId, k -> new CachedTenantInfo(tenantId));
-        cachedTenantInfo.getTenantUsers().add(
+        CachedTenantState cachedTenantState = tenantCache
+            .computeIfAbsent(tenantId, k -> new CachedTenantState(tenantId));
+        cachedTenantState.getTenantUsers().add(
             new ImmutablePair<>(user, accessId));
         userCount++;
       }
@@ -705,7 +705,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @VisibleForTesting
-  Map<String, CachedTenantInfo> getTenantCache() {
+  Map<String, CachedTenantState> getTenantCache() {
     return tenantCache;
   }
 }

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -52,7 +52,7 @@ public class TenantListHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
     try {
-      TenantInfoList tenantInfoList = objStore.listTenant();
+      TenantStateList tenantStateList = objStore.listTenant();
 
       if (printHeader) {
         // default console width 80 / 5 = 16. +1 for extra room. Change later?
@@ -67,13 +67,13 @@ public class TenantListHandler extends TenantHandler {
         }
       }
 
-      tenantInfoList.getTenantInfoList().forEach(tenantInfo -> {
+      tenantStateList.getTenantStateList().forEach(tenantState -> {
         out().format(longFormat ? "%-17s" : "%s%n",
-            tenantInfo.getTenantId());
+            tenantState.getTenantId());
         if (longFormat) {
           out().format("%-17s%-17s%n",
-              tenantInfo.getBucketNamespaceName(),
-              tenantInfo.getPolicyNamesList());
+              tenantState.getBucketNamespaceName(),
+              tenantState.getPolicyNamesList());
         }
       });
     } catch (IOException e) {

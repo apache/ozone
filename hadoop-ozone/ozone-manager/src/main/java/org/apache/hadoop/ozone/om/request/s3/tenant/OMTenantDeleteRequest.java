@@ -105,11 +105,11 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       }
 
       // Reading the TenantStateTable without lock as we don't have or need
-      // a TENANT_LOCK. The assumption is that OmDBTenantInfo is read-only
+      // a TENANT_LOCK. The assumption is that OmDBTenantState is read-only
       // once it is set during tenant creation.
-      final OmDBTenantState dbTenantInfo =
+      final OmDBTenantState dbTenantState =
           omMetadataManager.getTenantStateTable().get(tenantId);
-      volumeName = dbTenantInfo.getBucketNamespaceName();
+      volumeName = dbTenantState.getBucketNamespaceName();
       assert (volumeName != null);
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);

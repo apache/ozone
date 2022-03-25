@@ -94,7 +94,7 @@ public final class OMTenantRequestHelper {
           throw omEx;
         }
       }
-      throw new OMException("Error while retrieving OmDBTenantInfo for tenant "
+      throw new OMException("Error while retrieving OmDBTenantState for tenant "
           + "'" + tenantId + "': " + ex.getMessage(),
           OMException.ResultCodes.METADATA_ERROR);
     }
@@ -108,16 +108,16 @@ public final class OMTenantRequestHelper {
   public static String getTenantVolumeName(OMMetadataManager omMetadataManager,
                                            String tenantId) throws IOException {
 
-    final OmDBTenantState tenantInfo =
+    final OmDBTenantState tenantState =
         omMetadataManager.getTenantStateTable().get(tenantId);
 
-    if (tenantInfo == null) {
+    if (tenantState == null) {
       throw new OMException("Potential DB error or race condition. "
-          + "OmDBTenantInfo entry is missing for tenant '" + tenantId + "'.",
+          + "OmDBTenantState entry is missing for tenant '" + tenantId + "'.",
           ResultCodes.TENANT_NOT_FOUND);
     }
 
-    final String volumeName = tenantInfo.getBucketNamespaceName();
+    final String volumeName = tenantState.getBucketNamespaceName();
 
     if (volumeName == null) {
       throw new OMException("Potential DB error. volumeName "
@@ -187,7 +187,7 @@ public final class OMTenantRequestHelper {
     // Check if ugi is a tenant admin (or an Ozone cluster admin)
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
-    if (multiTenantManager.isTenantAdmin(ugi, tenantId, true)) {
+    if (multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
       return true;
     }
 

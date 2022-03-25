@@ -18,38 +18,39 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
 
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Utility class to handle protobuf message TenantInfo conversion.
+ * Utility class to handle protobuf message TenantState conversion.
  */
-public class TenantInfoList {
+public class TenantStateList {
 
   // A list of TenantAccessIdInfo from protobuf.
-  private final List<TenantInfo> tenantInfoList;
+  private final List<TenantState> tenantStateList;
 
-  public List<TenantInfo> getTenantInfoList() {
-    return tenantInfoList;
+  public List<TenantState> getTenantStateList() {
+    return tenantStateList;
   }
 
-  public TenantInfoList(List<TenantInfo> tenantInfoList) {
-    this.tenantInfoList = tenantInfoList;
+  public TenantStateList(List<TenantState> tenantStateList) {
+    this.tenantStateList = tenantStateList;
   }
 
-  public static TenantInfoList fromProtobuf(List<TenantInfo> tenantInfoList) {
-    return new TenantInfoList(tenantInfoList);
+  public static TenantStateList fromProtobuf(
+      List<TenantState> tenantStateList) {
+    return new TenantStateList(tenantStateList);
   }
 
-  public TenantInfo getProtobuf() {
+  public TenantState getProtobuf() {
     throw new NotImplementedException("getProtobuf() not implemented");
   }
 
   @Override
   public String toString() {
-    return "tenantInfoList=" + tenantInfoList;
+    return "tenantStateList=" + tenantStateList;
   }
 
   @Override
@@ -60,12 +61,12 @@ public class TenantInfoList {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    TenantInfoList that = (TenantInfoList) o;
-    return tenantInfoList.equals(that.tenantInfoList);
+    TenantStateList that = (TenantStateList) o;
+    return tenantStateList.equals(that.tenantStateList);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tenantInfoList);
+    return Objects.hash(tenantStateList);
   }
 }

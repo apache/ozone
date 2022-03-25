@@ -80,7 +80,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
     - If tenant already exists, throw exception to client; else continue
   - tenantStateTable: New entry
     - Key: tenant name. e.g. finance
-    - Value: new OmDBTenantInfo for the tenant
+    - Value: new OmDBTenantState for the tenant
       - tenantId: finance
       - bucketNamespaceName: finance
       - accountNamespaceName: finance
@@ -302,17 +302,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_NAME_SUFFIX;
       policyNamesList.add(bucketPolicyName);
 
-      final OmDBTenantState omDBTenantInfo = new OmDBTenantState(
+      final OmDBTenantState omDBTenantState = new OmDBTenantState(
           tenantId, bucketNamespaceName, policyNamesList);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.of(omDBTenantInfo), transactionLogIndex));
+          new CacheValue<>(Optional.of(omDBTenantState), transactionLogIndex));
 
       omResponse.setCreateTenantResponse(
           CreateTenantResponse.newBuilder()
               .build());
       omClientResponse = new OMTenantCreateResponse(omResponse.build(),
-          omVolumeArgs, volumeList, omDBTenantInfo);
+          omVolumeArgs, volumeList, omDBTenantState);
 
     } catch (IOException ex) {
       // Error handling. Clean up Ranger policies when necessary.

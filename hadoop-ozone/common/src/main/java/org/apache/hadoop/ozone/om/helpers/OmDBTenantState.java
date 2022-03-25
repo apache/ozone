@@ -89,10 +89,10 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   }
 
   /**
-   * Convert OmDBTenantInfo to protobuf to be persisted to DB.
+   * Convert OmDBTenantState to protobuf to be persisted to DB.
    */
-  public OzoneManagerProtocolProtos.TenantInfo getProtobuf() {
-    return OzoneManagerProtocolProtos.TenantInfo.newBuilder()
+  public OzoneManagerProtocolProtos.TenantState getProtobuf() {
+    return OzoneManagerProtocolProtos.TenantState.newBuilder()
         .setTenantId(tenantId)
         .setBucketNamespaceName(bucketNamespaceName)
         .addAllPolicyNames(policyNames)
@@ -100,10 +100,10 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   }
 
   /**
-   * Convert protobuf to OmDBTenantInfo.
+   * Convert protobuf to OmDBTenantState.
    */
   public static OmDBTenantState getFromProtobuf(
-      OzoneManagerProtocolProtos.TenantInfo proto) {
+      OzoneManagerProtocolProtos.TenantState proto) {
     return new Builder()
         .setTenantId(proto.getTenantId())
         .setBucketNamespaceName(proto.getBucketNamespaceName())
@@ -112,7 +112,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   }
 
   /**
-   * Builder for OmDBTenantInfo.
+   * Builder for OmDBTenantState.
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {

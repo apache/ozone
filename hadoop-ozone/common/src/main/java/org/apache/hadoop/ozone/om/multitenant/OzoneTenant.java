@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.multitenant.impl.AccountNameSpaceImpl;
 import org.apache.hadoop.ozone.om.multitenant.impl.SingleVolumeTenantNamespace;
 
 /**
- * In-memory tenant info. For DB state, see OmDBTenantInfo.
+ * In-memory tenant info. For DB state, see OmDBTenantState.
  */
 public class OzoneTenant implements Tenant {
   private final String tenantId;

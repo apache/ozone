@@ -215,7 +215,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,  // tenantId (tenant name)
                     new StringCodec(),
                     OmDBTenantState.class,
-                    new OmDBTenantInfoCodec());
+                    new OmDBTenantStateCodec());
 
   // End tables for S3 multi-tenancy
 

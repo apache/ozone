@@ -129,7 +129,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
@@ -158,7 +158,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -2952,7 +2952,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * List tenants.
    */
-  public TenantInfoList listTenant() throws IOException {
+  public TenantStateList listTenant() throws IOException {
 
     final UserGroupInformation ugi = getRemoteUser();
     if (!isAdmin(ugi)) {
@@ -2975,25 +2975,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
         iterator = tenantStateTable.iterator();
 
-    final List<TenantInfo> tenantInfoList = new ArrayList<>();
+    final List<TenantState> tenantStateList = new ArrayList<>();
 
     // Iterate table
     while (iterator.hasNext()) {
       final Table.KeyValue<String, OmDBTenantState> dbEntry = iterator.next();
       final String tenantId = dbEntry.getKey();
-      final OmDBTenantState omDBTenantInfo = dbEntry.getValue();
-      assert (tenantId.equals(omDBTenantInfo.getTenantId()));
-      tenantInfoList.add(TenantInfo.newBuilder()
-          .setTenantId(omDBTenantInfo.getTenantId())
-          .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
-          .addAllPolicyNames(omDBTenantInfo.getPolicyNames())
+      final OmDBTenantState omDBTenantState = dbEntry.getValue();
+      assert (tenantId.equals(omDBTenantState.getTenantId()));
+      tenantStateList.add(TenantState.newBuilder()
+          .setTenantId(omDBTenantState.getTenantId())
+          .setBucketNamespaceName(omDBTenantState.getBucketNamespaceName())
+          .addAllPolicyNames(omDBTenantState.getPolicyNames())
           .build());
     }
 
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         OMAction.LIST_TENANT, new LinkedHashMap<>()));
 
-    return new TenantInfoList(tenantInfoList);
+    return new TenantStateList(tenantStateList);
   }
 
   /**
@@ -3075,7 +3075,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
             getMetadataManager(), tenantId);
-    // TODO: Maybe use multiTenantManager.getTenantInfo(tenantId)
+    // TODO: Maybe use multiTenantManager.getTenantState(tenantId)
     //  .getTenantBucketNameSpace() after refactoring
 
     final Map<String, String> auditMap = new LinkedHashMap<>();
@@ -3125,10 +3125,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (optionalTenantId.isPresent()) {
         final String tenantId = optionalTenantId.get();
 
-        OmDBTenantState tenantInfo =
+        OmDBTenantState tenantState =
             metadataManager.getTenantStateTable().get(tenantId);
-        if (tenantInfo != null) {
-          s3Volume = tenantInfo.getBucketNamespaceName();
+        if (tenantState != null) {
+          s3Volume = tenantState.getBucketNamespaceName();
         } else {
           String message = "Unable to find tenant '" + tenantId
               + "' details for access ID " + accessId
