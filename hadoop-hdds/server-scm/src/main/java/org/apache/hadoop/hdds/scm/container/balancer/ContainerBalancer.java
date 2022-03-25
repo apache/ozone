@@ -436,24 +436,31 @@ public class ContainerBalancer {
       ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
       if (moveSelection != null) {
         isMoveGenerated = true;
-        LOG.info("ContainerBalancer is trying to move container {} from " +
-                "source datanode {} to target datanode {}",
-            moveSelection.getContainerID().toString(),
-            source.getUuidString(),
-            moveSelection.getTargetNode().getUuidString());
-
-        if (moveContainer(source, moveSelection)) {
-          // consider move successful for now, and update selection criteria
-          updateTargetsAndSelectionCriteria(
-              selectedTargets, moveSelection, source);
-        }
+        processMoveSelection(source, moveSelection, selectedTargets);
       } else {
         // can not find any target for this source
         findSourceStrategy.removeCandidateSourceDataNode(source);
       }
     }
+
     checkIterationResults(isMoveGenerated, selectedTargets);
     return iterationResult;
+  }
+
+  private void processMoveSelection(DatanodeDetails source,
+                                    ContainerMoveSelection moveSelection,
+                                    Set<DatanodeDetails> selectedTargets) {
+    LOG.info("ContainerBalancer is trying to move container {} from " +
+            "source datanode {} to target datanode {}",
+        moveSelection.getContainerID().toString(),
+        source.getUuidString(),
+        moveSelection.getTargetNode().getUuidString());
+
+    if (moveContainer(source, moveSelection)) {
+      // consider move successful for now, and update selection criteria
+      updateTargetsAndSelectionCriteria(
+          selectedTargets, moveSelection, source);
+    }
   }
 
   /**
