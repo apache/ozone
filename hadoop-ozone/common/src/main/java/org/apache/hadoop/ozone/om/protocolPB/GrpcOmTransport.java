@@ -83,7 +83,6 @@ public class GrpcOmTransport implements OmTransport {
   private int lastVisited = -1;
   private ConfigurationSource conf;
 
-  //private String host = "om";
   private AtomicReference<String> host;
   private int maxSize;
   private SecurityConfig secConfig;

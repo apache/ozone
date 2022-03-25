@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.s3;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -34,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.PreDestroy;
 import javax.enterprise.context.ApplicationScoped;
 import java.io.IOException;
+import java.security.cert.CertificateException;
 import java.util.Collections;
 import java.util.List;
 
@@ -143,12 +142,18 @@ public final class OzoneClientCache {
           caCertPem = serviceInfoEx.getCaCertificate();
           caCertPems = serviceInfoEx.getCaCertPemList();
           if (caCertPems == null || caCertPems.isEmpty()) {
-            Preconditions.checkNotNull(caCertPem);
+            if (caCertPem == null) {
+              LOG.error("S3g received empty caCertPems from serviceInfo");
+              throw new CertificateException("No caCerts found; caCertPem can" +
+                  " not be null when caCertPems is empty or null");
+            }
             caCertPems = Collections.singletonList(caCertPem);
           }
           GrpcOmTransport.setCaCerts(OzoneSecurityUtil
               .convertToX509(caCertPems));
         }
+      } catch (CertificateException ce) {
+        throw new IOException(ce);
       } catch (IOException e) {
         throw e;
       } finally {
