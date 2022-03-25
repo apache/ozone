@@ -30,7 +30,8 @@ public class TestContentGenerator {
   @Test
   public void writeWrite() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder().seyKeySize(1024).setBufferSize(1024).build();
+        new ContentGenerator.Builder().seyKeySize(1024).setBufferSize(1024)
+            .build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     generator.write(output);
     Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());

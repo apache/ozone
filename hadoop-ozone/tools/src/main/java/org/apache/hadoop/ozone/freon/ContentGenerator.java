@@ -116,8 +116,8 @@ public class ContentGenerator {
       return this;
     }
 
-    public Builder setBufferSize(int bufferSize) {
-      this.bufferSize = bufferSize;
+    public Builder setBufferSize(int buffersize) {
+      this.bufferSize = buffersize;
       return this;
     }
 
