@@ -1516,6 +1516,7 @@ public final class HttpServer2 implements FilterContainer {
     return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
 
+
   /**
    * A very simple servlet to serve up a text representation of the current
    * stack traces. It both returns the stacks to the caller and logs them.
