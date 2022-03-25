@@ -45,7 +45,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           </execution>
         </executions>
         <configuration>
-          <executable>dev-support/bin/generate-site.sh</executable>
+          <executable>../../hadoop-ozone/dev-support/checks/docs.sh</executable>
         </configuration>
       </plugin>
       <plugin>
