@@ -160,8 +160,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
     print(message);
   }
 
-  private void createSubDirRecursively(String parent, int depthIndex,
-                                       int spanIndex)
+  private void createSubDirRecursively(String parent, int depthIndex, int spanIndex)
       throws Exception {
     if (depthIndex < depth) {
       String depthSubDir = makeDirWithGivenNumberOfFiles(parent);

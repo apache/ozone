@@ -63,8 +63,7 @@ public class TestContentGenerator {
   public void writeWithSmallBuffer() throws IOException {
     ContentGenerator generator =
         new ContentGenerator.Builder().seyKeySize(1024).setBufferSize(1024)
-            .setCopyBufferSize(
-                10).build();
+            .setCopyBufferSize(10).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
