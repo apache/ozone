@@ -222,4 +222,5 @@ public class TestRootedOzoneFileSystemWithFSO
     // hence total delete calls = 6
     Assert.assertTrue(deletes == prevDeletes + 6);
   }
+
 }

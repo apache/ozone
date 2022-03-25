@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -27,9 +26,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -48,7 +45,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -251,17 +247,4 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     auditMap.put(DELETED_KEYS_LIST, String.join(",", deletedKeys));
     auditMap.put(UNDELETED_KEYS_LIST, String.join(",", unDeletedKeys));
   }
-
-  public static OMKeysDeleteRequest getInstance(
-      OzoneManagerProtocolProtos.DeleteKeyArgs keyArgs, OMRequest omRequest,
-      OzoneManager ozoneManager) throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    Preconditions.checkArgument(!bucketLayout.isFileSystemOptimized(),
-        "DeleteKeys called on FSO bucket");
-    return new OMKeysDeleteRequest(omRequest);
-  }
-
 }

@@ -95,20 +95,14 @@ public final class OMKeyRequestFactory {
           OMKeyDeleteRequest.getInstance(keyArgs, omRequest, ozoneManager);
       break;
     case DeleteKeys:
-      omKeyRequest = OMKeysDeleteRequest
-          .getInstance(omRequest.getDeleteKeysRequest().getDeleteKeys(),
-              omRequest, ozoneManager);
-      break;
+      return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
       keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
       omKeyRequest =
           OMKeyRenameRequest.getInstance(keyArgs, omRequest, ozoneManager);
       break;
     case RenameKeys:
-      omKeyRequest = OMKeysRenameRequest
-          .getInstance(omRequest.getRenameKeysRequest().getRenameKeysArgs(),
-              omRequest, ozoneManager);
-      break;
+      return new OMKeysRenameRequest(omRequest);
     case PurgeKeys:
       omKeyRequest = new OMKeyPurgeRequest(omRequest);
       break;

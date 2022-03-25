@@ -1069,20 +1069,6 @@ public class BasicRootedOzoneClientAdapterImpl
     return false;
   }
 
-  /**
-   * only for ofs.
-   * @param volumeName
-   * @param bucketName
-   * @return
-   * @throws IOException
-   */
-  public boolean isFSOptimizedBucket(String volumeName, String bucketName)
-      throws IOException {
-    OzoneVolume volume = objectStore.getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-    return bucket.getBucketLayout().isFileSystemOptimized();
-  }
-
   @Override
   public FileChecksum getFileChecksum(String keyName, long length)
       throws IOException {
