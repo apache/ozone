@@ -100,6 +100,9 @@ public class ContentGenerator {
     }
   }
 
+  /**
+   * Builder Class for Content generator.
+   */
   public static class Builder {
 
     private long keySize = 1024;
@@ -113,8 +116,8 @@ public class ContentGenerator {
       return this;
     }
 
-    public Builder bufferSize(int bufferSize) {
-      this.bufferSize = bufferSize;
+    public Builder bufferSize(int buffersize) {
+      this.bufferSize = buffersize;
       return this;
     }
 
@@ -123,12 +126,12 @@ public class ContentGenerator {
       return this;
     }
 
-    public Builder Hsync(boolean hsync) {
+    public Builder hsyncData(boolean hsync) {
       this.hSync = hsync;
       return this;
     }
 
-    public Builder Hflush(boolean hflush) {
+    public Builder hflushData(boolean hflush) {
       this.hFlush = hflush;
       return this;
     }
