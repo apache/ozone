@@ -92,7 +92,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
     contentGenerator =
-        new ContentGenerator.Builder().keySize(keySize).bufferSize(bufferSize)
+        new ContentGenerator.Builder().seyKeySize(keySize).setBufferSize(bufferSize)
             .build();
     metadata = new HashMap<>();
 

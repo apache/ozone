@@ -90,8 +90,8 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     }
 
     contentGenerator =
-        new Builder().keySize(fileSize).bufferSize(bufferSize)
-            .copyBufferSize(copyBufferSize).build();
+        new Builder().seyKeySize(fileSize).setBufferSize(bufferSize)
+            .setCopyBufferSize(copyBufferSize).build();
 
     timer = getMetrics().timer("file-create");
 
