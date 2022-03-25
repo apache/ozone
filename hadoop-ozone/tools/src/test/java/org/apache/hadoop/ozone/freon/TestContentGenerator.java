@@ -51,8 +51,7 @@ public class TestContentGenerator {
   public void writeWithByteLevelWrite() throws IOException {
     ContentGenerator generator =
         new ContentGenerator.Builder().seyKeySize(1024).setBufferSize(1024)
-            .setCopyBufferSize(
-                1).build();
+            .setCopyBufferSize(1).build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
