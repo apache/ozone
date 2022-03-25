@@ -166,7 +166,7 @@ public class TestPermissionCheck {
 
     try {
       bucketEndpoint.get("bucketName", null, null, null, 1000,
-          null, null, null, null, null, null, null);
+          null, null, null, null, null, null);
       Assert.fail("Should fail");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception);
@@ -211,7 +211,7 @@ public class TestPermissionCheck {
     bucketEndpoint.setClient(client);
     try {
       bucketEndpoint.get("bucketName", null, null, null, 1000,
-          null, null, null, null, null, "acl", null);
+          null, null, null, null, "acl", null);
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
