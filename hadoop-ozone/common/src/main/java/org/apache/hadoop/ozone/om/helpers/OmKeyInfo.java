@@ -71,42 +71,22 @@ public final class OmKeyInfo extends WithParentObjectId {
    */
   private List<OzoneAcl> acls;
 
-  @SuppressWarnings("parameternumber")
-  OmKeyInfo(String volumeName, String bucketName, String keyName,
-      List<OmKeyLocationInfoGroup> versions, long dataSize,
-      long creationTime, long modificationTime,
-      ReplicationConfig replicationConfig,
-      Map<String, String> metadata,
-      FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-      long objectID, long updateID) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.dataSize = dataSize;
-    this.keyLocationVersions = versions;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.replicationConfig = replicationConfig;
-    this.metadata = metadata;
-    this.encInfo = encInfo;
-    this.acls = acls;
-    this.objectID = objectID;
-    this.updateID = updateID;
-  }
-
-  @SuppressWarnings("parameternumber")
-  OmKeyInfo(String volumeName, String bucketName, String keyName,
-            String fileName, List<OmKeyLocationInfoGroup> versions,
-            long dataSize, long creationTime, long modificationTime,
-            ReplicationConfig replicationConfig,
-            Map<String, String> metadata,
-            FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-            long parentObjectID, long objectID, long updateID) {
-    this(volumeName, bucketName, keyName, versions, dataSize,
-            creationTime, modificationTime, replicationConfig, metadata,
-            encInfo, acls, objectID, updateID);
-    this.fileName = fileName;
-    this.parentObjectID = parentObjectID;
+  private OmKeyInfo(Builder builder) {
+    this.volumeName = builder.volumeName;
+    this.bucketName = builder.bucketName;
+    this.keyName = builder.keyName;
+    this.dataSize = builder.dataSize;
+    this.keyLocationVersions = builder.omKeyLocationInfoGroups;
+    this.creationTime = builder.creationTime;
+    this.modificationTime = builder.modificationTime;
+    this.replicationConfig = builder.replicationConfig;
+    this.metadata = builder.metadata;
+    this.encInfo = builder.encInfo;
+    this.acls = builder.acls;
+    this.objectID = builder.objectID;
+    this.updateID = builder.updateID;
+    this.fileName = builder.fileName;
+    this.parentObjectID = builder.parentObjectID;
   }
 
   public String getVolumeName() {
@@ -363,8 +343,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     private String bucketName;
     private String keyName;
     private long dataSize;
-    private List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups =
-        new ArrayList<>();
+    private List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups;
     private long creationTime;
     private long modificationTime;
     private ReplicationConfig replicationConfig;
@@ -484,11 +463,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     }
 
     public OmKeyInfo build() {
-      return new OmKeyInfo(
-              volumeName, bucketName, keyName, fileName,
-              omKeyLocationInfoGroups, dataSize, creationTime,
-              modificationTime, replicationConfig, metadata, encInfo, acls,
-              parentObjectID, objectID, updateID);
+      return new OmKeyInfo(this);
     }
   }
 
