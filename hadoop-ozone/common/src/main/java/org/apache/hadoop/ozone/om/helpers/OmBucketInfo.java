@@ -95,62 +95,27 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   /**
    * Private constructor, constructed via builder.
-   * @param volumeName - Volume name.
-   * @param bucketName - Bucket name.
-   * @param acls - list of ACLs.
-   * @param isVersionEnabled - Bucket version flag.
-   * @param storageType - Storage type to be used.
-   * @param creationTime - Bucket creation time.
-   * @param modificationTime - Bucket modification time.
-   * @param metadata - metadata.
-   * @param bekInfo - bucket encryption key info.
-   * @param sourceVolume - source volume for bucket links, null otherwise
-   * @param sourceBucket - source bucket for bucket links, null otherwise
-   * @param usedBytes - Bucket Quota Usage in bytes.
-   * @param quotaInBytes Bucket quota in bytes.
-   * @param quotaInNamespace Bucket quota in counts.
-   * @param bucketLayout Bucket Layout.
-   * @param owner owner of the bucket.
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  private OmBucketInfo(String volumeName,
-      String bucketName,
-      List<OzoneAcl> acls,
-      boolean isVersionEnabled,
-      StorageType storageType,
-      long creationTime,
-      long modificationTime,
-      long objectID,
-      long updateID,
-      Map<String, String> metadata,
-      BucketEncryptionKeyInfo bekInfo,
-      String sourceVolume,
-      String sourceBucket,
-      long usedBytes,
-      long usedNamespace,
-      long quotaInBytes,
-      long quotaInNamespace,
-      BucketLayout bucketLayout,
-      String owner) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.acls = acls;
-    this.isVersionEnabled = isVersionEnabled;
-    this.storageType = storageType;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.objectID = objectID;
-    this.updateID = updateID;
-    this.metadata = metadata;
-    this.bekInfo = bekInfo;
-    this.sourceVolume = sourceVolume;
-    this.sourceBucket = sourceBucket;
-    this.usedBytes = usedBytes;
-    this.usedNamespace = usedNamespace;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-    this.bucketLayout = bucketLayout;
-    this.owner = owner;
+  private OmBucketInfo(Builder builder) {
+    this.volumeName = builder.volumeName;
+    this.bucketName = builder.bucketName;
+    this.acls = builder.acls;
+    this.isVersionEnabled = builder.isVersionEnabled;
+    this.storageType = builder.storageType;
+    this.creationTime = builder.creationTime;
+    this.modificationTime = builder.modificationTime;
+    this.objectID = builder.objectID;
+    this.updateID = builder.updateID;
+    this.metadata = builder.metadata;
+    this.bekInfo = builder.bekInfo;
+    this.sourceVolume = builder.sourceVolume;
+    this.sourceBucket = builder.sourceBucket;
+    this.usedBytes = builder.usedBytes;
+    this.usedNamespace = builder.usedNamespace;
+    this.quotaInBytes = builder.quotaInBytes;
+    this.quotaInNamespace = builder.quotaInNamespace;
+    this.bucketLayout = builder.bucketLayout;
+    this.owner = builder.owner;
   }
 
   /**
@@ -546,10 +511,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(isVersionEnabled);
       Preconditions.checkNotNull(storageType);
 
-      return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
-          storageType, creationTime, modificationTime, objectID, updateID,
-          metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, owner);
+      return new OmBucketInfo(this);
     }
   }
 
