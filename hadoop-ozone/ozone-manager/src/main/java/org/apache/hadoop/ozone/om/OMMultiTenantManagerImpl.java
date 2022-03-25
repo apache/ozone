@@ -65,7 +65,7 @@ import org.apache.hadoop.ozone.om.multitenant.OzoneOwnerPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -455,7 +455,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       throw new IOException("Tenant '" + tenantID + "' not found!");
     }
 
-    List<TenantUserAccessId> userAccessIds = new ArrayList<>();
+    List<ExtendedAccessIdInfo> userAccessIds = new ArrayList<>();
     CachedTenantState cachedTenantState = tenantCache.get(tenantID);
     if (cachedTenantState == null) {
       throw new IOException("Inconsistent in memory Tenant cache '" + tenantID
@@ -467,7 +467,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
             k -> StringUtils.isEmpty(prefix) || k.getKey().startsWith(prefix))
         .forEach(
             k -> userAccessIds.add(
-                TenantUserAccessId.newBuilder()
+                ExtendedAccessIdInfo.newBuilder()
                     .setUserPrincipal(k.getKey())
                     .setAccessId(k.getValue())
                     .build()));

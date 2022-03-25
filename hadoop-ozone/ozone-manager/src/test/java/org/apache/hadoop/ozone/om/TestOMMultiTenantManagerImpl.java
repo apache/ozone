@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
 import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
@@ -96,10 +96,11 @@ public class TestOMMultiTenantManagerImpl {
 
     TenantUserList tenantUserList =
         tenantManager.listUsersInTenant(tenantName, "");
-    List<TenantUserAccessId> userAccessIds = tenantUserList.getUserAccessIds();
+    List<ExtendedAccessIdInfo> userAccessIds =
+        tenantUserList.getUserAccessIds();
     assertEquals(2, userAccessIds.size());
 
-    for (TenantUserAccessId userAccessId : userAccessIds) {
+    for (ExtendedAccessIdInfo userAccessId : userAccessIds) {
       String user = userAccessId.getUserPrincipal();
       if (user.equals("user1")) {
         assertEquals("accessId1", userAccessId.getAccessId());

@@ -1416,30 +1416,36 @@ message TenantUserPrincipalInfo {
     repeated string accessIds = 1;
 }
 
-// For storing extended access ID information (related to a tenant) to OM DB
-// Does not include the access ID value itself
+// Multi-purpose message for storing or transferring extra access ID information
+//
+// This is an extension to the S3Secret protobuf message, carrying supplementary
+//   information to the existing accessId (kerberosID) field.
+//
+// For now, all fields are related to multi-tenancy. New fields can be added
+//   when necessary in the future. e.g. when implementing new features.
+//
+// Usage 1: Stored as value in OmDBTenantState table.
+//   See OmDBAccessIdInfo.
+//   In this case, accessId field is not set to avoid duplication,
+//   because the key of the OmDBTenantState table is already the accessId.
+//
+// Usage 2: Used when transferring the result of `ozone tenant user list`.
+//   See TenantUserList.
+//   In this case, tenantId field is not set to avoid duplication.
+//   tenantId will be set once and only once in TenantListUserResponse.
+//
+// Usage 3: Used when transferring the result of `ozone tenant user info`
+//   See TenantUserInfoValue.
+//   In this case, userPrincipal field is not set to avoid duplication.
+//   userPrincipal will be set once and only once in TenantGetUserInfoResponse.
+//
 message ExtendedAccessIdInfo {
-    optional string tenantId = 1;
-    optional string userPrincipal = 2;
-    optional bool isAdmin = 3;
-    optional bool isDelegatedAdmin = 4;
-    repeated string roleNames = 5;
-}
-
-// For `tenant user info` to store access ID along with its tenant-related info
-message TenantAccessIdInfo {
-    optional string accessId = 1;
-    optional string tenantId = 2;
-    optional bool isAdmin = 3;
-    optional bool isDelegatedAdmin = 4;
-}
-
-// For `tenant user list` to store all access IDs assigned to the tenant
-message TenantUserAccessId {
-    optional string userPrincipal = 1;
-    optional string accessId = 2;
-    optional bool isAdmin = 3;
-    optional bool isDelegatedAdmin = 4;
+    optional string accessId = 1;        // OmDBTenantState doesn't store this
+    optional string tenantId = 2;        // `tenant user list` doesn't set this
+    optional string userPrincipal = 3;   // `user info` doesn't set this
+    optional bool isAdmin = 4;           // `tenant user list` doesn't set this (yet)
+    optional bool isDelegatedAdmin = 5;  // `tenant user list` doesn't set this (yet)
+    repeated string roleNames = 6;       // `tenant user list` doesn't set this (yet)
 }
 
 message ListTenantRequest {
@@ -1460,13 +1466,13 @@ message TenantListUserRequest {
 }
 
 message TenantGetUserInfoResponse {
-    optional string userPrincipal = 1;
-    repeated TenantAccessIdInfo accessIdInfo = 2;
+    optional string userPrincipal = 1;  // Set only once to avoid duplication
+    repeated ExtendedAccessIdInfo accessIdInfo = 2;
 }
 
 message TenantListUserResponse {
-    optional string tenantId = 1;
-    repeated TenantUserAccessId userAccessIdInfo = 2;
+    optional string tenantId = 1;  // Set only once to avoid duplication
+    repeated ExtendedAccessIdInfo userAccessIdInfo = 2;
 }
 
 message LayoutVersion {

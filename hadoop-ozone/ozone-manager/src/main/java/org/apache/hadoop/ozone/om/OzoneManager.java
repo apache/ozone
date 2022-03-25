@@ -157,7 +157,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
@@ -3006,7 +3006,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    final List<TenantAccessIdInfo> accessIdInfoList = new ArrayList<>();
+    final List<ExtendedAccessIdInfo> accessIdInfoList = new ArrayList<>();
 
     // Won't iterate cache here for a similar reason as in OM#listTenant
     //  tenantGetUserInfo lists all accessIds assigned to a user across
@@ -3036,11 +3036,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           return;
         }
         assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
-        accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
+        accessIdInfoList.add(ExtendedAccessIdInfo.newBuilder()
             .setAccessId(accessId)
             .setTenantId(accessIdInfo.getTenantId())
             .setIsAdmin(accessIdInfo.getIsAdmin())
             .setIsDelegatedAdmin(accessIdInfo.getIsDelegatedAdmin())
+            .addAllRoleNames(accessIdInfo.getRoleNamesSet())
             .build());
       } catch (IOException e) {
         LOG.error("Potential DB issue. Failed to retrieve OmDBAccessIdInfo "

@@ -28,7 +28,7 @@ import java.util.Objects;
  */
 public class TenantStateList {
 
-  // A list of TenantAccessIdInfo from protobuf.
+  // A list of TenantState from protobuf.
   private final List<TenantState> tenantStateList;
 
   public List<TenantState> getTenantStateList() {

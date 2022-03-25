@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 
 import java.util.List;
@@ -31,19 +31,19 @@ public class TenantUserInfoValue {
   // Usually this is the Kerberos principal of a user.
   private final String userPrincipal;
 
-  // A list of TenantAccessIdInfo from protobuf.
-  private final List<TenantAccessIdInfo> accessIdInfoList;
+  // A list of ExtendedAccessIdInfo from protobuf.
+  private final List<ExtendedAccessIdInfo> accessIdInfoList;
 
   public String getUserPrincipal() {
     return userPrincipal;
   }
 
-  public List<TenantAccessIdInfo> getAccessIdInfoList() {
+  public List<ExtendedAccessIdInfo> getAccessIdInfoList() {
     return accessIdInfoList;
   }
 
   public TenantUserInfoValue(String kerberosID,
-      List<TenantAccessIdInfo> accessIdInfoList) {
+      List<ExtendedAccessIdInfo> accessIdInfoList) {
     this.userPrincipal = kerberosID;
     this.accessIdInfoList = accessIdInfoList;
   }

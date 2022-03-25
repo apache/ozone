@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
 
 /**
  * Class to encapsulate the list of users and corresponding accessIds
@@ -32,10 +32,10 @@ public class TenantUserList {
 
   private final String tenantId;
 
-  private final List<TenantUserAccessId> userAccessIds;
+  private final List<ExtendedAccessIdInfo> userAccessIds;
   
   public TenantUserList(String tenantId,
-                        List<TenantUserAccessId> userAccessIds) {
+                        List<ExtendedAccessIdInfo> userAccessIds) {
     this.tenantId = tenantId;
     this.userAccessIds = userAccessIds;
   }
@@ -44,7 +44,7 @@ public class TenantUserList {
     return tenantId;
   }
 
-  public List<TenantUserAccessId> getUserAccessIds() {
+  public List<ExtendedAccessIdInfo> getUserAccessIds() {
     return userAccessIds;
   }
 
