@@ -161,7 +161,7 @@ public class TestBlockDataStreamOutput {
   private void testWrite(int dataLength) throws Exception {
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
-        keyName, ReplicationType.RATIS, 0);
+        keyName, ReplicationType.RATIS, dataLength);
     byte[] data =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
@@ -174,7 +174,7 @@ public class TestBlockDataStreamOutput {
   private void testWriteWithFailure(int dataLength) throws Exception {
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
-        keyName, ReplicationType.RATIS, 0);
+        keyName, ReplicationType.RATIS, dataLength);
     byte[] data =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
