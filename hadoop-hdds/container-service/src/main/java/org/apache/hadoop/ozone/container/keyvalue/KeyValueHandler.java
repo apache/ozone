@@ -191,10 +191,6 @@ public class KeyValueHandler extends Handler {
       return chunkManager.getStreamDataChannel(kvContainer,
           blockID, metrics);
     } else {
-      LOG.error(
-          "Get stream data channel error Malformed request " +
-              "containerID: {} msg: {}",
-          container.getContainerData().getContainerID(), msg);
       throw new StorageContainerException("Malformed request.",
           ContainerProtos.Result.IO_EXCEPTION);
     }
@@ -278,7 +274,7 @@ public class KeyValueHandler extends Handler {
   ContainerCommandResponseProto handleStreamInit(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext) {
-    BlockID blockID;
+    final BlockID blockID;
     if (request.hasWriteChunk()) {
       WriteChunkRequestProto writeChunk = request.getWriteChunk();
       blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());

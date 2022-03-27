@@ -575,20 +575,6 @@ public class ContainerStateMachine extends BaseStateMachine {
     });
   }
 
-  private CompletableFuture<ContainerCommandResponseProto> runCommandAsync(
-      ContainerCommandRequestProto requestProto, LogEntryProto entry) {
-    return CompletableFuture.supplyAsync(() -> {
-      final DispatcherContext context = new DispatcherContext.Builder()
-          .setTerm(entry.getTerm())
-          .setLogIndex(entry.getIndex())
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-          .setContainer2BCSIDMap(container2BCSIDMap)
-          .build();
-
-      return runCommand(requestProto, context);
-    }, executor);
-  }
-
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
     int i = (int)(req.getBlockID().getLocalID() % chunkExecutors.size());
     return chunkExecutors.get(i);

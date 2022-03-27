@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
@@ -30,8 +29,6 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * This class is used for error handling methods.
@@ -43,13 +40,11 @@ public abstract class AbstractDataStreamOutput
   private int retryCount;
   private boolean isException;
 
-  protected AbstractDataStreamOutput() {
+  protected AbstractDataStreamOutput(
+      Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap) {
+    this.retryPolicyMap = retryPolicyMap;
     this.isException = false;
     this.retryCount = 0;
-    this.retryPolicyMap = HddsClientUtils.getExceptionList()
-        .stream()
-        .collect(Collectors.toMap(Function.identity(),
-            e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
   }
 
   @VisibleForTesting
@@ -108,16 +103,15 @@ public abstract class AbstractDataStreamOutput
       String msg = "";
       if (action.reason != null) {
         msg = "Retry request failed. " + action.reason;
-        //LOG.error(msg, exception);
       }
       setExceptionAndThrow(new IOException(msg, exception));
     }
 
     // Throw the exception if the thread is interrupted
     if (Thread.currentThread().isInterrupted()) {
-      //LOG.warn("Interrupted while trying for retry");
       setExceptionAndThrow(exception);
     }
+    Preconditions.checkNotNull(action);
     Preconditions.checkArgument(
         action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
     if (action.delayMillis > 0) {
