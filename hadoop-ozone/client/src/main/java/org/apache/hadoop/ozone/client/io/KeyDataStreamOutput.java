@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.AbstractDataStreamOutput;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -45,8 +44,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Maintaining a list of BlockInputStream. Write based on offset.
@@ -113,10 +110,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion
   ) {
-    super(HddsClientUtils.getExceptionList()
-        .stream()
-        .collect(Collectors.toMap(Function.identity(),
-            e -> RetryPolicies.TRY_ONCE_THEN_FAIL)));
+    super(HddsClientUtils.getRetryPolicyByException(
+        config.getMaxRetryCount(), config.getRetryInterval()));
     this.config = config;
     OmKeyInfo info = handler.getKeyInfo();
     blockDataStreamOutputEntryPool =
