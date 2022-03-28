@@ -405,7 +405,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    */
   @NotNull
   protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
-    return new OMFileCreateRequest(omRequest);
+    return new OMFileCreateRequest(omRequest, getBucketLayout());
   }
 
 }
