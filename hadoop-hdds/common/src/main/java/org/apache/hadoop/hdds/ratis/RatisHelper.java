@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -58,6 +59,7 @@ import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -435,5 +437,29 @@ public final class RatisHelper {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static void debug(ByteBuffer buffer, String name, Logger log) {
+    if (!log.isDebugEnabled()) {
+      return;
+    }
+    buffer = buffer.duplicate();
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 1; buffer.remaining() > 0; i++) {
+      builder.append(buffer.get()).append(i % 20 == 0 ? "\n  " : ", ");
+    }
+    log.debug("{}: {}\n  {}", name, buffer, builder);
+  }
+
+  public static void debug(ByteBuf buf, String name, Logger log) {
+    if (!log.isDebugEnabled()) {
+      return;
+    }
+    buf = buf.duplicate();
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 1; buf.readableBytes() > 0; i++) {
+      builder.append(buf.readByte()).append(i % 20 == 0 ? "\n  " : ", ");
+    }
+    log.debug("{}: {}\n  {}", name, buf, builder);
   }
 }
