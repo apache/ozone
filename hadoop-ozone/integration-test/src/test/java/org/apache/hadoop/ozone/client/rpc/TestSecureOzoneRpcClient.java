@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -75,7 +74,6 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.Objects;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -160,7 +158,8 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
-  private void testPutKeySuccessWithBlockTokenWithBucketLayout(BucketLayout bucketLayout) throws Exception {
+  private void testPutKeySuccessWithBlockTokenWithBucketLayout(
+      BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     Instant testStartTime = Instant.now();
