@@ -268,9 +268,12 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
      */
   }
 
-  @Override
-  public void markCommitWithTimestamp(byte[] bytes, byte[] bytes1)
+  public void markCommitWithTimestamp(final byte[] xid, final byte[] ts)
       throws RocksDBException {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
 
   }
 
