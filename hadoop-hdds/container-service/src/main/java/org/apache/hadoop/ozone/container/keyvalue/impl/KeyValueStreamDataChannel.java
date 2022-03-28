@@ -28,7 +28,7 @@ import java.io.File;
 /**
  * This class is used to get the DataChannel for streaming.
  */
-class KeyValueStreamDataChannel extends StreamDataChannelBase {
+public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   KeyValueStreamDataChannel(File file, ContainerData containerData,
                             ContainerMetrics metrics)
       throws StorageContainerException {

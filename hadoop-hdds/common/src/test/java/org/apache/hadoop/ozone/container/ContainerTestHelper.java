@@ -566,6 +566,18 @@ public final class ContainerTestHelper {
     return String.format("%1$" + length + "s", string);
   }
 
+  public static byte[] generateData(int length, boolean random) {
+    final byte[] data = new byte[length];
+    if (random) {
+      ThreadLocalRandom.current().nextBytes(data);
+    } else {
+      for (int i = 0; i < length; i++) {
+        data[i] = (byte) i;
+      }
+    }
+    return data;
+  }
+
   /**
    * Construct fake protobuf messages for various types of requests.
    * This is tedious, however necessary to test. Protobuf classes are final

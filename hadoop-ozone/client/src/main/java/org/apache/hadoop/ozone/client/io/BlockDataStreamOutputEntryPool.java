@@ -18,10 +18,8 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -86,30 +84,6 @@ public class BlockDataStreamOutputEntryPool {
     this.openID = openID;
     this.excludeList = new ExcludeList();
     this.bufferList = new ArrayList<>();
-  }
-
-  /**
-   * A constructor for testing purpose only.
-   *
-   * @see KeyDataStreamOutput#KeyDataStreamOutput()
-   */
-  @VisibleForTesting
-  BlockDataStreamOutputEntryPool() {
-    streamEntries = new ArrayList<>();
-    omClient = null;
-    keyArgs = null;
-    xceiverClientFactory = null;
-    config =
-        new OzoneConfiguration().getObject(OzoneClientConfig.class);
-    config.setStreamBufferSize(0);
-    config.setStreamBufferMaxSize(0);
-    config.setStreamBufferFlushSize(0);
-    config.setStreamBufferFlushDelay(false);
-    requestID = null;
-    int chunkSize = 0;
-    currentStreamIndex = 0;
-    openID = -1;
-    excludeList = new ExcludeList();
   }
 
   /**
