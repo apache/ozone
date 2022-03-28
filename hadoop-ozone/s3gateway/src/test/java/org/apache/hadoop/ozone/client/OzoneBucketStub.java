@@ -228,6 +228,14 @@ public class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig repConfig) throws IOException {
+    String uploadID = UUID.randomUUID().toString();
+    multipartUploadIdMap.put(keyName, uploadID);
+    return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
+  }
+
+  @Override
   public OzoneOutputStream createMultipartKey(String key, long size,
                                               int partNumber, String uploadID)
       throws IOException {
