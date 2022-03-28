@@ -53,8 +53,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -178,24 +178,12 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
       // Normal put object
       OzoneBucket bucket = getBucket(bucketName);
-      ReplicationConfig clientConfiguredReplicationConfig = null;
-      String replication = ozoneConfiguration.get(OZONE_REPLICATION);
-      if (replication != null) {
-        clientConfiguredReplicationConfig = ReplicationConfig.parse(
-            ReplicationType.valueOf(ozoneConfiguration
-                .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
-            replication, ozoneConfiguration);
-      }
-      ReplicationConfig replicationConfig = S3Utils
-          .resolveS3ClientSideReplicationConfig(storageType,
-              clientConfiguredReplicationConfig, bucket.getReplicationConfig());
-      boolean storageTypeDefault = false;
-      if (storageType == null || storageType.equals("")) {
-        storageTypeDefault = true;
-      }
+      ReplicationConfig replicationConfig =
+          getReplicationConfig(bucket, storageType);
 
       if (copyHeader != null) {
         //Copy object, as copy source available.
@@ -498,17 +486,11 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
-      S3StorageType s3StorageType;
-      if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
-      } else {
-        s3StorageType = S3Utils.toS3StorageType(storageType);
-      }
-      ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      ReplicationConfig replicationConfig =
+          getReplicationConfig(ozoneBucket, storageType);
 
-      OmMultipartInfo multipartInfo = ozoneBucket
-          .initiateMultipartUpload(key, replicationType, replicationFactor);
+      OmMultipartInfo multipartInfo =
+          ozoneBucket.initiateMultipartUpload(key, replicationConfig);
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
@@ -529,6 +511,20 @@ public class ObjectEndpoint extends EndpointBase {
           "key: {}", bucket, key, ex);
       throw ex;
     }
+  }
+
+  private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket,
+      String storageType) throws OS3Exception {
+    ReplicationConfig clientConfiguredReplicationConfig = null;
+    String replication = ozoneConfiguration.get(OZONE_REPLICATION);
+    if (replication != null) {
+      clientConfiguredReplicationConfig = ReplicationConfig.parse(
+          ReplicationType.valueOf(ozoneConfiguration
+              .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
+          replication, ozoneConfiguration);
+    }
+    return S3Utils.resolveS3ClientSideReplicationConfig(storageType,
+        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig());
   }
 
   /**
