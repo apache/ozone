@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,10 +46,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
@@ -73,6 +71,11 @@ public class TestContainerStateMachineStream {
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
+
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -118,8 +121,15 @@ public class TestContainerStateMachineStream {
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).setHbInterval(200)
+        MiniOzoneCluster.newBuilder(conf)
+            .setNumDatanodes(3)
+            .setHbInterval(200)
             .setDataStreamMinPacketSize(1024)
+            .setBlockSize(BLOCK_SIZE)
+            .setChunkSize(CHUNK_SIZE)
+            .setStreamBufferFlushSize(FLUSH_SIZE)
+            .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
+            .setStreamBufferSizeUnit(StorageUnit.BYTES)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
@@ -146,20 +156,14 @@ public class TestContainerStateMachineStream {
 
   @Test
   public void testContainerStateMachineForStreaming() throws Exception {
-    long size = 1024 * 8;
+    long size = CHUNK_SIZE + 1;
 
     OzoneDataStreamOutput key = TestHelper.createStreamKey(
         "ozone-stream-test.txt", ReplicationType.RATIS, size, objectStore,
         volumeName, bucketName);
 
-    byte[] data =
-        ContainerTestHelper
-            .getFixedLengthString(UUID.randomUUID().toString(),
-                (int) (size / 2))
-            .getBytes(UTF_8);
+    byte[] data = ContainerTestHelper.generateData((int) size, true);
     key.write(ByteBuffer.wrap(data));
-    key.write(ByteBuffer.wrap(data));
-
     key.flush();
 
     KeyDataStreamOutput streamOutput =
@@ -169,6 +173,37 @@ public class TestContainerStateMachineStream {
 
     key.close();
 
+    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+        cluster);
+
+    long bytesUsed = dn.getDatanodeStateMachine()
+        .getContainer().getContainerSet()
+        .getContainer(omKeyLocationInfo.getContainerID()).
+            getContainerData().getBytesUsed();
+
+    Assert.assertTrue(bytesUsed == size);
+  }
+
+
+  @Test
+  public void testContainerStateMachineForStreamingSmallFile()
+      throws Exception {
+    long size = CHUNK_SIZE - 1;
+
+    OzoneDataStreamOutput key = TestHelper.createStreamKey(
+        "ozone-stream-test-small-file.txt", ReplicationType.RATIS, size,
+        objectStore, volumeName, bucketName);
+
+    byte[] data = ContainerTestHelper.generateData((int) size, true);
+    key.write(ByteBuffer.wrap(data));
+    key.flush();
+
+    KeyDataStreamOutput streamOutput =
+        (KeyDataStreamOutput) key.getByteBufStreamOutput();
+    List<OmKeyLocationInfo> locationInfoList =
+        streamOutput.getLocationInfoList();
+    key.close();
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
         cluster);

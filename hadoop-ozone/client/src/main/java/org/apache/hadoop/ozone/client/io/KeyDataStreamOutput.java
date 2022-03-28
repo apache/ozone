@@ -28,31 +28,22 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.hdds.scm.storage.AbstractDataStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
-import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Maintaining a list of BlockInputStream. Write based on offset.
@@ -63,7 +54,7 @@ import java.util.stream.Collectors;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput implements ByteBufferStreamOutput {
+public class KeyDataStreamOutput extends AbstractDataStreamOutput {
 
   private OzoneClientConfig config;
 
@@ -79,33 +70,15 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
 
   private boolean closed;
   private FileEncryptionInfo feInfo;
-  private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
-  private int retryCount;
+
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
   private long writeOffset;
-  // whether an exception is encountered while write and whole write could
-  // not succeed
-  private boolean isException;
+
   private final BlockDataStreamOutputEntryPool blockDataStreamOutputEntryPool;
 
   private long clientID;
-
-  /**
-   * A constructor for testing purpose only.
-   */
-  @VisibleForTesting
-  public KeyDataStreamOutput() {
-    closed = false;
-    this.retryPolicyMap = HddsClientUtils.getExceptionList()
-        .stream()
-        .collect(Collectors.toMap(Function.identity(),
-            e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
-    retryCount = 0;
-    offset = 0;
-    blockDataStreamOutputEntryPool = new BlockDataStreamOutputEntryPool();
-  }
 
   @VisibleForTesting
   public List<BlockDataStreamOutputEntry> getStreamEntries() {
@@ -123,11 +96,6 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   @VisibleForTesting
-  public int getRetryCount() {
-    return retryCount;
-  }
-
-  @VisibleForTesting
   public long getClientID() {
     return clientID;
   }
@@ -142,6 +110,8 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion
   ) {
+    super(HddsClientUtils.getRetryPolicyByException(
+        config.getMaxRetryCount(), config.getRetryInterval()));
     this.config = config;
     OmKeyInfo info = handler.getKeyInfo();
     blockDataStreamOutputEntryPool =
@@ -158,10 +128,6 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
-    this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
-        config.getMaxRetryCount(), config.getRetryInterval());
-    this.retryCount = 0;
-    this.isException = false;
     this.writeOffset = 0;
     this.clientID = handler.getId();
   }
@@ -322,83 +288,16 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     if (bufferedDataLen > 0) {
       // If the data is still cached in the underlying stream, we need to
       // allocate new block and write this data in the datanode.
-      handleRetry(exception, bufferedDataLen);
+      handleRetry(exception);
+      handleWrite(null, 0, bufferedDataLen, true);
       // reset the retryCount after handling the exception
-      retryCount = 0;
+      resetRetryCount();
     }
   }
 
   private void markStreamClosed() {
     blockDataStreamOutputEntryPool.cleanup();
     closed = true;
-  }
-
-  private void handleRetry(IOException exception, long len) throws IOException {
-    RetryPolicy retryPolicy = retryPolicyMap
-        .get(HddsClientUtils.checkForException(exception).getClass());
-    if (retryPolicy == null) {
-      retryPolicy = retryPolicyMap.get(Exception.class);
-    }
-    RetryPolicy.RetryAction action = null;
-    try {
-      action = retryPolicy.shouldRetry(exception, retryCount, 0, true);
-    } catch (Exception e) {
-      setExceptionAndThrow(new IOException(e));
-    }
-    if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
-      String msg = "";
-      if (action.reason != null) {
-        msg = "Retry request failed. " + action.reason;
-        LOG.error(msg, exception);
-      }
-      setExceptionAndThrow(new IOException(msg, exception));
-    }
-
-    // Throw the exception if the thread is interrupted
-    if (Thread.currentThread().isInterrupted()) {
-      LOG.warn("Interrupted while trying for retry");
-      setExceptionAndThrow(exception);
-    }
-    Preconditions.checkArgument(
-        action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
-    if (action.delayMillis > 0) {
-      try {
-        Thread.sleep(action.delayMillis);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        IOException ioe =  (IOException) new InterruptedIOException(
-            "Interrupted: action=" + action + ", retry policy=" + retryPolicy)
-            .initCause(e);
-        setExceptionAndThrow(ioe);
-      }
-    }
-    retryCount++;
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Retrying Write request. Already tried {} time(s); " +
-          "retry policy is {} ", retryCount, retryPolicy);
-    }
-    handleWrite(null, 0, len, true);
-  }
-
-  private void setExceptionAndThrow(IOException ioe) throws IOException {
-    isException = true;
-    throw ioe;
-  }
-
-  /**
-   * Checks if the provided exception signifies retry failure in ratis client.
-   * In case of retry failure, ratis client throws RaftRetryFailureException
-   * and all succeeding operations are failed with AlreadyClosedException.
-   */
-  private boolean checkForRetryFailure(Throwable t) {
-    return t instanceof RaftRetryFailureException
-        || t instanceof AlreadyClosedException;
-  }
-
-  // Every container specific exception from datatnode will be seen as
-  // StorageContainerException
-  private boolean checkIfContainerToExclude(Throwable t) {
-    return t instanceof StorageContainerException;
   }
 
   @Override
@@ -485,7 +384,7 @@ public class KeyDataStreamOutput implements ByteBufferStreamOutput {
     closed = true;
     try {
       handleFlushOrClose(StreamAction.CLOSE);
-      if (!isException) {
+      if (!isException()) {
         Preconditions.checkArgument(writeOffset == offset);
       }
       blockDataStreamOutputEntryPool.commitKey(offset);
