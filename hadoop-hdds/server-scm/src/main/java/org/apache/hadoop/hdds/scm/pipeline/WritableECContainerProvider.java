@@ -34,6 +34,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +43,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 
@@ -58,12 +62,21 @@ public class WritableECContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
+  private final NodeManager nodeManager;
   private final long containerSize;
   private final WritableECContainerProviderConfig providerConfig;
+  // We track for pipelines not containers, since containers may be closed
+  // on events triggered by DNs, and we'll lose track of their allocated
+  // space and result in orphan records.
+  // But EC pipelines are explicitly closed here, then we can safely
+  // clean them up.
+  private final Map<PipelineID, Long> pipelineAllocatedSpaceMap;
+  // Whether we reached the max pipelines limit once.
+  private volatile boolean maxPipelinesLimitReached;
 
   public WritableECContainerProvider(ConfigurationSource conf,
       PipelineManager pipelineManager, ContainerManager containerManager,
-      PipelineChoosePolicy pipelineChoosePolicy) {
+      NodeManager nodeManager, PipelineChoosePolicy pipelineChoosePolicy) {
     this.conf = conf;
     this.providerConfig =
         conf.getObject(WritableECContainerProviderConfig.class);
@@ -71,10 +84,12 @@ public class WritableECContainerProvider
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
     this.containerSize = getConfiguredContainerSize();
+    this.nodeManager = nodeManager;
+    this.pipelineAllocatedSpaceMap = new ConcurrentHashMap<>();
+    this.maxPipelinesLimitReached = false;
   }
 
   /**
-   *
    * @param size The max size of block in bytes which will be written. This
    *             comes from Ozone Manager and will be the block size configured
    *             for the cluster. The client cannot pass any arbitrary value
@@ -98,16 +113,31 @@ public class WritableECContainerProvider
     synchronized (this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < providerConfig.getMinimumPipelines()) {
+      if (openPipelineCount < calcMinimumPipelines(repConfig)) {
         try {
-          return allocateContainer(
+          ContainerInfo newContainer = allocateContainer(
               repConfig, requiredSpace, owner, excludeList);
+          pipelineAllocatedSpaceMap.put(newContainer.getPipelineID(),
+              requiredSpace);
+          return newContainer;
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
               + "containers", repConfig, openPipelineCount, e);
         }
       }
+
+      int maxPipelinesLimit = calcMaximumPipelines(repConfig);
+      if (openPipelineCount >= maxPipelinesLimit) {
+        // Here we don't force throttling on max pipelines limit reached,
+        // just hint that we should stop pre-allocation and always reuse
+        // existing pipelines.
+        maxPipelinesLimitReached = true;
+        LOG.warn("Number of pipelines {} greater than max {} for "
+            + "EC Replication {}", openPipelineCount, maxPipelinesLimit,
+            repConfig);
+      }
     }
+
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN,
         excludeList.getDatanodes(), excludeList.getPipelineIds());
@@ -116,6 +146,8 @@ public class WritableECContainerProvider
         PipelineRequestInformation.Builder.getBuilder()
             .setSize(requiredSpace)
             .build();
+    ContainerInfo containerInfo = null;
+
     while (existingPipelines.size() > 0) {
       Pipeline pipeline =
           pipelineChoosePolicy.choosePipeline(existingPipelines, pri);
@@ -124,35 +156,56 @@ public class WritableECContainerProvider
             existingPipelines.size());
         break;
       }
+
       synchronized (pipeline.getId()) {
         try {
-          ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
+          containerInfo = getContainerFromPipeline(pipeline);
           if (containerInfo == null
               || !containerHasSpace(containerInfo, requiredSpace)) {
             // This is O(n), which isn't great if there are a lot of pipelines
             // and we keep finding pipelines without enough space.
             existingPipelines.remove(pipeline);
+            pipelineAllocatedSpaceMap.remove(pipeline.getId());
             pipelineManager.closePipeline(pipeline, true);
           } else {
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipeline);
             } else {
-              return containerInfo;
+              // Found a matching container
+              break;
             }
           }
         } catch (PipelineNotFoundException | ContainerNotFoundException e) {
           LOG.warn("Pipeline or container not found when selecting a writable "
               + "container", e);
           existingPipelines.remove(pipeline);
+          pipelineAllocatedSpaceMap.remove(pipeline.getId());
           pipelineManager.closePipeline(pipeline, true);
         }
       }
     }
+
+    if (containerInfo != null) {
+      // Preallocate a new container if an existing container is predicted
+      // to be full. We don't return the pre-allocated one, just offer an
+      // extra choice for the next round, it helps to spread loads across.
+      preallocateContainerIfNeeded(containerInfo, requiredSpace, repConfig,
+          owner, excludeList, existingPipelines);
+      pipelineAllocatedSpaceMap.compute(containerInfo.getPipelineID(),
+          (pipelineID, space) -> space == null ?
+              requiredSpace : space + requiredSpace);
+      return containerInfo;
+    }
+
     // If we get here, all the pipelines we tried were no good. So try to
-    // allocate a new one and usePipelineManagerV2Impl.java it.
+    // allocate a new one.
     try {
       synchronized (this) {
-        return allocateContainer(repConfig, requiredSpace, owner, excludeList);
+        ContainerInfo newContainer = allocateContainer(
+            repConfig, requiredSpace, owner, excludeList);
+        pipelineAllocatedSpaceMap.put(newContainer.getPipelineID(),
+            requiredSpace);
+        return newContainer;
       }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
@@ -175,6 +228,37 @@ public class WritableECContainerProvider
         containerManager.getMatchingContainer(size, owner, newPipeline);
     pipelineManager.openPipeline(newPipeline.getId());
     return container;
+  }
+
+  private synchronized void preallocateContainerIfNeeded(
+      ContainerInfo containerInfo, long requiredSpace,
+      ECReplicationConfig repConfig, String owner,
+      ExcludeList excludeList, List<Pipeline> existingPipelines) {
+
+    if (maxPipelinesLimitReached) {
+      // If we reached the max once, stop pre-allocation.
+      if (existingPipelines.size() >= calcMinimumPipelines(repConfig)) {
+        return;
+      }
+      // Below the min again after max reached, restart pre-allocation.
+      maxPipelinesLimitReached = false;
+    }
+
+    long allocatedSpace = pipelineAllocatedSpaceMap.getOrDefault(
+        containerInfo.getPipelineID(), 0L);
+
+    if (allocatedSpace + requiredSpace > containerSize) {
+      // Rollback the tracked space so we don't preallocate on every
+      // request after container full predicted.
+      pipelineAllocatedSpaceMap.put(containerInfo.getPipelineID(), 0L);
+      try {
+        allocateContainer(repConfig, requiredSpace, owner, excludeList);
+      } catch (IOException e) {
+        LOG.error("Unable to preallocate a container for {} upon detecting" +
+            " container {} is possibly full",
+            repConfig, containerInfo.containerID(), e);
+      }
+    }
   }
 
   private boolean containerIsExcluded(ContainerInfo container,
@@ -212,6 +296,22 @@ public class WritableECContainerProvider
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, BYTES);
   }
 
+  private int calcMinimumPipelines(ECReplicationConfig repConfig) {
+    int minPipelines = providerConfig.getMinimumPipelines();
+    if (minPipelines != 0) {
+      return minPipelines;
+    }
+
+    int maxPipelines = calcMaximumPipelines(repConfig);
+    return (int)Math.ceil(providerConfig.getMinMaxRatio() * maxPipelines);
+  }
+
+  private int calcMaximumPipelines(ECReplicationConfig repConfig) {
+    return providerConfig.getMaximumPipelinesPerDatanode() *
+        nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) /
+        repConfig.getRequiredNodes();
+  }
+
   /**
    * Class to hold configuration for WriteableECContainerProvider.
    */
@@ -219,12 +319,12 @@ public class WritableECContainerProvider
   public static class WritableECContainerProviderConfig {
 
     @Config(key = "pipeline.minimum",
-        defaultValue = "5",
+        defaultValue = "0",
         type = ConfigType.INT,
         description = "The minimum number of pipelines to have open for each " +
             "Erasure Coding configuration",
         tags = ConfigTag.STORAGE)
-    private int minimumPipelines = 5;
+    private int minimumPipelines = 0;
 
     public int getMinimumPipelines() {
       return minimumPipelines;
@@ -232,6 +332,39 @@ public class WritableECContainerProvider
 
     public void setMinimumPipelines(int minPipelines) {
       this.minimumPipelines = minPipelines;
+    }
+
+    @Config(key = "pipeline.minimum.maximum.ratio",
+        defaultValue = "50",
+        type = ConfigType.INT,
+        description = "The ratio of the minimum and maximum number of" +
+            " pipelines for each Erasure Coding configuration. The value" +
+            " is an int in range [0, 100]",
+        tags = ConfigTag.STORAGE)
+    private int minMaxRatio = 50;
+
+    public double getMinMaxRatio() {
+      return (double)minMaxRatio / 100;
+    }
+
+    public void setMinMaxRatio(int minMaxRatio) {
+      this.minMaxRatio = minMaxRatio;
+    }
+
+    @Config(key = "pipeline.maximum.per.datanode",
+        defaultValue = "5",
+        type = ConfigType.INT,
+        description = "The maximum number of pipelines to join in for each " +
+            "Datanode per each Erasure Coding configuration",
+        tags = ConfigTag.STORAGE)
+    private int maximumPipelinesPerDatanode = 5;
+
+    public int getMaximumPipelinesPerDatanode() {
+      return maximumPipelinesPerDatanode;
+    }
+
+    public void setMaximumPipelinesPerDatanode(int maxPipelinesPerDN) {
+      this.maximumPipelinesPerDatanode = maxPipelinesPerDN;
     }
 
   }

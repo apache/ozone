@@ -112,8 +112,9 @@ public class TestWritableECContainerProvider {
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+    provider = new WritableECContainerProvider(conf,
+        pipelineManager, containerManager, nodeManager,
+        pipelineChoosingPolicy);
 
     Mockito.doAnswer(call -> {
       Pipeline pipeline = (Pipeline)call.getArguments()[2];
@@ -231,8 +232,9 @@ public class TestWritableECContainerProvider {
         throw new IOException("Cannot create pipelines");
       }
     };
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+    provider = new WritableECContainerProvider(conf,
+        pipelineManager, containerManager, nodeManager,
+        pipelineChoosingPolicy);
 
     ContainerInfo container =
         provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -258,8 +260,9 @@ public class TestWritableECContainerProvider {
         return super.createPipeline(repConfig);
       }
     };
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+    provider = new WritableECContainerProvider(conf,
+        pipelineManager, containerManager, nodeManager,
+        pipelineChoosingPolicy);
 
     ContainerInfo container =
         provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -322,8 +325,9 @@ public class TestWritableECContainerProvider {
         throw new PipelineNotFoundException("Simulated exception");
       }
     };
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+    provider = new WritableECContainerProvider(conf,
+        pipelineManager, containerManager, nodeManager,
+        pipelineChoosingPolicy);
 
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < minPipelines; i++) {
@@ -397,8 +401,9 @@ public class TestWritableECContainerProvider {
   public void testExcludedNodesPassedToCreatePipelineIfProvided()
       throws IOException {
     PipelineManager pipelineManagerSpy = Mockito.spy(pipelineManager);
-    provider = new WritableECContainerProvider(
-        conf, pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
+    provider = new WritableECContainerProvider(conf,
+        pipelineManagerSpy, containerManager, nodeManager,
+        pipelineChoosingPolicy);
     ExcludeList excludeList = new ExcludeList();
 
     // EmptyList should be passed if there are no nodes excluded.
