@@ -78,9 +78,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileCreateRequest.class);
-  public OMFileCreateRequest(OMRequest omRequest) {
-    super(omRequest);
-  }
 
   public OMFileCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
@@ -400,6 +397,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
     if (bucketLayout.isFileSystemOptimized()) {
       return new OMFileCreateRequestWithFSO(omRequest, bucketLayout);
     }
-    return new OMFileCreateRequest(omRequest);
+    return new OMFileCreateRequest(omRequest, bucketLayout);
   }
 }
