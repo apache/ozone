@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 
@@ -549,19 +550,29 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
-    return CompletableFuture.supplyAsync(() -> {
-      if (stream == null) {
-        return JavaUtils.completeExceptionally(
-            new IllegalStateException("DataStream is null"));
+    if (stream == null) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "DataStream is null"));
+    }
+    final DataChannel dataChannel = stream.getDataChannel();
+    if (dataChannel.isOpen()) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "DataStream: " + stream + " is not closed properly"));
+    }
+
+    final CompletableFuture<ContainerCommandResponseProto> f;
+    if (dataChannel instanceof KeyValueStreamDataChannel) {
+      f = CompletableFuture.completedFuture(null);
+    } else {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "Unexpected DataChannel " + dataChannel.getClass()));
+    }
+    return f.whenComplete((res, e) -> {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("PutBlock {} Term: {} Index: {}",
+            res.getResult(), entry.getTerm(), entry.getIndex());
       }
-      if (stream.getDataChannel().isOpen()) {
-        return JavaUtils.completeExceptionally(
-            new IllegalStateException(
-                "DataStream: " + stream + " is not closed properly"));
-      } else {
-        return CompletableFuture.completedFuture(null);
-      }
-    }, executor);
+    });
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
