@@ -79,8 +79,7 @@ abstract class StreamDataChannelBase implements StateMachine.DataChannel {
     randomAccessFile.close();
   }
 
-  @Override
-  public int write(ByteBuffer src) throws IOException {
+  final int writeFileChannel(ByteBuffer src) throws IOException {
     final int writeBytes = getChannel().write(src);
     metrics.incContainerBytesStats(getType(), writeBytes);
     containerData.updateWriteStats(writeBytes, false);
