@@ -120,7 +120,7 @@ public class TestBlockDataStreamOutput {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  private String getKeyName() {
+  static String getKeyName() {
     return UUID.randomUUID().toString();
   }
 
@@ -158,13 +158,11 @@ public class TestBlockDataStreamOutput {
     testWriteWithFailure(blockSize + 50);
   }
 
-  private void testWrite(int dataLength) throws Exception {
+  static void testWrite(int dataLength) throws Exception {
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
+    final byte[] data = ContainerTestHelper.generateData(dataLength, false);
     key.write(ByteBuffer.wrap(data));
     // now close the stream, It will update the key length.
     key.close();
@@ -221,14 +219,14 @@ public class TestBlockDataStreamOutput {
   }
 
 
-  private OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
+  static OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
       long size) throws Exception {
     return TestHelper.createStreamKey(
         keyName, type, size, objectStore, volumeName, bucketName);
   }
-  private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
-        .validateData(keyName, data, objectStore, volumeName, bucketName);
+  static void validateData(String keyName, byte[] data) throws Exception {
+    TestHelper.validateData(
+        keyName, data, objectStore, volumeName, bucketName);
   }
 
 
