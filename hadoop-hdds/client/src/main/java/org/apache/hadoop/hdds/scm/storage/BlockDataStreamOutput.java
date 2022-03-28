@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
@@ -83,6 +84,9 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
 public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
+
+  public static final int PUT_BLOCK_REQUEST_LENGTH_MAX = 1 << 20;  // 1MB
+
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
   private static final CompletableFuture[] EMPTY_FUTURE_ARRAY = {};
@@ -406,12 +410,26 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       byteBufferList = null;
     }
     waitFuturesComplete();
+    final BlockData blockData = containerBlockData.build();
     if (close) {
-      dataStreamCloseReply = out.closeAsync();
+      final ContainerCommandRequestProto putBlockRequest
+          = ContainerProtocolCalls.getPutBlockRequest(
+              xceiverClient.getPipeline(), blockData, true, token);
+      dataStreamCloseReply = executePutBlockClose(putBlockRequest,
+          PUT_BLOCK_REQUEST_LENGTH_MAX, out);
+      dataStreamCloseReply.whenComplete((reply, e) -> {
+        if (e != null || reply == null || !reply.isSuccess()) {
+          LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
+          try {
+            executePutBlock(true, false);
+          } catch (IOException ex) {
+            throw new CompletionException(ex);
+          }
+        }
+      });
     }
 
     try {
-      BlockData blockData = containerBlockData.build();
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, token);
       final CompletableFuture<ContainerCommandResponseProto> flushFuture
@@ -457,6 +475,30 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
+  }
+
+  public static CompletableFuture<DataStreamReply> executePutBlockClose(
+      ContainerCommandRequestProto putBlockRequest, int max,
+      DataStreamOutput out) {
+    final ByteBuffer putBlock = ContainerCommandRequestMessage.toMessage(
+        putBlockRequest, null).getContent().asReadOnlyByteBuffer();
+    final ByteBuffer protoLength = getProtoLength(putBlock, max);
+    RatisHelper.debug(putBlock, "putBlock", LOG);
+    out.writeAsync(putBlock);
+    RatisHelper.debug(protoLength, "protoLength", LOG);
+    return out.writeAsync(protoLength, StandardWriteOption.CLOSE);
+  }
+
+  public static ByteBuffer getProtoLength(ByteBuffer putBlock, int max) {
+    final int protoLength = putBlock.remaining();
+    Preconditions.checkState(protoLength <= max,
+        "protoLength== %s > max = %s", protoLength, max);
+    final ByteBuffer buffer = ByteBuffer.allocate(4);
+    buffer.putInt(protoLength);
+    buffer.flip();
+    LOG.debug("protoLength = {}", protoLength);
+    Preconditions.checkState(buffer.remaining() == 4);
+    return buffer.asReadOnlyBuffer();
   }
 
   @Override
@@ -547,7 +589,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
 
-  private void setIoException(Exception e) {
+  private void setIoException(Throwable e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
