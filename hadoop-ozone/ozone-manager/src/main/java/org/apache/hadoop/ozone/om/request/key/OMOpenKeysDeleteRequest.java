@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteResponse;
@@ -58,6 +59,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
   public OMOpenKeysDeleteRequest(OMRequest omRequest,
                                  BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

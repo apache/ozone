@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.util.ArrayList;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
@@ -43,6 +44,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
   public OMKeyPurgeRequest(OMRequest omRequest) {
     super(omRequest);
+    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

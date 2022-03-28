@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.file.OMDirectoryCreateResponseWithFSO;
@@ -78,6 +79,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
   public OMDirectoryCreateRequestWithFSO(OMRequest omRequest,
                                          BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+    OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

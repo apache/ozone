@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponseWithFSO;
@@ -45,6 +46,7 @@ public class S3MultipartUploadCommitPartRequestWithFSO
   public S3MultipartUploadCommitPartRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+    OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

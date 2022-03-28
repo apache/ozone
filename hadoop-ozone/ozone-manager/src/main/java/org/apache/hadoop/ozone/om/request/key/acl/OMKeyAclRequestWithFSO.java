@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -53,6 +54,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
                                 BucketLayout bucketLayout) {
     super(omReq);
     setBucketLayout(bucketLayout);
+    OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

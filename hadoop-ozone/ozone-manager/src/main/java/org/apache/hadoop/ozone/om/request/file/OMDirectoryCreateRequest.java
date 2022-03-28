@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -106,6 +107,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   public OMDirectoryCreateRequest(OMRequest omRequest,
                                   BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

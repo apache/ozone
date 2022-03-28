@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponse;
@@ -68,6 +69,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   public OMKeysDeleteRequest(OMRequest omRequest) {
     super(omRequest);
+    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

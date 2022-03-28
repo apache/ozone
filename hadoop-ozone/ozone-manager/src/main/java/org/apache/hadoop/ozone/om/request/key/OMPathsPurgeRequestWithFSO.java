@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMPathsPurgeResponseWithFSO;
@@ -37,6 +38,7 @@ public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
 
   public OMPathsPurgeRequestWithFSO(OMRequest omRequest) {
     super(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }
 
   @Override

@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMTrashRecoverResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
@@ -52,6 +53,7 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
 
   public OMTrashRecoverRequest(OMRequest omRequest) {
     super(omRequest);
+    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }
 
   @Override
