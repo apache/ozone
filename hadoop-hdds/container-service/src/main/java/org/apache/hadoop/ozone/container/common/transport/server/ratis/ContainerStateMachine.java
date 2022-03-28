@@ -427,6 +427,20 @@ public class ContainerStateMachine extends BaseStateMachine {
     return dispatchCommand(requestProto, context);
   }
 
+  private CompletableFuture<ContainerCommandResponseProto> runCommandAsync(
+      ContainerCommandRequestProto requestProto, LogEntryProto entry) {
+    return CompletableFuture.supplyAsync(() -> {
+      final DispatcherContext context = new DispatcherContext.Builder()
+          .setTerm(entry.getTerm())
+          .setLogIndex(entry.getIndex())
+          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+          .setContainer2BCSIDMap(container2BCSIDMap)
+          .build();
+
+      return runCommand(requestProto, context);
+    }, executor);
+  }
+
   private CompletableFuture<Message> handleWriteChunk(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
@@ -560,19 +574,16 @@ public class ContainerStateMachine extends BaseStateMachine {
           "DataStream: " + stream + " is not closed properly"));
     }
 
-    final CompletableFuture<ContainerCommandResponseProto> f;
+    final ContainerCommandRequestProto request;
     if (dataChannel instanceof KeyValueStreamDataChannel) {
-      f = CompletableFuture.completedFuture(null);
+      request = ((KeyValueStreamDataChannel) dataChannel).getPutBlockRequest();
     } else {
       return JavaUtils.completeExceptionally(new IllegalStateException(
           "Unexpected DataChannel " + dataChannel.getClass()));
     }
-    return f.whenComplete((res, e) -> {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("PutBlock {} Term: {} Index: {}",
-            res.getResult(), entry.getTerm(), entry.getIndex());
-      }
-    });
+    return runCommandAsync(request, entry).whenComplete(
+        (res, e) -> LOG.debug("link {}, entry: {}, request: {}",
+            res.getResult(), entry, request));
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
