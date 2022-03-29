@@ -76,6 +76,9 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   private final int failCallsFrequency;
   private int currentCall = 0;
 
+  // The number of blocks deleted by this client
+  private int numBlocksDeleted = 0;
+
   /**
    * If ClusterID or SCMID is blank a per instance ID is generated.
    *
@@ -155,6 +158,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
         switch (this.failCallsFrequency) {
         case 0:
           result = success;
+          numBlocksDeleted++;
           break;
         case 1:
           result = unknownFailure;
@@ -164,6 +168,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
             result = unknownFailure;
           } else {
             result = success;
+            numBlocksDeleted++;
           }
         }
         blockResultList.add(new DeleteBlockResult(blockKey, result));
@@ -192,6 +197,13 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException {
     return null;
+  }
+
+  /**
+   * Return the number of blocks puesdo deleted by this testing client.
+   */
+  public int getNumberOfDeletedBlocks() {
+    return numBlocksDeleted;
   }
 
   @Override

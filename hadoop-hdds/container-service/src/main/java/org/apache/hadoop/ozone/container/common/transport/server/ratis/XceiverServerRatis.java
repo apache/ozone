@@ -77,7 +77,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -426,7 +425,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RpcType rpc = SupportedRpcType.valueOfIgnoreCase(rpcType);
-    RaftConfigKeys.Rpc.setType(properties, rpc);
+    RatisHelper.setRpcType(properties, rpc);
     return rpc;
   }
 
@@ -461,24 +460,19 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // configuration for both.
   private static Parameters createTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
-    Parameters parameters = new Parameters();
-
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
           conf.getConfiguration());
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
           caList, true);
-      GrpcConfigKeys.Server.setTlsConf(parameters, serverConfig);
-      GrpcConfigKeys.Admin.setTlsConf(parameters, serverConfig);
-
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
           caList, false);
-      GrpcConfigKeys.Client.setTlsConf(parameters, clientConfig);
+      return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
 
-    return parameters;
+    return null;
   }
 
   @Override

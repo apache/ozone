@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.After;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,6 +63,22 @@ public class TestRootedOzoneFileSystemWithFSO
   public static void init()
       throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
+  }
+
+  /**
+   * HDDS-6414: Implementation gap for recursive deletion in FSO buckets.
+   * Please remove this once HDDS-6414 is merged.
+   *
+   * @throws IOException IOException
+   */
+  @After
+  public void cleanup() throws IOException {
+    getFs().delete(new Path(getBucketPath(), "root"), true);
+    getFs().delete(new Path(getBucketPath(), "dir"), true);
+    getFs().delete(new Path(getBucketPath(), "dir1"), true);
+    getFs().delete(new Path(getBucketPath(), "dir2"), true);
+    getFs().delete(new Path(getBucketPath(), "sub_dir1"), true);
+    getFs().delete(new Path(getBucketPath(), "file1"), true);
   }
 
   @Override
@@ -171,6 +188,9 @@ public class TestRootedOzoneFileSystemWithFSO
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
     //  rename should fail and return false
     Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
-  }
 
+    // cleanup
+    getFs().delete(subDir1, true);
+    getFs().delete(dir1Path, true);
+  }
 }

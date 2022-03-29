@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -251,5 +252,10 @@ public abstract class EndpointBase {
 
   public OzoneClient getClient() {
     return client;
+  }
+
+  @VisibleForTesting
+  public S3GatewayMetrics getMetrics() {
+    return S3GatewayMetrics.create();
   }
 }

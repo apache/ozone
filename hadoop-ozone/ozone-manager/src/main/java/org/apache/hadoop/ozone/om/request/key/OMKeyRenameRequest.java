@@ -70,10 +70,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyRenameRequest.class);
 
-  public OMKeyRenameRequest(OMRequest omRequest) {
-    super(omRequest);
-  }
-
   public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
   }
