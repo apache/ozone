@@ -51,37 +51,20 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
 
   /**
    * Private constructor, constructed via builder.
-   * @param adminName  - Administrator's name.
-   * @param ownerName  - Volume owner's name
-   * @param volume - volume name
-   * @param quotaInBytes - Volume Quota in bytes.
-   * @param quotaInNamespace - Volume Quota in counts.
-   * @param usedNamespace - Volume Namespace Quota Usage in counts.
-   * @param metadata - metadata map for custom key/value data.
-   * @param acls - list of volume acls.
-   * @param creationTime - Volume creation time.
-   * @param objectID - ID of this object.
-   * @param updateID - A sequence number that denotes the last update on this
-   * object. This is a monotonically increasing number.
    */
-  @SuppressWarnings({"checkstyle:ParameterNumber",
-      "This is invoked from a builder."})
-  private OmVolumeArgs(String adminName, String ownerName, String volume,
-      long quotaInBytes, long quotaInNamespace, long usedNamespace,
-      Map<String, String> metadata, List<OzoneAcl> acls, long creationTime,
-      long modificationTime, long objectID, long updateID) {
-    this.adminName = adminName;
-    this.ownerName = ownerName;
-    this.volume = volume;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-    this.usedNamespace = usedNamespace;
-    this.metadata = metadata;
-    this.acls = acls;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.objectID = objectID;
-    this.updateID = updateID;
+  private OmVolumeArgs(Builder builder) {
+    this.adminName = builder.adminName;
+    this.ownerName = builder.ownerName;
+    this.volume = builder.volume;
+    this.quotaInBytes = builder.quotaInBytes;
+    this.quotaInNamespace = builder.quotaInNamespace;
+    this.usedNamespace = builder.usedNamespace;
+    this.metadata = builder.metadata;
+    this.acls = builder.acls;
+    this.creationTime = builder.creationTime;
+    this.modificationTime = builder.modificationTime;
+    this.objectID = builder.objectID;
+    this.updateID = builder.updateID;
   }
 
 
@@ -352,6 +335,11 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setAcls(List<OzoneAcl> acls) {
+      this.acls = acls;
+      return this;
+    }
+
     /**
      * Constructs a CreateVolumeArgument.
      * @return CreateVolumeArgs.
@@ -360,9 +348,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(adminName);
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
-      return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-          quotaInNamespace, usedNamespace, metadata, acls, creationTime,
-          modificationTime, objectID, updateID);
+      return new OmVolumeArgs(this);
     }
 
   }
@@ -387,21 +373,20 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   }
 
   public static OmVolumeArgs getFromProtobuf(VolumeInfo volInfo) {
-    List<OzoneAcl> acls = OzoneAclUtil.fromProtobuf(
-        volInfo.getVolumeAclsList());
-    return new OmVolumeArgs(
-        volInfo.getAdminName(),
-        volInfo.getOwnerName(),
-        volInfo.getVolume(),
-        volInfo.getQuotaInBytes(),
-        volInfo.getQuotaInNamespace(),
-        volInfo.getUsedNamespace(),
-        KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()),
-        acls,
-        volInfo.getCreationTime(),
-        volInfo.getModificationTime(),
-        volInfo.getObjectID(),
-        volInfo.getUpdateID());
+    return OmVolumeArgs.newBuilder()
+        .setAdminName(volInfo.getAdminName())
+        .setOwnerName(volInfo.getOwnerName())
+        .setVolume(volInfo.getVolume())
+        .setQuotaInBytes(volInfo.getQuotaInBytes())
+        .setQuotaInNamespace(volInfo.getQuotaInNamespace())
+        .setUsedNamespace(volInfo.getUsedNamespace())
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()))
+        .setAcls(OzoneAclUtil.fromProtobuf(volInfo.getVolumeAclsList()))
+        .setCreationTime(volInfo.getCreationTime())
+        .setModificationTime(volInfo.getModificationTime())
+        .setObjectID(volInfo.getObjectID())
+        .setUpdateID(volInfo.getUpdateID())
+        .build();
   }
 
   @Override
@@ -420,19 +405,26 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * Return a new copy of the object.
    */
   public OmVolumeArgs copyObject() {
-    Map<String, String> cloneMetadata = new HashMap<>();
-    if (metadata != null) {
-      metadata.forEach((k, v) -> cloneMetadata.put(k, v));
-    }
+    Map<String, String> cloneMetadata = new HashMap<>(metadata);
 
-    List<OzoneAcl> cloneAcls = new ArrayList(acls.size());
-
+    List<OzoneAcl> cloneAcls = new ArrayList<>(acls.size());
     acls.forEach(acl -> cloneAcls.add(new OzoneAcl(acl.getType(),
         acl.getName(), (BitSet) acl.getAclBitSet().clone(),
         acl.getAclScope())));
 
-    return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        quotaInNamespace, usedNamespace, cloneMetadata, cloneAcls,
-        creationTime, modificationTime, objectID, updateID);
+    return OmVolumeArgs.newBuilder()
+        .setAdminName(adminName)
+        .setOwnerName(ownerName)
+        .setVolume(volume)
+        .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInNamespace(quotaInNamespace)
+        .setUsedNamespace(usedNamespace)
+        .addAllMetadata(cloneMetadata)
+        .setAcls(cloneAcls)
+        .setObjectID(objectID)
+        .setUpdateID(updateID)
+        .build();
   }
 }
