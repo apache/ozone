@@ -332,7 +332,7 @@ public class BlockManagerImpl implements BlockManager {
         List<? extends Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
                 .getSequentialRangeKVs(startKey, count,
-                    cData.getUnprefixedKeyFilter());
+                    cData.containerPrefix(), cData.getUnprefixedKeyFilter());
         for (Table.KeyValue<String, BlockData> entry : range) {
           result.add(entry.getValue());
         }
