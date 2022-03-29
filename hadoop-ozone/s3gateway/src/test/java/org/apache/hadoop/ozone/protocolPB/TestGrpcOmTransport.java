@@ -59,6 +59,19 @@ public class TestGrpcOmTransport {
   }
 
   @Test
+  public void testHrpcOmTransportFactory() throws Exception {
+    String omServiceId = "";
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
+    // OmTransport should be Hadoop Rpc and
+    // fail equality GrpcOmTransport equality test
+    Assert.assertNotEquals(GrpcOmTransport.class.getSimpleName(),
+        omTransport.getClass().getSimpleName());
+  }
+
+  @Test
   public void testStartStop() throws Exception {
     String omServiceId = "";
     OzoneConfiguration conf = new OzoneConfiguration();
