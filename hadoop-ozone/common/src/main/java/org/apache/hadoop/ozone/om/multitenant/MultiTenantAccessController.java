@@ -27,6 +27,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -116,6 +117,21 @@ public interface MultiTenantAccessController {
       return Optional.ofNullable(roleID);
     }
 
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (other == null || getClass() != other.getClass()) {
+        return false;
+      }
+      Role role = (Role) other;
+      return Objects.equals(getName(), role.getName()) &&
+          Objects.equals(getUsers(), role.getUsers()) &&
+          Objects.equals(getDescription(), role.getDescription()) &&
+          Objects.equals(getRoleID(), role.getRoleID());
+    }
+
     public static final class Builder {
       private String name;
       private final Collection<BasicUserPrincipal> users;
@@ -191,6 +207,18 @@ public interface MultiTenantAccessController {
     public boolean isAllowed() {
       return isAllowed;
     }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (other == null || getClass() != other.getClass()) {
+        return false;
+      }
+      Acl otherAcl = (Acl) other;
+      return isAllowed() == otherAcl.isAllowed() && acl == otherAcl.acl;
+    }
   }
 
   /**
@@ -241,6 +269,24 @@ public interface MultiTenantAccessController {
 
     public Map<String, Collection<Acl>> getRoleAcls() {
       return Collections.unmodifiableMap(roleAcls);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (other == null || getClass() != other.getClass()) {
+        return false;
+      }
+      Policy policy = (Policy) other;
+      return Objects.equals(getName(), policy.getName()) &&
+          Objects.equals(getVolumes(), policy.getVolumes()) &&
+          Objects.equals(getBuckets(), policy.getBuckets()) &&
+          Objects.equals(getKeys(), policy.getKeys()) &&
+          Objects.equals(getDescription(), policy.getDescription()) &&
+          Objects.equals(getRoleAcls(), policy.getRoleAcls()) &&
+          Objects.equals(getLabels(), policy.getLabels());
     }
 
     public static final class Builder {
