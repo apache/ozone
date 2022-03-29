@@ -372,11 +372,6 @@ public interface MultiTenantAccessController {
       }
 
       public Policy build() {
-        // All policies must have at least a volume specified as a resource.
-        if (volumes.isEmpty()) {
-          throw new IllegalStateException("A policy must have at least one " +
-              "volume as a resource.");
-        }
         if (name == null || name.isEmpty()) {
           throw new IllegalStateException("A policy must have a non-empty " +
               "name.");
