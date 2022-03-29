@@ -104,7 +104,7 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("uploads") String uploads,
       @QueryParam("acl") String aclMarker,
       @Context HttpHeaders hh) throws OS3Exception, IOException {
-    S3GAction s3GAction = null;
+    S3GAction s3GAction = S3GAction.GET_BUCKET;
     Map<String, String> auditParams = S3Utils.genAuditParam(
         "bucket", bucketName,
         "delimiter", delimiter,
@@ -148,7 +148,6 @@ public class BucketEndpoint extends EndpointBase {
         prefix = "";
       }
 
-      s3GAction = S3GAction.GET_BUCKET;
       OzoneBucket bucket = getBucket(bucketName);
 
       // Assign marker to startAfter. for the compatibility of aws api v1
@@ -176,7 +175,7 @@ public class BucketEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
@@ -262,7 +261,7 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("acl") String aclMarker,
       @Context HttpHeaders httpHeaders,
       InputStream body) throws IOException, OS3Exception {
-    S3GAction s3GAction = null;
+    S3GAction s3GAction = S3GAction.CREATE_BUCKET;
     Map<String, String> auditParams = S3Utils.genAuditParam(
         "bucket", bucketName,
         "acl", aclMarker
@@ -272,7 +271,6 @@ public class BucketEndpoint extends EndpointBase {
         s3GAction = S3GAction.PUT_ACL;
         return putAcl(bucketName, httpHeaders, body);
       }
-      s3GAction = S3GAction.CREATE_BUCKET;
       String location = createS3Bucket(bucketName);
       LOG.info("Location is {}", location);
       AUDIT.logWriteSuccess(
@@ -290,7 +288,7 @@ public class BucketEndpoint extends EndpointBase {
       LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
           exception);
       throw exception;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
@@ -335,7 +333,7 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
@@ -395,7 +393,7 @@ public class BucketEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;

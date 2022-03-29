@@ -163,7 +163,7 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
       InputStream body) throws IOException, OS3Exception {
 
-    S3GAction s3GAction = null;
+    S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
     Map<String, String> auditParams = genAuditParam(
         "bucket", bucketName,
@@ -210,7 +210,6 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       // Normal put object
-      s3GAction = S3GAction.CREATE_KEY;
       OzoneBucket bucket = getBucket(bucketName);
 
       output = bucket.createKey(keyPath, length, replicationType,
@@ -248,7 +247,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       LOG.error("Exception occurred in PutObject", ex);
       throw ex;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
@@ -282,7 +281,7 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("part-number-marker") String partNumberMarker,
       InputStream body) throws IOException, OS3Exception {
 
-    S3GAction s3GAction = null;
+    S3GAction s3GAction = S3GAction.GET_KEY;
     boolean auditSuccess = true;
     Map<String, String> auditParams = genAuditParam(
         "bucket", bucketName,
@@ -301,7 +300,6 @@ public class ObjectEndpoint extends EndpointBase {
             partMarker, maxParts);
       }
 
-      s3GAction = S3GAction.GET_KEY;
       OzoneBucket bucket = getBucket(bucketName);
 
       OzoneKeyDetails keyDetails = bucket.getKey(keyPath);
@@ -387,7 +385,7 @@ public class ObjectEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex)
@@ -446,7 +444,7 @@ public class ObjectEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
@@ -543,7 +541,7 @@ public class ObjectEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
@@ -612,7 +610,7 @@ public class ObjectEndpoint extends EndpointBase {
       LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
           "key: {}", bucket, key, ex);
       throw ex;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
@@ -695,7 +693,7 @@ public class ObjectEndpoint extends EndpointBase {
       LOG.error("Error in Complete Multipart Upload Request for bucket: {}, " +
           ", key: {}", bucket, key, ex);
       throw ex;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
