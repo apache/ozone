@@ -265,7 +265,7 @@ public final class SCMCertStore implements CertificateStore {
     } else {
       List<? extends Table.KeyValue<BigInteger, CertInfo>> certs =
           scmMetadataStore.getRevokedCertsV2Table().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
 
       for (Table.KeyValue<BigInteger, CertInfo> kv : certs) {
         try {
@@ -290,10 +290,10 @@ public final class SCMCertStore implements CertificateStore {
 
     if (role == SCM) {
       return scmMetadataStore.getValidSCMCertsTable().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
     } else {
       return scmMetadataStore.getValidCertsTable().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
     }
   }
 
