@@ -217,7 +217,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     List<? extends KeyValue
         <String, ? extends WithParentObjectId>> infoList =
-        table.getRangeKVs(null, 1000, filter);
+        table.getRangeKVs(null, 1000, null, filter);
 
     for (KeyValue<String, ? extends WithParentObjectId> info :infoList) {
       Path key = Paths.get(info.getKey());

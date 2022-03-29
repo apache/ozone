@@ -217,7 +217,8 @@ public final class KeyValueContainerUtil {
                 kvContainerData.getDeletingBlockKeyFilter();
         int numPendingDeletionBlocks =
             store.getBlockDataTable()
-            .getSequentialRangeKVs(null, Integer.MAX_VALUE, filter)
+            .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
+                Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter)
             .size();
         kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
       }

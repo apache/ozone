@@ -34,7 +34,6 @@ import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
-import org.rocksdb.RocksIterator;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -214,6 +213,14 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
+  public TableIterator<byte[], ByteArrayKeyValue> iterator(byte[] prefix) {
+    ReadOptions readOptions = new ReadOptions();
+    readOptions.setFillCache(false);
+    return new RDBStoreIterator(db.newIterator(handle, readOptions), this,
+        prefix);
+  }
+
+  @Override
   public String getName() throws IOException {
     try {
       return StringUtils.bytes2String(this.getHandle().getName());
@@ -239,58 +246,57 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, false, filters);
+    return getRangeKVs(startKey, count, false, prefix, filters);
   }
 
   @Override
   public List<ByteArrayKeyValue> getSequentialRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, true, filters);
+    return getRangeKVs(startKey, count, true, prefix, filters);
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, boolean sequential,
+      int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
     List<ByteArrayKeyValue> result = new ArrayList<>();
     long start = System.currentTimeMillis();
+
     if (count < 0) {
       throw new IllegalArgumentException(
             "Invalid count given " + count + ", count must be greater than 0");
     }
-    try (RocksIterator it = db.newIterator(handle)) {
+    try (TableIterator<byte[], ByteArrayKeyValue> it = iterator(prefix)) {
       if (startKey == null) {
         it.seekToFirst();
       } else {
-        if (get(startKey) == null) {
+        if ((prefix == null || startKey.length > prefix.length)
+            && get(startKey) == null) {
           // Key not found, return empty list
           return result;
         }
         it.seek(startKey);
       }
-      while (it.isValid() && result.size() < count) {
-        byte[] currentKey = it.key();
-        byte[] currentValue = it.value();
 
-        it.prev();
-        final byte[] prevKey = it.isValid() ? it.key() : null;
-
-        it.seek(currentKey);
-        it.next();
-        final byte[] nextKey = it.isValid() ? it.key() : null;
+      while (it.hasNext() && result.size() < count) {
+        ByteArrayKeyValue currentEntry = it.next();
+        byte[] currentKey = currentEntry.getKey();
 
         if (filters == null) {
-          result.add(ByteArrayKeyValue
-                  .create(currentKey, currentValue));
+          result.add(currentEntry);
         } else {
+          // NOTE: the preKey and nextKey are never checked
+          // in all existing underlying filters, so they could
+          // be safely as null here.
           if (Arrays.stream(filters)
-                  .allMatch(entry -> entry.filterKey(prevKey,
-                          currentKey, nextKey))) {
-            result.add(ByteArrayKeyValue
-                    .create(currentKey, currentValue));
+                  .allMatch(entry -> entry.filterKey(null,
+                          currentKey, null))) {
+            result.add(currentEntry);
           } else {
             if (result.size() > 0 && sequential) {
               // if the caller asks for a sequential range of results,

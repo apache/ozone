@@ -281,6 +281,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public TableIterator<KEY, TypedKeyValue> iterator(KEY prefix)
+      throws IOException {
+    TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
+        rawTable.iterator(codecRegistry.asRawData(prefix));
+    return new TypedTableIterator(iterator, keyType, valueType);
+  }
+
+  @Override
   public String getName() throws IOException {
     return rawTable.getName();
   }
@@ -315,19 +323,23 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<TypedKeyValue> getRangeKVs(
-          KEY startKey, int count,
+          KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
     byte[] startKeyBytes = null;
+    byte[] prefixBytes = null;
     if (startKey != null) {
       startKeyBytes = codecRegistry.asRawData(startKey);
     }
+    if (prefix != null) {
+      prefixBytes = codecRegistry.asRawData(prefix);
+    }
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
-            rawTable.getRangeKVs(startKeyBytes, count, filters);
+        rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filters);
 
     List<TypedKeyValue> rangeKVs = new ArrayList<>();
     rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
@@ -337,19 +349,24 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<TypedKeyValue> getSequentialRangeKVs(
-          KEY startKey, int count,
+          KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
     byte[] startKeyBytes = null;
+    byte[] prefixBytes = null;
     if (startKey != null) {
       startKeyBytes = codecRegistry.asRawData(startKey);
     }
+    if (prefix != null) {
+      prefixBytes = codecRegistry.asRawData(prefix);
+    }
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
-            rawTable.getSequentialRangeKVs(startKeyBytes, count, filters);
+        rawTable.getSequentialRangeKVs(startKeyBytes, count,
+            prefixBytes, filters);
 
     List<TypedKeyValue> rangeKVs = new ArrayList<>();
     rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
