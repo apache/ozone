@@ -80,22 +80,6 @@ public class OzoneKey {
             ReplicationFactor.valueOf(replicationFactor));
   }
 
-  @SuppressWarnings("parameternumber")
-  public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationType type,
-                  int replicationFactor, Map<String, String> metadata) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.name = keyName;
-    this.dataSize = size;
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type,
-        ReplicationFactor.valueOf(replicationFactor));
-    this.metadata.putAll(metadata);
-  }
-
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -122,6 +106,7 @@ public class OzoneKey {
         modificationTime, replicationConfig);
     this.metadata.putAll(metadata);
   }
+
   /**
    * Returns Volume Name associated with the Key.
    *

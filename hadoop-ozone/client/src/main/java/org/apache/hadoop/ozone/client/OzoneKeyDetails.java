@@ -48,9 +48,10 @@ public class OzoneKeyDetails extends OzoneKey {
                          ReplicationType type, Map<String, String> metadata,
                          FileEncryptionInfo feInfo, int replicationFactor) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor, metadata);
+        modificationTime, type, replicationFactor);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
+    this.getMetadata().putAll(metadata);
   }
 
 
