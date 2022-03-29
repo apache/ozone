@@ -58,7 +58,7 @@ public abstract class EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName);
-      } else if (ex.getResult() == ResultCodes.S3_SECRET_NOT_FOUND) {
+      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             s3Auth.getAccessID());
       } else if (ex.getResult() == ResultCodes.TIMEOUT ||
