@@ -67,25 +67,16 @@ public final class ServiceInfo {
 
   /**
    * Constructs the ServiceInfo for the {@code nodeType}.
-   * @param nodeType type of node/service
-   * @param hostname hostname of the service
-   * @param portList list of ports the service listens to
    */
-  private ServiceInfo(NodeType nodeType,
-                      String hostname,
-                      List<ServicePort> portList,
-                      OzoneManagerVersion omVersion,
-                      OMRoleInfo omRole) {
-    Preconditions.checkNotNull(nodeType);
-    Preconditions.checkNotNull(hostname);
-    this.nodeType = nodeType;
-    this.hostname = hostname;
-    this.omVersion = omVersion;
+  private ServiceInfo(Builder builder) {
+    this.nodeType = builder.nodeType;
+    this.hostname = builder.hostname;
+    this.omVersion = builder.omVersion;
     this.ports = new HashMap<>();
-    for (ServicePort port : portList) {
+    for (ServicePort port : builder.portList) {
       ports.put(port.getType(), port.getValue());
     }
-    this.omRoleInfo = omRole;
+    this.omRoleInfo = builder.omRoleInfo;
   }
 
   /**
@@ -181,11 +172,14 @@ public final class ServiceInfo {
   @JsonIgnore
   public static ServiceInfo getFromProtobuf(
       OzoneManagerProtocolProtos.ServiceInfo serviceInfo) {
-    return new ServiceInfo(serviceInfo.getNodeType(),
-        serviceInfo.getHostname(),
-        serviceInfo.getServicePortsList(),
-        OzoneManagerVersion.fromProtoValue(serviceInfo.getOMVersion()),
-        serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null);
+    return ServiceInfo.newBuilder()
+        .setNodeType(serviceInfo.getNodeType())
+        .setHostname(serviceInfo.getHostname())
+        .setPortList(serviceInfo.getServicePortsList())
+        .setOmVersion(OzoneManagerVersion
+            .fromProtoValue(serviceInfo.getOMVersion()))
+        .setOmRoleInfo(serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null)
+        .build();
   }
 
   /**
@@ -201,8 +195,8 @@ public final class ServiceInfo {
    */
   public static class Builder {
 
-    private NodeType node;
-    private String host;
+    private NodeType nodeType;
+    private String hostname;
     private List<ServicePort> portList = new ArrayList<>();
     private OMRoleInfo omRoleInfo;
     private OzoneManagerVersion omVersion;
@@ -230,7 +224,7 @@ public final class ServiceInfo {
      * @return the builder
      */
     public Builder setNodeType(NodeType nodeType) {
-      node = nodeType;
+      this.nodeType = nodeType;
       return this;
     }
 
@@ -240,7 +234,17 @@ public final class ServiceInfo {
      * @return the builder
      */
     public Builder setHostname(String hostname) {
-      host = hostname;
+      this.hostname = hostname;
+      return this;
+    }
+
+    /**
+     * Sets the hostname of the service.
+     * @param portList list of ServicePort
+     * @return the builder
+     */
+    public Builder setPortList(List<ServicePort> portList) {
+      this.portList = portList;
       return this;
     }
 
@@ -254,6 +258,11 @@ public final class ServiceInfo {
       return this;
     }
 
+    /**
+     * Sets the OMRoleInfo of the service.
+     * @param omRole info of OM role
+     * @return the builder
+     */
     public Builder setOmRoleInfo(OMRoleInfo omRole) {
       omRoleInfo = omRole;
       return this;
@@ -264,11 +273,9 @@ public final class ServiceInfo {
      * @return {@link ServiceInfo}
      */
     public ServiceInfo build() {
-      return new ServiceInfo(node,
-          host,
-          portList,
-          omVersion,
-          omRoleInfo);
+      Preconditions.checkNotNull(nodeType);
+      Preconditions.checkNotNull(hostname);
+      return new ServiceInfo(this);
     }
   }
 
