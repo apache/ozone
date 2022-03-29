@@ -309,9 +309,24 @@ public class BucketEndpoint extends EndpointBase {
 
     OzoneBucket bucket = getBucket(bucketName);
 
-    OzoneMultipartUploadList ozoneMultipartUploadList = null;
     try {
-      ozoneMultipartUploadList = bucket.listMultipartUploads(prefix);
+      OzoneMultipartUploadList ozoneMultipartUploadList =
+          bucket.listMultipartUploads(prefix);
+
+      ListMultipartUploadsResult result = new ListMultipartUploadsResult();
+      result.setBucket(bucketName);
+
+      ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
+          new ListMultipartUploadsResult.Upload(
+              upload.getKeyName(),
+              upload.getUploadId(),
+              upload.getCreationTime(),
+              S3StorageType.fromReplicationType(upload.getReplicationType(),
+                  upload.getReplicationFactor())
+          )));
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
+      getMetrics().incListMultipartUploadsSuccess();
+      return Response.ok(result).build();
     } catch (OMException exception) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, exception));
@@ -323,22 +338,8 @@ public class BucketEndpoint extends EndpointBase {
     } catch (IOException ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
+      throw ex;
     }
-
-    ListMultipartUploadsResult result = new ListMultipartUploadsResult();
-    result.setBucket(bucketName);
-
-    ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
-        new ListMultipartUploadsResult.Upload(
-            upload.getKeyName(),
-            upload.getUploadId(),
-            upload.getCreationTime(),
-            S3StorageType.fromReplicationType(upload.getReplicationType(),
-                upload.getReplicationFactor())
-        )));
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
-    getMetrics().incListMultipartUploadsSuccess();
-    return Response.ok(result).build();
   }
   /**
    * Rest endpoint to check the existence of a bucket.

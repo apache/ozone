@@ -29,12 +29,14 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,6 +51,9 @@ import static org.junit.Assert.assertEquals;
  */
 public class TestS3GatewayAuditLog {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestS3GatewayAuditLog.class.getName());
+
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
     System.setProperty("log4j2.contextSelector",
@@ -62,51 +67,40 @@ public class TestS3GatewayAuditLog {
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
 
-  private static final String USER = "testuser";
-  private static final String IP_ADDRESS = "localhost";
-
   @Before
   public void setup() throws Exception {
-    S3Auth s3Auth = new S3Auth("strToSign", "signature", USER);
 
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
-    bucketEndpoint = new BucketEndpoint() {
-      @Override
-      public String getClientIpAddress() {
-        return IP_ADDRESS;
-      }
-    };
-    bucketEndpoint.setS3Auth(s3Auth);
+    bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
 
-    rootEndpoint = new RootEndpoint() {
-      @Override
-      public String getClientIpAddress() {
-        return IP_ADDRESS;
-      }
-    };
-    rootEndpoint.setS3Auth(s3Auth);
+    rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
 
-    keyEndpoint = new ObjectEndpoint() {
-      @Override
-      public String getClientIpAddress() {
-        return IP_ADDRESS;
-      }
-    };
-    keyEndpoint.setS3Auth(s3Auth);
+    keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
 
   }
 
+  @AfterClass
+  public static void tearDown() {
+    File file = new File("audit.log");
+    if (FileUtils.deleteQuietly(file)) {
+      LOG.info("{} has been deleted as all tests have completed.",
+          file.getName());
+    } else {
+      LOG.info("audit.log could not be deleted.");
+    }
+  }
+
   @Test
   public void testHeadBucket() throws Exception {
     bucketEndpoint.head(bucketName);
-    String expected = "INFO  | S3GAudit | ? | user=testuser | ip=localhost | " +
+    String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
         "op=HEAD_BUCKET {bucket=bucket} | ret=SUCCESS";
     verifyLog(expected);
   }
@@ -115,7 +109,7 @@ public class TestS3GatewayAuditLog {
   public void testListBucket() throws Exception {
 
     rootEndpoint.get().getEntity();
-    String expected = "INFO  | S3GAudit | ? | user=testuser | ip=localhost | " +
+    String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
         "op=LIST_S3_BUCKETS null | ret=SUCCESS";
     verifyLog(expected);
   }
@@ -131,7 +125,7 @@ public class TestS3GatewayAuditLog {
 
 
     keyEndpoint.head(bucketName, "key1");
-    String expected = "INFO  | S3GAudit | ? | user=testuser | ip=localhost | " +
+    String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
         "op=HEAD_KEY {bucket=bucket, keyPath=key1} | ret=SUCCESS";
     verifyLog(expected);
 
