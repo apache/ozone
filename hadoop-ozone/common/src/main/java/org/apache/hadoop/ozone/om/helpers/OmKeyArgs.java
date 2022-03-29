@@ -50,30 +50,23 @@ public final class OmKeyArgs implements Auditable {
   private boolean recursive;
   private boolean headOp;
 
-  @SuppressWarnings("parameternumber")
-  private OmKeyArgs(String volumeName, String bucketName, String keyName,
-      long dataSize, ReplicationConfig replicationConfig,
-      List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
-      String uploadID, int partNumber,
-      Map<String, String> metadataMap, boolean refreshPipeline,
-      List<OzoneAcl> acls, boolean sortDatanode,
-      boolean latestVersionLocation, boolean recursive, boolean headOp) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.dataSize = dataSize;
-    this.replicationConfig = replicationConfig;
-    this.locationInfoList = locationInfoList;
-    this.isMultipartKey = isMultipart;
-    this.multipartUploadID = uploadID;
-    this.multipartUploadPartNumber = partNumber;
-    this.metadata = metadataMap;
-    this.refreshPipeline = refreshPipeline;
-    this.acls = acls;
-    this.sortDatanodesInPipeline = sortDatanode;
-    this.latestVersionLocation = latestVersionLocation;
-    this.recursive = recursive;
-    this.headOp = headOp;
+  private OmKeyArgs(Builder builder) {
+    this.volumeName = builder.volumeName;
+    this.bucketName = builder.bucketName;
+    this.keyName = builder.keyName;
+    this.dataSize = builder.dataSize;
+    this.replicationConfig = builder.replicationConfig;
+    this.locationInfoList = builder.locationInfoList;
+    this.isMultipartKey = builder.isMultipartKey;
+    this.multipartUploadID = builder.multipartUploadID;
+    this.multipartUploadPartNumber = builder.multipartUploadPartNumber;
+    this.metadata = builder.metadata;
+    this.refreshPipeline = builder.refreshPipeline;
+    this.acls = builder.acls;
+    this.sortDatanodesInPipeline = builder.sortDatanodesInPipeline;
+    this.latestVersionLocation = builder.latestVersionLocation;
+    this.recursive = builder.recursive;
+    this.headOp = builder.headOp;
   }
 
   public boolean getIsMultipartKey() {
@@ -298,11 +291,7 @@ public final class OmKeyArgs implements Auditable {
     }
 
     public OmKeyArgs build() {
-      return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
-          replicationConfig, locationInfoList, isMultipartKey,
-          multipartUploadID,
-          multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp);
+      return new OmKeyArgs(this);
     }
 
   }
