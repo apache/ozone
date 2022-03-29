@@ -40,6 +40,9 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.DBKeyGenerator;
+import org.apache.hadoop.ozone.om.DBKeyGeneratorImpl;
+import org.apache.hadoop.ozone.om.DBKeyGeneratorWithFSOImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -98,14 +101,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
+  private final DBKeyGenerator dbKeyGenerator;
 
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
+    this.dbKeyGenerator = this.bucketLayout.isFileSystemOptimized() ?
+        new DBKeyGeneratorWithFSOImpl() :
+        new DBKeyGeneratorImpl();
   }
 
   public OMKeyRequest(OMRequest omRequest, BucketLayout bucketLayoutArg) {
     super(omRequest);
     this.bucketLayout = bucketLayoutArg;
+    this.dbKeyGenerator = this.bucketLayout.isFileSystemOptimized() ?
+        new DBKeyGeneratorWithFSOImpl() :
+        new DBKeyGeneratorImpl();
   }
 
   public BucketLayout getBucketLayout() {
@@ -801,5 +811,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
           trxnLogIndex, isRatisEnabled);
+  }
+
+  /**
+   * Get the DBKeyPathGenerator instance for generating the DB key for querying
+   * key/file table.
+   *
+   * @return DBKeyPathGenerator instance.
+   */
+  public DBKeyGenerator getDbKeyPathGenerator() {
+    return dbKeyGenerator;
   }
 }

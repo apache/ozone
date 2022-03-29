@@ -134,7 +134,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
 
       String objectKey =
-          omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+          getDbKeyPathGenerator().getOzoneDBKey(keyArgs, ozoneManager, "");
 
       acquiredLock = omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);

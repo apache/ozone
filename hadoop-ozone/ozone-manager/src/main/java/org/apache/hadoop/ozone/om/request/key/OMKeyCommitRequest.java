@@ -149,10 +149,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           commitKeyRequest.getClientID());
 
       String dbOzoneKey =
-          omMetadataManager.getOzoneKey(volumeName, bucketName,
-              keyName);
-      String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-          keyName, commitKeyRequest.getClientID());
+          getDbKeyPathGenerator().getOzoneDBKey(commitKeyArgs, ozoneManager,
+              "");
+      String dbOpenKey =
+          getDbKeyPathGenerator().getOzoneOpenDBKey(commitKeyArgs,
+              ozoneManager, commitKeyRequest.getClientID(), "");
 
       List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
       for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {

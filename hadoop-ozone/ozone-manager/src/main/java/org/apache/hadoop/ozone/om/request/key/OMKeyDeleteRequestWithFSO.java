@@ -127,8 +127,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      String ozonePathKey = omMetadataManager.getOzonePathKey(
-              omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
+      String ozonePathKey =
+          getDbKeyPathGenerator().getOzoneDBKey(keyArgs, ozoneManager, "");
 
       if (keyStatus.isDirectory()) {
         // Check if there are any sub path exists under the user requested path
