@@ -73,7 +73,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
+    if (!(this instanceof OMKeyRenameRequestWithFSO)) {
+      OMClientRequestUtils.checkOBSClientRequestPreconditions(
+          getBucketLayout());
+    }
   }
 
   @Override

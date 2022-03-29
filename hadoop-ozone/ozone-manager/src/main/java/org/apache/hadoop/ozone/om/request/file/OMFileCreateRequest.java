@@ -82,7 +82,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
   public OMFileCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
+    if (!(this instanceof OMFileCreateRequestWithFSO)) {
+      OMClientRequestUtils.checkOBSClientRequestPreconditions(
+          getBucketLayout());
+    }
   }
 
   @Override

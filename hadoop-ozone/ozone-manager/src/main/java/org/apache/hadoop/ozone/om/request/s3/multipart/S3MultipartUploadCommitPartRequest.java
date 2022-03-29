@@ -76,7 +76,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   public S3MultipartUploadCommitPartRequest(OMRequest omRequest,
       BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
+    if (!(this instanceof S3MultipartUploadCommitPartRequestWithFSO)) {
+      OMClientRequestUtils.checkOBSClientRequestPreconditions(
+          getBucketLayout());
+    }
   }
 
   @Override

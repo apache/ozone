@@ -72,7 +72,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   public OMAllocateBlockRequest(OMRequest omRequest,
       BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
+    if (!(this instanceof OMAllocateBlockRequestWithFSO)) {
+      OMClientRequestUtils.checkOBSClientRequestPreconditions(
+          getBucketLayout());
+    }
   }
 
   @Override

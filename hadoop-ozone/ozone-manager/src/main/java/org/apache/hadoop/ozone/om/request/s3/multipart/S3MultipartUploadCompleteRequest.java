@@ -83,7 +83,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   public S3MultipartUploadCompleteRequest(OMRequest omRequest,
       BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
+    if (!(this instanceof S3MultipartUploadCompleteRequestWithFSO)) {
+      OMClientRequestUtils.checkOBSClientRequestPreconditions(
+          getBucketLayout());
+    }
   }
 
   @Override

@@ -76,7 +76,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
   public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
+    if (!(this instanceof OMKeyCommitRequestWithFSO)) {
+      OMClientRequestUtils.checkOBSClientRequestPreconditions(
+          getBucketLayout());
+    }
   }
 
   @Override

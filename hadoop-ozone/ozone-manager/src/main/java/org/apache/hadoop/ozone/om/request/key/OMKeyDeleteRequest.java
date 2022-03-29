@@ -66,7 +66,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
   public OMKeyDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-    OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
+    if (!(this instanceof OMKeyDeleteRequestWithFSO)) {
+      OMClientRequestUtils.checkOBSClientRequestPreconditions(
+          getBucketLayout());
+    }
   }
 
   @Override
