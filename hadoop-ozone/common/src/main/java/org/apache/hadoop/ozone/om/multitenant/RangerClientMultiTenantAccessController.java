@@ -19,16 +19,13 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_CLIENT_SSL_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +36,6 @@ import org.apache.http.auth.BasicUserPrincipal;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
-import org.apache.ranger.plugin.util.RangerRESTClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,26 +49,29 @@ public class RangerClientMultiTenantAccessController implements
     MultiTenantAccessController {
 
   private static final Logger LOG = LoggerFactory
-      .getLogger(MultiTenantAccessController.class);
+      .getLogger(RangerClientMultiTenantAccessController.class);
 
   private final RangerClient client;
-  private final String service;
-  private final Map<IAccessAuthorizer.ACLType, String> rangerAclStrings;
+  private final String rangerServiceName;
+  private final Map<IAccessAuthorizer.ACLType, String> aclToString;
+  private final Map<String, IAccessAuthorizer.ACLType> stringToAcl;
+  private final String omPrincipal;
 
   public RangerClientMultiTenantAccessController(OzoneConfiguration conf) {
-    rangerAclStrings = new EnumMap<>(IAccessAuthorizer.ACLType.class);
+    // TODO: Make these maps singleton.
+    aclToString = MultiTenantAccessController.getRangerAclStrings();
+    stringToAcl = new HashMap<>();
+    aclToString.forEach((type, string) -> stringToAcl.put(string, type));
 
     // TODO get these from the existing ranger plugin config.
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
-    System.err.println("Ranger address: " + rangerHttpsAddress);
-    service = conf.get(OZONE_RANGER_SERVICE);
-    System.err.println("Ranger service name: " + service);
+    rangerServiceName = conf.get(OZONE_RANGER_SERVICE);
 
     // Auth using kerberos if using 3.0 snapshot ranger client.
-    String principal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+    omPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
     String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
     client = new RangerClient(rangerHttpsAddress,
-        "kerberos", principal, keytabPath, service, "ozone");
+        "kerberos", omPrincipal, keytabPath, rangerServiceName, "ozone");
 
     // Auth with username/password if using 2.1.0 ranger client.
 //    String username = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
@@ -86,101 +85,119 @@ public class RangerClientMultiTenantAccessController implements
   }
 
   @Override
-  public long createPolicy(Policy policy) throws RangerServiceException {
+  public void createPolicy(Policy policy) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending create request for policy {} to Ranger.",
           policy.getName());
     }
-    return client.createPolicy(toRangerPolicy(policy)).getId();
+    client.createPolicy(toRangerPolicy(policy));
   }
 
   @Override
-  public void enablePolicy(long policyID) throws RangerServiceException {
+  public Policy getPolicy(String policyName) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending enable request for policy ID {} to Ranger.",
-          policyID);
+      LOG.debug("Sending get request for policy {} to Ranger.",
+          policyName);
     }
-    RangerPolicy rangerPolicy = client.getPolicy(policyID);
-    rangerPolicy.setIsEnabled(true);
-    client.updatePolicy(policyID, rangerPolicy);
+    return fromRangerPolicy(client.getPolicy(rangerServiceName, policyName));
   }
 
   @Override
-  public void disablePolicy(long policyID) throws RangerServiceException {
+  public List<Policy> getLabelledPolicies(String... labels)
+      throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending disable request for policy ID {} to Ranger.",
-          policyID);
+      LOG.debug("Sending get request for policies with labels {} to Ranger.",
+          String.join(", ", labels));
     }
-    RangerPolicy rangerPolicy = client.getPolicy(policyID);
-    rangerPolicy.setIsEnabled(true);
-    client.updatePolicy(policyID, rangerPolicy);
+    // TODO: See if this actually gets policies by label.
+    Map<String, String> filterMap = new HashMap<>();
+    Arrays.stream(labels).forEach(label -> filterMap.put("policyLabels", label));
+    return client.findPolicies(filterMap).stream()
+        .map(this::fromRangerPolicy)
+        .collect(Collectors.toList());
   }
 
   @Override
-  public void deletePolicy(long policyID) throws RangerServiceException {
+  public void updatePolicy(Policy policy) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending delete request for policy ID {} to Ranger.",
-          policyID);
+      LOG.debug("Sending update request for policy {} to Ranger.",
+          policy.getName());
     }
-    client.deletePolicy(policyID);
-
+    client.updatePolicy(rangerServiceName, policy.getName(),
+        toRangerPolicy(policy));
   }
 
   @Override
-  public long createRole(Role role) throws RangerServiceException {
+  public void deletePolicy(String policyName) throws RangerServiceException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sending delete request for policy {} to Ranger.",
+          policyName);
+    }
+    client.deletePolicy(rangerServiceName, policyName);
+  }
+
+  @Override
+  public void createRole(Role role) throws RangerServiceException {
+    if (role.getRoleID().isPresent()) {
+      throw new IllegalArgumentException("Role ID cannot be set outside of " +
+          "Ranger.");
+    }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending create request for role {} to Ranger.",
           role.getName());
     }
-    return client.createRole(service, toRangerRole(role)).getId();
+    client.createRole(rangerServiceName, toRangerRole(role));
   }
 
   @Override
-  public void deleteRole(long roleID) throws RangerServiceException {
+  public Role getRole(String roleName) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending delete request for role ID {} to Ranger.",
+      LOG.debug("Sending get request for role {} to Ranger.",
+          roleName);
+    }
+    return fromRangerRole(client.getRole(roleName, omPrincipal,
+        rangerServiceName));
+  }
+
+  @Override
+  public void updateRole(long roleID, Role role) throws RangerServiceException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sending update request for role ID {} to Ranger.",
           roleID);
     }
-    client.deleteRole(roleID);
+    client.updateRole(roleID, toRangerRole(role));
   }
 
   @Override
-  public void addUsersToRole(long roleID,
-      BasicUserPrincipal... newUsers) throws RangerServiceException {
+  public void deleteRole(String roleName) throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Adding users {} to role ID {} in Ranger.",
-          toUserListString(newUsers), roleID);
+      LOG.debug("Sending delete request for role {} to Ranger.",
+          roleName);
     }
-    RangerRole originalRole = client.getRole(roleID);
-    originalRole.getUsers().addAll(toRangerRoleMembers(newUsers));
-    client.updateRole(roleID, originalRole);
-  }
-
-  @Override
-  public void removeUsersFromRole(long roleID,
-      BasicUserPrincipal... users)
-      throws RangerServiceException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Removing users {} from role ID {} in Ranger.",
-          toUserListString(users), roleID);
-    }
-    RangerRole originalRole = client.getRole(roleID);
-    originalRole.getUsers().removeAll(toRangerRoleMembers(users));
-    client.updateRole(roleID, originalRole);
+    client.deleteRole(roleName, omPrincipal, rangerServiceName);
   }
 
   private static List<RangerRole.RoleMember> toRangerRoleMembers(
-      Collection<BasicUserPrincipal> users) {
-    return users.stream()
+      Collection<BasicUserPrincipal> members) {
+    return members.stream()
             .map(princ -> new RangerRole.RoleMember(princ.getName(), false))
             .collect(Collectors.toList());
   }
 
-  private static List<RangerRole.RoleMember> toRangerRoleMembers(
-      BasicUserPrincipal[] users) {
-    return Arrays.stream(users)
-        .map(princ -> new RangerRole.RoleMember(princ.getName(), false))
+  private static List<BasicUserPrincipal> fromRangerRoleMembers(
+      Collection<RangerRole.RoleMember> members) {
+    return members.stream()
+        .map(rangerUser -> new BasicUserPrincipal(rangerUser.getName()))
         .collect(Collectors.toList());
+  }
+
+  private static Role fromRangerRole(RangerRole rangerRole) {
+    return new Role.Builder()
+      .setID(rangerRole.getId())
+      .setName(rangerRole.getName())
+      .setDescription(rangerRole.getDescription())
+      .addUsers(fromRangerRoleMembers(rangerRole.getUsers()))
+      .build();
   }
 
   private static RangerRole toRangerRole(Role role) {
@@ -193,25 +210,81 @@ public class RangerClientMultiTenantAccessController implements
     return rangerRole;
   }
 
+  private Policy fromRangerPolicy(RangerPolicy rangerPolicy) {
+    Policy.Builder policyBuilder = new Policy.Builder();
+
+    // Get roles and their acls from the policy.
+    for (RangerPolicy.RangerPolicyItem policyItem:
+        rangerPolicy.getPolicyItems()) {
+      Collection<Acl> acls = new ArrayList<>();
+      for (RangerPolicy.RangerPolicyItemAccess access:
+           policyItem.getAccesses()) {
+        if (access.getIsAllowed()) {
+          acls.add(Acl.allow(stringToAcl.get(access.getType())));
+        } else {
+          acls.add(Acl.deny(stringToAcl.get(access.getType())));
+        }
+      }
+
+      for (String roleName: policyItem.getRoles()) {
+        policyBuilder.addRoleAcl(roleName, acls);
+      }
+    }
+
+    // Add resources.
+    for (Map.Entry<String, RangerPolicy.RangerPolicyResource> resource:
+        rangerPolicy.getResources().entrySet()) {
+      String resourceType = resource.getKey();
+      List<String> resourceNames = resource.getValue().getValues();
+      switch (resourceType) {
+        case "volume":
+          policyBuilder.addVolumes(resourceNames);
+          break;
+        case "bucket":
+          policyBuilder.addBuckets(resourceNames);
+          break;
+        case "key":
+          policyBuilder.addKeys(resourceNames);
+          break;
+        default:
+          LOG.warn("Pulled Ranger policy with unknown resource type '{}' with" +
+              " names '{}'", resourceType,
+              String.join(",", resourceNames));
+      }
+    }
+
+    policyBuilder.setName(rangerPolicy.getName())
+       .setDescription(rangerPolicy.getDescription())
+       .addLabels(rangerPolicy.getPolicyLabels());
+
+    return policyBuilder.build();
+  }
+
   private RangerPolicy toRangerPolicy(Policy policy) {
     RangerPolicy rangerPolicy = new RangerPolicy();
     rangerPolicy.setName(policy.getName());
+    rangerPolicy.setService(rangerServiceName);
+    rangerPolicy.setPolicyLabels(policy.getLabels());
 
+    // Add resources.
     Map<String, RangerPolicy.RangerPolicyResource> resource = new HashMap<>();
-    for (String volume: policy.getVolumes()) {
-      resource.put("volume",
-          new RangerPolicy.RangerPolicyResource(volume));
-    }
-    for (String bucket: policy.getVolumes()) {
-      resource.put("bucket",
-          new RangerPolicy.RangerPolicyResource(bucket));
-    }
-    for (String key: policy.getVolumes()) {
-      resource.put("key",
-          new RangerPolicy.RangerPolicyResource(key));
-    }
+    // Add volumes.
+    RangerPolicy.RangerPolicyResource volumeResources =
+        new RangerPolicy.RangerPolicyResource();
+    volumeResources.setValues(policy.getVolumes());
+    resource.put("volume", volumeResources);
+    // Add buckets.
+    RangerPolicy.RangerPolicyResource bucketResources =
+        new RangerPolicy.RangerPolicyResource();
+    bucketResources.setValues(policy.getBuckets());
+    resource.put("bucket", bucketResources);
+    // Add keys.
+    RangerPolicy.RangerPolicyResource keyResources =
+        new RangerPolicy.RangerPolicyResource();
+    keyResources.setValues(policy.getKeys());
+    resource.put("key", keyResources);
 
-    rangerPolicy.setService(service);
+    rangerPolicy.setService(rangerServiceName);
     rangerPolicy.setResources(resource);
 
     // Add roles to the policy.
@@ -224,7 +297,7 @@ public class RangerClientMultiTenantAccessController implements
         RangerPolicy.RangerPolicyItemAccess access =
             new RangerPolicy.RangerPolicyItemAccess();
         access.setIsAllowed(acl.isAllowed());
-        access.setType(rangerAclStrings.get(acl.getAclType()));
+        access.setType(aclToString.get(acl.getAclType()));
         item.getAccesses().add(access);
       }
 
@@ -232,22 +305,5 @@ public class RangerClientMultiTenantAccessController implements
     }
 
     return rangerPolicy;
-  }
-
-  private String toUserListString(BasicUserPrincipal[] users) {
-    return Arrays.stream(users)
-        .map(Object::toString).collect(Collectors.joining(", "));
-  }
-
-  private void fillRangerAclStrings() {
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.ALL, "All");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.LIST, "List");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ, "Read");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE, "Write");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.CREATE, "Create");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.DELETE, "Delete");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ_ACL, "Read_ACL");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE_ACL, "Write_ACL");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.NONE, "");
   }
 }
