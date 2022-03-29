@@ -172,6 +172,8 @@ share/ozone/lib/netty-common.Final.jar
 share/ozone/lib/netty-handler.Final.jar
 share/ozone/lib/netty-handler-proxy.Final.jar
 share/ozone/lib/netty-resolver.Final.jar
+share/ozone/lib/netty-tcnative-boringssl-static.Final.jar
+share/ozone/lib/netty-tcnative.Final.jar
 share/ozone/lib/netty-transport.Final.jar
 share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar

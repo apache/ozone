@@ -1350,7 +1350,7 @@ message UpdateGetS3SecretRequest {
 }
 
 /**
-  This will be used by OM to authenicate S3 gateway requests on a per request basis.
+  This will be used by OM to authenticate S3 gateway requests on a per request basis.
 */
 message S3Authentication {
     required string stringToSign = 1;
