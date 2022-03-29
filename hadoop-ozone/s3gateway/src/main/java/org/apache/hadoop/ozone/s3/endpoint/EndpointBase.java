@@ -49,6 +49,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 
@@ -212,12 +214,20 @@ public abstract class EndpointBase {
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> k.startsWith(CUSTOM_METADATA_HEADER_PREFIX))
             .collect(Collectors.toSet());
+    long sizeInBytes = 0;
     if (!customMetadataKeys.isEmpty()) {
       for (String key : customMetadataKeys) {
         String mapKey =
             key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
         List<String> values = requestHeaders.get(key);
-        customMetadata.put(mapKey, StringUtils.join(values, ","));
+        String value = StringUtils.join(values, ",");
+        sizeInBytes += mapKey.getBytes(UTF_8).length;
+        sizeInBytes += value.getBytes(UTF_8).length;
+        if (sizeInBytes > 2 * KB) {
+          throw new IllegalArgumentException("Illegal user defined metadata." +
+              " Combined size cannot exceed 2KB.");
+        }
+        customMetadata.put(mapKey, value);
       }
     }
     return customMetadata;
