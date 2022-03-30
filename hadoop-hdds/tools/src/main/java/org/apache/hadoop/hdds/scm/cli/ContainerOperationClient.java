@@ -493,8 +493,9 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<ContainerReplicaInfo>
       getContainerReplicas(long containerId) throws IOException {
-    List<HddsProtos.SCMContainerReplicaProto> protos
-        = storageContainerLocationClient.getContainerReplicas(containerId);
+    List<HddsProtos.SCMContainerReplicaProto> protos =
+        storageContainerLocationClient.getContainerReplicas(containerId,
+            ClientVersion.CURRENT_VERSION);
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     for (HddsProtos.SCMContainerReplicaProto p : protos) {
       replicas.add(ContainerReplicaInfo.fromProto(p));
