@@ -168,6 +168,11 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public void closeStalePipelines(DatanodeDetails datanodeDetails) {
+
+  }
+
+  @Override
   public void scrubPipeline(ReplicationConfig replicationConfig)
       throws IOException {
 

@@ -59,6 +59,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * SCM Pipeline Manager implementation.
@@ -372,6 +373,40 @@ public class PipelineManagerImpl implements PipelineManager {
       // close pipeline right away.
       removePipeline(pipeline);
     }
+  }
+
+  /** close the pipelines whose nodes' IPs are stale
+   *
+   * @param datanodeDetails new datanodeDetails
+   */
+  @Override
+  public void closeStalePipelines(DatanodeDetails datanodeDetails) {
+    List<Pipeline> pipelinesWithStaleIpOrHostname = getStalePipelines(datanodeDetails);
+    if (pipelinesWithStaleIpOrHostname.isEmpty()) {
+      LOG.info("No stale pipelines");
+      return;
+    }
+    LOG.info("Pipelines with stale IP or Host name: {}", pipelinesWithStaleIpOrHostname);
+    pipelinesWithStaleIpOrHostname.forEach(p -> {
+      try {
+        LOG.info("Closing pipeline: {}", p.getId());
+        closePipeline(p, false);
+        LOG.info("Closed pipeline: {}", p.getId());
+      } catch (IOException e) {
+        LOG.error("Close pipeline failed: {}", p, e);
+      }
+    });
+  }
+
+  @VisibleForTesting
+  List<Pipeline> getStalePipelines(DatanodeDetails datanodeDetails) {
+    List<Pipeline> pipelines = getPipelines();
+    return pipelines.stream()
+            .filter(p -> p.getNodes().stream()
+                    .anyMatch(n -> n.getUuid().equals(datanodeDetails.getUuid())
+                            && (!n.getIpAddress().equals(datanodeDetails.getIpAddress())
+                            || !n.getHostName().equals(datanodeDetails.getHostName()))))
+            .collect(Collectors.toList());
   }
 
   /**

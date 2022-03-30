@@ -90,6 +90,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void closePipeline(Pipeline pipeline, boolean onTimeout) throws IOException;
 
+  void closeStalePipelines(DatanodeDetails datanodeDetails);
+
   void scrubPipeline(ReplicationConfig replicationConfig)
       throws IOException;
 
