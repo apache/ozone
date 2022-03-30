@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -103,15 +102,15 @@ public class RangerClientMultiTenantAccessController implements
   }
 
   @Override
-  public List<Policy> getLabelledPolicies(String... labels)
+  public List<Policy> getLabeledPolicies(String label)
       throws RangerServiceException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending get request for policies with labels {} to Ranger.",
-          String.join(", ", labels));
+      LOG.debug("Sending get request for policies with label {} to Ranger.",
+          label);
     }
     // TODO: See if this actually gets policies by label.
     Map<String, String> filterMap = new HashMap<>();
-    Arrays.stream(labels).forEach(label -> filterMap.put("policyLabels", label));
+    filterMap.put("policyLabels", label);
     return client.findPolicies(filterMap).stream()
         .map(this::fromRangerPolicy)
         .collect(Collectors.toList());
@@ -138,10 +137,6 @@ public class RangerClientMultiTenantAccessController implements
 
   @Override
   public void createRole(Role role) throws RangerServiceException {
-    if (role.getRoleID().isPresent()) {
-      throw new IllegalArgumentException("Role ID cannot be set outside of " +
-          "Ranger.");
-    }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sending create request for role {} to Ranger.",
           role.getName());
@@ -264,24 +259,24 @@ public class RangerClientMultiTenantAccessController implements
     RangerPolicy rangerPolicy = new RangerPolicy();
     rangerPolicy.setName(policy.getName());
     rangerPolicy.setService(rangerServiceName);
-    rangerPolicy.setPolicyLabels(policy.getLabels());
+    rangerPolicy.setPolicyLabels(new ArrayList<>(policy.getLabels()));
 
     // Add resources.
     Map<String, RangerPolicy.RangerPolicyResource> resource = new HashMap<>();
     // Add volumes.
     RangerPolicy.RangerPolicyResource volumeResources =
         new RangerPolicy.RangerPolicyResource();
-    volumeResources.setValues(policy.getVolumes());
+    volumeResources.setValues(new ArrayList<>(policy.getVolumes()));
     resource.put("volume", volumeResources);
     // Add buckets.
     RangerPolicy.RangerPolicyResource bucketResources =
         new RangerPolicy.RangerPolicyResource();
-    bucketResources.setValues(policy.getBuckets());
+    bucketResources.setValues(new ArrayList<>(policy.getBuckets()));
     resource.put("bucket", bucketResources);
     // Add keys.
     RangerPolicy.RangerPolicyResource keyResources =
         new RangerPolicy.RangerPolicyResource();
-    keyResources.setValues(policy.getKeys());
+    keyResources.setValues(new ArrayList<>(policy.getKeys()));
     resource.put("key", keyResources);
 
     rangerPolicy.setService(rangerServiceName);

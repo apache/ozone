@@ -22,13 +22,14 @@ import org.apache.http.auth.BasicUserPrincipal;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Defines the operations needed for multi-tenant access control.
@@ -44,7 +45,7 @@ public interface MultiTenantAccessController {
 
   Policy getPolicy(String policyName) throws Exception;
 
-  List<Policy> getLabelledPolicies(String... labels) throws Exception;
+  List<Policy> getLabeledPolicies(String label) throws Exception;
 
   void updatePolicy(Policy policy) throws Exception;
 
@@ -83,101 +84,6 @@ public interface MultiTenantAccessController {
     rangerAclStrings.put(IAccessAuthorizer.ACLType.NONE, "");
 
     return rangerAclStrings;
-  }
-
-  /**
-   * Define a role to be created.
-   */
-  class Role {
-    private final String name;
-    private final Collection<BasicUserPrincipal> users;
-    private final String description;
-    private final Long roleID;
-
-    private Role(Builder builder) {
-      name = builder.name;
-      users = builder.users;
-      description = builder.description;
-      roleID = builder.roleID;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public Collection<BasicUserPrincipal> getUsers() {
-      return users;
-    }
-
-    public Optional<String> getDescription() {
-      return Optional.ofNullable(description);
-    }
-
-    public Optional<Long> getRoleID() {
-      return Optional.ofNullable(roleID);
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (other == null || getClass() != other.getClass()) {
-        return false;
-      }
-      Role role = (Role) other;
-      return Objects.equals(getName(), role.getName()) &&
-          Objects.equals(getUsers(), role.getUsers()) &&
-          Objects.equals(getDescription(), role.getDescription()) &&
-          Objects.equals(getRoleID(), role.getRoleID());
-    }
-
-    public static final class Builder {
-      private String name;
-      private final Collection<BasicUserPrincipal> users;
-      private String description;
-      private Long roleID;
-
-      public Builder() {
-        this.users = new ArrayList<>();
-      }
-
-      public Builder(Role copy) {
-        this.name = copy.getName();
-        this.users = copy.getUsers();
-        copy.getDescription().ifPresent(desc -> this.description = desc);
-        copy.getRoleID().ifPresent(id -> this.roleID = id);
-      }
-
-      public Builder setName(String name) {
-        this.name = name;
-        return this;
-      }
-
-      public Builder addUser(BasicUserPrincipal user) {
-        this.users.add(user);
-        return this;
-      }
-
-      public Builder addUsers(Collection<BasicUserPrincipal> users) {
-        this.users.addAll(users);
-        return this;
-      }
-
-      public Builder setDescription(String description) {
-        this.description = description;
-        return this;
-      }
-
-      public Builder setID(long roleID) {
-        this.roleID = roleID;
-        return this;
-      }
-
-      public Role build() {
-        return new Role(this);
-      }
-    }
   }
 
   /**
@@ -222,16 +128,111 @@ public interface MultiTenantAccessController {
   }
 
   /**
+   * Define a role to be created.
+   */
+  class Role {
+    private final String name;
+    private final Set<BasicUserPrincipal> users;
+    private final String description;
+    private final Long roleID;
+
+    private Role(Builder builder) {
+      name = builder.name;
+      users = builder.users;
+      description = builder.description;
+      roleID = builder.roleID;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public Set<BasicUserPrincipal> getUsers() {
+      return users;
+    }
+
+    public Optional<String> getDescription() {
+      return Optional.ofNullable(description);
+    }
+
+    public Optional<Long> getRoleID() {
+      return Optional.ofNullable(roleID);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (other == null || getClass() != other.getClass()) {
+        return false;
+      }
+      Role role = (Role) other;
+      // If one role does not have the ID set, still consider them equal.
+      // Role ID may not be set if the policy is being sent to Ranger for
+      // creation, but will be set if the same policy is retrieved from Ranger.
+      boolean roleIDsMatch = true;
+      if (getRoleID().isPresent() && role.getRoleID().isPresent()) {
+        roleIDsMatch = getRoleID().equals(role.getRoleID());
+      }
+      return Objects.equals(getName(), role.getName()) &&
+          Objects.equals(getUsers(), role.getUsers()) &&
+          Objects.equals(getDescription(), role.getDescription()) &&
+          roleIDsMatch;
+    }
+
+    public static final class Builder {
+      private String name;
+      private final Set<BasicUserPrincipal> users;
+      private String description;
+      private Long roleID;
+
+      public Builder() {
+        this.users = new HashSet<>();
+      }
+
+      public Builder setName(String name) {
+        this.name = name;
+        return this;
+      }
+
+      public Builder addUser(BasicUserPrincipal user) {
+        this.users.add(user);
+        return this;
+      }
+
+      public Builder addUsers(Collection<BasicUserPrincipal> users) {
+        this.users.addAll(users);
+        return this;
+      }
+
+      public Builder setDescription(String description) {
+        this.description = description;
+        return this;
+      }
+
+      public Builder setID(long roleID) {
+        this.roleID = roleID;
+        return this;
+      }
+
+      public Role build() {
+        return new Role(this);
+      }
+    }
+  }
+
+  /**
    * Define a policy to be created.
    */
   class Policy {
     private final String name;
-    private final List<String> volumes;
-    private final List<String> buckets;
-    private final List<String> keys;
+    private final Set<String> volumes;
+    private final Set<String> buckets;
+    private final Set<String> keys;
     private final String description;
     private final Map<String, Collection<Acl>> roleAcls;
-    private final List<String> labels;
+    private final Set<String> labels;
 
     private Policy(Builder builder) {
       name = builder.name;
@@ -243,16 +244,16 @@ public interface MultiTenantAccessController {
       labels = builder.labels;
     }
 
-    public List<String> getVolumes() {
-      return Collections.unmodifiableList(volumes);
+    public Set<String> getVolumes() {
+      return volumes;
     }
 
-    public List<String> getBuckets() {
-      return Collections.unmodifiableList(buckets);
+    public Set<String> getBuckets() {
+      return buckets;
     }
 
-    public List<String> getKeys() {
-      return Collections.unmodifiableList(keys);
+    public Set<String> getKeys() {
+      return keys;
     }
 
     public String getName() {
@@ -263,12 +264,12 @@ public interface MultiTenantAccessController {
       return Optional.ofNullable(description);
     }
 
-    public List<String> getLabels() {
-      return Collections.unmodifiableList(labels);
+    public Set<String> getLabels() {
+      return (labels);
     }
 
     public Map<String, Collection<Acl>> getRoleAcls() {
-      return Collections.unmodifiableMap(roleAcls);
+      return roleAcls;
     }
 
     @Override
@@ -291,29 +292,19 @@ public interface MultiTenantAccessController {
 
     public static final class Builder {
       private String name;
-      private final List<String> volumes;
-      private final List<String> buckets;
-      private final List<String> keys;
+      private final Set<String> volumes;
+      private final Set<String> buckets;
+      private final Set<String> keys;
       private String description;
       private final Map<String, Collection<Acl>> roleAcls;
-      private final List<String> labels;
+      private final Set<String> labels;
 
       public Builder() {
-        this.volumes = new ArrayList<>();
-        this.buckets = new ArrayList<>();
-        this.keys = new ArrayList<>();
+        this.volumes = new HashSet<>();
+        this.buckets = new HashSet<>();
+        this.keys = new HashSet<>();
         this.roleAcls = new HashMap<>();
-        this.labels = new ArrayList<>();
-      }
-
-      public Builder(Policy copy) {
-        this.name = copy.getName();
-        this.volumes = copy.getVolumes();
-        this.buckets = copy.getBuckets();
-        this.keys = copy.getKeys();
-        copy.getDescription().ifPresent(desc -> this.description = desc);
-        this.roleAcls = copy.getRoleAcls();
-        this.labels = copy.getLabels();
+        this.labels = new HashSet<>();
       }
 
       public Builder setName(String name) {
