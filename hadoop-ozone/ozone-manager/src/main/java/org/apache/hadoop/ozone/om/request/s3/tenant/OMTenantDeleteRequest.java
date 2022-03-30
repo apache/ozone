@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
@@ -81,6 +82,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantDeletes();
 
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
@@ -214,10 +218,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     if (exception == null) {
       LOG.info("Deleted tenant '{}' and volume '{}'", tenantId, volumeName);
-      // TODO: HDDS-6375: omMetrics.decNumTenants()
+      omMetrics.decNumTenants();
     } else {
       LOG.error("Failed to delete tenant '{}'", tenantId, exception);
-      // TODO: HDDS-6375: omMetrics.incNumTenantDeleteFails()
+      omMetrics.incNumTenantDeleteFails();
     }
     return omClientResponse;
   }

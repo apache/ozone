@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
@@ -217,6 +218,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantCreates();
+    omMetrics.incNumVolumeCreates();
+
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -367,10 +372,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     if (exception == null) {
       LOG.info("Created tenant '{}' and volume '{}'", tenantId, volumeName);
-      // TODO: HDDS-6375: omMetrics.incNumTenants()
+      omMetrics.incNumTenants();
+      omMetrics.incNumVolumes();
     } else {
       LOG.error("Failed to create tenant '{}'", tenantId, exception);
-      // TODO: HDDS-6375: omMetrics.incNumTenantCreateFails()
+      omMetrics.incNumTenantCreateFails();
     }
     return omClientResponse;
   }

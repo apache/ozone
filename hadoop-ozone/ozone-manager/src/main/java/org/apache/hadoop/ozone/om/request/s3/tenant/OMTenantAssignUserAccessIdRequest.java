@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -220,6 +221,9 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantAssignUsers();
+
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -391,11 +395,11 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Assigned user '{}' to tenant '{}' with accessId '{}'",
           userPrincipal, tenantId, accessId);
-      // TODO: HDDS-6375: omMetrics.incNumTenantAssignUser()
+      omMetrics.incNumTenantAssignUserSuccesses();
     } else {
       LOG.error("Failed to assign '{}' to tenant '{}' with accessId '{}': {}",
           userPrincipal, tenantId, accessId, exception.getMessage());
-      // TODO: HDDS-6375: omMetrics.incNumTenantAssignUserFails()
+      omMetrics.incNumTenantAssignUserFails();
     }
     return omClientResponse;
   }

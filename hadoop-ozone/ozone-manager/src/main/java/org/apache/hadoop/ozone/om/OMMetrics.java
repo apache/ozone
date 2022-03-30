@@ -114,6 +114,33 @@ public class OMMetrics {
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
 
+  // Number of tenant operations attempted
+  private @Metric MutableCounterLong numTenantOps;
+  // Metrics for a total number of tenants
+  private @Metric MutableCounterLong numTenants;
+  // Metrics for tenant create operation
+  private @Metric MutableCounterLong numTenantCreates;
+  private @Metric MutableCounterLong numTenantCreateFails;
+  // Metrics for tenant delete operation
+  private @Metric MutableCounterLong numTenantDeletes;
+  private @Metric MutableCounterLong numTenantDeleteFails;
+  // Metrics for tenant assign user operation
+  private @Metric MutableCounterLong numTenantAssignUsers;
+  private @Metric MutableCounterLong numTenantAssignUserSuccesses;
+  private @Metric MutableCounterLong numTenantAssignUserFails;
+  // Metrics for tenant revoke user operation
+  private @Metric MutableCounterLong numTenantRevokeUsers;
+  private @Metric MutableCounterLong numTenantRevokeUserSuccesses;
+  private @Metric MutableCounterLong numTenantRevokeUserFails;
+  // Metrics for tenant assign admin operation
+  private @Metric MutableCounterLong numTenantAssignAdmins;
+  private @Metric MutableCounterLong numTenantAssignAdminSuccesses;
+  private @Metric MutableCounterLong numTenantAssignAdminFails;
+  // Metrics for tenant revoke admin operation
+  private @Metric MutableCounterLong numTenantRevokeAdmins;
+  private @Metric MutableCounterLong numTenantRevokeAdminSuccesses;
+  private @Metric MutableCounterLong numTenantRevokeAdminFails;
+
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
   private @Metric MutableCounterLong numCreateFileFails;
@@ -398,6 +425,84 @@ public class OMMetrics {
   public void incNumListMultipartUploadParts() {
     numKeyOps.incr();
     numListMultipartUploadParts.incr();
+  }
+
+  public void incNumTenants() {
+    numTenants.incr();
+  }
+
+  public void decNumTenants() {
+    numTenants.incr(-1);
+  }
+
+  public void incNumTenantCreates() {
+    numTenantOps.incr();
+    numTenantCreates.incr();
+  }
+
+  public void incNumTenantCreateFails() {
+    numTenantCreateFails.incr();
+  }
+
+  public void incNumTenantDeletes() {
+    numTenantOps.incr();
+    numTenantDeletes.incr();
+  }
+
+  public void incNumTenantDeleteFails() {
+    numTenantDeleteFails.incr();
+  }
+
+  public void incNumTenantAssignUsers() {
+    numTenantOps.incr();
+    numTenantAssignUsers.incr();
+  }
+
+  public void incNumTenantAssignUserSuccesses() {
+    numTenantAssignUserSuccesses.incr();
+  }
+
+  public void incNumTenantAssignUserFails() {
+    numTenantAssignUserFails.incr();
+  }
+
+  public void incNumTenantRevokeUsers() {
+    numTenantOps.incr();
+    numTenantRevokeUsers.incr();
+  }
+
+  public void incNumTenantRevokeUserSuccesses() {
+    numTenantRevokeUserSuccesses.incr();
+  }
+
+  public void incNumTenantRevokeUserFails() {
+    numTenantRevokeUserFails.incr();
+  }
+
+  public void incNumTenantAssignAdmins() {
+    numTenantOps.incr();
+    numTenantAssignAdmins.incr();
+  }
+
+  public void incNumTenantAssignAdminSuccesses() {
+    numTenantAssignAdminSuccesses.incr();
+  }
+
+  public void incNumTenantAssignAdminFails() {
+    numTenantAssignAdminFails.incr();
+  }
+
+  public void incNumTenantRevokeAdmins() {
+    numTenantOps.incr();
+    numTenantRevokeAdmins.incr();
+  }
+
+  public void incNumTenantRevokeAdminSuccesses() {
+    numTenantRevokeAdminSuccesses.incr();
+  }
+
+  public void incNumTenantRevokeAdminFails() {
+    numTenantRevokeAdminFails.incr();
   }
 
   public void incNumGetFileStatus() {
