@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.junit.Assert;
 import org.junit.Rule;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.migrationsupport.rules.EnableRuleMigrationSupport;
@@ -238,7 +237,6 @@ public class TestOzoneContainer {
     }
   }
 
-  @Disabled("HDDS-6473")
   @Test
   public void testBothGetandPutSmallFile() throws Exception {
     MiniOzoneCluster cluster = null;

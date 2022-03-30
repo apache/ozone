@@ -169,9 +169,10 @@ public class ObjectEndpoint extends EndpointBase {
           partNumber, uploadID, body);
     }
 
+    String copyHeader = null, storageType = null;
     try {
-      String copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
-      String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+      storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
       S3StorageType s3StorageType;
       boolean storageTypeDefault;
@@ -207,9 +208,15 @@ public class ObjectEndpoint extends EndpointBase {
 
       IOUtils.copy(body, output);
 
+      getMetrics().incCreateKeySuccess();
       return Response.ok().status(HttpStatus.SC_OK)
           .build();
     } catch (OMException ex) {
+      if (copyHeader != null) {
+        getMetrics().incCopyObjectFailure();
+      } else {
+        getMetrics().incCreateKeyFailure();
+      }
       if (ex.getResult() == ResultCodes.NOT_A_FILE) {
         OS3Exception os3Exception = newError(INVALID_REQUEST, keyPath, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
@@ -322,8 +329,14 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
+      getMetrics().incGetKeySuccess();
       return responseBuilder.build();
     } catch (OMException ex) {
+      if (uploadId != null) {
+        getMetrics().incListPartsFailure();
+      } else {
+        getMetrics().incGetKeyFailure();
+      }
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
@@ -362,6 +375,7 @@ public class ObjectEndpoint extends EndpointBase {
       key = getBucket(bucketName).headObject(keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
+      getMetrics().incHeadKeyFailure();
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
@@ -377,6 +391,7 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
+    getMetrics().incHeadKeySuccess();
     return response.build();
   }
 
@@ -400,6 +415,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     }
+    getMetrics().incAbortMultiPartUploadSuccess();
     return Response
         .status(Status.NO_CONTENT)
         .build();
@@ -430,6 +446,11 @@ public class ObjectEndpoint extends EndpointBase {
       bucket.getKey(keyPath);
       bucket.deleteKey(keyPath);
     } catch (OMException ex) {
+      if (uploadId != null && !uploadId.equals("")) {
+        getMetrics().incAbortMultiPartUploadFailure();
+      } else {
+        getMetrics().incDeleteKeyFailure();
+      }
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
@@ -447,6 +468,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
     }
+    getMetrics().incDeleteKeySuccess();
     return Response
         .status(Status.NO_CONTENT)
         .build();
@@ -488,9 +510,11 @@ public class ObjectEndpoint extends EndpointBase {
       multipartUploadInitiateResponse.setKey(key);
       multipartUploadInitiateResponse.setUploadID(multipartInfo.getUploadID());
 
+      getMetrics().incInitMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
+      getMetrics().incInitMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
       }
@@ -535,9 +559,11 @@ public class ObjectEndpoint extends EndpointBase {
           .getHash());
       // Location also setting as bucket name.
       completeMultipartUploadResponse.setLocation(bucket);
+      getMetrics().incCompleteMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
+      getMetrics().incCompleteMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.INVALID_PART) {
         throw newError(S3ErrorTable.INVALID_PART, key, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_PART_ORDER) {
@@ -638,6 +664,7 @@ public class ObjectEndpoint extends EndpointBase {
           ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
+      getMetrics().incCreateMultipartKeySuccess();
       if (copyHeader != null) {
         return Response.ok(new CopyPartResult(eTag)).build();
       } else {
@@ -646,6 +673,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
     } catch (OMException ex) {
+      getMetrics().incCreateMultipartKeyFailure();
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
@@ -711,6 +739,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     }
+    getMetrics().incListPartsSuccess();
     return Response.status(Status.OK).entity(listPartsResponse).build();
   }
 
@@ -783,6 +812,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       OzoneKeyDetails destKeyDetails = destOzoneBucket.getKey(destkey);
 
+      getMetrics().incCopyObjectSuccess();
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());

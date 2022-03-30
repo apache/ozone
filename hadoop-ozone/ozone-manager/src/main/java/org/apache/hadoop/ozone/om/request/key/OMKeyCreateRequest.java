@@ -79,10 +79,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateRequest.class);
 
-  public OMKeyCreateRequest(OMRequest omRequest) {
-    super(omRequest);
-  }
-
   public OMKeyCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
   }
