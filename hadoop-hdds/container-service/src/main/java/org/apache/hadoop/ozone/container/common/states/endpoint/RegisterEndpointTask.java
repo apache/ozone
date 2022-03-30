@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -177,7 +176,7 @@ public final class RegisterEndpointTask implements
             rpcEndPoint.getState().getNextState();
         rpcEndPoint.setState(nextState);
         rpcEndPoint.zeroMissedCount();
-        if (rpcEndPoint.getAddress().equals(getReconAddresses(conf))) {
+        if (rpcEndPoint.isPassive()) {
           this.stateContext.configureReconHeartbeatFrequency();
         } else {
           this.stateContext.configureHeartbeatFrequency();

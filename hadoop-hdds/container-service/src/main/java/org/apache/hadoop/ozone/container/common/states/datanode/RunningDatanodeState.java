@@ -44,8 +44,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
-
 /**
  * Class that implements handshake with SCM.
  */
@@ -149,7 +147,7 @@ public class RunningDatanodeState implements DatanodeState {
         // so that it won't affect the communication between datanode and
         // other EndpointStateMachine.
         long heartbeatFrequency;
-        if (endpoint.getAddress().equals(getReconAddresses(conf))) {
+        if (endpoint.isPassive()) {
           heartbeatFrequency = context.getReconHeartbeatFrequency();
         } else {
           heartbeatFrequency = context.getHeartbeatFrequency();

@@ -978,10 +978,10 @@
   </property>
   <property>
     <name>hdds.recon.heartbeat.interval</name>
-    <value>30s</value>
+    <value>60s</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
-      The heartbeat interval from a data node to Recon.
+      The heartbeat interval from a Datanode to Recon.
     </description>
   </property>
   <property>
