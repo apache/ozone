@@ -612,7 +612,7 @@ public class TestContainerBalancer {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
-    containerBalancer.start(balancerConfiguration);
+    startBalancer(balancerConfiguration);
     sleepWhileBalancing(1000);
 
     /*
@@ -634,7 +634,7 @@ public class TestContainerBalancer {
             ReplicationManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
     balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
 
-    containerBalancer.start(balancerConfiguration);
+    startBalancer(balancerConfiguration);
     sleepWhileBalancing(1000);
 
     Assert.assertEquals(ContainerBalancer.IterationResult.ITERATION_COMPLETED,
