@@ -2832,6 +2832,27 @@
   </property>
 
   <property>
+    <name>ozone.flexible.fqdn.resolution.enabled</name>
+    <tag>OZONE, SCM, OM</tag>
+    <value>false</value>
+    <description>SCM, OM hosts will be able to resolve itself based on its host
+      name instead of fqdn. It is useful for deploying to kubernetes
+      environment, during the initial launching time when
+      [pod_name].[service_name] is not resolvable yet because of the probe.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.jvm.network.address.cache.enabled</name>
+    <tag>OZONE, SCM, OM, DATANODE</tag>
+    <value>true</value>
+    <description>Disable the jvm network address cache. In environment such as
+      kubernetes, IPs of instances of scm, om and datanodes can be changed.
+      Disabling this cache helps to quickly resolve the fqdn's to the new IPs.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
