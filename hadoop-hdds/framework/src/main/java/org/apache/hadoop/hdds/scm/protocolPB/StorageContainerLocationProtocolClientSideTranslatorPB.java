@@ -259,8 +259,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerID) throws IOException {
+  public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerID, int clientVersion) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
 
