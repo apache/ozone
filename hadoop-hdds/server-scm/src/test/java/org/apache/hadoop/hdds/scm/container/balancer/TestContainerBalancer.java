@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -268,35 +269,29 @@ public class TestContainerBalancer {
     }
     balancerConfiguration.setThreshold(10);
     startBalancer(balancerConfiguration);
-
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
-
+    sleepWhileBalancing(500);
     containerBalancer.stopBalancer();
 
     // balancer should have identified unbalanced nodes
     Assert.assertFalse(containerBalancer.getUnBalancedNodes().isEmpty());
     // no container should have been selected
     Assert.assertTrue(containerBalancer.getSourceToTargetMap().isEmpty());
+    /*
+    Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
+    move is generated
+     */
+    Assert.assertEquals(
+        ContainerBalancer.IterationResult.CAN_NOT_BALANCE_ANY_MORE,
+        containerBalancer.getIterationResult());
 
     // now, close all containers
     for (ContainerInfo containerInfo : cidToInfoMap.values()) {
       containerInfo.setState(HddsProtos.LifeCycleState.CLOSED);
     }
     startBalancer(balancerConfiguration);
-
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) { }
-
+    sleepWhileBalancing(500);
     containerBalancer.stopBalancer();
+
     // check whether all selected containers are closed
     for (ContainerMoveSelection moveSelection:
          containerBalancer.getSourceToTargetMap().values()) {
@@ -319,8 +314,8 @@ public class TestContainerBalancer {
     Assert.assertFalse(containerBalancer.getSizeMovedPerIteration() >
         10 * OzoneConsts.GB);
 
-    long size =
-        containerBalancer.getMetrics().getDataSizeMovedGBInLatestIteration();
+    long size = containerBalancer.getMetrics()
+        .getDataSizeMovedGBInLatestIteration();
     Assert.assertTrue(size > 0);
     Assert.assertFalse(size > 10);
     containerBalancer.stopBalancer();
@@ -520,10 +515,8 @@ public class TestContainerBalancer {
 
     startBalancer(balancerConfiguration);
     sleepWhileBalancing(500);
-
-    sleepWhileBalancing(500);
-
     containerBalancer.stopBalancer();
+
     ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
     Assert.assertEquals(determineExpectedUnBalancedNodes(
             balancerConfiguration.getThreshold()).size(),
@@ -608,6 +601,45 @@ public class TestContainerBalancer {
 
     Assert.assertEquals(30 * 60 * 1000,
         cbConf.getMoveTimeout().toMillis());
+  }
+
+  @Test
+  public void checkIterationResult()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+
+    containerBalancer.start(balancerConfiguration);
+    sleepWhileBalancing(1000);
+
+    /*
+    According to the setup and configurations, this iteration's result should
+    be ITERATION_COMPLETED.
+     */
+    Assert.assertEquals(ContainerBalancer.IterationResult.ITERATION_COMPLETED,
+        containerBalancer.getIterationResult());
+    containerBalancer.stop();
+
+    /*
+    Now, limit maxSizeToMovePerIteration but fail all container moves. The
+    result should still be ITERATION_COMPLETED.
+     */
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            ReplicationManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
+    balancerConfiguration.setMaxSizeToMovePerIteration(10 * OzoneConsts.GB);
+
+    containerBalancer.start(balancerConfiguration);
+    sleepWhileBalancing(1000);
+
+    Assert.assertEquals(ContainerBalancer.IterationResult.ITERATION_COMPLETED,
+        containerBalancer.getIterationResult());
+    containerBalancer.stop();
   }
 
   /**

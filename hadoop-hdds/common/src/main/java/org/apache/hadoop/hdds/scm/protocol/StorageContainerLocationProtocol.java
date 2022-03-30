@@ -102,8 +102,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return List of ReplicaInfo for the container or an empty list if none.
    * @throws IOException
    */
-  List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerId) throws IOException;
+  List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId, int clientVersion) throws IOException;
 
   /**
    * Ask SCM the location of a batch of containers. SCM responds with a group of

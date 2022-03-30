@@ -30,12 +30,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for AllocateBlock request.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE})
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, BUCKET_TABLE})
 public class OMAllocateBlockResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;

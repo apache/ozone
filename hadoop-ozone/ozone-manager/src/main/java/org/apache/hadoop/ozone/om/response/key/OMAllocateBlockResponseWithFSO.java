@@ -30,12 +30,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for AllocateBlock request - prefix layout.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, BUCKET_TABLE})
 public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
 
   public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,

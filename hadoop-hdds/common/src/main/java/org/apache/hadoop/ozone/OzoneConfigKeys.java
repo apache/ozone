@@ -172,23 +172,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
 
-  /**
-   * The interval of open key clean service.
-   */
-  public static final String OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_SECONDS =
-      "ozone.open.key.cleanup.service.interval.seconds";
-  public static final int
-      OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_SECONDS_DEFAULT
-      = 24 * 3600; // a total of 24 hour
-
-  /**
-   * An open key gets cleaned up when it is being in open state for too long.
-   */
-  public static final String OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS =
-      "ozone.open.key.expire.threshold";
-  public static final int OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT =
-      24 * 3600;
-
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT =
       "ozone.block.deleting.service.timeout";
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT
@@ -466,11 +449,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT =
       "FILE_SYSTEM_OPTIMIZED";
 
-  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY =
-      "ozone.om.client.protocol.version";
-  // The version of the protocol for Client (S3G/OFS) to OM Communication.
-  // The protocol starts at 2.0.0 and a null or empty value for older versions.
-  public static final String OZONE_OM_CLIENT_PROTOCOL_VERSION = "2.0.0";
+  public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY =
+      "ozone.client.required.om.version.min";
+
+  public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT =
+      OzoneManagerVersion.S3G_PERSISTENT_CONNECTIONS.name();
 
   /**
    * There is no need to instantiate this class.

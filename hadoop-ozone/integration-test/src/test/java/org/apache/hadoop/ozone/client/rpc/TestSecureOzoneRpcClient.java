@@ -57,11 +57,11 @@ import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -97,7 +97,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     testDir = GenericTestUtils.getTestDir(
         TestSecureOzoneRpcClient.class.getSimpleName());
@@ -159,11 +159,15 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
+      long committedBytes = ozoneManager.getMetrics().getDataCommittedBytes();
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
       }
+
+      Assert.assertEquals(committedBytes + value.getBytes(UTF_8).length,
+              ozoneManager.getMetrics().getDataCommittedBytes());
 
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
@@ -189,7 +193,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    * 2. writeChunk
    * */
   @Test
-  @Ignore("Needs to be moved out of this class as  client setup is static")
+  @Disabled("Needs to be moved out of this class as  client setup is static")
   public void testKeyOpFailureWithoutBlockToken() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -340,7 +344,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
     if (ozClient != null) {
       ozClient.close();
