@@ -68,6 +68,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 
 import org.apache.commons.collections.CollectionUtils;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,6 +119,7 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
+  private final AtomicLong lastHeartbeatSent;
   // Endpoint -> ReportType -> Boolean of whether the full report should be
   //  queued in getFullReports call.
   private final Map<InetSocketAddress,
@@ -172,6 +174,7 @@ public class StateContext {
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
+    lastHeartbeatSent = new AtomicLong(0);
     fullReportSendIndicator = new HashMap<>();
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
@@ -181,7 +184,7 @@ public class StateContext {
   /**
    * init related ReportType Collections.
    */
-  private void initReportTypeCollection(){
+  private void initReportTypeCollection() {
     fullReportTypeList.add(CONTAINER_REPORTS_PROTO_NAME);
     type2Reports.put(CONTAINER_REPORTS_PROTO_NAME, containerReports);
     fullReportTypeList.add(NODE_REPORT_PROTO_NAME);
@@ -218,7 +221,7 @@ public class StateContext {
    */
   boolean isExiting(DatanodeStateMachine.DatanodeStates newState) {
     boolean isExiting = state != newState && stateExecutionCount.get() > 0;
-    if(isExiting) {
+    if (isExiting) {
       stateExecutionCount.set(0);
     }
     return isExiting;
@@ -341,7 +344,7 @@ public class StateContext {
       Preconditions.checkState(reportType != null);
     }
     synchronized (incrementalReportsQueue) {
-      if (incrementalReportsQueue.containsKey(endpoint)){
+      if (incrementalReportsQueue.containsKey(endpoint)) {
         incrementalReportsQueue.get(endpoint).addAll(0, reportsToPutBack);
       }
     }
@@ -378,7 +381,7 @@ public class StateContext {
       InetSocketAddress endpoint) {
     Map<String, AtomicBoolean> mp = fullReportSendIndicator.get(endpoint);
     List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
-    if (null != mp){
+    if (null != mp) {
       for (Map.Entry<String, AtomicBoolean> kv : mp.entrySet()) {
         if (kv.getValue().get()) {
           String reportType = kv.getKey();
@@ -616,16 +619,17 @@ public class StateContext {
       }
 
       if (!isThreadPoolAvailable(service)) {
-        long count = threadPoolNotAvailableCount.getAndIncrement();
-        if (count % getLogWarnInterval(conf) == 0) {
-          LOG.warn("No available thread in pool for past {} seconds.",
-              unit.toSeconds(time) * (count + 1));
+        long count = threadPoolNotAvailableCount.incrementAndGet();
+        long unavailableTime = Time.monotonicNow() - lastHeartbeatSent.get();
+        if (unavailableTime > time && count % getLogWarnInterval(conf) == 0) {
+          LOG.warn("No available thread in pool for the past {} seconds " +
+              "and {} times.", unit.toSeconds(unavailableTime), count);
         }
         return;
       }
-
       threadPoolNotAvailableCount.set(0);
       task.execute(service);
+      lastHeartbeatSent.set(Time.monotonicNow());
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
       if (this.state != newState) {
         if (LOG.isDebugEnabled()) {
@@ -813,14 +817,14 @@ public class StateContext {
    */
   public boolean updateCommandStatus(Long cmdId,
       Consumer<CommandStatus> cmdStatusUpdater) {
-    if(cmdStatusMap.containsKey(cmdId)) {
+    if (cmdStatusMap.containsKey(cmdId)) {
       cmdStatusUpdater.accept(cmdStatusMap.get(cmdId));
       return true;
     }
     return false;
   }
 
-  public void configureHeartbeatFrequency(){
+  public void configureHeartbeatFrequency() {
     heartbeatFrequency.set(getScmHeartbeatInterval(conf));
   }
 

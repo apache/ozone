@@ -51,7 +51,7 @@ public final class OzoneClientFactory {
   /**
    * Private constructor, class is not meant to be initialized.
    */
-  private OzoneClientFactory(){}
+  private OzoneClientFactory() { }
 
 
   /**
@@ -107,43 +107,15 @@ public final class OzoneClientFactory {
    */
   public static OzoneClient getRpcClient(String omServiceId,
       ConfigurationSource config) throws IOException {
-    return getRpcClient(getClientProtocol(config, omServiceId), config, null);
-  }
-
-  public static OzoneClient getRpcClient(String omServiceId,
-      ConfigurationSource config, String accessID) throws IOException {
     Preconditions.checkNotNull(omServiceId);
     Preconditions.checkNotNull(config);
     if (OmUtils.isOmHAServiceId(config, omServiceId)) {
-      return getRpcClient(getClientProtocol(config, omServiceId), config,
-          accessID);
+      return getRpcClient(getClientProtocol(config, omServiceId), config);
     } else {
       throw new IOException("Service ID specified " +
           "does not match with " + OZONE_OM_SERVICE_IDS_KEY + " defined in " +
           "the configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
           config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
-    }
-  }
-
-  public static OzoneClient getRpcClient(ConfigurationSource config,
-        String accessID) throws IOException {
-    Preconditions.checkNotNull(config);
-
-    // Doing this explicitly so that when service ids are defined in the
-    // configuration, we don't fall back to default ozone.om.address defined
-    // in ozone-default.xml.
-
-    String[] serviceIds = config.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
-    if (serviceIds.length > 1) {
-      throw new IOException("Following ServiceID's " +
-          config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + " are" +
-          " defined in the configuration. Use the method getRpcClient which " +
-          "takes serviceID and configuration as param");
-    } else if (serviceIds.length == 1) {
-      return getRpcClient(getClientProtocol(config, serviceIds[0]), config,
-          accessID);
-    } else {
-      return getRpcClient(getClientProtocol(config), config, accessID);
     }
   }
 
@@ -159,7 +131,23 @@ public final class OzoneClientFactory {
    */
   public static OzoneClient getRpcClient(ConfigurationSource config)
       throws IOException {
-    return getRpcClient(config, null);
+    Preconditions.checkNotNull(config);
+
+    // Doing this explicitly so that when service ids are defined in the
+    // configuration, we don't fall back to default ozone.om.address defined
+    // in ozone-default.xml.
+
+    String[] serviceIds = config.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
+    if (serviceIds.length > 1) {
+      throw new IOException("Following ServiceID's " +
+          config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + " are" +
+          " defined in the configuration. Use the method getRpcClient which " +
+          "takes serviceID and configuration as param");
+    } else if (serviceIds.length == 1) {
+      return getRpcClient(getClientProtocol(config, serviceIds[0]), config);
+    } else {
+      return getRpcClient(getClientProtocol(config), config);
+    }
   }
 
   /**
@@ -172,13 +160,8 @@ public final class OzoneClientFactory {
    *        Configuration to be used for OzoneClient creation
    */
   private static OzoneClient getRpcClient(ClientProtocol clientProtocol,
-      ConfigurationSource config) {
-    return new OzoneClient(config, clientProtocol, null);
-  }
-
-  private static OzoneClient getRpcClient(ClientProtocol clientProtocol,
-      ConfigurationSource config, String accessID) {
-    return new OzoneClient(config, clientProtocol, accessID);
+                                       ConfigurationSource config) {
+    return new OzoneClient(config, clientProtocol);
   }
 
   /**

@@ -70,7 +70,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
           "written in each directory. Full name --fileSize will be removed " +
           "in later versions.",
       defaultValue = "4096")
-  private int fileSizeInBytes;
+  private long fileSizeInBytes;
 
   @Option(names = {"-b", "--buffer"},
           description = "Size of buffer used to generated the file content.",
@@ -175,7 +175,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       }
     }
 
-    while(spanIndex < span) {
+    while (spanIndex < span) {
       String levelSubDir = makeDirWithGivenNumberOfFiles(parent);
       ++spanIndex;
 

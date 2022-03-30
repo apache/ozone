@@ -27,6 +27,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -37,18 +38,26 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -119,12 +128,13 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * @param accessID
-   * @return The {@link OzoneVolume} that should be used to for this S3
-   * request based on its access ID.
+   * @return Raw GetS3VolumeContextResponse.
+   * S3Auth won't be updated with actual userPrincipal by this call.
    * @throws IOException
    */
-  OzoneVolume getS3VolumeDetails(String accessID) throws IOException;
+  S3VolumeContext getS3VolumeContext() throws IOException;
+
+  OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**
    * Checks if a Volume exists and the user with a role specified has access
@@ -545,12 +555,38 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * returns S3 Secret given kerberos user.
-   * @param kerberosID
+   * Returns S3 Secret given kerberos user.
+   * Will generate a secret access key for the accessId (=kerberosID)
+   * if it doesn't exist.
+   * @param kerberosID Access ID
    * @return S3SecretValue
    * @throws IOException
    */
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
+
+  /**
+   * Returns S3 Secret given kerberos user.
+   * Optionally generate a secret access key for the accessId (=kerberosID)
+   * if it doesn't exist if createIfNotExist is true.
+   * When createIfNotExist is false and accessId (=kerberosID) doesn't
+   * exist, OM throws OMException with ACCESSID_NOT_FOUND to the client.
+   * @param kerberosID
+   * @param createIfNotExist
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException;
+
+  /**
+   * Set secret key of a given accessId.
+   * @param accessId
+   * @param secretKey
+   * @return S3SecretValue
+   * @throws IOException
+   */
+  S3SecretValue setS3Secret(String accessId, String secretKey)
+      throws IOException;
 
   /**
    * Revoke S3 Secret of given kerberos user.
@@ -560,36 +596,63 @@ public interface ClientProtocol {
   void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
-   * Create tenant.
-   * @param tenantName tenant name.
+   * Create a tenant.
+   * @param tenantId tenant name.
    * @throws IOException
    */
-  void createTenant(String tenantName) throws IOException;
-
-  // TODO
-//  /**
-//   * Modify tenant.
-//   * @param tenantName tenant name.
-//   * @throws IOException
-//   */
-//  void modifyTenant(String tenantName) throws IOException;
-//
-//  /**
-//   * Delete tenant.
-//   * @param tenantName tenant name.
-//   * @throws IOException
-//   */
-//  void deleteTenant(String tenantName) throws IOException;
+  void createTenant(String tenantId) throws IOException;
 
   /**
-   * Assign user to tenant.
+   * Create a tenant with args.
+   *
+   * @param tenantId
+   * @param tenantArgs extra arguments e.g. volume name
+   * @throws IOException
+   */
+  void createTenant(String tenantId, TenantArgs tenantArgs) throws IOException;
+
+  /**
+   * Delete a tenant.
+   * @param tenantId tenant name.
+   * @throws IOException
+   * @return DeleteTenantInfo
+   */
+  DeleteTenantInfo deleteTenant(String tenantId) throws IOException;
+
+  /**
+   * Assign a user to a tenant.
    * @param username user name to be assigned.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param accessId access ID.
    * @throws IOException
    */
-  S3SecretValue assignUserToTenant(String username, String tenantName,
+  S3SecretValue tenantAssignUserAccessId(String username, String tenantId,
       String accessId) throws IOException;
+
+  /**
+   * Revoke a user accessId previously assign to a tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  void tenantRevokeUserAccessId(String accessId) throws IOException;
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @param delegated true if making delegated admin.
+   * @throws IOException
+   */
+  void tenantAssignAdmin(String accessId, String tenantId, boolean delegated)
+      throws IOException;
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  void tenantRevokeAdmin(String accessId, String tenantId) throws IOException;
 
   /**
    * Get tenant info for a user.
@@ -599,6 +662,23 @@ public interface ClientProtocol {
    */
   TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException;
+
+  /**
+   * Get List of users in a tenant.
+   * @param tenantId tenant name
+   * @param prefix optional prefix
+   * @return List of username, accessIds in tenant.
+   * @throws IOException on server error.
+   */
+  TenantUserList listUsersInTenant(String tenantId, String prefix)
+      throws IOException;
+
+  /**
+   * List tenants.
+   * @return TenantInfoList
+   * @throws IOException
+   */
+  TenantInfoList listTenant() throws IOException;
 
   /**
    * Get KMS client provider.
@@ -685,6 +765,7 @@ public interface ClientProtocol {
    *                     invalid arguments
    */
   @SuppressWarnings("checkstyle:parameternumber")
+  @Deprecated
   OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationType type, ReplicationFactor factor,
       boolean overWrite, boolean recursive) throws IOException;
@@ -802,4 +883,47 @@ public interface ClientProtocol {
    */
   OzoneKey headObject(String volumeName, String bucketName,
       String keyName) throws IOException;
+
+  /**
+   * Sets the S3 Authentication information for the requests executed on behalf
+   * of the S3 API implementation within Ozone.
+   * @param s3Auth authentication information for each S3 API call.
+   */
+  void setTheadLocalS3Auth(S3Auth s3Auth);
+
+  /**
+   * Gets the S3 Authentication information that is attached to the thread.
+   * @return S3 Authentication information.
+   */
+  S3Auth getThreadLocalS3Auth();
+
+  /**
+   * Clears the S3 Authentication information attached to the thread.
+   */
+  void clearTheadLocalS3Auth();
+
+  /**
+   * Sets the owner of bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param owner to be set for the bucket
+   * @throws IOException
+   */
+  boolean setBucketOwner(String volumeName, String bucketName,
+      String owner) throws IOException;
+
+  /**
+   * Reads every replica for all the blocks associated with a given key.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @return For every OmKeyLocationInfo (represents a block) it is mapped
+   * every replica, which is constructed by the DatanodeDetails and an
+   * inputstream made from the block.
+   * @throws IOException
+   */
+  Map<OmKeyLocationInfo,
+      Map<DatanodeDetails, OzoneInputStream>> getKeysEveryReplicas(
+          String volumeName, String bucketName, String keyName)
+      throws IOException;
 }

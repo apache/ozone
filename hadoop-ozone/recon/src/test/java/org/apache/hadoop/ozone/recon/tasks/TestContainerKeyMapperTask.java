@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -84,7 +85,7 @@ public class TestContainerKeyMapperTask {
   }
 
   @Test
-  public void testReprocessOMDB() throws Exception{
+  public void testReprocessOMDB() throws Exception {
 
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
@@ -186,7 +187,7 @@ public class TestContainerKeyMapperTask {
         OMUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
         .setValue(omKeyInfo)
-        .setTable(omMetadataManager.getKeyTable().getName())
+        .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
         .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
         .build();
 
@@ -213,7 +214,7 @@ public class TestContainerKeyMapperTask {
         OMUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
         .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
-        .setTable(omMetadataManager.getKeyTable().getName())
+        .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
         .build();
 
     OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(new
@@ -279,5 +280,9 @@ public class TestContainerKeyMapperTask {
         .setOmKeyLocationInfos(Collections.singletonList(
             omKeyLocationInfoGroup))
         .build();
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.BlockLocation;
@@ -43,9 +44,14 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -153,6 +159,8 @@ public class TestOzoneFileInterfaces {
 
   public void init() throws Exception {
     OzoneConfiguration conf = getOzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
     MiniOzoneCluster newCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -168,7 +176,8 @@ public class TestOzoneFileInterfaces {
     OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
+        getBucketLayout());
 
     rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
@@ -239,9 +248,12 @@ public class TestOzoneFileInterfaces {
         o3fs.pathToKey(path));
 
     // verify prefix directories and the file, do not already exist
-    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
-    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
-    assertTrue(metadataManager.getKeyTable().get(fileKey) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev1key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev2key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(fileKey) == null);
 
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
@@ -269,10 +281,12 @@ public class TestOzoneFileInterfaces {
     FileStatus lev2status;
 
     // verify prefix directories got created when creating the file.
-    assertTrue(metadataManager.getKeyTable().get(lev1key).getKeyName()
-        .equals("l1dir/"));
-    assertTrue(metadataManager.getKeyTable().get(lev2key).getKeyName()
-        .equals("l1dir/l2dir/"));
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev1key).getKeyName()
+            .equals("l1dir/"));
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev2key).getKeyName()
+            .equals("l1dir/l2dir/"));
     lev1status = getDirectoryStat(lev1path);
     lev2status = getDirectoryStat(lev2path);
     assertTrue((lev1status != null) && (lev2status != null));
@@ -347,9 +361,12 @@ public class TestOzoneFileInterfaces {
         o3fs.pathToKey(leaf));
 
     // verify prefix directories and the leaf, do not already exist
-    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
-    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
-    assertTrue(metadataManager.getKeyTable().get(leafKey) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev1key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(lev2key) == null);
+    assertTrue(
+        metadataManager.getKeyTable(getBucketLayout()).get(leafKey) == null);
 
     assertTrue("Makedirs returned with false for the path " + leaf,
         fs.mkdirs(leaf));
@@ -363,11 +380,11 @@ public class TestOzoneFileInterfaces {
 
     // verify prefix directories got created when creating the leaf directory.
     assertTrue(metadataManager
-        .getKeyTable()
+        .getKeyTable(getBucketLayout())
         .get(lev1key)
         .getKeyName().equals("abc/"));
     assertTrue(metadataManager
-        .getKeyTable()
+        .getKeyTable(getBucketLayout())
         .get(lev2key)
         .getKeyName().equals("abc/def/"));
     lev1status = getDirectoryStat(lev1path);
@@ -506,7 +523,7 @@ public class TestOzoneFileInterfaces {
 
     assertEquals(0, blockLocations[0].getOffset());
     assertEquals(blockSize, blockLocations[1].getOffset());
-    assertEquals(2*blockSize, blockLocations[2].getOffset());
+    assertEquals(2 * blockSize, blockLocations[2].getOffset());
     assertEquals(blockSize, blockLocations[0].getLength());
     assertEquals(blockSize, blockLocations[1].getLength());
     assertEquals(837, blockLocations[2].getLength());
@@ -522,6 +539,44 @@ public class TestOzoneFileInterfaces {
 
     assertEquals("key1/key2",
         o3fs.pathToKey(new Path("o3fs://test1/key1/key2")));
+  }
+
+
+  /**
+   * Verify that FS throws exception when trying to access bucket with
+   * incompatible layout.
+   * @throws IOException
+   */
+  @Test
+  public void testFileSystemWithObjectStoreLayout() throws IOException {
+    String obsVolume = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume and bucket
+    store.createVolume(obsVolume);
+    OzoneVolume volume = store.getVolume(obsVolume);
+    String obsBucket = UUID.randomUUID().toString();
+    // create bucket with OBJECT_STORE bucket layout (incompatible with fs)
+    volume.createBucket(obsBucket,
+        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+            .build());
+
+    String obsRootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
+
+    OzoneConfiguration config = (OzoneConfiguration) fs.getConf();
+    config.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, obsRootPath);
+
+    try {
+      fs = FileSystem.get(fs.getConf());
+      Assert.fail("Should throw Exception due incompatible bucket layout");
+    } catch (IllegalArgumentException iae) {
+      // Expected exception
+      Assert.assertTrue(iae.getMessage().contains(
+          "OBJECT_STORE, which does not support file system semantics"));
+    }
   }
 
   private String getCurrentUser() {
@@ -568,5 +623,9 @@ public class TestOzoneFileInterfaces {
 
   private void assertCounter(long value, String key) {
     assertEquals(value, statistics.getLong(key).longValue());
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -48,6 +47,19 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private long quotaInNamespace;
   private long usedNamespace;
   private List<OzoneAcl> acls;
+  /**
+   * Reference count on this Ozone volume.
+   *
+   * When reference count is larger than zero, it indicates that at least one
+   * "lock" is held on the volume by some Ozone feature (e.g. multi-tenancy).
+   * Volume delete operation will be denied in this case, and user should be
+   * prompted to release the lock first via the interface provided by that
+   * feature.
+   *
+   * Volumes created using CLI, ObjectStore API or upgraded from older OM DB
+   * will have reference count set to zero by default.
+   */
+  private long refCount;
 
   /**
    * Private constructor, constructed via builder.
@@ -69,7 +81,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private OmVolumeArgs(String adminName, String ownerName, String volume,
       long quotaInBytes, long quotaInNamespace, long usedNamespace,
       Map<String, String> metadata, List<OzoneAcl> acls, long creationTime,
-      long modificationTime, long objectID, long updateID) {
+      long modificationTime, long objectID, long updateID, long refCount) {
     this.adminName = adminName;
     this.ownerName = ownerName;
     this.volume = volume;
@@ -82,8 +94,29 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     this.modificationTime = modificationTime;
     this.objectID = objectID;
     this.updateID = updateID;
+    this.refCount = refCount;
   }
 
+  public long getRefCount() {
+    Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
+    return refCount;
+  }
+
+  /**
+   * Increase refCount by 1.
+   */
+  public void incRefCount() {
+    this.refCount++;
+  }
+
+  /**
+   * Decrease refCount by 1.
+   */
+  public void decRefCount() {
+    Preconditions.checkState(this.refCount > 0L,
+        "refCount should not become negative");
+    this.refCount--;
+  }
 
   public void setOwnerName(String newOwner) {
     this.ownerName = newOwner;
@@ -94,7 +127,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   }
 
   public void setQuotaInNamespace(long quotaInNamespace) {
-    this.quotaInNamespace= quotaInNamespace;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   public void setCreationTime(long time) {
@@ -263,6 +296,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    private long refCount;
 
     /**
      * Sets the Object ID for this Object.
@@ -347,9 +381,15 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       return this;
     }
 
-    public Builder addOzoneAcls(OzoneAcl acl) throws IOException {
+    public Builder addOzoneAcls(OzoneAcl acl) {
       OzoneAclUtil.addAcl(acls, acl);
       return this;
+    }
+
+    public void setRefCount(long refCount) {
+      Preconditions.checkState(refCount >= 0L,
+          "refCount should not be negative");
+      this.refCount = refCount;
     }
 
     /**
@@ -362,7 +402,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(volume);
       return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
           quotaInNamespace, usedNamespace, metadata, acls, creationTime,
-          modificationTime, objectID, updateID);
+          modificationTime, objectID, updateID, refCount);
     }
 
   }
@@ -383,6 +423,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
+        .setRefCount(refCount)
         .build();
   }
 
@@ -401,7 +442,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         volInfo.getCreationTime(),
         volInfo.getModificationTime(),
         volInfo.getObjectID(),
-        volInfo.getUpdateID());
+        volInfo.getUpdateID(),
+        volInfo.getRefCount());
   }
 
   @Override
@@ -413,6 +455,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         ", creationTime='" + creationTime + '\'' +
         ", quotaInBytes='" + quotaInBytes + '\'' +
         ", usedNamespace='" + usedNamespace + '\'' +
+        ", refCount='" + refCount + '\'' +
         '}';
   }
 
@@ -433,6 +476,6 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
 
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
         quotaInNamespace, usedNamespace, cloneMetadata, cloneAcls,
-        creationTime, modificationTime, objectID, updateID);
+        creationTime, modificationTime, objectID, updateID, refCount);
   }
 }

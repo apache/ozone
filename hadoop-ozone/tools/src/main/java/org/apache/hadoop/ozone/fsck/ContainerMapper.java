@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.fsck;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -49,7 +50,7 @@ public class ContainerMapper {
       throws IOException {
     OmMetadataManagerImpl metadataManager =
         new OmMetadataManagerImpl(configuration);
-    return metadataManager.getKeyTable();
+    return metadataManager.getKeyTable(getBucketLayout());
   }
 
   public static void main(String[] args) throws IOException {
@@ -130,6 +131,10 @@ public class ContainerMapper {
       return dataMap;
 
     }
+  }
+
+  private static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }
 

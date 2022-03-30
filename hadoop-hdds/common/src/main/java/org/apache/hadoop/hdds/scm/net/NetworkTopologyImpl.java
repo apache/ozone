@@ -45,7 +45,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DE
  * (computers) and inner nodes represent datacenter/core-switches/routers that
  * manages traffic in/out of data centers or racks.
  */
-public class NetworkTopologyImpl implements NetworkTopology{
+public class NetworkTopologyImpl implements NetworkTopology {
   public static final Logger LOG =
       LoggerFactory.getLogger(NetworkTopologyImpl.class);
 
@@ -91,7 +91,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
     Preconditions.checkArgument(node != null, "node cannot be null");
     if (node instanceof InnerNode) {
       throw new IllegalArgumentException(
-          "Not allowed to add an inner node: "+ node.getNetworkFullPath());
+          "Not allowed to add an inner node: " + node.getNetworkFullPath());
     }
     int newDepth = NetUtils.locationToDepth(node.getNetworkLocation()) + 1;
 
@@ -104,7 +104,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
     boolean add;
     try {
       add = clusterTree.add(node);
-    }finally {
+    } finally {
       netlock.writeLock().unlock();
     }
 
@@ -126,12 +126,12 @@ public class NetworkTopologyImpl implements NetworkTopology{
     Preconditions.checkArgument(node != null, "node cannot be null");
     if (node instanceof InnerNode) {
       throw new IllegalArgumentException(
-          "Not allowed to remove an inner node: "+ node.getNetworkFullPath());
+          "Not allowed to remove an inner node: " + node.getNetworkFullPath());
     }
     netlock.writeLock().lock();
     try {
       clusterTree.remove(node);
-    }finally {
+    } finally {
       netlock.writeLock().unlock();
     }
     LOG.info("Removed a node: {}", node.getNetworkFullPath());
@@ -421,7 +421,8 @@ public class NetworkTopologyImpl implements NetworkTopology{
    */
   @Override
   public Node chooseRandom(String scope, List<String> excludedScopes,
-      Collection<Node> excludedNodes, Node affinityNode, int ancestorGen) {
+      Collection<? extends Node> excludedNodes, Node affinityNode,
+      int ancestorGen) {
     if (scope == null) {
       scope = ROOT;
     }
@@ -511,7 +512,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
   }
 
   private Node chooseNodeInternal(String scope, int leafIndex,
-      List<String> excludedScopes, Collection<Node> excludedNodes,
+      List<String> excludedScopes, Collection<? extends Node> excludedNodes,
       Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(scope != null);
     if (LOG.isDebugEnabled()) {
@@ -533,7 +534,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
             " generation  " + ancestorGen);
       }
       // affinity ancestor should has overlap with scope
-      if (affinityAncestor.getNetworkFullPath().startsWith(scope)){
+      if (affinityAncestor.getNetworkFullPath().startsWith(scope)) {
         finalScope = affinityAncestor.getNetworkFullPath();
       } else if (!scope.startsWith(affinityAncestor.getNetworkFullPath())) {
         return null;
@@ -654,21 +655,21 @@ public class NetworkTopologyImpl implements NetworkTopology{
       if (level1 > maxLevel || level2 > maxLevel) {
         return Integer.MAX_VALUE;
       }
-      while(level1 > level2 && node1 != null) {
+      while (level1 > level2 && node1 != null) {
         node1 = node1.getParent();
         level1--;
-        cost += node1 == null? 0 : node1.getCost();
+        cost += node1 == null ? 0 : node1.getCost();
       }
-      while(level2 > level1 && node2 != null) {
+      while (level2 > level1 && node2 != null) {
         node2 = node2.getParent();
         level2--;
-        cost += node2 == null? 0 : node2.getCost();
+        cost += node2 == null ? 0 : node2.getCost();
       }
-      while(node1 != null && node2 != null && node1 != node2) {
+      while (node1 != null && node2 != null && node1 != node2) {
         node1 = node1.getParent();
         node2 = node2.getParent();
-        cost += node1 == null? 0 : node1.getCost();
-        cost += node2 == null? 0 : node2.getCost();
+        cost += node1 == null ? 0 : node1.getCost();
+        cost += node2 == null ? 0 : node2.getCost();
       }
       return cost;
     } finally {
@@ -751,7 +752,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
     List<Node> excludedAncestorList =
         NetUtils.getAncestorList(this, mutableExcludedNodes, ancestorGen);
     for (Node ancestor : excludedAncestorList) {
-      if (scope.startsWith(ancestor.getNetworkFullPath())){
+      if (scope.startsWith(ancestor.getNetworkFullPath())) {
         return 0;
       }
     }

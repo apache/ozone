@@ -209,8 +209,8 @@ public class NodeStatus {
 
   @Override
   public String toString() {
-    return "OperationalState: "+operationalState+" Health: "+health+
-        " OperationStateExpiry: "+opStateExpiryEpochSeconds;
+    return "OperationalState: " + operationalState + " Health: " + health +
+        " OperationStateExpiry: " + opStateExpiryEpochSeconds;
   }
 
 }

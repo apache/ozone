@@ -43,12 +43,12 @@ public interface AccessPolicy {
    * an access policy associated with its Policy-ID ID.
    *
    */
-  enum AccessPolicyType {NATIVE_ACL, RANGER_POLICY, AWS_POLICY, OTHER};
+  enum AccessPolicyType { NATIVE_ACL, RANGER_POLICY, AWS_POLICY, OTHER };
 
   /**
    * Allow or deny.
    */
-  enum AccessGrantType {ALLOW, DENY};
+  enum AccessGrantType { ALLOW, DENY };
 
   /**
    * Defines an access policy entry.

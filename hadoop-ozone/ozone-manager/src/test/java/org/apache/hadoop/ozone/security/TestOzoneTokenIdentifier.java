@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.security;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -220,7 +218,7 @@ public class TestOzoneTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with HmacSha256(RSA/1024 key) is {} ns",
-        duration/testTokenCount);
+        duration / testTokenCount);
 
     startTime = Time.monotonicNowNanos();
     for (int i = 0; i < testTokenCount; i++) {
@@ -228,7 +226,7 @@ public class TestOzoneTokenIdentifier {
     }
     duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token verify time with HmacSha256(RSA/1024 key) "
-        + "is {} ns", duration/testTokenCount);
+        + "is {} ns", duration / testTokenCount);
   }
 
   @Test
@@ -275,7 +273,7 @@ public class TestOzoneTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
-        hmacAlgorithm, keyLen, duration/testTokenCount);
+        hmacAlgorithm, keyLen, duration / testTokenCount);
   }
 
   /*
@@ -347,21 +345,5 @@ public class TestOzoneTokenIdentifier {
     }
     Assert.assertEquals("Deserialize Serialized Token should equal.",
         idWrite, idRead);
-  }
-
-  @Test
-  public void testGetUserFromAccessIdInToken() {
-    OzoneTokenIdentifier id = getIdentifierInst();
-    Assert.assertEquals("User1", id.getUser().getUserName());
-
-    id.setTokenType(S3AUTHINFO);
-    Assert.assertEquals("User1", id.getUser().getUserName());
-
-    id.setGetUserForAccessId(s -> "modified-" + s);
-    Assert.assertEquals("modified-User1", id.getUser().getUserName());
-
-    id.setGetUserForAccessId(s -> null);
-    Assert.assertEquals("User1", id.getUser().getUserName());
-
   }
 }

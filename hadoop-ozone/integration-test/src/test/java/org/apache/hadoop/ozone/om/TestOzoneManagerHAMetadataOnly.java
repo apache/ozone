@@ -1,4 +1,4 @@
-  /**
+/**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -17,11 +17,8 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -65,7 +62,7 @@ import java.util.TreeSet;
 import java.util.Iterator;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
@@ -75,20 +72,6 @@ import static org.junit.Assert.fail;
  * Test Ozone Manager Metadata operation in distributed handler scenario.
  */
 public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
-
-  @Override
-  protected void additionalConfiguration() {
-    OzoneConfiguration conf = getConf();
-    // These test do not use any features of SCM, so we can skip safemode
-    // which gets the cluster to come up much faster.
-    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
-  }
-
-  @Override
-  protected void additionalClusterSettings() {
-    MiniOzoneCluster.Builder builder = getClusterBuilder();
-    builder.setNumDatanodes(0);
-  }
 
   private OzoneVolume createAndCheckVolume(String volumeName)
       throws Exception {
@@ -110,6 +93,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     return retVolume;
   }
+
   @Test
   public void testAllVolumeOperations() throws Exception {
 
@@ -342,7 +326,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     ObjectStore objectStore = getObjectStore();
 
     Set<String> expectedVolumes = new TreeSet<>();
-    for (int i=0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
       String volumeName = "vol" + i;
       expectedVolumes.add(volumeName);
       VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()

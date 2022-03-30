@@ -432,14 +432,14 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     // trigger CommitKeyRequest
     outputStream.close();
 
-    OmKeyInfo omKeyInfo = omMgr.getKeyTable().get(openFileKey);
+    OmKeyInfo omKeyInfo = omMgr.getKeyTable(getBucketLayout()).get(openFileKey);
     Assert.assertNotNull("Invalid Key!", omKeyInfo);
     verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
 
     // wait for DB updates
     GenericTestUtils.waitFor(() -> {
       try {
-        return omMgr.getOpenKeyTable().isEmpty();
+        return omMgr.getOpenKeyTable(getBucketLayout()).isEmpty();
       } catch (IOException e) {
         LOG.error("DB failure!", e);
         Assert.fail("DB failure!");
@@ -476,5 +476,10 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertEquals("Wrong representation!",
         dbKey + ":" + dirInfo.getObjectID(), dirInfo.toString());
     return dirInfo.getObjectID();
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

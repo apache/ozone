@@ -19,8 +19,9 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import java.util.List;
 
+import com.google.common.base.Optional;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AccountNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
@@ -31,8 +32,8 @@ import org.apache.http.auth.BasicUserPrincipal;
  * OM MultiTenant manager interface.
  */
 public interface OMMultiTenantManager {
-  /**
-   * Start multi-tenant manager. Performs initialization e.g.
+  /*
+   * Init multi-tenant manager. Performs initialization e.g.
    *  - Initialize Multi-Tenant-Gatekeeper-Plugin
    *  - Validate Multi-Tenant Bucket-NameSpaces
    *  - Validate Multi-Tenant Account-NameSpaces
@@ -44,15 +45,14 @@ public interface OMMultiTenantManager {
    *       . OM-DB state <-in-sync-> IMultiTenantGateKeeperPluginState
    *       . OM DB state is always the source of truth.
    *
-   * @param configuration
    * @throws IOException
    */
-  void start(OzoneConfiguration configuration) throws IOException;
-
-  /**
-   * Stop multi-tenant manager.
-   */
-  void stop() throws Exception;
+//  void start() throws IOException;
+//
+//  /**
+//   * Stop multi-tenant manager.
+//   */
+//  void stop() throws Exception;
 
   /**
    * Returns the corresponding OzoneManager instance.
@@ -67,7 +67,8 @@ public interface OMMultiTenantManager {
    * @param tenantID
    * @return Tenant interface.
    */
-  Tenant createTenant(String tenantID) throws IOException;
+  Tenant createTenantAccessInAuthorizer(String tenantID) throws IOException;
+
 
   /**
    * Given a TenantID String, Return Tenant Interface. If the Tenant doesn't
@@ -106,34 +107,50 @@ public interface OMMultiTenantManager {
    * @return
    * @throws IOException
    */
-  void destroyTenant(Tenant tenant) throws Exception;
+  void removeTenantAccessFromAuthorizer(Tenant tenant) throws Exception;
 
 
   /**
    * Creates a new user that exists for S3 API access to Ozone.
-   * @param tenantName
    * @param principal
-   * @param accessID
+   * @param tenantId
+   * @param accessId
    * @return Unique UserID.
    * @throws IOException if there is any error condition detected.
    */
-  String assignUserToTenant(BasicUserPrincipal principal, String tenantName,
-                            String accessID);
+  String assignUserToTenant(BasicUserPrincipal principal, String tenantId,
+                            String accessId) throws IOException;
 
   /**
-   * Given a user, destroys all state associated with that user.
-   * This is different from deactivateUser().
+   * Revoke user accessId.
    * @param accessID
-   * @return
    * @throws IOException
    */
-  void destroyUser(String accessID);
+  void revokeUserAccessId(String accessID) throws IOException;
 
+  /**
+   * A placeholder method to remove a failed-to-assign accessId from
+   * tenantCache.
+   * Triggered in OMAssignUserToTenantRequest#handleRequestFailure.
+   * Most likely becomes unnecessary if we move OMMTM call to the end of the
+   * request (current it runs in preExecute).
+   * TODO: Remove this if unneeded when Ranger thread patch lands.
+   */
+  void removeUserAccessIdFromCache(String accessId, String userPrincipal,
+                                   String tenantId);
 
   /**
    * Given an accessId, return kerberos user name for the tenant user.
    */
   String getUserNameGivenAccessId(String accessId);
+
+  /**
+   * Get the default Access ID string given tenant name and user name.
+   * @param tenantId tenant name
+   * @param userPrincipal user name
+   * @return access ID in the form of tenantName$username
+   */
+  String getDefaultAccessId(String tenantId, String userPrincipal);
 
   /**
    * Given a user, return their S3-Secret Key.
@@ -160,6 +177,31 @@ public interface OMMultiTenantManager {
   void deactivateUser(String accessID) throws IOException;
 
   /**
+   * Check if a user is a tenant Admin.
+   * @param user user name.
+   * @param tenantId tenant name.
+   * @return
+   */
+  boolean isTenantAdmin(String user, String tenantId);
+
+  /**
+   * Check if a tenant exists.
+   * @param tenantId tenant name.
+   * @return true if tenant exists, false otherwise.
+   * @throws IOException
+   */
+  boolean tenantExists(String tenantId) throws IOException;
+
+  /**
+   * List all the user & accessIDs of all users that belong to this Tenant.
+   * Note this read is unprotected. See OzoneManager#listUserInTenant
+   * @param tenantID
+   * @return List of users
+   */
+  TenantUserList listUsersInTenant(String tenantID, String prefix)
+      throws IOException;
+
+  /**
    * List all the access IDs of all users that belong to this Tenant.
    * @param tenantID
    * @return List of users
@@ -172,13 +214,14 @@ public interface OMMultiTenantManager {
    * @param accessID
    * @return String tenant name
    */
-  String getTenantForAccessID(String accessID) throws IOException;
+  Optional<String> getTenantForAccessID(String accessID) throws IOException;
 
   /**
    * Given a user, make him an admin of the corresponding Tenant.
    * @param accessID
+   * @param delegated
    */
-  void assignTenantAdminRole(String accessID) throws IOException;
+  void assignTenantAdmin(String accessID, boolean delegated) throws IOException;
 
   /**
    * Given a user, remove him as admin of the corresponding Tenant.

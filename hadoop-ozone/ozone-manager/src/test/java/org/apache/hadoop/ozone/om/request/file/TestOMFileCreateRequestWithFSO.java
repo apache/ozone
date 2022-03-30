@@ -18,16 +18,14 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -45,10 +43,10 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     Assert.assertEquals("Invalid metrics value", 0, omMetrics.getNumKeys());
 
     // Create parent dirs for the path
-    TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName,
             "a/b/c", omMetadataManager);
     String fileNameD = "d";
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
             "a/b/c/" + fileNameD, 0L, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, omMetadataManager);
 
@@ -60,8 +58,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
     String dbFileD = omMetadataManager.getOzonePathKey(
             dirPathC.getObjectID(), fileNameD);
-    omMetadataManager.getKeyTable().delete(dbFileD);
-    omMetadataManager.getKeyTable().delete(dirPathC.getPath());
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dbFileD);
+    omMetadataManager.getKeyTable(getBucketLayout()).delete(dirPathC.getPath());
 
     // can create non-recursive because parents already exist.
     testNonRecursivePath("a/b/e", false, false, false);
@@ -78,12 +76,12 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     // Add the key to key table
     OmDirectoryInfo omDirInfo = getDirInfo("c/d/e");
     OmKeyInfo omKeyInfo =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, key,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     omDirInfo.getObjectID() + 10,
                     omDirInfo.getObjectID(), 100, Time.now());
-    TestOMRequestUtils.addFileToKeyTable(false, false,
+    OMRequestTestUtils.addFileToKeyTable(false, false,
             "f", omKeyInfo, -1,
             omDirInfo.getObjectID() + 10, omMetadataManager);
 
@@ -99,10 +97,10 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     String parentDir = "c/d/e";
     String fileName = "f";
     String key = parentDir + "/" + fileName;
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     // Create parent dirs for the path
-    long parentId = TestOMRequestUtils.addParentsToDirTable(volumeName,
+    long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName,
             bucketName, parentDir, omMetadataManager);
 
     // Need to add the path which starts with "c/d/e" to OpenKeyTable as this is
@@ -110,12 +108,12 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath(key, false, false, false);
 
     OmKeyInfo omKeyInfo =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, key,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentId + 1,
                     parentId, 100, Time.now());
-    TestOMRequestUtils.addFileToKeyTable(false, false,
+    OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
 
     // Even if key exists in KeyTable, should be able to create file as
@@ -128,7 +126,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
                                              boolean doAssert)
           throws Exception {
-    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
+    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
             omMetadataManager);
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
@@ -138,7 +136,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
       if (indx == pathComponents.length - 1) {
         String dbOpenFileName = omMetadataManager.getOpenFileName(
                 parentId, pathElement, id);
-        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
+        OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
           Assert.assertNotNull("Invalid key!", omKeyInfo);
@@ -161,7 +160,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
   private OmDirectoryInfo getDirInfo(String key)
           throws Exception {
-    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
+    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
             omMetadataManager);
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
@@ -179,19 +178,14 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     return dirInfo;
   }
 
-  @NotNull
   @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata Layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
+    return new OMFileCreateRequestWithFSO(omRequest,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
-  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
-    return new OMFileCreateRequestWithFSO(omRequest);
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

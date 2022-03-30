@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -70,39 +71,30 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   @Override
-  public CompletableFuture<Path> getContainerDataFromReplicas(
+  public Path getContainerDataFromReplicas(
       long containerId, List<DatanodeDetails> sourceDatanodes) {
-
-    CompletableFuture<Path> result = null;
 
     final List<DatanodeDetails> shuffledDatanodes =
         shuffleDatanodes(sourceDatanodes);
 
     for (DatanodeDetails datanode : shuffledDatanodes) {
       try {
-        if (result == null) {
-          result = downloadContainer(containerId, datanode);
-        } else {
-
-          result = result.exceptionally(t -> {
-            LOG.error("Error on replicating container: " + containerId, t);
-            try {
-              return downloadContainer(containerId, datanode).get();
-            } catch (Exception e) {
-              LOG.error("Error on replicating container: " + containerId,
-                  e);
-              return null;
-            }
-          });
-        }
+        CompletableFuture<Path> result =
+            downloadContainer(containerId, datanode);
+        return result.get();
+      } catch (ExecutionException | IOException e) {
+        LOG.error("Error on replicating container: {} from {}/{}", containerId,
+            datanode.getHostName(), datanode.getIpAddress(), e);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       } catch (Exception ex) {
-        LOG.error(String.format(
-            "Container %s download from datanode %s was unsuccessful. "
-                + "Trying the next datanode", containerId, datanode), ex);
+        LOG.error("Container {} download from datanode {} was unsuccessful. "
+                + "Trying the next datanode", containerId, datanode, ex);
       }
     }
-    return result;
-
+    LOG.error("Container {} could not be downloaded from any datanode",
+        containerId);
+    return null;
   }
 
   //There is a chance for the download is successful but import is failed,

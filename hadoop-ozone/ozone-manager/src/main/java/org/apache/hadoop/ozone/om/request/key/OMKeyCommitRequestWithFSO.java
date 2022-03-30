@@ -25,9 +25,11 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -56,8 +58,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
-  public OMKeyCommitRequestWithFSO(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCommitRequestWithFSO(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -122,7 +125,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
       long bucketId = omBucketInfo.getObjectID();
       long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-              keyName, omMetadataManager);
+          keyName, omMetadataManager, "Cannot create file : " + keyName
+              + " as parent directory doesn't exist");
       String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
       dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
               commitKeyRequest.getClientID());
@@ -143,12 +147,27 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      // If bucket versioning is turned on during the update, between key
+      // creation and key commit, old versions will be just overwritten and
+      // not kept. Bucket versioning will be effective from the first key
+      // creation after the knob turned on.
+      RepeatedOmKeyInfo keysToDelete = getOldVersionsToCleanUp(dbFileKey,
+              omMetadataManager, omBucketInfo.getIsVersionEnabled(),
+              trxnLogIndex, ozoneManager.isRatisEnabled());
+      OmKeyInfo keyToDelete =
+              omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
+
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
               null, fileName, trxnLogIndex);
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
               omKeyInfo, fileName, trxnLogIndex);
+
+      if (keysToDelete != null) {
+        OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbFileKey,
+                keysToDelete, trxnLogIndex);
+      }
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
@@ -158,22 +177,28 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
               locationInfoList.size() * scmBlockSize * factor;
+      // Subtract the size of blocks to be overwritten.
+      if (keyToDelete != null) {
+        correctedSpace -= keyToDelete.getDataSize() *
+            keyToDelete.getReplicationConfig().getRequiredNodes();
+      }
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
-              omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject());
+              omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
+              keysToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyCommitResponseWithFSO(createErrorOMResponse(
-              omResponse, exception));
+              omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
 
-      if(bucketLockAcquired) {
+      if (bucketLockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
                 bucketName);
       }

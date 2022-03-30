@@ -27,6 +27,7 @@ import java.util.HashMap;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -61,6 +62,7 @@ public class TestObjectHead {
     // Create HeadBucket and setClient to OzoneClientStub
     keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
+    keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   @Test
@@ -69,7 +71,7 @@ public class TestObjectHead {
     String value = RandomStringUtils.randomAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
         value.getBytes(UTF_8).length,
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.STAND_ALONE,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
         ReplicationFactor.ONE), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();

@@ -46,18 +46,20 @@ Simple is the existing OM metadata format, which stores key entry with full path
     prefixed by the unique identifier of its parent directory, `<parent
      unique-id>/<filename>`. 
      
-![FSO Format](PrefixFSO-Format.png)
+{{< image src="PrefixFSO-Format.png">}}
 
 
 ### Directory delete operation with prefix layout: ###
 Following picture describes the OM metadata changes while performing a delete
  operation on a directory.
-![FSO Delete](PrefixFSO-Delete.png)
+
+{{< image src="PrefixFSO-Delete.png">}}
 
 ### Directory rename operation with prefix layout: ###
 Following picture describes the OM metadata changes while performing a rename
  operation on a directory.
-![FSO Rename](PrefixFSO-Rename.png)
+
+{{< image src="PrefixFSO-Rename.png">}}
 
 ## Configuration
 By default the feature is disabled. It can be enabled with the following
@@ -71,5 +73,21 @@ By default the feature is disabled. It can be enabled with the following
 <property>
    <name>ozone.om.metadata.layout</name>
    <value>PREFIX</value>
+</property>
+```
+
+In reference to efforts towards supporting protocol aware buckets 
+within an Ozone cluster, the following configuration can be used 
+to define the default value for bucket layout during bucket creation 
+if the client has not specified the bucket layout argument. 
+Supported values are `OBJECT_STORE` and `FILE_SYSTEM_OPTIMIZED`.
+
+By default, the buckets will default to `OBJECT_STORE` behaviour.
+
+```XML
+
+<property>
+ <name>ozone.default.bucket.layout</name>
+ <value>OBJECT_STORE</value>
 </property>
 ```

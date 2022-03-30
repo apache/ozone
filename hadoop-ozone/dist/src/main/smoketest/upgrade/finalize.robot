@@ -19,7 +19,7 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
-** Test Cases ***
+*** Test Cases ***
 Finalize SCM
     ${result} =        Execute      ozone admin scm finalizeupgrade
                        #Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   OM Preparation successful!

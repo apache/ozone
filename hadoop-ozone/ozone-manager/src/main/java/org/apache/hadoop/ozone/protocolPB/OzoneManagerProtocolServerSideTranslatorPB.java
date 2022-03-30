@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -126,16 +127,44 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private OMResponse processRequest(OMRequest request) throws
       ServiceException {
-    RaftServerStatus raftServerStatus;
     OMClientRequest omClientRequest = null;
     if (isRatisEnabled) {
+      boolean s3Auth = false;
+      try {
+        // If Request has S3Authentication validate S3 credentials
+        // if current OM is leader and then proceed with processing the request.
+        if (request.hasS3Authentication()) {
+          s3Auth = true;
+          checkLeaderStatus();
+          S3SecurityUtil.validateS3Credential(request, ozoneManager);
+        }
+      } catch (IOException ex) {
+        // If validate credentials fail return error OM Response.
+        return createErrorResponse(request, ex);
+      }
       // Check if the request is a read only request
       if (OmUtils.isReadOnly(request)) {
-        return submitReadRequestToOM(request);
-      } else {
-        checkLeaderStatus();
         try {
-          omClientRequest = createClientRequest(request);
+          if (request.hasS3Authentication()) {
+            ozoneManager.setS3Auth(request.getS3Authentication());
+          }
+          return submitReadRequestToOM(request);
+        } finally {
+          ozoneManager.setS3Auth(null);
+        }
+      } else {
+        // To validate credentials we have already verified leader status.
+        // This will skip of checking leader status again if request has S3Auth.
+        if (!s3Auth) {
+          checkLeaderStatus();
+        }
+        try {
+          omClientRequest =
+              createClientRequest(request, ozoneManager);
+          // TODO: Note: Due to HDDS-6055, createClientRequest() could now
+          //  return null, which triggered the findbugs warning.
+          //  Added the assertion.
+          assert (omClientRequest != null);
           request = omClientRequest.preExecute(ozoneManager);
         } catch (IOException ex) {
           // As some of the preExecute returns error. So handle here.
@@ -145,7 +174,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           return createErrorResponse(request, ex);
         }
         OMResponse response = submitRequestToRatis(request);
-        if (!response.getSuccess() && omClientRequest != null) {
+        if (!response.getSuccess()) {
           omClientRequest.handleRequestFailure(ozoneManager);
         }
         return response;
@@ -217,15 +246,28 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
+      // If Request has S3Authentication validate S3 credentials and
+      // then proceed with processing the request.
+      if (request.hasS3Authentication()) {
+        S3SecurityUtil.validateS3Credential(request, ozoneManager);
+      }
       if (OmUtils.isReadOnly(request)) {
-        return handler.handleReadRequest(request);
+        try {
+          if (request.hasS3Authentication()) {
+            ozoneManager.setS3Auth(request.getS3Authentication());
+          }
+          return handler.handleReadRequest(request);
+        } finally {
+          ozoneManager.setS3Auth(null);
+        }
       } else {
-        OMClientRequest omClientRequest = createClientRequest(request);
+        OMClientRequest omClientRequest =
+            createClientRequest(request, ozoneManager);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);
       }
-    } catch(IOException ex) {
+    } catch (IOException ex) {
       // As some of the preExecute returns error. So handle here.
       return createErrorResponse(request, ex);
     }
@@ -240,6 +282,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       String errorMessage = "Got error during waiting for flush to be " +
           "completed for " + "request" + request.toString();
       ExitUtils.terminate(1, errorMessage, ex, LOG);
+      Thread.currentThread().interrupt();
     }
     return omClientResponse.getOMResponse();
   }
@@ -276,5 +319,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     if (!isRatisEnabled) {
       ozoneManagerDoubleBuffer.stop();
     }
+  }
+
+  public static Logger getLog() {
+    return LOG;
   }
 }

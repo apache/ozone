@@ -192,5 +192,5 @@ public interface ContainerManager extends Closeable {
    * Returns containerStateManger.
    * @return containerStateManger
    */
-  ContainerStateManagerV2 getContainerStateManager();
+  ContainerStateManager getContainerStateManager();
 }

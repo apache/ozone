@@ -74,6 +74,9 @@ message ScmContainerLocationRequest {
   optional ContainerBalancerStatusRequestProto containerBalancerStatusRequest = 35;
   optional FinalizeScmUpgradeRequestProto finalizeScmUpgradeRequest = 36;
   optional QueryUpgradeFinalizationProgressRequestProto queryUpgradeFinalizationProgressRequest = 37;
+  optional GetContainerCountRequestProto getContainerCountRequest = 38;
+  optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
+  optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
 }
 
 message ScmContainerLocationResponse {
@@ -119,6 +122,9 @@ message ScmContainerLocationResponse {
   optional ContainerBalancerStatusResponseProto containerBalancerStatusResponse = 35;
   optional FinalizeScmUpgradeResponseProto finalizeScmUpgradeResponse = 36;
   optional QueryUpgradeFinalizationProgressResponseProto queryUpgradeFinalizationProgressResponse = 37;
+  optional GetContainerCountResponseProto getContainerCountResponse = 38;
+  optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
+  optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
 
   enum Status {
     OK = 1;
@@ -162,6 +168,9 @@ enum Type {
   GetContainerBalancerStatus = 30;
   FinalizeScmUpgrade = 31;
   QueryUpgradeFinalizationProgress = 32;
+  GetContainerCount = 33;
+  GetContainerReplicas = 34;
+  GetReplicationManagerReport = 35;
 }
 
 /**
@@ -210,6 +219,15 @@ message GetContainerWithPipelineResponseProto {
   required ContainerWithPipeline containerWithPipeline = 1;
 }
 
+message GetContainerReplicasRequestProto {
+  required int64 containerID = 1;
+  optional string traceID = 2;
+}
+
+message GetContainerReplicasResponseProto {
+  repeated SCMContainerReplicaProto containerReplica = 1;
+}
+
 message GetContainerWithPipelineBatchRequestProto {
   repeated int64 containerIDs = 1;
   optional string traceID = 2;
@@ -246,6 +264,7 @@ message SCMListContainerRequestProto {
   optional uint64 startContainerID = 2;
   optional string traceID = 3;
   optional LifeCycleState state = 4;
+  optional ReplicationFactor factor = 5;
 }
 
 message SCMListContainerResponseProto {
@@ -382,6 +401,13 @@ message GetPipelineResponseProto {
   required Pipeline pipeline = 1;
 }
 
+message GetContainerCountRequestProto {
+}
+
+message GetContainerCountResponseProto {
+  required int64 containerCount = 1;
+}
+
 message ActivatePipelineRequestProto {
   required PipelineID pipelineID = 1;
   optional string traceID = 2;
@@ -445,6 +471,14 @@ message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
 }
 
+message ReplicationManagerReportRequestProto {
+  optional string traceID = 1;
+}
+
+message ReplicationManagerReportResponseProto {
+  required ReplicationManagerReportProto report = 1;
+}
+
 message FinalizeScmUpgradeRequestProto {
   required string upgradeClientId = 1;
 }
@@ -478,11 +512,14 @@ message GetContainerTokenResponseProto {
 message StartContainerBalancerRequestProto {
   optional string traceID = 1;
   optional double threshold = 2;
-  optional int32 idleiterations = 3;
-  optional double maxDatanodesRatioToInvolvePerIteration = 4;
+  optional int32 idleiterations = 3 [deprecated = true];
+  optional double maxDatanodesRatioToInvolvePerIteration = 4 [deprecated =
+      true];
   optional int64 maxSizeToMovePerIterationInGB = 5;
   optional int64 maxSizeEnteringTargetInGB = 6;
   optional int64 maxSizeLeavingSourceInGB = 7;
+  optional int32 maxDatanodesPercentageToInvolvePerIteration = 8;
+  optional int32 iterations = 9;
 }
 
 message StartContainerBalancerResponseProto {

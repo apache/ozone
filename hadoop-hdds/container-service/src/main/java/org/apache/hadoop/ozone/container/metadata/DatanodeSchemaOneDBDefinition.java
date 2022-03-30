@@ -68,7 +68,7 @@ public class DatanodeSchemaOneDBDefinition
             ChunkInfoList.class,
             new SchemaOneChunkInfoListCodec());
 
-  protected DatanodeSchemaOneDBDefinition(String dbPath) {
+  public DatanodeSchemaOneDBDefinition(String dbPath) {
     super(dbPath);
   }
 
@@ -91,7 +91,7 @@ public class DatanodeSchemaOneDBDefinition
 
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
-        getMetadataColumnFamily(), getDeletedBlocksColumnFamily() };
+    return new DBColumnFamilyDefinition[] {getMetadataColumnFamily(),
+        getDeletedBlocksColumnFamily(), getBlockDataColumnFamily()};
   }
 }

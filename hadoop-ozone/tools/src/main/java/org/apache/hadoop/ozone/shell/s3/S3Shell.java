@@ -31,6 +31,7 @@ import picocli.CommandLine.Command;
     description = "Shell for S3 specific operations",
     subcommands = {
         GetS3SecretHandler.class,
+        SetS3SecretHandler.class,
         RevokeS3SecretHandler.class
     })
 public class S3Shell extends Shell {

@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -127,7 +129,7 @@ public class BucketManagerImpl implements BucketManager {
       if (volumeArgs == null) {
         LOG.debug("volume: {} not found ", volumeName);
         throw new OMException("Volume doesn't exist",
-            OMException.ResultCodes.VOLUME_NOT_FOUND);
+            VOLUME_NOT_FOUND);
       }
       //Check if bucket already exists
       if (metadataManager.getBucketTable().get(bucketKey) != null) {
@@ -236,6 +238,12 @@ public class BucketManagerImpl implements BucketManager {
    *
    * @param volumeName - Name of the Volume.
    * @param bucketName - Name of the Bucket.
+   * @return OmBucketInfo
+   * @throws IOException The exception thrown could be:
+   * 1. OMException VOLUME_NOT_FOUND when the parent volume doesn't exist.
+   * 2. OMException BUCKET_NOT_FOUND when the parent volume exists, but bucket
+   * doesn't.
+   * 3. Other exceptions, e.g. IOException thrown from getBucketTable().get().
    */
   @Override
   public OmBucketInfo getBucketInfo(String volumeName, String bucketName)
@@ -250,9 +258,21 @@ public class BucketManagerImpl implements BucketManager {
       if (value == null) {
         LOG.debug("bucket: {} not found in volume: {}.", bucketName,
             volumeName);
-        throw new OMException("Bucket not found",
-            BUCKET_NOT_FOUND);
+        // Check parent volume existence
+        final String dbVolumeKey = metadataManager.getVolumeKey(volumeName);
+        if (metadataManager.getVolumeTable().get(dbVolumeKey) == null) {
+          // Parent volume doesn't exist, throw VOLUME_NOT_FOUND
+          throw new OMException("Volume not found when getting bucket info",
+              VOLUME_NOT_FOUND);
+        } else {
+          // Parent volume exists, throw BUCKET_NOT_FOUND
+          throw new OMException("Bucket not found", BUCKET_NOT_FOUND);
+        }
       }
+
+      value = OzoneManagerUtils.resolveLinkBucketLayout(value, metadataManager,
+          new HashSet<>());
+
       return value;
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
@@ -601,7 +621,7 @@ public class BucketManagerImpl implements BucketManager {
       }
       return hasAccess;
     } catch (IOException ex) {
-      if(ex instanceof OMException) {
+      if (ex instanceof OMException) {
         throw (OMException) ex;
       }
       LOG.error("CheckAccess operation failed for bucket:{}/{}.",

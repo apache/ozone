@@ -82,7 +82,7 @@ public class SimpleMockNodeManager implements NodeManager {
    */
   public void setPipelines(DatanodeDetails dd, int count) {
     Set<PipelineID> pipelines = new HashSet<>();
-    for (int i=0; i<count; i++) {
+    for (int i = 0; i < count; i++) {
       pipelines.add(PipelineID.randomId());
     }
     pipelineMap.put(dd.getUuid(), pipelines);
@@ -230,6 +230,11 @@ public class SimpleMockNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed) {
+    return null;
+  }
+
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
     return null;
   }
 

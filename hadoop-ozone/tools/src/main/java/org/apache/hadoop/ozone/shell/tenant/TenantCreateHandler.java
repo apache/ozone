@@ -17,42 +17,35 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * ozone tenant create.
  */
 @CommandLine.Command(name = "create",
-    description = "Create one or more tenants")
+    description = "Create a tenant."
+        + " This can create a new Ozone volume for the tenant.")
 public class TenantCreateHandler extends TenantHandler {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
+  @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
+  private String tenantId;
 
-  @CommandLine.Parameters(description = "List of tenant names")
-  private List<String> tenants = new ArrayList<>();
+  // TODO: HDDS-6340. Add an option to print JSON result
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    if (tenants.size() > 0) {
-      for (String tenantName : tenants) {
-        try {
-          client.getObjectStore().createTenant(tenantName);
-          out().println("Created tenant '" + tenantName + "'.");
-        } catch (IOException e) {
-          err().println("Failed to create tenant '" + tenantName + "': " +
-              e.getMessage());
-        }
-      }
-    } else {
-      GenericCli.missingSubcommand(spec);
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
+    try {
+      client.getObjectStore().createTenant(tenantId);
+      // Note: RpcClient#createTenant prints volume name in info level LOG
+      out().println("Created tenant '" + tenantId + "'.");
+    } catch (IOException e) {
+      // Throw exception to make client exit code non-zero
+      throw new IOException("Failed to create tenant '" + tenantId + "'", e);
     }
   }
 }

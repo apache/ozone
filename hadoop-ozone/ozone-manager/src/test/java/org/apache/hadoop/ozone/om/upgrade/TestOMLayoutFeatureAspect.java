@@ -69,6 +69,7 @@ public class TestOMLayoutFeatureAspect {
     MethodSignature methodSignature = mock(MethodSignature.class);
     when(methodSignature.getMethod())
         .thenReturn(OMLayoutFeatureUtil.class.getMethod("ecMethod"));
+    when(methodSignature.toShortString()).thenReturn("ecMethod");
     when(joinPoint.getSignature()).thenReturn(methodSignature);
 
     LambdaTestUtils.intercept(OMException.class,

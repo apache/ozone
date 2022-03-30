@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
@@ -54,7 +55,9 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -106,9 +109,10 @@ public class DatanodeStateMachine implements Closeable {
    */
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
   private final MeasuredReplicator replicatorMetrics;
+  private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
 
   /**
-   * Constructs a a datanode state machine.
+   * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
    * @param conf - Configuration.
    * @param certClient - Datanode Certificate client, required if security is
@@ -163,9 +167,15 @@ public class DatanodeStateMachine implements Closeable {
 
     replicatorMetrics = new MeasuredReplicator(replicator);
 
+    ReplicationConfig replicationConfig =
+        conf.getObject(ReplicationConfig.class);
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, dnConf.getReplicationMaxStreams());
+            replicatorMetrics, replicationConfig);
+
+    replicationSupervisorMetrics =
+        ReplicationSupervisorMetrics.create(supervisor);
+
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -181,6 +191,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
+        .addHandler(new RefreshVolumeUsageCommandHandler())
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -208,6 +219,8 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("Fail to get scm addresses", e);
     }
 
+    LOG.info("Datanode State Machine Task Thread Pool size {}",
+        totalServerCount);
     return totalServerCount;
   }
 
@@ -280,7 +293,7 @@ public class DatanodeStateMachine implements Closeable {
 
       now = Time.monotonicNow();
       if (now < nextHB.get()) {
-        if(!Thread.interrupted()) {
+        if (!Thread.interrupted()) {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
@@ -346,6 +359,7 @@ public class DatanodeStateMachine implements Closeable {
       cmdProcessThread.interrupt();
     }
     context.setState(DatanodeStates.getLastState());
+    replicationSupervisorMetrics.unRegister();
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -365,7 +379,7 @@ public class DatanodeStateMachine implements Closeable {
       connectionManager.close();
     }
 
-    if(container != null) {
+    if (container != null) {
       container.stop();
     }
 
@@ -461,7 +475,7 @@ public class DatanodeStateMachine implements Closeable {
     };
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("Datanode State Machine Thread - %d")
+        .setNameFormat("Datanode State Machine Daemon Thread")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate Datanode, encounter uncaught exception"
               + " in Datanode State Machine Thread";
@@ -623,12 +637,12 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   public StatusAndMessages finalizeUpgrade()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
   }
 
   public StatusAndMessages queryUpgradeStatus()
-      throws IOException{
+      throws IOException {
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         true);
   }

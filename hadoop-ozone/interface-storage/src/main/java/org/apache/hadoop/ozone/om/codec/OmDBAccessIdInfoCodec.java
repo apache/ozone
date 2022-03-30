@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ public class OmDBAccessIdInfoCodec implements Codec<OmDBAccessIdInfo> {
   @Override
   public byte[] toPersistedFormat(OmDBAccessIdInfo object) throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.convertToByteArray();
+    return object.getProtobuf().toByteArray();
   }
 
   @Override
@@ -44,7 +45,8 @@ public class OmDBAccessIdInfoCodec implements Codec<OmDBAccessIdInfo> {
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OmDBAccessIdInfo.getFromByteArray(rawData);
+    return OmDBAccessIdInfo.getFromProtobuf(
+        OzoneManagerProtocolProtos.OmDBAccessInfo.parseFrom(rawData));
   }
 
   @Override

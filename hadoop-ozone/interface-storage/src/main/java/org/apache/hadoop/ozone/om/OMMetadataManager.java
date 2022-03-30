@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto.
@@ -293,7 +294,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @return KeyTable.
    */
-  Table<String, OmKeyInfo> getKeyTable();
+
+  Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout);
 
   /**
    * Returns the FileTable.
@@ -314,7 +316,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @return Table.
    */
-  Table<String, OmKeyInfo> getOpenKeyTable();
+  Table<String, OmKeyInfo> getOpenKeyTable(BucketLayout buckLayout);
 
   /**
    * Gets the DelegationTokenTable.
@@ -356,8 +358,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, S3SecretValue> getS3SecretTable();
 
   Table<String, TransactionInfo> getTransactionInfoTable();
-
-  Table<String, String> getTenantUserTable();
 
   Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
 

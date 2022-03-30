@@ -251,6 +251,7 @@ public class TestPermissionCheck {
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.get("bucketName", "keyPath", null, 1000, "marker",
@@ -272,6 +273,7 @@ public class TestPermissionCheck {
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.put("bucketName", "keyPath", 1024, 0, null, null);
@@ -289,6 +291,7 @@ public class TestPermissionCheck {
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.delete("bucketName", "keyPath", null);
@@ -307,6 +310,7 @@ public class TestPermissionCheck {
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.initializeMultipartUpload("bucketName", "keyPath");

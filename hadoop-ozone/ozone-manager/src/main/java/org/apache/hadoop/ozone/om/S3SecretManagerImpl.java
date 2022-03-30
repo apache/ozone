@@ -65,7 +65,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
     try {
       S3SecretValue s3Secret =
           omMetadataManager.getS3SecretTable().get(kerberosID);
-      if(s3Secret == null) {
+      if (s3Secret == null) {
         byte[] secret = OmUtils.getSHADigest();
         result = new S3SecretValue(kerberosID, DigestUtils.sha256Hex(secret));
         omMetadataManager.getS3SecretTable().put(kerberosID, result);
@@ -82,22 +82,22 @@ public class S3SecretManagerImpl implements S3SecretManager {
   }
 
   @Override
-  public String getS3UserSecretString(String kerberosID)
+  public String getS3UserSecretString(String awsAccessKey)
       throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
+    Preconditions.checkArgument(Strings.isNotBlank(awsAccessKey),
         "awsAccessKeyId cannot be null or empty.");
-    LOG.trace("Get secret for awsAccessKey:{}", kerberosID);
+    LOG.trace("Get secret for awsAccessKey:{}", awsAccessKey);
 
     S3SecretValue s3Secret;
-    omMetadataManager.getLock().acquireReadLock(S3_SECRET_LOCK, kerberosID);
+    omMetadataManager.getLock().acquireReadLock(S3_SECRET_LOCK, awsAccessKey);
     try {
-      s3Secret = omMetadataManager.getS3SecretTable().get(kerberosID);
+      s3Secret = omMetadataManager.getS3SecretTable().get(awsAccessKey);
       if (s3Secret == null) {
         throw new OzoneSecurityException("S3 secret not found for " +
-            "awsAccessKeyId " + kerberosID, S3_SECRET_NOT_FOUND);
+            "awsAccessKeyId " + awsAccessKey, S3_SECRET_NOT_FOUND);
       }
     } finally {
-      omMetadataManager.getLock().releaseReadLock(S3_SECRET_LOCK, kerberosID);
+      omMetadataManager.getLock().releaseReadLock(S3_SECRET_LOCK, awsAccessKey);
     }
 
     return s3Secret.getAwsSecret();

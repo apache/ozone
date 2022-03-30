@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -45,6 +47,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -72,11 +75,16 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
  */
 
 public class OMKeyCreateRequest extends OMKeyRequest {
+
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateRequest.class);
 
   public OMKeyCreateRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OMKeyCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -90,22 +98,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if(checkKeyNameEnabled){
+    if (checkKeyNameEnabled) {
       OmUtils.validateKeyName(keyArgs.getKeyName());
     }
 
     String keyPath = keyArgs.getKeyName();
-    if (ozoneManager.getEnableFileSystemPaths()) {
-      // If enabled, disallow keys with trailing /. As in fs semantics
-      // directories end with trailing /.
-      keyPath = validateAndNormalizeKey(
-          ozoneManager.getEnableFileSystemPaths(), keyPath);
-      if (keyPath.endsWith("/")) {
-        throw new OMException("Invalid KeyPath, key names with trailing / " +
-            "are not allowed." + keyPath,
-            OMException.ResultCodes.INVALID_KEY_NAME);
-      }
-    }
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with
@@ -232,12 +231,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // Check if Key already exists
       String dbKeyName = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
-      OmKeyInfo dbKeyInfo =
-          omMetadataManager.getKeyTable().getIfExist(dbKeyName);
-
-      if (dbKeyInfo != null) {
-        ozoneManager.getKeyManager().refresh(dbKeyInfo);
-      }
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .getIfExist(dbKeyName);
 
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
@@ -310,7 +305,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
@@ -335,7 +330,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -379,5 +374,17 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
           createKeyRequest);
     }
+  }
+
+  public static OMKeyCreateRequest getInstance(KeyArgs keyArgs,
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMKeyCreateRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMKeyCreateRequest(omRequest, bucketLayout);
   }
 }

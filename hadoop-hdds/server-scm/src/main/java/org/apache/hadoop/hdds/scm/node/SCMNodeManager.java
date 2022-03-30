@@ -268,7 +268,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
-      NodeOperationalState newState) throws NodeNotFoundException{
+      NodeOperationalState newState) throws NodeNotFoundException {
     setNodeOperationalState(datanodeDetails, newState, 0);
   }
 
@@ -283,7 +283,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       NodeOperationalState newState, long opStateExpiryEpocSec)
-      throws NodeNotFoundException{
+      throws NodeNotFoundException {
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
   }
@@ -612,7 +612,7 @@ public class SCMNodeManager implements NodeManager {
         // send Finalize command multiple times.
         scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
             new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
-      } catch(NotLeaderException ex) {
+      } catch (NotLeaderException ex) {
         LOG.warn("Skip sending finalize upgrade command since current SCM is" +
             "not leader.", ex);
       }
@@ -676,6 +676,7 @@ public class SCMNodeManager implements NodeManager {
    * @param mostUsed true if most used, false if least used
    * @return List of DatanodeUsageInfo
    */
+  @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
     List<DatanodeDetails> healthyNodes =
@@ -700,6 +701,18 @@ public class SCMNodeManager implements NodeManager {
           DatanodeUsageInfo.getMostUtilized());
     }
     return datanodeUsageInfoList;
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
+    SCMNodeStat stat = getNodeStatInternal(dn);
+    return new DatanodeUsageInfo(dn, stat);
   }
 
   /**
@@ -751,7 +764,7 @@ public class SCMNodeManager implements NodeManager {
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
       NodeStatus status = dni.getNodeStatus();
       nodes.get(status.getOperationalState().name())
-          .compute(status.getHealth().name(), (k, v) -> v+1);
+          .compute(status.getHealth().name(), (k, v) -> v + 1);
     }
     return nodes;
   }

@@ -101,44 +101,44 @@ query string parameter. e.g., http://scm:9876/?user.name=scmadmin.
 Property| Value
 -----------------------------------|-----------------------------------------
 ozone.om.http.auth.type | simple
-ozone.om.http.auth.simple.anonymous_allowed | false
+ozone.om.http.auth.simple.anonymous.allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change ozone.om.http.auth.simple.anonymous_allowed to true.
+change ozone.om.http.auth.simple.anonymous.allowed to true.
 
 ### Enable SIMPLE authentication for S3G HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 ozone.s3g.http.auth.type | simple
-ozone.s3g.http.auth.simple.anonymous_allowed | false
+ozone.s3g.http.auth.simple.anonymous.allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change ozone.s3g.http.auth.simple.anonymous_allowed to true.
+change ozone.s3g.http.auth.simple.anonymous.allowed to true.
 
 ### Enable SIMPLE authentication for RECON HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 ozone.recon.http.auth.type | simple
-ozone.recon.http.auth.simple.anonymous_allowed | false
+ozone.recon.http.auth.simple.anonymous.allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change ozone.recon.http.auth.simple.anonymous_allowed to true.
+change ozone.recon.http.auth.simple.anonymous.allowed to true.
 
 
 ### Enable SIMPLE authentication for SCM HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 hdds.scm.http.auth.type | simple
-hdds.scm.http.auth.simple.anonymous_allowed | false
+hdds.scm.http.auth.simple.anonymous.allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change hdds.scm.http.auth.simple.anonymous_allowed to true.
+change hdds.scm.http.auth.simple.anonymous.allowed to true.
 
 ### Enable SIMPLE authentication for DATANODE HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
 hdds.datanode.http.auth.type | simple
-hdds.datanode.http.auth.simple.anonymous_allowed | false
+hdds.datanode.http.auth.simple.anonymous.allowed | false
 
 If you don't want to specify the user.name in the query string parameter, 
-change hdds.datanode.http.auth.simple.anonymous_allowed to true.
+change hdds.datanode.http.auth.simple.anonymous.allowed to true.

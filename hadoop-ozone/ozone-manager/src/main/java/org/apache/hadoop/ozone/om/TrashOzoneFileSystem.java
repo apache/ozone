@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -110,7 +109,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     ozoneManager.getMetrics().incNumTrashWriteRequests();
     if (ozoneManager.isRatisEnabled()) {
       OMClientRequest omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(omRequest);
+          OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
       omRequest = omClientRequest.preExecute(ozoneManager);
       RaftClientRequest req = getRatisRequest(omRequest);
       ozoneManager.getOmRatisServer().submitRequest(omRequest, req);
@@ -136,7 +135,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   public FSDataOutputStream create(Path path,
       FsPermission fsPermission,
       boolean b, int i, short i1,
-      long l, Progressable progressable){
+      long l, Progressable progressable) {
     throw new UnsupportedOperationException(
         "fs.create() not implemented in TrashOzoneFileSystem");
   }
@@ -157,7 +156,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath dstPath = new OFSPath(dst);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketLayout())) {
+    if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return renameFSO(srcPath, dstPath);
     }
     Preconditions.checkArgument(srcPath.getBucketName().
@@ -174,12 +173,12 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getRenameKeyRequest(srcPath, dstPath);
     try {
-      if(omRequest != null) {
+      if (omRequest != null) {
         submitRequest(omRequest);
         return true;
       }
       return false;
-    } catch (Exception e){
+    } catch (Exception e) {
       LOG.error("Couldn't send rename request", e);
       return false;
     }
@@ -191,7 +190,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OFSPath srcPath = new OFSPath(path);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
-    if (OzoneFSUtils.isFSOptimizedBucket(bucket.getBucketLayout())) {
+    if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return deleteFSO(srcPath);
     }
     DeleteIterator iterator = new DeleteIterator(path, true);
@@ -204,7 +203,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         getDeleteKeyRequest(srcPath);
     try {
-      if(omRequest != null) {
+      if (omRequest != null) {
         submitRequest(omRequest);
         return true;
       }
@@ -300,7 +299,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         CacheValue<OmBucketInfo>>> bucketIterator =
         ozoneManager.getMetadataManager().getBucketIterator();
     List<FileStatus> ret = new ArrayList<>();
-    while (bucketIterator.hasNext()){
+    while (bucketIterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry =
           bucketIterator.next();
       OmBucketInfo omBucketInfo = entry.getValue().getCacheValue();
@@ -317,7 +316,7 @@ public class TrashOzoneFileSystem extends FileSystem {
             }
           }
         }
-      } catch (Exception e){
+      } catch (Exception e) {
         LOG.error("Couldn't perform fs operation " +
             "fs.listStatus()/fs.exists()", e);
       }

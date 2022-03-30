@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 
@@ -41,13 +43,14 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -108,6 +111,9 @@ public class TestReconWithOzoneManager {
             OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
         TimeUnit.MILLISECONDS
     );
+    conf.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 2);
+    conf.setLong(RECON_OM_DELTA_UPDATE_LOOP_LIMIT, 10);
+
     RequestConfig config = RequestConfig.custom()
         .setConnectTimeout(socketTimeout)
         .setConnectionRequestTimeout(connectionTimeout)
@@ -179,10 +185,12 @@ public class TestReconWithOzoneManager {
     // check if OM metadata has vol0/bucket0/key0 info
     String ozoneKey = metadataManager.getOzoneKey(
         "vol0", "bucket0", "key0");
-    OmKeyInfo keyInfo1 = metadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo keyInfo1 =
+        metadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
+        omKeyValueTableIterator =
+        metadataManager.getKeyTable(getBucketLayout()).iterator();
 
     long omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
@@ -224,7 +232,8 @@ public class TestReconWithOzoneManager {
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
-    omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
+    omKeyValueTableIterator =
+        metadataManager.getKeyTable(getBucketLayout()).iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
     // update the next snapshot from om to verify delta updates
@@ -269,7 +278,8 @@ public class TestReconWithOzoneManager {
 
     //add 5 more keys to OM
     addKeys(5, 10);
-    omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
+    omKeyValueTableIterator =
+        metadataManager.getKeyTable(getBucketLayout()).iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
     // get the next snapshot from om
@@ -345,8 +355,8 @@ public class TestReconWithOzoneManager {
    * For test purpose each container will have only one key.
    */
   private void addKeys(int start, int end) throws Exception {
-    for(int i = start; i < end; i++) {
-      Pipeline pipeline = TestUtils.getRandomPipeline();
+    for (int i = start; i < end; i++) {
+      Pipeline pipeline = HddsTestUtils.getRandomPipeline();
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
       BlockID blockID = new BlockID(i, 1);
       OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID,
@@ -354,7 +364,7 @@ public class TestReconWithOzoneManager {
       omKeyLocationInfoList.add(omKeyLocationInfo1);
       OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
           OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
-      writeDataToOm("key"+i, "bucket"+i, "vol"+i,
+      writeDataToOm("key" + i, "bucket" + i, "vol" + i,
           Collections.singletonList(omKeyLocationInfoGroup));
     }
   }
@@ -362,7 +372,7 @@ public class TestReconWithOzoneManager {
   private long getTableKeyCount(TableIterator<String, ? extends
       Table.KeyValue<String, OmKeyInfo>> iterator) {
     long keyCount = 0;
-    while(iterator.hasNext()) {
+    while (iterator.hasNext()) {
       keyCount++;
       iterator.next();
     }
@@ -385,7 +395,7 @@ public class TestReconWithOzoneManager {
     String omKey = metadataManager.getOzoneKey(volume,
         bucket, key);
 
-    metadataManager.getKeyTable().put(omKey,
+    metadataManager.getKeyTable(getBucketLayout()).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucket)
             .setVolumeName(volume)
@@ -394,5 +404,9 @@ public class TestReconWithOzoneManager {
                 HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
+  }
+
+  private static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

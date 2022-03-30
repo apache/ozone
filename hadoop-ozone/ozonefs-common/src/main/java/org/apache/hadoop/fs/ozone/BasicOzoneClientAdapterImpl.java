@@ -24,11 +24,13 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.HashSet;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
@@ -52,11 +55,12 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -83,6 +87,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private ReplicationConfig replicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
+  private OzoneConfiguration config;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -153,9 +158,18 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
+
+    // resolve the bucket layout in case of Link Bucket
+    BucketLayout resolvedBucketLayout =
+        OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+            new HashSet<>());
+
+    OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+    this.config = conf;
   }
 
   @Override
@@ -199,7 +213,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
         ReplicationConfig customReplicationConfig =
             ReplicationConfig.adjustReplication(
-                replicationConfig, replication
+                replicationConfig, replication, config
             );
         ozoneOutputStream =
             bucket.createFile(key, 0, customReplicationConfig, overWrite,
@@ -330,7 +344,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
 
   @Override
-  public Iterator<BasicKeyInfo> listKeys(String pathKey) throws IOException{
+  public Iterator<BasicKeyInfo> listKeys(String pathKey) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     return new IteratorAdapter(bucket.listKeys(pathKey));
   }
@@ -545,6 +559,18 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public boolean isFSOptimizedBucket() {
-    return bucket.getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    return bucket.getBucketLayout().isFileSystemOptimized();
+  }
+
+  @Override
+  public FileChecksum getFileChecksum(String keyName, long length)
+      throws IOException {
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+
+    return OzoneClientUtils.getFileChecksumWithCombineMode(
+        volume, bucket, keyName,
+        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
+
   }
 }

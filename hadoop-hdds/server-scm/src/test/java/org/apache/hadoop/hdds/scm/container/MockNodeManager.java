@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -283,11 +283,11 @@ public class MockNodeManager implements NodeManager {
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();
         long remaining = nodeMetricMap.get(dd).getRemaining().get();
-        StorageReportProto storage1 = TestUtils.createStorageReport(
+        StorageReportProto storage1 = HddsTestUtils.createStorageReport(
             di.getUuid(), "/data1-" + di.getUuidString(),
             capacity, used, remaining, null);
         MetadataStorageReportProto metaStorage1 =
-            TestUtils.createMetadataStorageReport(
+            HddsTestUtils.createMetadataStorageReport(
                 "/metadata1-" + di.getUuidString(), capacity, used,
                 remaining, null);
         di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
@@ -393,6 +393,18 @@ public class MockNodeManager implements NodeManager {
         .map(node -> new DatanodeUsageInfo(node, nodeMetricMap.get(node)))
         .sorted(comparator)
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param datanodeDetails the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails datanodeDetails) {
+    SCMNodeStat stat = nodeMetricMap.get(datanodeDetails);
+    return new DatanodeUsageInfo(datanodeDetails, stat);
   }
 
   /**
@@ -520,7 +532,7 @@ public class MockNodeManager implements NodeManager {
 
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
-    if(commandMap.containsKey(dnId)) {
+    if (commandMap.containsKey(dnId)) {
       List<SCMCommand> commandList = commandMap.get(dnId);
       Preconditions.checkNotNull(commandList);
       commandList.add(command);
@@ -589,7 +601,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   public void clearCommandQueue(UUID dnId) {
-    if(commandMap.containsKey(dnId)) {
+    if (commandMap.containsKey(dnId)) {
       commandMap.put(dnId, new LinkedList<>());
     }
   }
@@ -738,7 +750,8 @@ public class MockNodeManager implements NodeManager {
     SCMNodeStat stat = this.nodeMetricMap.get(datanodeDetails);
     if (stat != null) {
       aggregateStat.subtract(stat);
-      stat.getCapacity().add(size);
+      stat.getScmUsed().add(size);
+      stat.getRemaining().subtract(size);
       aggregateStat.add(stat);
       nodeMetricMap.put(datanodeDetails, stat);
     }
@@ -754,7 +767,8 @@ public class MockNodeManager implements NodeManager {
     SCMNodeStat stat = this.nodeMetricMap.get(datanodeDetails);
     if (stat != null) {
       aggregateStat.subtract(stat);
-      stat.getCapacity().subtract(size);
+      stat.getScmUsed().subtract(size);
+      stat.getRemaining().add(size);
       aggregateStat.add(stat);
       nodeMetricMap.put(datanodeDetails, stat);
     }
@@ -785,7 +799,7 @@ public class MockNodeManager implements NodeManager {
     if (uuids == null) {
       return results;
     }
-    for(String uuid : uuids) {
+    for (String uuid : uuids) {
       DatanodeDetails dn = getNodeByUuid(uuid);
       if (dn != null) {
         results.add(dn);

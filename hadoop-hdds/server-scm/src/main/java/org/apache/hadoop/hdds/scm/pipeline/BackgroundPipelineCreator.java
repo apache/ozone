@@ -17,118 +17,195 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.collections.iterators.LoopingIterator;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
 
 /**
  * Implements api for running background pipeline creation jobs.
  */
-class BackgroundPipelineCreator {
+public class BackgroundPipelineCreator implements SCMService {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BackgroundPipelineCreator.class);
 
-  private final Scheduler scheduler;
-  private final AtomicBoolean isPipelineCreatorRunning;
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
-  private ScheduledFuture<?> periodicTask;
-  private AtomicBoolean pausePipelineCreation;
+  private final SCMContext scmContext;
+
+  /**
+   * SCMService related variables.
+   * 1) after leaving safe mode, BackgroundPipelineCreator needs to
+   *    wait for a while before really take effect.
+   * 2) NewNodeHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
+   *    will trigger a one-shot run of BackgroundPipelineCreator,
+   *    no matter in safe mode or not.
+   */
+  private final Lock serviceLock = new ReentrantLock();
+  private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
+  private final boolean createPipelineInSafeMode;
+  private final long waitTimeInMillis;
+  private long lastTimeToBeReadyInMillis = 0;
+  private boolean oneShotRun = false;
+
+  /**
+   * RatisPipelineUtilsThread is the one which wakes up at
+   * configured interval and tries to create pipelines.
+   */
+  private Thread thread;
+  private final Object monitor = new Object();
+  private static final String THREAD_NAME = "RatisPipelineUtilsThread";
+  private final AtomicBoolean running = new AtomicBoolean(false);
+  private final long intervalInMillis;
+
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
-      Scheduler scheduler, ConfigurationSource conf) {
+                              ConfigurationSource conf,
+                              SCMServiceManager serviceManager,
+                              SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
-    this.scheduler = scheduler;
-    this.pausePipelineCreation = new AtomicBoolean(false);
-    isPipelineCreatorRunning = new AtomicBoolean(false);
-  }
+    this.scmContext = scmContext;
 
-  public void pause() {
-    pausePipelineCreation.set(true);
-  }
+    this.createPipelineInSafeMode = conf.getBoolean(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
 
-  public void resume() {
-    pausePipelineCreation.set(false);
-  }
+    this.waitTimeInMillis = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+        TimeUnit.MILLISECONDS);
 
-  private boolean shouldSchedulePipelineCreator() {
-    return isPipelineCreatorRunning.compareAndSet(false, true);
+    this.intervalInMillis = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    // register BackgroundPipelineCreator to SCMServiceManager
+    serviceManager.register(this);
+
+    // start RatisPipelineUtilsThread
+    start();
   }
 
   /**
-   * Schedules a fixed interval job to create pipelines.
+   * Start RatisPipelineUtilsThread.
    */
-  synchronized void startFixedIntervalPipelineCreator() {
-    if (periodicTask != null) {
+  @Override
+  public void start() {
+    if (!running.compareAndSet(false, true)) {
+      LOG.warn("{} is already started, just ignore.", THREAD_NAME);
       return;
     }
-    long intervalInMillis = conf
-        .getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
-            TimeUnit.MILLISECONDS);
-    // TODO: #CLUTIL We can start the job asap
-    periodicTask = scheduler.scheduleWithFixedDelay(() -> {
-      if (!shouldSchedulePipelineCreator()) {
-        return;
+
+    LOG.info("Starting {}.", THREAD_NAME);
+
+    thread = new ThreadFactoryBuilder()
+        .setDaemon(false)
+        .setNameFormat(THREAD_NAME + " - %d")
+        .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
+          // gracefully shutdown SCM.
+          scmContext.getScm().stop();
+
+          String message = "Terminate SCM, encounter uncaught exception"
+              + " in RatisPipelineUtilsThread";
+          ExitUtils.terminate(1, message, ex, LOG);
+        })
+        .build()
+        .newThread(this::run);
+
+    thread.start();
+  }
+
+  /**
+   * Stop RatisPipelineUtilsThread.
+   */
+  public void stop() {
+    if (!running.compareAndSet(true, false)) {
+      LOG.warn("{} is not running, just ignore.", THREAD_NAME);
+      return;
+    }
+
+    LOG.info("Stopping {}.", THREAD_NAME);
+
+    // in case RatisPipelineUtilsThread is sleeping
+    synchronized (monitor) {
+      monitor.notifyAll();
+    }
+
+    try {
+      thread.join();
+    } catch (InterruptedException e) {
+      LOG.warn("Interrupted during join {}.", THREAD_NAME);
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private void run() {
+    while (running.get()) {
+      if (shouldRun()) {
+        createPipelines();
       }
-      createPipelines();
-    }, 0, intervalInMillis, TimeUnit.MILLISECONDS);
-  }
 
-  /**
-   * Triggers pipeline creation via background thread.
-   */
-  void triggerPipelineCreation() {
-    // TODO: #CLUTIL introduce a better mechanism to not have more than one
-    // job of a particular type running, probably via ratis.
-    if (!shouldSchedulePipelineCreator()) {
-      return;
+      try {
+        synchronized (monitor) {
+          // skip wait if another one-shot run was triggered in the meantime
+          if (!isOneShotRunNeeded()) {
+            monitor.wait(intervalInMillis);
+          }
+        }
+      } catch (InterruptedException e) {
+        LOG.warn("{} is interrupted.", THREAD_NAME);
+        Thread.currentThread().interrupt();
+      }
     }
-    scheduler.schedule(this::createPipelines, 0, TimeUnit.MILLISECONDS);
   }
 
   private boolean skipCreation(ReplicationConfig replicationConfig,
       boolean autoCreate) {
-    if (replicationConfig.getReplicationType()
-        == HddsProtos.ReplicationType.RATIS) {
+    if (replicationConfig.getReplicationType().equals(RATIS)) {
       return RatisReplicationConfig
           .hasFactor(replicationConfig, ReplicationFactor.ONE) && (!autoCreate);
-    } else if (replicationConfig.getReplicationType()
-        == ReplicationType.STAND_ALONE) {
+    } else if (replicationConfig.getReplicationType().equals(STAND_ALONE)) {
       // For STAND_ALONE Replication Type, Replication Factor 3 should not be
       // used.
       return ((StandaloneReplicationConfig) replicationConfig)
-          .getReplicationFactor() == ReplicationFactor.ONE;
+          .getReplicationFactor() != ReplicationFactor.ONE;
     }
     return true;
   }
 
   private void createPipelines() throws RuntimeException {
     // TODO: #CLUTIL Different replication factor may need to be supported
-
-    if(pausePipelineCreation.get()) {
-      LOG.info("Pipeline Creation is paused.");
-      return;
-    }
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
             OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
@@ -140,10 +217,8 @@ class BackgroundPipelineCreator {
         new ArrayList<>();
     for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
         .values()) {
-
       final ReplicationConfig replicationConfig =
-          ReplicationConfig.fromTypeAndFactor(type, factor);
-
+          ReplicationConfig.fromProtoTypeAndFactor(type, factor);
       if (skipCreation(replicationConfig, autoCreateFactorOne)) {
         // Skip this iteration for creating pipeline
         continue;
@@ -164,9 +239,6 @@ class BackgroundPipelineCreator {
           (ReplicationConfig) it.next();
 
       try {
-        if (scheduler.isClosed()) {
-          break;
-        }
         pipelineManager.createPipeline(replicationConfig);
       } catch (IOException ioe) {
         it.remove();
@@ -176,7 +248,85 @@ class BackgroundPipelineCreator {
       }
     }
 
-    isPipelineCreatorRunning.set(false);
     LOG.debug("BackgroundPipelineCreator createPipelines finished.");
+  }
+
+  @Override
+  public void notifyStatusChanged() {
+    serviceLock.lock();
+    try {
+      // 1) SCMContext#isLeader returns true.
+      // 2) not in safe mode or createPipelineInSafeMode is true
+      if (scmContext.isLeaderReady() &&
+          (!scmContext.isInSafeMode() || createPipelineInSafeMode)) {
+        // transition from PAUSING to RUNNING
+        if (serviceStatus != ServiceStatus.RUNNING) {
+          LOG.info("Service {} transitions to RUNNING.", getServiceName());
+          lastTimeToBeReadyInMillis = Time.monotonicNow();
+          serviceStatus = ServiceStatus.RUNNING;
+        }
+      } else {
+        serviceStatus = ServiceStatus.PAUSING;
+      }
+    } finally {
+      serviceLock.unlock();
+    }
+  }
+
+  @Override
+  public void notifyEventTriggered(Event event) {
+    if (!scmContext.isLeader()) {
+      LOG.info("ignore, not leader SCM.");
+      return;
+    }
+    if (event == NEW_NODE_HANDLER_TRIGGERED
+        || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
+        || event == PRE_CHECK_COMPLETED) {
+      LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
+
+      serviceLock.lock();
+      try {
+        oneShotRun = true;
+      } finally {
+        serviceLock.unlock();
+      }
+
+      synchronized (monitor) {
+        monitor.notifyAll();
+      }
+    }
+  }
+
+  @Override
+  public boolean shouldRun() {
+    serviceLock.lock();
+    try {
+      // check one-short run
+      if (oneShotRun) {
+        oneShotRun = false;
+        return true;
+      }
+
+      // If safe mode is off, then this SCMService starts to run with a delay.
+      return serviceStatus == ServiceStatus.RUNNING && (
+          createPipelineInSafeMode ||
+          Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis);
+    } finally {
+      serviceLock.unlock();
+    }
+  }
+
+  private boolean isOneShotRunNeeded() {
+    serviceLock.lock();
+    try {
+      return oneShotRun;
+    } finally {
+      serviceLock.unlock();
+    }
+  }
+
+  @Override
+  public String getServiceName() {
+    return BackgroundPipelineCreator.class.getSimpleName();
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
 
 import com.google.common.base.Optional;
@@ -26,6 +27,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -38,6 +40,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -71,6 +74,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     super(omRequest);
   }
 
+  public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
+  }
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
@@ -81,7 +88,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if(checkKeyNameEnabled){
+    if (checkKeyNameEnabled) {
       OmUtils.validateKeyName(renameKeyRequest.getToKeyName());
     }
 
@@ -156,7 +163,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           fromKeyName);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
-      OmKeyInfo toKeyValue = omMetadataManager.getKeyTable().get(toKey);
+      OmKeyInfo toKeyValue =
+          omMetadataManager.getKeyTable(getBucketLayout()).get(toKey);
 
       if (toKeyValue != null) {
         throw new OMException("Key already exists " + toKeyName,
@@ -164,7 +172,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       }
 
       // fromKeyName should exist
-      fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
+      fromKeyValue =
+          omMetadataManager.getKeyTable(getBucketLayout()).get(fromKey);
       if (fromKeyValue == null) {
           // TODO: Add support for renaming open key
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
@@ -180,7 +189,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       // Add to cache.
       // fromKey should be deleted, toKey should be added with newly updated
       // omKeyInfo.
-      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+      Table<String, OmKeyInfo> keyTable =
+          omMetadataManager.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(fromKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
@@ -190,14 +200,14 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-          fromKeyName, toKeyName, fromKeyValue);
+          fromKeyName, toKeyName, fromKeyValue, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);
@@ -238,4 +248,16 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     return auditMap;
   }
 
+  public static OMKeyRenameRequest getInstance(
+      OzoneManagerProtocolProtos.KeyArgs keyArgs, OMRequest omRequest,
+      OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new OMKeyRenameRequestWithFSO(omRequest, bucketLayout);
+    }
+    return new OMKeyRenameRequest(omRequest, bucketLayout);
+  }
 }

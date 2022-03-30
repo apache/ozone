@@ -18,17 +18,75 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.common.base.Preconditions;
+
 /**
  * This class is used for storing Ozone tenant arguments.
  */
 public class OmTenantArgs {
-  private final String tenantName;
 
-  public OmTenantArgs(String tenantName) {
-    this.tenantName = tenantName;
+  /**
+   * Tenant name.
+   */
+  private final String tenantId;
+
+  /**
+   * Volume name to be created for this tenant.
+   * Default volume name would be the same as tenant name if unspecified.
+   */
+  private final String volumeName;
+
+  public OmTenantArgs(String tenantId) {
+    this.tenantId = tenantId;
+    this.volumeName = this.tenantId;
   }
 
-  public String getTenantName() {
-    return tenantName;
+  public OmTenantArgs(String tenantId, String volumeName) {
+    this.tenantId = tenantId;
+    this.volumeName = volumeName;
   }
+
+  public String getTenantId() {
+    return tenantId;
+  }
+
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public static OmTenantArgs.Builder newBuilder() {
+    return new OmTenantArgs.Builder();
+  }
+
+  /**
+   * Builder for OmTenantArgs.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static class Builder {
+    private String tenantId;
+    private String volumeName;
+
+    /**
+     * Constructs a builder.
+     */
+    public Builder() {
+    }
+
+    public Builder setTenantId(String tenantId) {
+      this.tenantId = tenantId;
+      return this;
+    }
+
+    public Builder setVolumeName(String volumeName) {
+      this.volumeName = volumeName;
+      return this;
+    }
+
+    public OmTenantArgs build() {
+      Preconditions.checkNotNull(tenantId);
+      Preconditions.checkNotNull(volumeName);
+      return new OmTenantArgs(tenantId, volumeName);
+    }
+  }
+
 }

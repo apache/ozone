@@ -35,6 +35,7 @@ import java.util.Scanner;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -73,9 +74,14 @@ public class TestMultipartUploadWithCopy {
   private static final String EXISTING_KEY = "key1";
   private static final String EXISTING_KEY_CONTENT = "testkey";
   private static final OzoneClient CLIENT = new OzoneClientStub();
-  private static final int RANGE_FROM = 2;
-  private static final int RANGE_TO = 4;
-
+  private static final long DELAY_MS = 2000;
+  private static long sourceKeyLastModificationTime;
+  private static String beforeSourceKeyModificationTimeStr;
+  private static String afterSourceKeyModificationTimeStr;
+  private static String futureTimeStr;
+  private static final String UNPARSABLE_TIME_STR = "Unparsable time string";
+  private static final String ERROR_CODE =
+      S3ErrorTable.PRECOND_FAILED.getCode();
   @BeforeClass
   public static void setUp() throws Exception {
     CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
@@ -91,25 +97,37 @@ public class TestMultipartUploadWithCopy {
       stream.write(keyContent);
     }
 
+    sourceKeyLastModificationTime = CLIENT.getObjectStore()
+        .getS3Bucket(OzoneConsts.S3_BUCKET)
+        .getKey(EXISTING_KEY)
+        .getModificationTime().toEpochMilli();
+    beforeSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
+    afterSourceKeyModificationTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
+    futureTimeStr =
+        OzoneUtils.formatTime(sourceKeyLastModificationTime +
+            1000 * 60 * 24);
+
+    // Make sure DELAY_MS has passed, otherwise
+    //  afterSourceKeyModificationTimeStr will be in the future
+    //  and thus invalid
+    long currentTime = System.currentTimeMillis();
+    long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
+    if (sleepMs > 0) {
+      Thread.sleep(sleepMs);
+    }
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
+    REST.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   @Test
   public void testMultipart() throws Exception {
-    Long sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
-    String beforeSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
-    String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000);
-
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(KEY);
 
@@ -158,55 +176,132 @@ public class TestMultipartUploadWithCopy {
     }
   }
 
+  /**
+  * CopyIfTimestampTestCase captures all the possibilities for the time stamps
+  * that can be passed into the multipart copy with copy-if flags for
+  * timestamps. Only some of the cases are valid others should raise an
+  * exception.
+  * Time stamps can be,
+  * 1. after the timestamp on the object but still a valid time stamp
+  * (in regard to wall clock time on server)
+  * 2. before the timestamp on the object
+  * 3. In the Future beyond the wall clock time on the server
+  * 4. Null
+  * 5. Unparsable
+  */
+  public enum CopyIfTimestampTestCase {
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_AFTER_TS(
+        afterSourceKeyModificationTimeStr, afterSourceKeyModificationTimeStr,
+        ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        afterSourceKeyModificationTimeStr, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_NULL(
+        afterSourceKeyModificationTimeStr, null,
+        ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_FUTURE(
+        afterSourceKeyModificationTimeStr, futureTimeStr,
+        ERROR_CODE),
+    MODIFIED_SINCE_AFTER_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        afterSourceKeyModificationTimeStr, UNPARSABLE_TIME_STR,
+        ERROR_CODE),
+
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_AFTER_TS(
+        beforeSourceKeyModificationTimeStr, afterSourceKeyModificationTimeStr,
+        null),
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        beforeSourceKeyModificationTimeStr, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_NULL(
+        beforeSourceKeyModificationTimeStr, null,
+        null),
+    MODIFIED_SINCE_BEFORE_TS_UNMOFIFIED_SINCE_FUTURE(
+        beforeSourceKeyModificationTimeStr, futureTimeStr,
+        null),
+    MODIFIED_SINCE_BEFORE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        beforeSourceKeyModificationTimeStr, UNPARSABLE_TIME_STR,
+        null),
+
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_AFTER_TS(
+        null, afterSourceKeyModificationTimeStr,
+        null),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        null, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_NULL_TS(
+        null, null,
+        null),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_FUTURE_TS(
+        null, futureTimeStr,
+        null),
+    MODIFIED_SINCE_NULL_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        null, UNPARSABLE_TIME_STR,
+        null),
+
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_AFTER_TS(
+        UNPARSABLE_TIME_STR, afterSourceKeyModificationTimeStr,
+        null),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        UNPARSABLE_TIME_STR, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_NULL_TS(
+        UNPARSABLE_TIME_STR, null,
+        null),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_FUTURE_TS(
+        UNPARSABLE_TIME_STR, futureTimeStr,
+        null),
+    MODIFIED_SINCE_UNPARSABLE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        UNPARSABLE_TIME_STR, UNPARSABLE_TIME_STR,
+        null),
+
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_AFTER_TS(
+        futureTimeStr, afterSourceKeyModificationTimeStr,
+        null),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_BEFORE_TS(
+        futureTimeStr, beforeSourceKeyModificationTimeStr,
+        ERROR_CODE),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_NULL_TS(
+        futureTimeStr, null,
+        null),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_FUTURE_TS(
+        futureTimeStr, futureTimeStr,
+        null),
+    MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
+        futureTimeStr, UNPARSABLE_TIME_STR,
+        null);
+    
+    private final String modifiedTimestamp;
+    private final String unmodifiedTimestamp;
+    private final String errorCode;
+
+    CopyIfTimestampTestCase(String modifiedTimestamp,
+        String unmodifiedTimestamp, String errorCode) {
+      this.modifiedTimestamp = modifiedTimestamp;
+      this.unmodifiedTimestamp = unmodifiedTimestamp;
+      this.errorCode = errorCode;
+    }
+
+    @Override
+    public String toString() {
+      return this.name() +
+          " Modified:" + this.modifiedTimestamp
+          + " Unmodified:" + this.unmodifiedTimestamp
+          + " ErrorCode:" + this.errorCode;
+    }
+  }
   @Test
-  public void testMultipartIfModifiedSince() throws Exception {
-    Long sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
-    String beforeSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
-    String afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + 1000);
-
-    // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(KEY);
-
-    // ifUnmodifiedSince = beforeSourceKeyModificationTime,
-    // ifModifiedSince = afterSourceKeyModificationTime
-    try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTimeStr,
-          beforeSourceKeyModificationTimeStr
-      );
-      fail("testMultipartIfModifiedSinceError");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
-    }
-
-    // ifUnmodifiedSince = beforeSourceKeyModificationTime,
-    try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          null,
-          beforeSourceKeyModificationTimeStr
-      );
-      fail("testMultipartIfModifiedSinceError");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
-    }
-
-    // ifModifiedSince = afterSourceKeyModificationTime
-    try {
-      uploadPartWithCopy(KEY, uploadID, 1,
-          OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
-          afterSourceKeyModificationTimeStr,
-          null
-      );
-      fail("testMultipartIfModifiedSinceError");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.PRECOND_FAILED.getCode());
+  public void testMultipartTSHeaders() throws Exception {
+    for (CopyIfTimestampTestCase t : CopyIfTimestampTestCase.values()) {
+      try {
+        uploadPartWithCopy(t.modifiedTimestamp, t.unmodifiedTimestamp);
+        if (t.errorCode != null) {
+          fail("Fail test:" + t);
+        }
+      } catch (OS3Exception ex) {
+        if ((t.errorCode == null) || (!ex.getCode().equals(ERROR_CODE))) {
+          fail("Failed test:" + t);
+        }
+      }
     }
   }
 
@@ -246,6 +341,16 @@ public class TestMultipartUploadWithCopy {
       String keyOrigin, String range) throws IOException, OS3Exception {
     return uploadPartWithCopy(key, uploadID, partNumber, keyOrigin,
         range, null, null);
+  }
+
+  private Part uploadPartWithCopy(String ifModifiedSinceStr,
+      String ifUnmodifiedSinceStr) throws IOException, OS3Exception {
+    // Initiate multipart upload
+    String uploadID = initiateMultipartUpload(KEY);
+
+    return uploadPartWithCopy(KEY, uploadID, 1,
+      OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3",
+      ifModifiedSinceStr, ifUnmodifiedSinceStr);
   }
 
   private Part uploadPartWithCopy(String key, String uploadID, int partNumber,

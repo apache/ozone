@@ -22,6 +22,7 @@ import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -73,7 +74,8 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable();
+    Table<String, OmKeyInfo> omKeyInfoTable =
+        omMetadataManager.getKeyTable(getBucketLayout());
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         keyIter = omKeyInfoTable.iterator()) {
@@ -126,7 +128,7 @@ public class FileSizeCountTask implements ReconOmTask {
       String updatedKey = omdbUpdateEvent.getKey();
       OmKeyInfo omKeyInfo = omdbUpdateEvent.getValue();
 
-      try{
+      try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
           handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
@@ -217,6 +219,10 @@ public class FileSizeCountTask implements ReconOmTask {
     fileSizeCountMap.put(key, count);
   }
 
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
   /**
    * Calculate and update the count of files being tracked by
    * fileSizeCountMap.
@@ -252,7 +258,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
     @Override
     public boolean equals(Object obj) {
-      if(obj instanceof FileSizeCountKey) {
+      if (obj instanceof FileSizeCountKey) {
         FileSizeCountKey s = (FileSizeCountKey) obj;
         return volume.equals(s.volume) && bucket.equals(s.bucket) &&
             fileSizeUpperBound.equals(s.fileSizeUpperBound);

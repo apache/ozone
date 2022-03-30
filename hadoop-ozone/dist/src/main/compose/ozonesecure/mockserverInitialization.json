@@ -17,7 +17,31 @@
   },
   {
     "httpRequest": {
-      "path": "/service/xusers/secure/groups"
+      "path": "/service/roles/roles"
+    },
+    "httpResponse": {
+      "body": "{id: 222}"
+    }
+  },
+  {
+    "httpRequest": {
+      "path": "/service/roles/roles/name/tenantone-UserRole"
+    },
+    "httpResponse": {
+      "body": "{id: 222, users: []}"
+    }
+  },
+  {
+    "httpRequest": {
+      "path": "/service/roles/roles/name/tenantone-AdminRole"
+    },
+    "httpResponse": {
+      "body": "{id: 222, users: []}"
+    }
+  },
+  {
+    "httpRequest": {
+      "path": "/service/roles/roles/222"
     },
     "httpResponse": {
       "body": "{id: 222}"
@@ -33,7 +57,7 @@
   },
   {
     "httpRequest": {
-      "path": "/service/public/v2/api/policy/*",
+      "path": "/service/public/v2/api/policy/*"
     },
     "httpResponse": {
       "body": "[{id: 444}]"

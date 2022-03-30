@@ -24,8 +24,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -55,6 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -69,8 +72,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCommitPartRequest.class);
 
-  public S3MultipartUploadCommitPartRequest(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCommitPartRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -79,13 +83,14 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         getOmRequest().getCommitMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
     return getOmRequest().toBuilder().setCommitMultiPartUploadRequest(
-        multipartCommitUploadPartRequest.toBuilder()
-            .setKeyArgs(keyArgs.toBuilder().setModificationTime(Time.now())
-                .setKeyName(validateAndNormalizeKey(
-                    ozoneManager.getEnableFileSystemPaths(),
-                    keyArgs.getKeyName()))))
-        .setUserInfo(getUserInfo()).build();
+        multipartCommitUploadPartRequest.toBuilder().setKeyArgs(
+            keyArgs.toBuilder().setModificationTime(Time.now())
+                .setKeyName(keyPath))).setUserInfo(getUserInfo()).build();
   }
 
   @Override
@@ -213,7 +218,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(multipartKeyInfo),
               trxnLogIndex));
 
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
@@ -276,13 +281,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
         multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-        ozoneManager.isRatisEnabled(), omBucketInfo);
+        ozoneManager.isRatisEnabled(), omBucketInfo, getBucketLayout());
   }
 
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
       String openKey, String keyName) throws IOException {
 
-    return omMetadataManager.getOpenKeyTable().get(openKey);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
   }
 
   protected String getOpenKey(String volumeName, String bucketName,
@@ -330,6 +335,19 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       String keyName, OMMetadataManager omMetadataManager, String uploadID) {
     return omMetadataManager.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
+  }
+
+  public static S3MultipartUploadCommitPartRequest getInstance(KeyArgs keyArgs,
+      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
+
+    BucketLayout bucketLayout =
+        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
+            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
+    if (bucketLayout.isFileSystemOptimized()) {
+      return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
+          bucketLayout);
+    }
+    return new S3MultipartUploadCommitPartRequest(omRequest, bucketLayout);
   }
 }
 

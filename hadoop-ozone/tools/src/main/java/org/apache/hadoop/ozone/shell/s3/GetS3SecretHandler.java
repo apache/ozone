@@ -30,13 +30,12 @@ import picocli.CommandLine.Option;
 /**
  * Executes getsecret calls.
  */
-@Command(name = "getsecret",
-    description = "Returns s3 secret for current user")
+@Command(name = "getsecret", aliases = "get-secret",
+    description = "Returns S3 secret for a user")
 public class GetS3SecretHandler extends S3Handler {
 
   @Option(names = "-u",
-      description = "Specify the user to perform the operation on "
-          + "(Admins only)'")
+      description = "Specify the user (accessId). Requires admin privilege'")
   private String username;
 
   @Option(names = "-e",

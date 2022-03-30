@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -53,6 +54,7 @@ public class TestContainerManagerImpl {
   private ContainerManager containerManager;
   private SCMHAManager scmhaManager;
   private SequenceIdGenerator sequenceIdGen;
+  private NodeManager nodeManager;
 
   @Before
   public void setUp() throws Exception {
@@ -63,9 +65,11 @@ public class TestContainerManagerImpl {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = MockSCMHAManager.getInstance(true);
+    nodeManager = new MockNodeManager(true, 10);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    final PipelineManager pipelineManager = MockPipelineManager.getInstance();
+    final PipelineManager pipelineManager =
+        new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(new RatisReplicationConfig(
         ReplicationFactor.THREE));
     containerManager = new ContainerManagerImpl(conf,
@@ -75,7 +79,7 @@ public class TestContainerManagerImpl {
 
   @After
   public void cleanup() throws Exception {
-    if(containerManager != null) {
+    if (containerManager != null) {
       containerManager.close();
     }
 
@@ -121,12 +125,12 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testGetContainers() throws Exception{
+  public void testGetContainers() throws Exception {
     Assert.assertTrue(
         containerManager.getContainers().isEmpty());
 
     ContainerID[] cidArray = new ContainerID[10];
-    for(int i = 0; i < 10; i++){
+    for (int i = 0; i < 10; i++) {
       ContainerInfo container = containerManager.allocateContainer(
           new RatisReplicationConfig(
               ReplicationFactor.THREE), "admin");

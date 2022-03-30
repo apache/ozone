@@ -20,20 +20,22 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
 
+import java.util.Objects;
+
 /**
  * This class is used for storing Ozone tenant info.
  */
-public final class OmDBTenantInfo {
+public final class OmDBTenantInfo implements Comparable<OmDBTenantInfo> {
   /**
    * Name of the tenant.
    */
-  private final String tenantName;
+  private final String tenantId;
   /**
-   * Name of the tenant's bucket namespace.
+   * Name of the bucket namespace (volume name).
    */
   private final String bucketNamespaceName;
   /**
-   * Name of the tenant's account namespace.
+   * Name of the account namespace.
    */
   private final String accountNamespaceName;
   /**
@@ -47,10 +49,10 @@ public final class OmDBTenantInfo {
   // Implies above names should NOT contain the split key.
   public static final String TENANT_INFO_SPLIT_KEY = ";";
 
-  public OmDBTenantInfo(String tenantName,
+  public OmDBTenantInfo(String tenantId,
       String bucketNamespaceName, String accountNamespaceName,
       String userPolicyGroupName, String bucketPolicyGroupName) {
-    this.tenantName = tenantName;
+    this.tenantId = tenantId;
     this.bucketNamespaceName = bucketNamespaceName;
     this.accountNamespaceName = accountNamespaceName;
     this.userPolicyGroupName = userPolicyGroupName;
@@ -62,20 +64,47 @@ public final class OmDBTenantInfo {
     Preconditions.checkState(tInfo.length == 5,
         "Incorrect tenantInfoString");
 
-    tenantName = tInfo[0];
+    tenantId = tInfo[0];
     bucketNamespaceName = tInfo[1];
     accountNamespaceName = tInfo[2];
     userPolicyGroupName = tInfo[3];
     bucketPolicyGroupName = tInfo[4];
   }
 
-  public String getTenantName() {
-    return tenantName;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    OmDBTenantInfo that = (OmDBTenantInfo) o;
+    return Objects.equals(tenantId, that.tenantId)
+        && Objects.equals(bucketNamespaceName, that.bucketNamespaceName)
+        && Objects.equals(accountNamespaceName, that.accountNamespaceName)
+        && Objects.equals(userPolicyGroupName, that.userPolicyGroupName)
+        && Objects.equals(bucketPolicyGroupName, that.bucketPolicyGroupName);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(tenantId, bucketNamespaceName, accountNamespaceName,
+        userPolicyGroupName, bucketPolicyGroupName);
+  }
+
+  @Override
+  public int compareTo(OmDBTenantInfo o) {
+    return this.getTenantId().compareTo(o.getTenantId());
+  }
+
+  public String getTenantId() {
+    return tenantId;
   }
 
   private String generateTenantInfo() {
     StringBuilder sb = new StringBuilder();
-    sb.append(tenantName).append(TENANT_INFO_SPLIT_KEY);
+    sb.append(tenantId).append(TENANT_INFO_SPLIT_KEY);
     sb.append(bucketNamespaceName).append(TENANT_INFO_SPLIT_KEY);
     sb.append(accountNamespaceName).append(TENANT_INFO_SPLIT_KEY);
     sb.append(userPolicyGroupName).append(TENANT_INFO_SPLIT_KEY);
@@ -101,6 +130,12 @@ public final class OmDBTenantInfo {
     return new OmDBTenantInfo(tInfo);
   }
 
+  /**
+   * Returns the bucket namespace name. a.k.a. volume name.
+   *
+   * Note: This returns an empty string ("") if the tenant is somehow not
+   * associated with a volume. Should never return null.
+   */
   public String getBucketNamespaceName() {
     return bucketNamespaceName;
   }
@@ -122,7 +157,7 @@ public final class OmDBTenantInfo {
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
-    private String tenantName;
+    private String tenantId;
     private String bucketNamespaceName;
     private String accountNamespaceName;
     private String userPolicyGroupName;
@@ -131,8 +166,8 @@ public final class OmDBTenantInfo {
     private Builder() {
     }
 
-    public Builder setTenantName(String tenantName) {
-      this.tenantName = tenantName;
+    public Builder setTenantId(String tenantId) {
+      this.tenantId = tenantId;
       return this;
     }
 
@@ -157,7 +192,7 @@ public final class OmDBTenantInfo {
     }
 
     public OmDBTenantInfo build() {
-      return new OmDBTenantInfo(tenantName, bucketNamespaceName,
+      return new OmDBTenantInfo(tenantId, bucketNamespaceName,
           accountNamespaceName, userPolicyGroupName, bucketPolicyGroupName);
     }
   }

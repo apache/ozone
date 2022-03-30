@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -86,15 +87,18 @@ public class TestOMDBUpdatesHandler {
     metaMgr.getVolumeTable().put(volumeKey, args);
 
     OmKeyInfo firstKey = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
-    metaMgr.getKeyTable().put("/sampleVol/bucketOne/key_one", firstKey);
+    metaMgr.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_one", firstKey);
 
     OmKeyInfo secondKey = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
-    metaMgr.getKeyTable().put("/sampleVol/bucketOne/key_two", secondKey);
+    metaMgr.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_two", secondKey);
 
     // Write the secondKey to the target OM DB.
     OzoneConfiguration conf2 = createNewTestPath();
     OmMetadataManagerImpl reconOmmetaMgr = new OmMetadataManagerImpl(conf2);
-    reconOmmetaMgr.getKeyTable().put("/sampleVol/bucketOne/key_two", secondKey);
+    reconOmmetaMgr.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_two", secondKey);
 
     RDBStore rdbStore = (RDBStore) metaMgr.getStore();
     RocksDB rocksDB = rdbStore.getDb();
@@ -103,7 +107,7 @@ public class TestOMDBUpdatesHandler {
         rocksDB.getUpdatesSince(0);
     List<byte[]> writeBatches = new ArrayList<>();
 
-    while(transactionLogIterator.isValid()) {
+    while (transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
       result.writeBatch().markWalTerminationPoint();
@@ -166,14 +170,18 @@ public class TestOMDBUpdatesHandler {
     metaMgrCopy.getVolumeTable().put(volumeKey, args);
 
     OmKeyInfo omKeyInfo = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
-    metaMgr.getKeyTable().put("/sampleVol/bucketOne/key_one", omKeyInfo);
-    metaMgrCopy.getKeyTable().put("/sampleVol/bucketOne/key_one", omKeyInfo);
+    metaMgr.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_one", omKeyInfo);
+    metaMgrCopy.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_one", omKeyInfo);
 
     // Delete the volume and key from target DB.
-    metaMgr.getKeyTable().delete("/sampleVol/bucketOne/key_one");
+    metaMgr.getKeyTable(getBucketLayout())
+        .delete("/sampleVol/bucketOne/key_one");
     metaMgr.getVolumeTable().delete(volumeKey);
     // Delete a non-existing volume and key
-    metaMgr.getKeyTable().delete("/sampleVol/bucketOne/key_two");
+    metaMgr.getKeyTable(getBucketLayout())
+        .delete("/sampleVol/bucketOne/key_two");
     metaMgr.getVolumeTable().delete(metaMgr.getVolumeKey("nonExistingVolume"));
 
     RDBStore rdbStore = (RDBStore) metaMgr.getStore();
@@ -182,7 +190,7 @@ public class TestOMDBUpdatesHandler {
         rocksDB.getUpdatesSince(3);
     List<byte[]> writeBatches = new ArrayList<>();
 
-    while(transactionLogIterator.isValid()) {
+    while (transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
       result.writeBatch().markWalTerminationPoint();
@@ -235,7 +243,7 @@ public class TestOMDBUpdatesHandler {
     OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(configuration);
 
     assertEquals(String.class, omdbDefinition.getKeyType(
-        metaMgr.getKeyTable().getName()).get());
+        metaMgr.getKeyTable(getBucketLayout()).getName()).get());
     assertEquals(OzoneTokenIdentifier.class, omdbDefinition.getKeyType(
         metaMgr.getDelegationTokenTable().getName()).get());
   }
@@ -246,7 +254,7 @@ public class TestOMDBUpdatesHandler {
     OmMetadataManagerImpl metaMgr = new OmMetadataManagerImpl(configuration);
 
     assertEquals(OmKeyInfo.class, omdbDefinition.getValueType(
-        metaMgr.getKeyTable().getName()).get());
+        metaMgr.getKeyTable(getBucketLayout()).getName()).get());
     assertEquals(OmVolumeArgs.class, omdbDefinition.getValueType(
         metaMgr.getVolumeTable().getName()).get());
     assertEquals(OmBucketInfo.class, omdbDefinition.getValueType(
@@ -263,5 +271,9 @@ public class TestOMDBUpdatesHandler {
             new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(random.nextLong())
         .build();
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

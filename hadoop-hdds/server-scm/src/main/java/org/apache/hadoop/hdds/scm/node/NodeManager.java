@@ -153,6 +153,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed);
 
   /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails DatanodeDetails.
    * @return node stat if it is live/stale, null if it is decommissioned or
@@ -316,7 +324,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     return null;
   }
 
-  default HDDSLayoutVersionManager getLayoutVersionManager(){
+  default HDDSLayoutVersionManager getLayoutVersionManager() {
     return null;
   }
 

@@ -22,30 +22,39 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.assertj.core.util.Lists;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -68,11 +77,12 @@ public class TestOmMetrics {
   private MiniOzoneCluster.Builder clusterBuilder;
   private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
-
+  private OzoneManagerProtocol writeClient;
   /**
    * The exception used for testing failure metrics.
    */
-  private IOException exception = new IOException();
+  private final OMException exception =
+      new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -89,6 +99,8 @@ public class TestOmMetrics {
     cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
   }
 
   /**
@@ -111,31 +123,24 @@ public class TestOmMetrics {
             ozoneManager, "volumeManager");
     VolumeManager mockVm = Mockito.spy(volumeManager);
 
-    Mockito.doNothing().when(mockVm).createVolume(null);
-    Mockito.doNothing().when(mockVm).deleteVolume(null);
-    Mockito.doReturn(null).when(mockVm).getVolumeInfo(null);
-    Mockito.doReturn(true).when(mockVm).checkVolumeAccess(null, null);
-    Mockito.doNothing().when(mockVm).setOwner(null, null);
-    Mockito.doReturn(null).when(mockVm).listVolumes(null, null, null, 0);
-
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "volumeManager", mockVm);
-    doVolumeOps();
-
+    OmVolumeArgs volumeArgs = createVolumeArgs();
+    doVolumeOps(volumeArgs);
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumeOps", 6L, omMetrics);
+    assertCounter("NumVolumeOps", 5L, omMetrics);
     assertCounter("NumVolumeCreates", 1L, omMetrics);
     assertCounter("NumVolumeUpdates", 1L, omMetrics);
     assertCounter("NumVolumeInfos", 1L, omMetrics);
-    assertCounter("NumVolumeCheckAccesses", 1L, omMetrics);
     assertCounter("NumVolumeDeletes", 1L, omMetrics);
     assertCounter("NumVolumeLists", 1L, omMetrics);
     assertCounter("NumVolumes", 1L, omMetrics);
 
-    ozoneManager.createVolume(null);
-    ozoneManager.createVolume(null);
-    ozoneManager.createVolume(null);
-    ozoneManager.deleteVolume(null);
+    volumeArgs = createVolumeArgs();
+    writeClient.createVolume(volumeArgs);
+    volumeArgs = createVolumeArgs();
+    writeClient.createVolume(volumeArgs);
+    volumeArgs = createVolumeArgs();
+    writeClient.createVolume(volumeArgs);
+    writeClient.deleteVolume(volumeArgs.getVolume());
 
     omMetrics = getMetrics("OMMetrics");
 
@@ -143,31 +148,29 @@ public class TestOmMetrics {
     assertCounter("NumVolumes", 3L, omMetrics);
 
 
-    // inject exception to test for Failure Metrics
-    Mockito.doThrow(exception).when(mockVm).createVolume(null);
-    Mockito.doThrow(exception).when(mockVm).deleteVolume(null);
-    Mockito.doThrow(exception).when(mockVm).getVolumeInfo(null);
-    Mockito.doThrow(exception).when(mockVm).checkVolumeAccess(null, null);
-    Mockito.doThrow(exception).when(mockVm).setOwner(null, null);
-    Mockito.doThrow(exception).when(mockVm).listVolumes(null, null, null, 0);
+    // inject exception to test for Failure Metrics on the read path
+    Mockito.doThrow(exception).when(mockVm).getVolumeInfo(any());
+    Mockito.doThrow(exception).when(mockVm).listVolumes(any(), any(),
+        any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
         "volumeManager", mockVm);
-    doVolumeOps();
+    // inject exception to test for Failure Metrics on the write path
+    mockWritePathExceptions(OmVolumeArgs.class);
+    volumeArgs = createVolumeArgs();
+    doVolumeOps(volumeArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumeOps", 16L, omMetrics);
+    assertCounter("NumVolumeOps", 14L, omMetrics);
     assertCounter("NumVolumeCreates", 5L, omMetrics);
     assertCounter("NumVolumeUpdates", 2L, omMetrics);
     assertCounter("NumVolumeInfos", 2L, omMetrics);
-    assertCounter("NumVolumeCheckAccesses", 2L, omMetrics);
     assertCounter("NumVolumeDeletes", 3L, omMetrics);
     assertCounter("NumVolumeLists", 2L, omMetrics);
 
     assertCounter("NumVolumeCreateFails", 1L, omMetrics);
     assertCounter("NumVolumeUpdateFails", 1L, omMetrics);
     assertCounter("NumVolumeInfoFails", 1L, omMetrics);
-    assertCounter("NumVolumeCheckAccessFails", 1L, omMetrics);
     assertCounter("NumVolumeDeleteFails", 1L, omMetrics);
     assertCounter("NumVolumeListFails", 1L, omMetrics);
 
@@ -189,16 +192,8 @@ public class TestOmMetrics {
             ozoneManager, "bucketManager");
     BucketManager mockBm = Mockito.spy(bucketManager);
 
-    Mockito.doNothing().when(mockBm).createBucket(null);
-    Mockito.doNothing().when(mockBm).deleteBucket(null, null);
-    Mockito.doReturn(null).when(mockBm).getBucketInfo(null, null);
-    Mockito.doNothing().when(mockBm).setBucketProperty(null);
-    Mockito.doReturn(null).when(mockBm).listBuckets(null, null, null, 0);
-
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "bucketManager", mockBm);
-
-    doBucketOps();
+    OmBucketInfo bucketInfo = createBucketInfo();
+    doBucketOps(bucketInfo);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
     assertCounter("NumBucketOps", 5L, omMetrics);
@@ -209,24 +204,29 @@ public class TestOmMetrics {
     assertCounter("NumBucketLists", 1L, omMetrics);
     assertCounter("NumBuckets", 0L, omMetrics);
 
-    ozoneManager.createBucket(null);
-    ozoneManager.createBucket(null);
-    ozoneManager.createBucket(null);
-    ozoneManager.deleteBucket(null, null);
+    bucketInfo = createBucketInfo();
+    writeClient.createBucket(bucketInfo);
+    bucketInfo = createBucketInfo();
+    writeClient.createBucket(bucketInfo);
+    bucketInfo = createBucketInfo();
+    writeClient.createBucket(bucketInfo);
+    writeClient.deleteBucket(bucketInfo.getVolumeName(),
+        bucketInfo.getBucketName());
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumBuckets", 2L, omMetrics);
 
-    // inject exception to test for Failure Metrics
-    Mockito.doThrow(exception).when(mockBm).createBucket(null);
-    Mockito.doThrow(exception).when(mockBm).deleteBucket(null, null);
-    Mockito.doThrow(exception).when(mockBm).getBucketInfo(null, null);
-    Mockito.doThrow(exception).when(mockBm).setBucketProperty(null);
-    Mockito.doThrow(exception).when(mockBm).listBuckets(null, null, null, 0);
+    // inject exception to test for Failure Metrics on the read path
+    Mockito.doThrow(exception).when(mockBm).getBucketInfo(any(), any());
+    Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(),
+        any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
-    doBucketOps();
+
+    // inject exception to test for Failure Metrics on the write path
+    mockWritePathExceptions(OmBucketInfo.class);
+    doBucketOps(bucketInfo);
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumBucketOps", 14L, omMetrics);
@@ -250,31 +250,17 @@ public class TestOmMetrics {
 
   @Test
   public void testKeyOps() throws Exception {
+    // This test needs a cluster with DNs and SCM to wait on safemode
+    clusterBuilder.setNumDatanodes(3);
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
     startCluster();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
-    BucketManager mockBm = Mockito.mock(BucketManager.class);
-
-    OmBucketInfo mockBucket = OmBucketInfo.newBuilder()
-        .setVolumeName("").setBucketName("")
-        .build();
-    Mockito.when(mockBm.getBucketInfo(any(), any())).thenReturn(mockBucket);
-    Mockito.doReturn(null).when(mockKm).openKey(any());
-    Mockito.doNothing().when(mockKm).deleteKey(any());
-    Mockito.doReturn(null).when(mockKm).lookupKey(any(), any());
-    Mockito.doReturn(null).when(mockKm).listKeys(any(), any(), any(), any(),
-        anyInt());
-    Mockito.doReturn(null).when(mockKm).listTrash(any(), any(), any(), any(),
-        anyInt());
-    Mockito.doNothing().when(mockKm).commitKey(any(), anyLong());
-    Mockito.doReturn(null).when(mockKm).initiateMultipartUpload(any());
-
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "bucketManager", mockBm);
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "keyManager", mockKm);
-    OmKeyArgs keyArgs = createKeyArgs();
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName);
     doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
@@ -287,32 +273,33 @@ public class TestOmMetrics {
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
 
-
-    ozoneManager.openKey(keyArgs);
-    ozoneManager.commitKey(keyArgs, 0);
-    ozoneManager.openKey(keyArgs);
-    ozoneManager.commitKey(keyArgs, 0);
-    ozoneManager.openKey(keyArgs);
-    ozoneManager.commitKey(keyArgs, 0);
-    ozoneManager.deleteKey(keyArgs);
+    keyArgs = createKeyArgs(volumeName, bucketName);
+    OpenKeySession keySession = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, keySession.getId());
+    keyArgs = createKeyArgs(volumeName, bucketName);
+    keySession = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, keySession.getId());
+    keyArgs = createKeyArgs(volumeName, bucketName);
+    keySession = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, keySession.getId());
+    writeClient.deleteKey(keyArgs);
 
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
 
-    // inject exception to test for Failure Metrics
-    Mockito.doThrow(exception).when(mockKm).openKey(any());
-    Mockito.doThrow(exception).when(mockKm).deleteKey(any());
+    // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(
         any(), any(), any(), any(), anyInt());
-    Mockito.doThrow(exception).when(mockKm).commitKey(any(), anyLong());
-    Mockito.doThrow(exception).when(mockKm).initiateMultipartUpload(any());
-
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
+
+    // inject exception to test for Failure Metrics on the write path
+    mockWritePathExceptions(OmBucketInfo.class);
+    keyArgs = createKeyArgs(volumeName, bucketName);
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
@@ -339,6 +326,30 @@ public class TestOmMetrics {
 
   }
 
+  private <T> void mockWritePathExceptions(Class<T>klass) throws Exception {
+    String tableName;
+    if (klass == OmBucketInfo.class) {
+      tableName = "bucketTable";
+    } else {
+      tableName = "volumeTable";
+    }
+    OMMetadataManager metadataManager = (OMMetadataManager)
+        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
+    OMMetadataManager mockMm = Mockito.spy(metadataManager);
+    @SuppressWarnings("unchecked")
+    Table<String, T> table = (Table<String, T>)
+        HddsWhiteboxTestUtils.getInternalState(metadataManager, tableName);
+    Table<String, T> mockTable = Mockito.spy(table);
+    Mockito.doThrow(exception).when(mockTable).isExist(any());
+    if (klass == OmBucketInfo.class) {
+      Mockito.doReturn(mockTable).when(mockMm).getBucketTable();
+    } else {
+      Mockito.doReturn(mockTable).when(mockMm).getVolumeTable();
+    }
+    HddsWhiteboxTestUtils.setInternalState(
+        ozoneManager, "metadataManager", mockMm);
+  }
+
   @Test
   public void testAclOperations() throws Exception {
     startCluster();
@@ -355,19 +366,19 @@ public class TestOmMetrics {
       assertCounter("NumGetAcl", 1L, omMetrics);
 
       // Test addAcl
-      ozoneManager.addAcl(volObj,
+      writeClient.addAcl(volObj,
           new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
               IAccessAuthorizer.ACLType.ALL, ACCESS));
       omMetrics = getMetrics("OMMetrics");
       assertCounter("NumAddAcl", 1L, omMetrics);
 
       // Test setAcl
-      ozoneManager.setAcl(volObj, acls);
+      writeClient.setAcl(volObj, acls);
       omMetrics = getMetrics("OMMetrics");
       assertCounter("NumSetAcl", 1L, omMetrics);
 
       // Test removeAcl
-      ozoneManager.removeAcl(volObj, acls.get(0));
+      writeClient.removeAcl(volObj, acls.get(0));
       omMetrics = getMetrics("OMMetrics");
       assertCounter("NumRemoveAcl", 1L, omMetrics);
 
@@ -442,34 +453,29 @@ public class TestOmMetrics {
   /**
    * Test volume operations with ignoring thrown exception.
    */
-  private void doVolumeOps() {
+  private void doVolumeOps(OmVolumeArgs volumeArgs) {
     try {
-      ozoneManager.createVolume(null);
+      writeClient.createVolume(volumeArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.deleteVolume(null);
+      ozoneManager.getVolumeInfo(volumeArgs.getVolume());
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.getVolumeInfo(null);
+      writeClient.setOwner(volumeArgs.getVolume(), "dummy");
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.checkVolumeAccess(null, null);
+      ozoneManager.listAllVolumes("", null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.setOwner(null, null);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.listAllVolumes(null, null, 0);
+      writeClient.deleteVolume(volumeArgs.getVolume());
     } catch (IOException ignored) {
     }
   }
@@ -477,29 +483,29 @@ public class TestOmMetrics {
   /**
    * Test bucket operations with ignoring thrown exception.
    */
-  private void doBucketOps() {
+  private void doBucketOps(OmBucketInfo info) {
     try {
-      ozoneManager.createBucket(null);
+      writeClient.createBucket(info);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.deleteBucket(null, null);
+      ozoneManager.getBucketInfo(info.getVolumeName(), info.getBucketName());
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.getBucketInfo(null, null);
+      writeClient.setBucketProperty(getBucketArgs(info));
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.setBucketProperty(null);
+      ozoneManager.listBuckets(info.getVolumeName(), null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listBuckets(null, null, null, 0);
+      writeClient.deleteBucket(info.getVolumeName(), info.getBucketName());
     } catch (IOException ignored) {
     }
   }
@@ -508,13 +514,15 @@ public class TestOmMetrics {
    * Test key operations with ignoring thrown exception.
    */
   private void doKeyOps(OmKeyArgs keyArgs) {
+    OpenKeySession keySession = null;
     try {
-      ozoneManager.openKey(keyArgs);
+      keySession = writeClient.openKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.deleteKey(keyArgs);
+      long id = (keySession != null) ? keySession.getId() : 0;
+      writeClient.commitKey(keyArgs, id);
     } catch (IOException ignored) {
     }
 
@@ -524,35 +532,66 @@ public class TestOmMetrics {
     }
 
     try {
-      ozoneManager.listKeys("", "", null, null, 0);
+      ozoneManager.listKeys(keyArgs.getVolumeName(),
+                            keyArgs.getBucketName(), null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listTrash("", "", null, null, 0);
+      ozoneManager.listTrash(keyArgs.getVolumeName(),
+                             keyArgs.getBucketName(), null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.commitKey(keyArgs, 0);
+      writeClient.deleteKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.initiateMultipartUpload(keyArgs);
+      writeClient.initiateMultipartUpload(keyArgs);
     } catch (IOException ignored) {
     }
-
   }
 
-  private OmKeyArgs createKeyArgs() {
+  private OmKeyArgs createKeyArgs(String volumeName, String bucketName)
+      throws IOException {
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
+        .setPipeline(MockPipeline.createSingleNodePipeline())
         .build();
     keyLocationInfo.setCreateVersion(0);
 
+    String keyName = UUID.randomUUID().toString();
     return new OmKeyArgs.Builder()
         .setLocationInfoList(Collections.singletonList(keyLocationInfo))
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setAcls(Lists.emptyList())
+        .build();
+  }
+  private OmVolumeArgs createVolumeArgs() {
+    String volumeName = UUID.randomUUID().toString();
+    return new OmVolumeArgs.Builder()
+        .setVolume(volumeName)
+        .setOwnerName("dummy")
+        .setAdminName("dummyAdmin")
+        .build();
+  }
+  private OmBucketArgs getBucketArgs(OmBucketInfo info) {
+    return new OmBucketArgs.Builder()
+        .setVolumeName(info.getVolumeName())
+        .setBucketName(info.getBucketName())
+        .build();
+  }
+  private OmBucketInfo createBucketInfo() throws IOException {
+    OmVolumeArgs volumeArgs = createVolumeArgs();
+    writeClient.createVolume(volumeArgs);
+    String bucketName = UUID.randomUUID().toString();
+    return new OmBucketInfo.Builder()
+        .setVolumeName(volumeArgs.getVolume())
+        .setBucketName(bucketName)
         .build();
   }
 }
