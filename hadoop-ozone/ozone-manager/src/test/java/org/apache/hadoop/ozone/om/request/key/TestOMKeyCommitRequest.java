@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -478,7 +479,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @NotNull
-  protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
+  protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest)
+      throws OMException {
     return new OMKeyCommitRequest(omRequest, BucketLayout.DEFAULT);
   }
 

@@ -23,6 +23,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -79,7 +80,8 @@ public class TestOMAllocateBlockRequestWithFSO
   @NotNull
   @Override
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
-      OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
+      OzoneManagerProtocolProtos.OMRequest modifiedOmRequest)
+      throws OMException {
     return new OMAllocateBlockRequestWithFSO(modifiedOmRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }

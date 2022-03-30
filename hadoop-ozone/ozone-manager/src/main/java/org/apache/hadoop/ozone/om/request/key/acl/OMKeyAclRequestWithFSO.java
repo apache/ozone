@@ -51,7 +51,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
   public OMKeyAclRequestWithFSO(OzoneManagerProtocolProtos.OMRequest omReq,
-                                BucketLayout bucketLayout) {
+                                BucketLayout bucketLayout) throws OMException {
     super(omReq);
     setBucketLayout(bucketLayout);
     OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());

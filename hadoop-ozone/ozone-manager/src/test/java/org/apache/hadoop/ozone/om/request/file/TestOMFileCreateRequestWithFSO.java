@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -179,7 +180,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   }
 
   @Override
-  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest)
+      throws OMException {
     return new OMFileCreateRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }

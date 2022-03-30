@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -120,21 +121,21 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
-          OMRequest omRequest) {
+          OMRequest omRequest) throws OMException {
     return new S3MultipartUploadCompleteRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
-      OMRequest omRequest) {
+      OMRequest omRequest) throws OMException {
     return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-      OMRequest initiateMPURequest) {
+      OMRequest initiateMPURequest) throws OMException {
     return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }

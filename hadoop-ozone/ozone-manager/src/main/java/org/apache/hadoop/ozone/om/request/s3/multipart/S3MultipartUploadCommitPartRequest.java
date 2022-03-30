@@ -74,7 +74,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       LoggerFactory.getLogger(S3MultipartUploadCommitPartRequest.class);
 
   public S3MultipartUploadCommitPartRequest(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof S3MultipartUploadCommitPartRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

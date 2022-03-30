@@ -63,7 +63,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
         extends S3InitiateMultipartUploadRequest {
 
   public S3InitiateMultipartUploadRequestWithFSO(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }

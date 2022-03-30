@@ -105,7 +105,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   public OMDirectoryCreateRequest(OMRequest omRequest,
-                                  BucketLayout bucketLayout) {
+                                  BucketLayout bucketLayout)
+      throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof OMDirectoryCreateRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

@@ -77,7 +77,8 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       LoggerFactory.getLogger(OMDirectoryCreateRequestWithFSO.class);
 
   public OMDirectoryCreateRequestWithFSO(OMRequest omRequest,
-                                         BucketLayout bucketLayout) {
+                                         BucketLayout bucketLayout)
+      throws OMException {
     super(omRequest, bucketLayout);
     OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }

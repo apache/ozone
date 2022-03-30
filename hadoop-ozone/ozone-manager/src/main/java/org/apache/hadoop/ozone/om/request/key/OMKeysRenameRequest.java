@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -69,7 +70,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeysRenameRequest.class);
 
-  public OMKeysRenameRequest(OMRequest omRequest) {
+  public OMKeysRenameRequest(OMRequest omRequest) throws OMException {
     super(omRequest);
     OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }

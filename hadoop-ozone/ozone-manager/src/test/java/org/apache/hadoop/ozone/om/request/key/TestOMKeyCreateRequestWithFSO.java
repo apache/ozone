@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -142,7 +143,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   }
 
   @Override
-  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
+  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest)
+      throws OMException {
     return new OMKeyCreateRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }

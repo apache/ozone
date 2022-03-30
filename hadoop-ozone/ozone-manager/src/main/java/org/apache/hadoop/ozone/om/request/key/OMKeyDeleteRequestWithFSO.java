@@ -63,7 +63,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       LoggerFactory.getLogger(OMKeyDeleteRequestWithFSO.class);
 
   public OMKeyDeleteRequestWithFSO(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }

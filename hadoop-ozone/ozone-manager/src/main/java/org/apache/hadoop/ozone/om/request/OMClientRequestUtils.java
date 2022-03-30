@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 /**
@@ -29,18 +29,24 @@ public final class OMClientRequestUtils {
   }
 
   public static void checkFSOClientRequestPreconditions(
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     // Make sure class is called for the correct bucket layout.
-    Preconditions.checkArgument(bucketLayout.isFileSystemOptimized(),
-        "Unsupported operation, invalid BucketLayout: " +
-            bucketLayout);
+    if (!bucketLayout.isFileSystemOptimized()) {
+      throw new OMException(
+          "Unsupported operation, invalid BucketLayout: " + bucketLayout,
+          OMException.ResultCodes.INVALID_REQUEST
+      );
+    }
   }
 
   public static void checkOBSClientRequestPreconditions(
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     // Make sure class is called for the correct bucket layout.
-    Preconditions.checkArgument(!bucketLayout.isFileSystemOptimized(),
-        "Unsupported operation, invalid BucketLayout: " +
-            bucketLayout);
+    if (bucketLayout.isFileSystemOptimized()) {
+      throw new OMException(
+          "Unsupported operation, invalid BucketLayout: " + bucketLayout,
+          OMException.ResultCodes.INVALID_REQUEST
+      );
+    }
   }
 }

@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -69,7 +70,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LoggerFactory.getLogger(S3InitiateMultipartUploadRequest.class);
 
   public S3InitiateMultipartUploadRequest(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof S3InitiateMultipartUploadRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

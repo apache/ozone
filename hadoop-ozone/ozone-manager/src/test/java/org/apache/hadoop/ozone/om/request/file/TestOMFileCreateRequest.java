@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -404,7 +405,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @return OMFileCreateRequest reference
    */
   @NotNull
-  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest)
+      throws OMException {
     return new OMFileCreateRequest(omRequest, getBucketLayout());
   }
 

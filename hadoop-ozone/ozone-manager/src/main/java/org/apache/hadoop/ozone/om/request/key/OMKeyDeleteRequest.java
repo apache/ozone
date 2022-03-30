@@ -64,7 +64,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyDeleteRequest.class);
 
-  public OMKeyDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+  public OMKeyDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout)
+      throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof OMKeyDeleteRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

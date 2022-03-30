@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
@@ -256,16 +257,18 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         keyName);
   }
 
-  protected OMKeyAclRequest getOmKeyAddAclRequest(OMRequest originalRequest) {
+  protected OMKeyAclRequest getOmKeyAddAclRequest(OMRequest originalRequest)
+      throws OMException {
     return new OMKeyAddAclRequest(originalRequest, ozoneManager);
   }
 
   protected OMKeyAclRequest getOmKeyRemoveAclRequest(
-      OMRequest removeAclRequest) {
+      OMRequest removeAclRequest) throws OMException {
     return new OMKeyRemoveAclRequest(removeAclRequest, ozoneManager);
   }
 
-  protected OMKeyAclRequest getOmKeySetAclRequest(OMRequest setAclRequest) {
+  protected OMKeyAclRequest getOmKeySetAclRequest(OMRequest setAclRequest)
+      throws OMException {
     return new OMKeySetAclRequest(setAclRequest, ozoneManager);
   }
 }

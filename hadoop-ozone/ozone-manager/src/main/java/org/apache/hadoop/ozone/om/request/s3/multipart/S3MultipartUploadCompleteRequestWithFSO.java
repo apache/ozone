@@ -54,7 +54,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
   public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }

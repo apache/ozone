@@ -81,7 +81,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequest.class);
 
   public S3MultipartUploadCompleteRequest(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof S3MultipartUploadCompleteRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

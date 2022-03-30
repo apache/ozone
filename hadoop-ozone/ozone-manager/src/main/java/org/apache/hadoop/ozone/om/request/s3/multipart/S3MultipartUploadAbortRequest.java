@@ -71,7 +71,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   }
 
   public S3MultipartUploadAbortRequest(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof S3MultipartUploadAbortRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

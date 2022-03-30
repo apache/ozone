@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -172,7 +173,8 @@ public class TestCleanupTableInfo {
   }
 
   @Test
-  public void testFileCreateRequestSetsAllTouchedTableCachesForEviction() {
+  public void testFileCreateRequestSetsAllTouchedTableCachesForEviction()
+      throws OMException {
     OMFileCreateRequest request = anOMFileCreateRequest();
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 
@@ -183,7 +185,8 @@ public class TestCleanupTableInfo {
   }
 
   @Test
-  public void testKeyCreateRequestSetsAllTouchedTableCachesForEviction() {
+  public void testKeyCreateRequestSetsAllTouchedTableCachesForEviction()
+      throws OMException {
     OMKeyCreateRequest request = anOMKeyCreateRequest();
     when(om.getEnableFileSystemPaths()).thenReturn(true);
 
@@ -281,7 +284,7 @@ public class TestCleanupTableInfo {
     return spy(new OmMetadataManagerImpl(conf));
   }
 
-  private OMFileCreateRequest anOMFileCreateRequest() {
+  private OMFileCreateRequest anOMFileCreateRequest() throws OMException {
     OMRequest protoRequest = mock(OMRequest.class);
     when(protoRequest.getCreateFileRequest()).thenReturn(aCreateFileRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateFile);
@@ -290,7 +293,7 @@ public class TestCleanupTableInfo {
         aBucketInfo().getBucketLayout());
   }
 
-  private OMKeyCreateRequest anOMKeyCreateRequest() {
+  private OMKeyCreateRequest anOMKeyCreateRequest() throws OMException {
     OMRequest protoRequest = mock(OMRequest.class);
     when(protoRequest.getCreateKeyRequest()).thenReturn(aKeyCreateRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateKey);

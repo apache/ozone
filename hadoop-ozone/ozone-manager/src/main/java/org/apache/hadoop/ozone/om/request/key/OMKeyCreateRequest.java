@@ -80,7 +80,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateRequest.class);
 
-  public OMKeyCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+  public OMKeyCreateRequest(OMRequest omRequest, BucketLayout bucketLayout)
+      throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof OMKeyCreateRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

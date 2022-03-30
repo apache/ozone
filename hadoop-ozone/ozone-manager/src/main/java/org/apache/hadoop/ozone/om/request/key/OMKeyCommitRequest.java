@@ -74,7 +74,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
-  public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+  public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout)
+      throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof OMKeyCommitRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

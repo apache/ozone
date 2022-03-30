@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.ArrayList;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -42,7 +43,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyPurgeRequest.class);
 
-  public OMKeyPurgeRequest(OMRequest omRequest) {
+  public OMKeyPurgeRequest(OMRequest omRequest) throws OMException {
     super(omRequest);
     OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }

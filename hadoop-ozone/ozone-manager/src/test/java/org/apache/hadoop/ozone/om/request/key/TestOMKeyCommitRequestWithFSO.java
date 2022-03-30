@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -86,7 +87,8 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
   }
 
   @NotNull
-  protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
+  protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest)
+      throws OMException {
     return new OMKeyCommitRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }

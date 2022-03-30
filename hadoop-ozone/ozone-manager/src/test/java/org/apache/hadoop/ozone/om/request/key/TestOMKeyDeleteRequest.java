@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
@@ -181,7 +182,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
-      OMRequest modifiedOmRequest) {
+      OMRequest modifiedOmRequest) throws OMException {
     return new OMKeyDeleteRequest(modifiedOmRequest, BucketLayout.DEFAULT);
   }
 }

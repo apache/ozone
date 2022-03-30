@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -57,7 +58,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           LoggerFactory.getLogger(OMOpenKeysDeleteRequest.class);
 
   public OMOpenKeysDeleteRequest(OMRequest omRequest,
-                                 BucketLayout bucketLayout) {
+                                 BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     OMClientRequestUtils.checkOBSClientRequestPreconditions(getBucketLayout());
   }

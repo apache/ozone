@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
@@ -119,7 +120,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   @NotNull
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
-          OMRequest modifiedOmRequest) {
+          OMRequest modifiedOmRequest) throws OMException {
     return new OMAllocateBlockRequest(modifiedOmRequest, BucketLayout.DEFAULT);
   }
 

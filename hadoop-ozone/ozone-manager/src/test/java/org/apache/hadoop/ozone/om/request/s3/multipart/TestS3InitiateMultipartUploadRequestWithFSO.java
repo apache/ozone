@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -141,7 +142,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-      OMRequest initiateMPURequest) {
+      OMRequest initiateMPURequest) throws OMException {
     return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }

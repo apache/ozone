@@ -63,7 +63,7 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
   public OMKeyCreateRequestWithFSO(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }

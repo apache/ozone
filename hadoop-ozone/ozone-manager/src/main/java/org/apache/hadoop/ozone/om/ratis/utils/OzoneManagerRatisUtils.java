@@ -198,7 +198,7 @@ public final class OzoneManagerRatisUtils {
   }
 
   private static OMClientRequest getOMAclRequest(OMRequest omRequest,
-      OzoneManager ozoneManager) {
+      OzoneManager ozoneManager) throws OMException {
     Type cmdType = omRequest.getCmdType();
     if (Type.AddAcl == cmdType) {
       ObjectType type = omRequest.getAddAclRequest().getObj().getResType();

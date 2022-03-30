@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -56,20 +57,21 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
 
   @Override
   protected OMKeyAclRequest getOmKeyAddAclRequest(
-      OzoneManagerProtocolProtos.OMRequest originalRequest) {
+      OzoneManagerProtocolProtos.OMRequest originalRequest) throws OMException {
     return new OMKeyAddAclRequestWithFSO(originalRequest, getBucketLayout());
   }
 
   @Override
   protected OMKeyAclRequest getOmKeyRemoveAclRequest(
-      OzoneManagerProtocolProtos.OMRequest removeAclRequest) {
+      OzoneManagerProtocolProtos.OMRequest removeAclRequest)
+      throws OMException {
     return new OMKeyRemoveAclRequestWithFSO(removeAclRequest,
         getBucketLayout());
   }
 
   @Override
   protected OMKeyAclRequest getOmKeySetAclRequest(
-      OzoneManagerProtocolProtos.OMRequest setAclRequest) {
+      OzoneManagerProtocolProtos.OMRequest setAclRequest) throws OMException {
     return new OMKeySetAclRequestWithFSO(setAclRequest, getBucketLayout());
   }
 

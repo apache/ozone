@@ -503,7 +503,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
 
-  private void checkNotAValidPath(String keyName) {
+  private void checkNotAValidPath(String keyName) throws OMException {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 
@@ -592,7 +592,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
   }
 
-  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
+  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest)
+      throws OMException {
     return new OMKeyCreateRequest(omRequest, BucketLayout.DEFAULT);
   }
 }

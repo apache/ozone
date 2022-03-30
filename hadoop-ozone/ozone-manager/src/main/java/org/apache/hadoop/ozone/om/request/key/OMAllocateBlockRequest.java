@@ -70,7 +70,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       LoggerFactory.getLogger(OMAllocateBlockRequest.class);
 
   public OMAllocateBlockRequest(OMRequest omRequest,
-      BucketLayout bucketLayout) {
+      BucketLayout bucketLayout) throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof OMAllocateBlockRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

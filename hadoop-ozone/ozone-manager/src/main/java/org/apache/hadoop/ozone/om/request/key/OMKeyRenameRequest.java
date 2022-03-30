@@ -71,7 +71,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyRenameRequest.class);
 
-  public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+  public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout)
+      throws OMException {
     super(omRequest, bucketLayout);
     if (!(this instanceof OMKeyRenameRequestWithFSO)) {
       OMClientRequestUtils.checkOBSClientRequestPreconditions(

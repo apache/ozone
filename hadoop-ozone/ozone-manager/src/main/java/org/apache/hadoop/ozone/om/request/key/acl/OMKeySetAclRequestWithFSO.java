@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -67,7 +68,8 @@ public class OMKeySetAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   private OzoneObj obj;
 
   public OMKeySetAclRequestWithFSO(
-      OzoneManagerProtocolProtos.OMRequest omReq, BucketLayout bucketLayout) {
+      OzoneManagerProtocolProtos.OMRequest omReq, BucketLayout bucketLayout)
+      throws OMException {
     super(omReq, bucketLayout);
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();

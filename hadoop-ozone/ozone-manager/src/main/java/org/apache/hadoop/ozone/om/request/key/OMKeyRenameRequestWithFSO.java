@@ -68,7 +68,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
           LoggerFactory.getLogger(OMKeyRenameRequestWithFSO.class);
 
   public OMKeyRenameRequestWithFSO(OMRequest omRequest,
-                                   BucketLayout bucketLayout) {
+                                   BucketLayout bucketLayout)
+      throws OMException {
     super(omRequest, bucketLayout);
     OMClientRequestUtils.checkFSOClientRequestPreconditions(getBucketLayout());
   }
