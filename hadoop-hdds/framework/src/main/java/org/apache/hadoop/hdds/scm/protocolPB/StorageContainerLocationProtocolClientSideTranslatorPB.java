@@ -775,7 +775,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean startContainerBalancer(
+  public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
@@ -830,13 +830,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       builder.setMaxSizeLeavingSourceInGB(msls);
     }
 
-
     StartContainerBalancerRequestProto request = builder.build();
-    StartContainerBalancerResponseProto response =
-        submitRequest(Type.StartContainerBalancer,
-            builder1 -> builder1.setStartContainerBalancerRequest(request))
-            .getStartContainerBalancerResponse();
-    return response.getStart();
+    return submitRequest(Type.StartContainerBalancer,
+        builder1 -> builder1.setStartContainerBalancerRequest(request))
+        .getStartContainerBalancerResponse();
   }
 
   @Override

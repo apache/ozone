@@ -792,11 +792,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           Optional.of(request.getMaxSizeLeavingSourceInGB());
     }
 
-    return StartContainerBalancerResponseProto.newBuilder().
-        setStart(impl.startContainerBalancer(threshold,
-            iterations, maxDatanodesPercentageToInvolvePerIteration,
-            maxSizeToMovePerIterationInGB,
-            maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB)).build();
+    return impl.startContainerBalancer(threshold, iterations,
+        maxDatanodesPercentageToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(

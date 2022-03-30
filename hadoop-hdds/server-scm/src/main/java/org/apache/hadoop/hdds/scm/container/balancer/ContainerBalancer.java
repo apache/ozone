@@ -763,7 +763,7 @@ public class ContainerBalancer implements SCMService {
    */
   @Override
   public void notifyStatusChanged() {
-    if (!checkLeaderAndSafeMode()) {
+    if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
       if (isBalancerRunning()) {
         stopBalancingThread();
       }
@@ -811,14 +811,8 @@ public class ContainerBalancer implements SCMService {
       InvalidContainerBalancerConfigurationException {
     lock.lock();
     try {
-      if (!canRun()) {
-        throw new IllegalContainerBalancerStateException("Cannot start " +
-            "ContainerBalancer in the current state.");
-      }
-      if (!validateConfiguration(this.config)) {
-        throw new InvalidContainerBalancerConfigurationException("Cannot " +
-            "start ContainerBalancer because the configuration is invalid.");
-      }
+      canStart();
+      validateConfiguration(this.config);
       startBalancingThread();
     } finally {
       lock.unlock();
@@ -842,36 +836,31 @@ public class ContainerBalancer implements SCMService {
     LOG.info("Starting Container Balancer... {}", this);
   }
 
-  private boolean canRun() {
-    if (!checkLeaderAndSafeMode()) {
-      return false;
+  /**
+   * Checks if ContainerBalancer can start.
+   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
+   * already running, SCM is in safe mode, or SCM is not leader ready
+   */
+  private void canStart() throws IllegalContainerBalancerStateException {
+    if (!scmContext.isLeaderReady()) {
+      LOG.warn("SCM is not leader ready");
+      throw new IllegalContainerBalancerStateException("SCM is not leader " +
+          "ready");
+    }
+    if (scmContext.isInSafeMode()) {
+      LOG.warn("SCM is in safe mode");
+      throw new IllegalContainerBalancerStateException("SCM is in safe mode");
     }
     lock.lock();
     try {
       if (isBalancerRunning() || currentBalancingThread != null) {
-        LOG.warn("Cannot run ContainerBalancer because it's already running");
-        return false;
+        LOG.warn("Cannot start ContainerBalancer because it's already running");
+        throw new IllegalContainerBalancerStateException(
+            "Cannot start ContainerBalancer because it's already running");
       }
     } finally {
       lock.unlock();
     }
-    return true;
-  }
-
-  /**
-   * Used to check if SCM is leader ready and not in safe mode.
-   * @return true if SCM is leader ready and not in safe mode, false otherwise
-   */
-  private boolean checkLeaderAndSafeMode() {
-    if (!scmContext.isLeaderReady()) {
-      LOG.warn("SCM is not leader ready");
-      return false;
-    }
-    if (scmContext.isInSafeMode()) {
-      LOG.warn("SCM is in safe mode");
-      return false;
-    }
-    return true;
   }
 
   /**
@@ -914,11 +903,17 @@ public class ContainerBalancer implements SCMService {
         Thread.currentThread().interrupt();
       }
     }
-    currentBalancingThread = null;
+    lock.lock();
+    try {
+      currentBalancingThread = null;
+    } finally {
+      lock.unlock();
+    }
     LOG.info("Container Balancer stopped successfully.");
   }
 
-  private boolean validateConfiguration(ContainerBalancerConfiguration conf) {
+  private void validateConfiguration(ContainerBalancerConfiguration conf)
+      throws InvalidContainerBalancerConfigurationException {
     // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
@@ -926,25 +921,30 @@ public class ContainerBalancer implements SCMService {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     if (conf.getMaxSizeEnteringTarget() <= size) {
-      LOG.info("MaxSizeEnteringTarget should be larger than " +
-          "ozone.scm.container.size");
-      return false;
+      LOG.warn("hdds.container.balancer.size.entering.target.max {} should " +
+          "be greater than ozone.scm.container.size {}",
+          conf.getMaxSizeEnteringTarget(), size);
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.entering.target.max should be greater" +
+              " than ozone.scm.container.size");
     }
     if (conf.getMaxSizeLeavingSource() <= size) {
-      LOG.info("MaxSizeLeavingSource should be larger than " +
-          "ozone.scm.container.size");
-      return false;
+      LOG.warn("hdds.container.balancer.size.leaving.source.max {} should " +
+              "be greater than ozone.scm.container.size {}",
+          conf.getMaxSizeLeavingSource(), size);
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.leaving.source.max should be greater" +
+              " than ozone.scm.container.size");
     }
 
     // balancing interval should be greater than DUFactory refresh period
     DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
-    long balancingInterval = duConf.getRefreshPeriod().toMillis();
-    if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
-      LOG.info("balancing.iteration.interval should be larger than " +
-          "hdds.datanode.du.refresh.period.");
-      return false;
+    long refreshPeriod = duConf.getRefreshPeriod().toMillis();
+    if (conf.getBalancingInterval().toMillis() <= refreshPeriod) {
+      LOG.warn("hdds.container.balancer.balancing.iteration.interval {} " +
+              "should be greater than hdds.datanode.du.refresh.period {}",
+          conf.getBalancingInterval(), refreshPeriod);
     }
-    return true;
   }
 
   public void setNodeManager(NodeManager nodeManager) {

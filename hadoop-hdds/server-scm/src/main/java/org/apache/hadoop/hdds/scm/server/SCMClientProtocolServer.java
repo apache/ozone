@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -778,7 +779,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public boolean startContainerBalancer(
+  public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
@@ -841,11 +842,16 @@ public class SCMClientProtocolServer implements
         InvalidContainerBalancerConfigurationException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.START_CONTAINER_BALANCER, null, e));
-      return false;
+      return StartContainerBalancerResponseProto.newBuilder()
+          .setStart(false)
+          .setMessage(e.getMessage())
+          .build();
     }
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_CONTAINER_BALANCER, null));
-    return true;
+    return StartContainerBalancerResponseProto.newBuilder()
+        .setStart(true)
+        .build();
   }
 
   @Override
