@@ -105,9 +105,21 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       // Delete existing
       // Delete non-existing
       Table table = omMetadataManager.getTable(tableName);
-      // Recon does not add entries to cache and it is safer to always use
-      // getSkipCache in Recon.
-      Object oldValue = table.getSkipCache(key);
+
+      OMDBUpdateEvent previousEvent = omdbUpdateEvents.stream()
+          .filter(event -> key.equals(event.getKey()))
+          .reduce((first, second) -> second)
+          .orElse(null);
+
+      Object oldValue;
+      if (previousEvent != null) {
+        oldValue = previousEvent.getValue();
+      } else {
+        // Recon does not add entries to cache and it is safer to always use
+        // getSkipCache in Recon.
+        oldValue = table.getSkipCache(key);
+      }
+
       if (action == PUT) {
         Object value = codecRegistry.asObject(valueBytes, valueType.get());
         builder.setValue(value);
@@ -127,12 +139,6 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       if (LOG.isDebugEnabled()) {
         LOG.debug(String.format("Generated OM update Event for table : %s, " +
                 "action = %s", tableName, action));
-      }
-      if (omdbUpdateEvents.contains(event)) {
-        // If the same event is part of this batch, the last one only holds.
-        // For example, if there are 2 PUT key1 events, then the first one
-        // can be discarded.
-        omdbUpdateEvents.remove(event);
       }
       omdbUpdateEvents.add(event);
     } else {
