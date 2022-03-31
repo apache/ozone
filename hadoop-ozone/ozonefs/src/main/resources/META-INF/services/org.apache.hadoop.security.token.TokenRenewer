@@ -17,3 +17,4 @@
 #
 
 org.apache.hadoop.fs.ozone.BasicOzoneClientAdapterImpl$Renewer
+org.apache.hadoop.fs.ozone.BasicRootedOzoneClientAdapterImpl$Renewer
