@@ -491,15 +491,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     boolean processKeyPath(List<String> keyPathList) throws IOException {
       LOG.trace("Deleting keys: {}", keyPathList);
       boolean succeed = keyPathList.isEmpty();
-      if (recursive) {
-        for (String key : keyPathList) {
-          // if key is a directory
-          if (key.endsWith(OZONE_URI_DELIMITER)) {
-            succeed = adapterImpl.deleteObject(key, true);
-          } else {
-            succeed = adapterImpl.deleteObject(key);
-          }
-        }
+      if (recursive && !succeed) {
+        succeed = adapterImpl.deleteObjects(keyPathList);
       } else {
         // Non empty paths cannot be deleted when recursive flag is false
         if (!keyPathList.isEmpty()) {

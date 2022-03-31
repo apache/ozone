@@ -152,7 +152,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
       BucketLayout defaultType = BucketLayout.fromString(omDefaultBucketLayout);
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
-      LOG.info("Bucket Layout not present for volume/bucket = {}/{}, "
+      LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
               + "initialising with default bucket layout" + ": {}", volumeName,
           bucketName, omDefaultBucketLayout);
     } else {

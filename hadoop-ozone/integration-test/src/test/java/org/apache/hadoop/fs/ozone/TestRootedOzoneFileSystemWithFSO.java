@@ -218,9 +218,7 @@ public class TestRootedOzoneFileSystemWithFSO
     long prevDeletes = getOMMetrics().getNumKeyDeletes();
     Assert.assertTrue(getFs().delete(volumePath1, true));
     long deletes = getOMMetrics().getNumKeyDeletes();
-    // a recursive bucket delete should only do delete calls for top level keys
-    // hence total delete calls = 6
-    Assert.assertTrue(deletes == prevDeletes + 6);
+    Assert.assertTrue(deletes == prevDeletes + 1);
   }
 
 }
