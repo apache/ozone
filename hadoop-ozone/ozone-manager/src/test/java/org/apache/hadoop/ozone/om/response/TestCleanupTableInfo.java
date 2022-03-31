@@ -286,7 +286,8 @@ public class TestCleanupTableInfo {
     when(protoRequest.getCreateFileRequest()).thenReturn(aCreateFileRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateFile);
     when(protoRequest.getTraceID()).thenReturn("");
-    return new OMFileCreateRequest(protoRequest);
+    return new OMFileCreateRequest(protoRequest,
+        aBucketInfo().getBucketLayout());
   }
 
   private OMKeyCreateRequest anOMKeyCreateRequest() {
@@ -294,7 +295,8 @@ public class TestCleanupTableInfo {
     when(protoRequest.getCreateKeyRequest()).thenReturn(aKeyCreateRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateKey);
     when(protoRequest.getTraceID()).thenReturn("");
-    return new OMKeyCreateRequest(protoRequest);
+    return new OMKeyCreateRequest(protoRequest,
+        aBucketInfo().getBucketLayout());
   }
 
   private OmBucketInfo aBucketInfo() {

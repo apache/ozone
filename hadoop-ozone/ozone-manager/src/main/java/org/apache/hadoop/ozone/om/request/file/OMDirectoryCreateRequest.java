@@ -103,10 +103,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     FAILURE // The request failed and exception was thrown
   }
 
-  public OMDirectoryCreateRequest(OMRequest omRequest) {
-    super(omRequest);
-  }
-
   public OMDirectoryCreateRequest(OMRequest omRequest,
                                   BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
