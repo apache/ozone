@@ -362,6 +362,7 @@ public class SCMNodeManager implements NodeManager {
     InetAddress dnAddress = Server.getRemoteIp();
     if (dnAddress != null) {
       // Mostly called inside an RPC, update ip
+      datanodeDetails.setHostName(dnAddress.getHostName());
       datanodeDetails.setIpAddress(dnAddress.getHostAddress());
     }
 
