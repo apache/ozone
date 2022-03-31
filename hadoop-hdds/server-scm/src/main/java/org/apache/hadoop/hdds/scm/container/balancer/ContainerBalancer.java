@@ -843,7 +843,7 @@ public class ContainerBalancer implements SCMService {
       InvalidContainerBalancerConfigurationException {
     lock.lock();
     try {
-      canStart();
+      validateState();
       validateConfiguration(this.config);
       startBalancingThread();
     } finally {
@@ -873,7 +873,7 @@ public class ContainerBalancer implements SCMService {
    * @throws IllegalContainerBalancerStateException if ContainerBalancer is
    * already running, SCM is in safe mode, or SCM is not leader ready
    */
-  private void canStart() throws IllegalContainerBalancerStateException {
+  private void validateState() throws IllegalContainerBalancerStateException {
     if (!scmContext.isLeaderReady()) {
       LOG.warn("SCM is not leader ready");
       throw new IllegalContainerBalancerStateException("SCM is not leader " +
@@ -920,26 +920,22 @@ public class ContainerBalancer implements SCMService {
   }
 
   private void stopBalancingThread() {
+    Thread balancingThread = currentBalancingThread;
     lock.lock();
     try {
       balancerRunning = false;
-    } finally {
-      lock.unlock();
-    }
-    // wait for currentBalancingThread to die
-    if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
-      currentBalancingThread.interrupt();
-      try {
-        currentBalancingThread.join();
-      } catch (InterruptedException exception) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    lock.lock();
-    try {
       currentBalancingThread = null;
     } finally {
       lock.unlock();
+    }
+    // wait for balancingThread to die
+    if (Thread.currentThread().getId() != balancingThread.getId()) {
+      balancingThread.interrupt();
+      try {
+        balancingThread.join();
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+      }
     }
     LOG.info("Container Balancer stopped successfully.");
   }
