@@ -375,18 +375,20 @@ public class PipelineManagerImpl implements PipelineManager {
     }
   }
 
-  /** close the pipelines whose nodes' IPs are stale
+  /** close the pipelines whose nodes' IPs are stale.
    *
    * @param datanodeDetails new datanodeDetails
    */
   @Override
   public void closeStalePipelines(DatanodeDetails datanodeDetails) {
-    List<Pipeline> pipelinesWithStaleIpOrHostname = getStalePipelines(datanodeDetails);
+    List<Pipeline> pipelinesWithStaleIpOrHostname =
+            getStalePipelines(datanodeDetails);
     if (pipelinesWithStaleIpOrHostname.isEmpty()) {
       LOG.info("No stale pipelines");
       return;
     }
-    LOG.info("Pipelines with stale IP or Host name: {}", pipelinesWithStaleIpOrHostname);
+    LOG.info("Pipelines with stale IP or Host name: {}",
+            pipelinesWithStaleIpOrHostname);
     pipelinesWithStaleIpOrHostname.forEach(p -> {
       try {
         LOG.info("Closing pipeline: {}", p.getId());
@@ -403,9 +405,12 @@ public class PipelineManagerImpl implements PipelineManager {
     List<Pipeline> pipelines = getPipelines();
     return pipelines.stream()
             .filter(p -> p.getNodes().stream()
-                    .anyMatch(n -> n.getUuid().equals(datanodeDetails.getUuid())
-                            && (!n.getIpAddress().equals(datanodeDetails.getIpAddress())
-                            || !n.getHostName().equals(datanodeDetails.getHostName()))))
+                    .anyMatch(n -> n.getUuid()
+                            .equals(datanodeDetails.getUuid())
+                            && (!n.getIpAddress()
+                            .equals(datanodeDetails.getIpAddress())
+                            || !n.getHostName()
+                            .equals(datanodeDetails.getHostName()))))
             .collect(Collectors.toList());
   }
 
