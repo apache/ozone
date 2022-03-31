@@ -59,11 +59,11 @@ public final class ContainerBalancerMetrics {
 
   @Metric(about = "Total number of container moves across all iterations of " +
       "Container Balancer.")
-  private MutableCounterLong totalNumContainerMoves;
+  private MutableCounterLong numContainerMoves;
 
   @Metric(about = "Total data size in GB moved across all iterations of " +
       "Container Balancer.")
-  private MutableCounterLong totalSizeMovedGB;
+  private MutableCounterLong dataSizeMovedGB;
 
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
@@ -179,19 +179,19 @@ public final class ContainerBalancerMetrics {
     numDatanodesUnbalanced.incr(-getNumDatanodesUnbalanced());
   }
 
-  public long getTotalNumContainerMoves() {
-    return totalNumContainerMoves.value();
+  public long getNumContainerMoves() {
+    return numContainerMoves.value();
   }
 
-  public void incrementTotalNumContainerMoves(long valueToAdd) {
-    totalNumContainerMoves.incr(valueToAdd);
+  public void incrementNumContainerMoves(long valueToAdd) {
+    numContainerMoves.incr(valueToAdd);
   }
 
-  public long getTotalSizeMovedGB() {
-    return totalSizeMovedGB.value();
+  public long getDataSizeMovedGB() {
+    return dataSizeMovedGB.value();
   }
 
-  public void incrementTotalSizeMovedGB(long valueToAdd) {
-    totalSizeMovedGB.incr(valueToAdd);
+  public void incrementDataSizeMovedGB(long valueToAdd) {
+    dataSizeMovedGB.incr(valueToAdd);
   }
 }

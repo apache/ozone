@@ -508,9 +508,9 @@ public class ContainerBalancer {
         countDatanodesInvolvedPerIteration);
     sizeMovedPerIteration /= OzoneConsts.GB;
     metrics.incrementDataSizeMovedGBInLatestIteration(sizeMovedPerIteration);
-    metrics.incrementTotalNumContainerMoves(
+    metrics.incrementNumContainerMoves(
         metrics.getNumContainerMovesInLatestIteration());
-    metrics.incrementTotalSizeMovedGB(sizeMovedPerIteration);
+    metrics.incrementDataSizeMovedGB(sizeMovedPerIteration);
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
             "in this iteration: {}GB.",
         countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
