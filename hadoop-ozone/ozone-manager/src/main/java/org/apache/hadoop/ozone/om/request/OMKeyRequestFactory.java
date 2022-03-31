@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
@@ -101,8 +100,6 @@ public final class OMKeyRequestFactory {
       omKeyRequest =
           OMKeyRenameRequest.getInstance(keyArgs, omRequest, ozoneManager);
       break;
-    case RenameKeys:
-      return new OMKeysRenameRequest(omRequest);
     case PurgeKeys:
       omKeyRequest = new OMKeyPurgeRequest(omRequest);
       break;

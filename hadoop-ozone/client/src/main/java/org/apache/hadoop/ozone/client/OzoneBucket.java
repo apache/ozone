@@ -684,16 +684,6 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Rename the key by keyMap, The key is fromKeyName and value is toKeyName.
-   * @param keyMap The key is original key name nad value is new key name.
-   * @throws IOException
-   */
-  public void renameKeys(Map<String, String> keyMap)
-      throws IOException {
-    proxy.renameKeys(volumeName, name, keyMap);
-  }
-
-  /**
    * Initiate multipart upload for a specified key.
    * @param keyName
    * @param type

@@ -102,7 +102,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -1036,18 +1035,6 @@ public class RpcClient implements ClientProtocol {
         .build();
     ozoneManagerClient.renameKey(keyArgs, toKeyName);
   }
-
-  @Override
-  public void renameKeys(String volumeName, String bucketName,
-                         Map<String, String> keyMap) throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
-    HddsClientUtils.checkNotNull(keyMap);
-    OmRenameKeys omRenameKeys =
-        new OmRenameKeys(volumeName, bucketName, keyMap, null);
-    ozoneManagerClient.renameKeys(omRenameKeys);
-  }
-
 
   @Override
   public List<OzoneKey> listKeys(String volumeName, String bucketName,

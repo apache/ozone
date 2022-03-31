@@ -272,7 +272,6 @@ public final class OmUtils {
     case DeleteBucket:
     case CreateKey:
     case RenameKey:
-    case RenameKeys:
     case DeleteKey:
     case DeleteKeys:
     case CommitKey:
