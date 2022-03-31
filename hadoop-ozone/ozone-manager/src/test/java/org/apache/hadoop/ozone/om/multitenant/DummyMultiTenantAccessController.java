@@ -11,8 +11,10 @@ public class DummyMultiTenantAccessController
 
   private final Map<String, Policy>  policies;
   private final Map<String, Role>  roles;
+  private long nextRoleID;
 
   public DummyMultiTenantAccessController() {
+    nextRoleID = 0;
     policies = new HashMap<>();
     roles = new HashMap<>();
   }
@@ -22,7 +24,16 @@ public class DummyMultiTenantAccessController
     if (policies.containsKey(policy.getName())) {
       throw new Exception("Policy already exists.");
     }
+    // Multiple policies for the sare resource should not be allowed.
+    for (Policy existingPolicy: policies.values()) {
+      if (existingPolicy.getVolumes().equals(policy.getVolumes()) &&
+          existingPolicy.getBuckets().equals(policy.getBuckets()) &&
+      existingPolicy.getKeys().equals(policy.getKeys())) {
+        throw new Exception("Policy for the same resource already defined.");
+      }
+    }
     policies.put(policy.getName(), policy);
+    // Ranger will create roles if specified with poicy creation.
     for (String roleName: policy.getRoleAcls().keySet()) {
       if (!roles.containsKey(roleName)) {
         createRole(new Role.Builder().setName(roleName).build());
@@ -71,7 +82,11 @@ public class DummyMultiTenantAccessController
     if (roles.containsKey(role.getName())) {
       throw new Exception("Role already exists.");
     }
-    roles.put(role.getName(), role);
+    Role newRole = new Role.Builder(role)
+        .setID(nextRoleID)
+        .build();
+    nextRoleID++;
+    roles.put(newRole.getName(), newRole);
   }
 
   @Override

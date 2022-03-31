@@ -80,12 +80,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>commons-net</groupId>
       <artifactId>commons-net</artifactId>
     </dependency>
-    <dependency>
-        <groupId>org.apache.ranger</groupId>
-        <artifactId>ranger-intg</artifactId>
-        <version>3.0.0-SNAPSHOT</version>
-        <scope>compile</scope>
-    </dependency>
   </dependencies>
 
   <build>

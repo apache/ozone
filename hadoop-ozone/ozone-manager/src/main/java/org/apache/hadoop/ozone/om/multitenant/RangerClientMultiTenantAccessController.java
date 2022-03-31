@@ -57,30 +57,17 @@ public class RangerClientMultiTenantAccessController implements
   private final String omPrincipal;
 
   public RangerClientMultiTenantAccessController(OzoneConfiguration conf) {
-    // TODO: Make these maps singleton.
     aclToString = MultiTenantAccessController.getRangerAclStrings();
     stringToAcl = new HashMap<>();
     aclToString.forEach((type, string) -> stringToAcl.put(string, type));
 
-    // TODO get these from the existing ranger plugin config.
+    // TODO: Handle config setup in cluster without kerberos/tls/ranger.
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     rangerServiceName = conf.get(OZONE_RANGER_SERVICE);
-
-    // Auth using kerberos if using 3.0 snapshot ranger client.
     omPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
     String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
     client = new RangerClient(rangerHttpsAddress,
         "kerberos", omPrincipal, keytabPath, rangerServiceName, "ozone");
-
-    // Auth with username/password if using 2.1.0 ranger client.
-//    String username = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
-//    String password = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
-//    String clientSslFile = conf.get(OZONE_RANGER_CLIENT_SSL_FILE);
-//    System.err.println("ssl file: " + clientSslFile);
-//    RangerRESTClient restClient = new RangerRESTClient(rangerHttpsAddress,
-//        clientSslFile, conf);
-//    restClient.setBasicAuthInfo(username, password);
-//    client = new RangerClient(restClient);
   }
 
   @Override

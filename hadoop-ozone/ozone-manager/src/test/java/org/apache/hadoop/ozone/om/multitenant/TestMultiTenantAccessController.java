@@ -1,6 +1,5 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
-import org.apache.avro.generic.GenericData;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Acl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
@@ -20,28 +19,40 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public class TestMultiTenantController {
+public class TestMultiTenantAccessController {
   private MultiTenantAccessController controller;
-  // Users must already be added to Ranger.
   private List<BasicUserPrincipal> users;
 
-   @Before
-   public void setup() {
-     // TODO decide what to do with config.
-     OzoneConfiguration conf = new OzoneConfiguration();
-     users = new ArrayList<>();
-     users.add(new BasicUserPrincipal("om"));
-     users.add(new BasicUserPrincipal("hdfs"));
+  @Before
+  public void setupUsers() {
+    // If testing against a real cluster, users must already be added to Ranger.
+    users = new ArrayList<>();
+    users.add(new BasicUserPrincipal("om"));
+    users.add(new BasicUserPrincipal("hdfs"));
+  }
 
-     // Set these when manually running the test.
-//     conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "");
-//     conf.set(OZONE_RANGER_SERVICE, "");
-//     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "");
-//     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "");
-//     controller = new RangerClientMultiTenantAccessController(conf);
+  /**
+   * Use this setup to test against a mock Ranger instance.
+   */
+   @Before
+   public void setupUnitTest() {
      controller = new DummyMultiTenantAccessController();
    }
 
+  /**
+   * Use this setup to test against a live Ranger instance.
+   */
+  //  @Before
+  public void setupClusterTest() {
+    // These config keys must be set when the test is run:
+    // OZONE_RANGER_HTTPS_ADDRESS_KEY
+    // OZONE_RANGER_SERVICE
+    // These config keys must be set in a secure cluster.
+    // OZONE_OM_KERBEROS_PRINCIPAL_KEY
+    // OZONE_OM_KERBEROS_KEYTAB_FILE_KEY
+    OzoneConfiguration conf = new OzoneConfiguration();
+    controller = new RangerClientMultiTenantAccessController(conf);
+  }
 
     @Test
     public void testCreateGetDeletePolicies() throws Exception {
@@ -129,10 +140,12 @@ public class TestMultiTenantController {
     public void testGetLabeledPolicies() throws Exception  {
       final String label = "label";
       Policy labeledPolicy1 = new Policy.Builder()
+          .setName("policy1")
           .addVolume(UUID.randomUUID().toString())
           .addLabel(label)
           .build();
       Policy labeledPolicy2 = new Policy.Builder()
+          .setName("policy2")
           .addVolume(UUID.randomUUID().toString())
           .addLabel(label)
           .build();
@@ -141,6 +154,7 @@ public class TestMultiTenantController {
       labeledPolicies.add(labeledPolicy1);
       labeledPolicies.add(labeledPolicy2);
       Policy unlabeledPolicy = new Policy.Builder()
+          .setName("policy3")
           .addVolume(UUID.randomUUID().toString())
           .build();
 
@@ -161,7 +175,7 @@ public class TestMultiTenantController {
       Assert.assertEquals(unlabeledPolicy, retrievedPolicy);
 
       // Get of policies with nonexistent label should give an empty list.
-      Assert.assertTrue(controller.getLabeledPolicies(label).isEmpty());
+      Assert.assertTrue(controller.getLabeledPolicies(label + "1").isEmpty());
 
     // Cleanup
       for (Policy policy: labeledPolicies) {
@@ -206,11 +220,11 @@ public class TestMultiTenantController {
   @Test
   public void testCreatePolicyWithRoles() throws Exception {
     // Create a policy with role acls.
-    final String role1Name = "role1";
+    final String roleName = "role1";
     Policy policy = new Policy.Builder()
         .setName("policy1")
         .addVolume("volume")
-        .addRoleAcl("newrole",
+        .addRoleAcl(roleName,
             Collections.singletonList(Acl.allow(ACLType.ALL)))
         .build();
     // This should create the role as well.
@@ -221,13 +235,13 @@ public class TestMultiTenantController {
     Map<String, Collection<Acl>> retrievedRoleAcls =
         retrievedPolicy.getRoleAcls();
     Assert.assertEquals(1, retrievedRoleAcls.size());
-    List<Acl> roleAcls = new ArrayList<>(retrievedRoleAcls.get("newrole"));
+    List<Acl> roleAcls = new ArrayList<>(retrievedRoleAcls.get(roleName));
     Assert.assertEquals(1, roleAcls.size());
     Assert.assertEquals(ACLType.ALL, roleAcls.get(0).getAclType());
     Assert.assertTrue(roleAcls.get(0).isAllowed());
 
     // get one of the roles to check it is there but empty.
-    Role retrievedRole = controller.getRole(role1Name);
+    Role retrievedRole = controller.getRole(roleName);
     Assert.assertFalse(retrievedRole.getDescription().isPresent());
     Assert.assertTrue(retrievedRole.getUsers().isEmpty());
     Assert.assertTrue(retrievedRole.getRoleID().isPresent());
@@ -241,15 +255,15 @@ public class TestMultiTenantController {
     Policy policy2 = new Policy.Builder()
         .setName("policy2")
         .addVolume("volume2")
-        .addRoleAcl(role1Name,
+        .addRoleAcl(roleName,
             Collections.singletonList(Acl.allow(ACLType.READ)))
         .build();
     controller.createPolicy(policy2);
-    Assert.assertEquals(controller.getRole(role1Name), retrievedRole);
+    Assert.assertEquals(controller.getRole(roleName), retrievedRole);
 
     controller.deletePolicy("policy1");
     controller.deletePolicy("policy2");
-    controller.deleteRole(role1Name);
+    controller.deleteRole(roleName);
   }
 
   @Test
@@ -319,6 +333,7 @@ public class TestMultiTenantController {
 
     Role retrievedRole = controller.getRole(roleName);
     Assert.assertEquals(originalRole, retrievedRole);
+    Assert.assertTrue(retrievedRole.getRoleID().isPresent());
     long roleID = retrievedRole.getRoleID().get();
 
     // Remove a user from the role and update it.
