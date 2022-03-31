@@ -140,6 +140,12 @@ public class OMMetrics {
   private @Metric MutableCounterLong numTenantRevokeAdmins;
   private @Metric MutableCounterLong numTenantRevokeAdminSuccesses;
   private @Metric MutableCounterLong numTenantRevokeAdminFails;
+  // Metric for tenant list operation
+  private @Metric MutableCounterLong numTenantLists;
+  // Metric for tenant get user info
+  private @Metric MutableCounterLong numTenantGetUserInfos;
+  // Metric for list users in tenant operation
+  private @Metric MutableCounterLong numTenantTenantUserLists;
 
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
@@ -503,6 +509,21 @@ public class OMMetrics {
 
   public void incNumTenantRevokeAdminFails() {
     numTenantRevokeAdminFails.incr();
+  }
+
+  public void incNumTenantLists() {
+    numTenantOps.incr();
+    numTenantLists.incr();
+  }
+
+  public void incNumTenantGetUserInfos() {
+    numTenantOps.incr();
+    numTenantGetUserInfos.incr();
+  }
+
+  public void incNumTenantUserLists() {
+    numTenantOps.incr();
+    numTenantTenantUserLists.incr();
   }
 
   public void incNumGetFileStatus() {

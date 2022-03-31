@@ -2955,6 +2955,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public TenantInfoList listTenant() throws IOException {
 
+    metrics.incNumTenantLists();
+
     final UserGroupInformation ugi = getRemoteUser();
     if (!isAdmin(ugi)) {
       final OMException omEx = new OMException(
@@ -3004,6 +3006,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException {
+
+    metrics.incNumTenantGetUserInfos();
 
     if (StringUtils.isEmpty(userPrincipal)) {
       return null;
@@ -3065,6 +3069,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
+
+    metrics.incNumTenantGetUserInfos();
 
     if (StringUtils.isEmpty(tenantId)) {
       return null;
