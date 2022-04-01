@@ -229,6 +229,8 @@ public class OMException extends IOException {
 
     NOT_SUPPORTED_OPERATION,
 
+    PARTIAL_RENAME,
+
     QUOTA_EXCEEDED,
 
     QUOTA_ERROR,

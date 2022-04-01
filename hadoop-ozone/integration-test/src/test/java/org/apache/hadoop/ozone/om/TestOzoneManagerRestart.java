@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -46,6 +47,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
 import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -200,8 +202,15 @@ public class TestOzoneManagerRestart {
     ozoneOutputStream1.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream1.close();
 
-    ozoneBucket.renameKey(key1, newKey1);
-    ozoneBucket.renameKey(key2, newKey2);
+    Map<String, String> keyMap = new HashMap();
+    keyMap.put(key1, newKey1);
+    keyMap.put(key2, newKey2);
+
+    try {
+      ozoneBucket.renameKeys(keyMap);
+    } catch (OMException ex) {
+      Assert.assertEquals(PARTIAL_RENAME, ex.getResult());
+    }
 
     // Get original Key1, it should not exist
     try {

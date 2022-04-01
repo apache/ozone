@@ -183,6 +183,7 @@ public final class OzoneManagerRatisUtils {
     case DeleteKey:
     case DeleteKeys:
     case RenameKey:
+    case RenameKeys:
     case PurgeKeys:
     case PurgePaths:
     case InitiateMultiPartUpload:

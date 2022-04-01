@@ -343,6 +343,16 @@ public interface ClientProtocol {
                  String toKeyName) throws IOException;
 
   /**
+   * Renames existing keys within a bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyMap The key is original key name nad value is new key name.
+   * @throws IOException
+   */
+  void renameKeys(String volumeName, String bucketName,
+                  Map<String, String> keyMap) throws IOException;
+
+  /**
    * Returns list of Keys in {Volume/Bucket} that matches the keyPrefix,
    * size of the returned list depends on maxListResult. The caller has
    * to make multiple calls to read all keys.
