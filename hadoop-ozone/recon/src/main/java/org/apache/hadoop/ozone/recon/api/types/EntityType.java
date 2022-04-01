@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.api.EntityHandler;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -37,18 +36,18 @@ import java.util.Set;
 public enum EntityType {
   ROOT {
     @Override
-    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityUtils entityUtils) throws IOException {
       NamespaceSummaryResponse namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.ROOT);
-      List<OmVolumeArgs> volumes = entityHandler.listVolumes();
+      List<OmVolumeArgs> volumes = entityUtils.listVolumes();
       namespaceSummaryResponse.setNumVolume(volumes.size());
-      List<OmBucketInfo> allBuckets = entityHandler.listBucketsUnderVolume(null);
+      List<OmBucketInfo> allBuckets = entityUtils.listBucketsUnderVolume(null);
       namespaceSummaryResponse.setNumBucket(allBuckets.size());
       int totalNumDir = 0;
       long totalNumKey = 0L;
       for (OmBucketInfo bucket : allBuckets) {
         long bucketObjectId = bucket.getObjectID();
-        totalNumDir += entityHandler.getTotalDirCount(bucketObjectId);
-        totalNumKey += entityHandler.getTotalKeyCount(bucketObjectId);
+        totalNumDir += entityUtils.getTotalDirCount(bucketObjectId);
+        totalNumKey += entityUtils.getTotalKeyCount(bucketObjectId);
       }
 
       namespaceSummaryResponse.setNumTotalDir(totalNumDir);
@@ -59,10 +58,10 @@ public enum EntityType {
 
     @Override
     public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                    boolean withReplica, EntityHandler entityHandler) throws IOException {
+                                    boolean withReplica, EntityUtils entityUtils) throws IOException {
       DUResponse duResponse = new DUResponse();
-      ReconOMMetadataManager omMetadataManager = entityHandler.getOmMetadataManager();
-      List<OmVolumeArgs> volumes = entityHandler.listVolumes();
+      ReconOMMetadataManager omMetadataManager = entityUtils.getOmMetadataManager();
+      List<OmVolumeArgs> volumes = entityUtils.listVolumes();
       duResponse.setCount(volumes.size());
 
       List<DUResponse.DiskUsage> volumeDuData = new ArrayList<>();
@@ -75,16 +74,16 @@ public enum EntityType {
         long dataSize = 0;
         diskUsage.setSubpath(subpath);
         // iterate all buckets per volume to get total data size
-        for (OmBucketInfo bucket: entityHandler.listBucketsUnderVolume(volumeName)) {
+        for (OmBucketInfo bucket: entityUtils.listBucketsUnderVolume(volumeName)) {
           long bucketObjectID = bucket.getObjectID();
-          dataSize += entityHandler.getTotalSize(bucketObjectID);
+          dataSize += entityUtils.getTotalSize(bucketObjectID);
         }
         totalDataSize += dataSize;
 
         // count replicas
         // TODO: to be dropped or optimized in the future
         if (withReplica) {
-          long volumeDU = entityHandler.calculateDUForVolume(volumeName);
+          long volumeDU = entityUtils.calculateDUForVolume(volumeName);
           totalDataSizeWithReplica += volumeDU;
           diskUsage.setSizeWithReplica(volumeDU);
         }
@@ -101,10 +100,10 @@ public enum EntityType {
     }
 
     @Override
-    public QuotaUsageResponse getQuotaResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public QuotaUsageResponse getQuotaResponse(String[] names, EntityUtils entityUtils) throws IOException {
       QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-      List<OmVolumeArgs> volumes = entityHandler.listVolumes();
-      List<OmBucketInfo> buckets = entityHandler.listBucketsUnderVolume(null);
+      List<OmVolumeArgs> volumes = entityUtils.listVolumes();
+      List<OmBucketInfo> buckets = entityUtils.listBucketsUnderVolume(null);
       long quotaInBytes = 0L;
       long quotaUsedInBytes = 0L;
 
@@ -120,7 +119,7 @@ public enum EntityType {
       }
       for (OmBucketInfo bucket: buckets) {
         long bucketObjectId = bucket.getObjectID();
-        quotaUsedInBytes += entityHandler.getTotalSize(bucketObjectId);
+        quotaUsedInBytes += entityUtils.getTotalSize(bucketObjectId);
       }
 
       quotaUsageResponse.setQuota(quotaInBytes);
@@ -129,16 +128,16 @@ public enum EntityType {
     }
 
     @Override
-    public FileSizeDistributionResponse getDistResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public FileSizeDistributionResponse getDistResponse(String[] names, EntityUtils entityUtils) throws IOException {
       FileSizeDistributionResponse distResponse =
               new FileSizeDistributionResponse();
-      List<OmBucketInfo> allBuckets = entityHandler.listBucketsUnderVolume(null);
+      List<OmBucketInfo> allBuckets = entityUtils.listBucketsUnderVolume(null);
       int[] fileSizeDist = new int[ReconConstants.NUM_OF_BINS];
 
       // accumulate file size distribution arrays from all buckets
       for (OmBucketInfo bucket : allBuckets) {
         long bucketObjectId = bucket.getObjectID();
-        int[] bucketFileSizeDist = entityHandler.getTotalFileSizeDist(bucketObjectId);
+        int[] bucketFileSizeDist = entityUtils.getTotalFileSizeDist(bucketObjectId);
         // add on each bin
         for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
           fileSizeDist[i] += bucketFileSizeDist[i];
@@ -150,10 +149,10 @@ public enum EntityType {
   },
   VOLUME {
     @Override
-    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityUtils entityUtils) throws IOException {
       NamespaceSummaryResponse namespaceSummaryResponse =
               new NamespaceSummaryResponse(EntityType.VOLUME);
-      List<OmBucketInfo> buckets = entityHandler.listBucketsUnderVolume(names[0]);
+      List<OmBucketInfo> buckets = entityUtils.listBucketsUnderVolume(names[0]);
       namespaceSummaryResponse.setNumBucket(buckets.size());
       int totalDir = 0;
       long totalKey = 0L;
@@ -161,8 +160,8 @@ public enum EntityType {
       // iterate all buckets to collect the total object count.
       for (OmBucketInfo bucket : buckets) {
         long bucketObjectId = bucket.getObjectID();
-        totalDir += entityHandler.getTotalDirCount(bucketObjectId);
-        totalKey += entityHandler.getTotalKeyCount(bucketObjectId);
+        totalDir += entityUtils.getTotalDirCount(bucketObjectId);
+        totalKey += entityUtils.getTotalKeyCount(bucketObjectId);
       }
 
       namespaceSummaryResponse.setNumTotalDir(totalDir);
@@ -173,11 +172,11 @@ public enum EntityType {
 
     @Override
     public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                    boolean withReplica, EntityHandler entityHandler) throws IOException {
+                                    boolean withReplica, EntityUtils entityUtils) throws IOException {
       DUResponse duResponse = new DUResponse();
-      ReconOMMetadataManager omMetadataManager = entityHandler.getOmMetadataManager();
+      ReconOMMetadataManager omMetadataManager = entityUtils.getOmMetadataManager();
       String volName = names[0];
-      List<OmBucketInfo> buckets = entityHandler.listBucketsUnderVolume(volName);
+      List<OmBucketInfo> buckets = entityUtils.listBucketsUnderVolume(volName);
       duResponse.setCount(buckets.size());
 
       // List of DiskUsage data for all buckets
@@ -190,10 +189,10 @@ public enum EntityType {
         String subpath = omMetadataManager.getBucketKey(volName, bucketName);
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
         diskUsage.setSubpath(subpath);
-        long dataSize = entityHandler.getTotalSize(bucketObjectID);
+        long dataSize = entityUtils.getTotalSize(bucketObjectID);
         volDataSize += dataSize;
         if (withReplica) {
-          long bucketDU = entityHandler.calculateDUUnderObject(bucketObjectID);
+          long bucketDU = entityUtils.calculateDUUnderObject(bucketObjectID);
           diskUsage.setSizeWithReplica(bucketDU);
           volDataSizeWithReplica += bucketDU;
         }
@@ -209,10 +208,10 @@ public enum EntityType {
     }
 
     @Override
-    public QuotaUsageResponse getQuotaResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public QuotaUsageResponse getQuotaResponse(String[] names, EntityUtils entityUtils) throws IOException {
       QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-      ReconOMMetadataManager omMetadataManager = entityHandler.getOmMetadataManager();
-      List<OmBucketInfo> buckets = entityHandler.listBucketsUnderVolume(names[0]);
+      ReconOMMetadataManager omMetadataManager = entityUtils.getOmMetadataManager();
+      List<OmBucketInfo> buckets = entityUtils.listBucketsUnderVolume(names[0]);
       String volKey = omMetadataManager.getVolumeKey(names[0]);
       OmVolumeArgs volumeArgs =
               omMetadataManager.getVolumeTable().getSkipCache(volKey);
@@ -222,7 +221,7 @@ public enum EntityType {
       // Get the total data size used by all buckets
       for (OmBucketInfo bucketInfo: buckets) {
         long bucketObjectId = bucketInfo.getObjectID();
-        quotaUsedInBytes += entityHandler.getTotalSize(bucketObjectId);
+        quotaUsedInBytes += entityUtils.getTotalSize(bucketObjectId);
       }
       quotaUsageResponse.setQuota(quotaInBytes);
       quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
@@ -230,16 +229,16 @@ public enum EntityType {
     }
 
     @Override
-    public FileSizeDistributionResponse getDistResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public FileSizeDistributionResponse getDistResponse(String[] names, EntityUtils entityUtils) throws IOException {
       FileSizeDistributionResponse distResponse =
               new FileSizeDistributionResponse();
-      List<OmBucketInfo> buckets = entityHandler.listBucketsUnderVolume(names[0]);
+      List<OmBucketInfo> buckets = entityUtils.listBucketsUnderVolume(names[0]);
       int[] volumeFileSizeDist = new int[ReconConstants.NUM_OF_BINS];
 
       // accumulate file size distribution arrays from all buckets under volume
       for (OmBucketInfo bucket : buckets) {
         long bucketObjectId = bucket.getObjectID();
-        int[] bucketFileSizeDist = entityHandler.getTotalFileSizeDist(bucketObjectId);
+        int[] bucketFileSizeDist = entityUtils.getTotalFileSizeDist(bucketObjectId);
         // add on each bin
         for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
           volumeFileSizeDist[i] += bucketFileSizeDist[i];
@@ -251,24 +250,24 @@ public enum EntityType {
   },
   BUCKET {
     @Override
-    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityUtils entityUtils) throws IOException {
       NamespaceSummaryResponse namespaceSummaryResponse =
               new NamespaceSummaryResponse(EntityType.BUCKET);
       assert (names.length == 2);
-      long bucketObjectId = entityHandler.getBucketObjectId(names);
-      namespaceSummaryResponse.setNumTotalDir(entityHandler.getTotalDirCount(bucketObjectId));
-      namespaceSummaryResponse.setNumTotalKey(entityHandler.getTotalKeyCount(bucketObjectId));
+      long bucketObjectId = entityUtils.getBucketObjectId(names);
+      namespaceSummaryResponse.setNumTotalDir(entityUtils.getTotalDirCount(bucketObjectId));
+      namespaceSummaryResponse.setNumTotalKey(entityUtils.getTotalKeyCount(bucketObjectId));
 
       return namespaceSummaryResponse;
     }
 
     @Override
     public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                    boolean withReplica, EntityHandler entityHandler) throws IOException {
+                                    boolean withReplica, EntityUtils entityUtils) throws IOException {
       DUResponse duResponse = new DUResponse();
-      long bucketObjectId = entityHandler.getBucketObjectId(names);
+      long bucketObjectId = entityUtils.getBucketObjectId(names);
       ReconNamespaceSummaryManager reconNamespaceSummaryManager =
-              entityHandler.getReconNamespaceSummaryManager();
+              entityUtils.getReconNamespaceSummaryManager();
       NSSummary bucketNSSummary =
               reconNamespaceSummaryManager.getNSSummary(bucketObjectId);
       // empty bucket, because it's not a parent of any directory or key
@@ -291,16 +290,16 @@ public enum EntityType {
 
         // get directory's name and generate the next-level subpath.
         String dirName = subdirNSSummary.getDirName();
-        String subpath = EntityHandler.buildSubpath(path, dirName);
+        String subpath = EntityUtils.buildSubpath(path, dirName);
         // we need to reformat the subpath in the response in a
         // format with leading slash and without trailing slash
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
         diskUsage.setSubpath(subpath);
-        long dataSize = entityHandler.getTotalSize(subdirObjectId);
+        long dataSize = entityUtils.getTotalSize(subdirObjectId);
         bucketDataSize += dataSize;
 
         if (withReplica) {
-          long dirDU = entityHandler.calculateDUUnderObject(subdirObjectId);
+          long dirDU = entityUtils.calculateDUUnderObject(subdirObjectId);
           diskUsage.setSizeWithReplica(dirDU);
           bucketDataSizeWithReplica += dirDU;
         }
@@ -309,7 +308,7 @@ public enum EntityType {
       }
       // Either listFile or withReplica is enabled, we need the directKeys info
       if (listFile || withReplica) {
-        bucketDataSizeWithReplica += entityHandler.handleDirectKeys(bucketObjectId,
+        bucketDataSizeWithReplica += entityUtils.handleDirectKeys(bucketObjectId,
                 withReplica, listFile, dirDUData, path);
       }
       if (withReplica) {
@@ -322,50 +321,50 @@ public enum EntityType {
     }
 
     @Override
-    public QuotaUsageResponse getQuotaResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public QuotaUsageResponse getQuotaResponse(String[] names, EntityUtils entityUtils) throws IOException {
       QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-      ReconOMMetadataManager omMetadataManager = entityHandler.getOmMetadataManager();
+      ReconOMMetadataManager omMetadataManager = entityUtils.getOmMetadataManager();
       String bucketKey = omMetadataManager.getBucketKey(names[0], names[1]);
       OmBucketInfo bucketInfo = omMetadataManager
               .getBucketTable().getSkipCache(bucketKey);
       long bucketObjectId = bucketInfo.getObjectID();
       long quotaInBytes = bucketInfo.getQuotaInBytes();
-      long quotaUsedInBytes = entityHandler.getTotalSize(bucketObjectId);
+      long quotaUsedInBytes = entityUtils.getTotalSize(bucketObjectId);
       quotaUsageResponse.setQuota(quotaInBytes);
       quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
       return quotaUsageResponse;
     }
 
     @Override
-    public FileSizeDistributionResponse getDistResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public FileSizeDistributionResponse getDistResponse(String[] names, EntityUtils entityUtils) throws IOException {
       FileSizeDistributionResponse distResponse =
               new FileSizeDistributionResponse();
-      long bucketObjectId = entityHandler.getBucketObjectId(names);
-      int[] bucketFileSizeDist = entityHandler.getTotalFileSizeDist(bucketObjectId);
+      long bucketObjectId = entityUtils.getBucketObjectId(names);
+      int[] bucketFileSizeDist = entityUtils.getTotalFileSizeDist(bucketObjectId);
       distResponse.setFileSizeDist(bucketFileSizeDist);
       return distResponse;
     }
   },
   DIRECTORY {
     @Override
-    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityUtils entityUtils) throws IOException {
       // path should exist so we don't need any extra verification/null check
-      long dirObjectId = entityHandler.getDirObjectId(names);
+      long dirObjectId = entityUtils.getDirObjectId(names);
       NamespaceSummaryResponse namespaceSummaryResponse =
               new NamespaceSummaryResponse(EntityType.DIRECTORY);
-      namespaceSummaryResponse.setNumTotalDir(entityHandler.getTotalDirCount(dirObjectId));
-      namespaceSummaryResponse.setNumTotalKey(entityHandler.getTotalKeyCount(dirObjectId));
+      namespaceSummaryResponse.setNumTotalDir(entityUtils.getTotalDirCount(dirObjectId));
+      namespaceSummaryResponse.setNumTotalKey(entityUtils.getTotalKeyCount(dirObjectId));
 
       return namespaceSummaryResponse;
     }
 
     @Override
     public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                    boolean withReplica, EntityHandler entityHandler) throws IOException {
+                                    boolean withReplica, EntityUtils entityUtils) throws IOException {
       DUResponse duResponse = new DUResponse();
-      long dirObjectId = entityHandler.getDirObjectId(names);
+      long dirObjectId = entityUtils.getDirObjectId(names);
       ReconNamespaceSummaryManager reconNamespaceSummaryManager =
-              entityHandler.getReconNamespaceSummaryManager();
+              entityUtils.getReconNamespaceSummaryManager();
       NSSummary dirNSSummary =
               reconNamespaceSummaryManager.getNSSummary(dirObjectId);
       // Empty directory
@@ -388,15 +387,15 @@ public enum EntityType {
                 reconNamespaceSummaryManager.getNSSummary(subdirObjectId);
         String subdirName = subdirNSSummary.getDirName();
         // build the path for subdirectory
-        String subpath = EntityHandler.buildSubpath(path, subdirName);
+        String subpath = EntityUtils.buildSubpath(path, subdirName);
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
         // reformat the response
         diskUsage.setSubpath(subpath);
-        long dataSize = entityHandler.getTotalSize(subdirObjectId);
+        long dataSize = entityUtils.getTotalSize(subdirObjectId);
         dirDataSize += dataSize;
 
         if (withReplica) {
-          long subdirDU = entityHandler.calculateDUUnderObject(subdirObjectId);
+          long subdirDU = entityUtils.calculateDUUnderObject(subdirObjectId);
           diskUsage.setSizeWithReplica(subdirDU);
           dirDataSizeWithReplica += subdirDU;
         }
@@ -407,7 +406,7 @@ public enum EntityType {
 
       // handle direct keys under directory
       if (listFile || withReplica) {
-        dirDataSizeWithReplica += entityHandler.handleDirectKeys(dirObjectId, withReplica,
+        dirDataSizeWithReplica += entityUtils.handleDirectKeys(dirObjectId, withReplica,
                 listFile, subdirDUData, path);
       }
 
@@ -422,7 +421,7 @@ public enum EntityType {
     }
 
     @Override
-    public QuotaUsageResponse getQuotaResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public QuotaUsageResponse getQuotaResponse(String[] names, EntityUtils entityUtils) throws IOException {
       QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
       quotaUsageResponse.setResponseCode(
               ResponseStatus.TYPE_NOT_APPLICABLE);
@@ -430,18 +429,18 @@ public enum EntityType {
     }
 
     @Override
-    public FileSizeDistributionResponse getDistResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public FileSizeDistributionResponse getDistResponse(String[] names, EntityUtils entityUtils) throws IOException {
       FileSizeDistributionResponse distResponse =
               new FileSizeDistributionResponse();
-      long dirObjectId = entityHandler.getDirObjectId(names);
-      int[] dirFileSizeDist = entityHandler.getTotalFileSizeDist(dirObjectId);
+      long dirObjectId = entityUtils.getDirObjectId(names);
+      int[] dirFileSizeDist = entityUtils.getTotalFileSizeDist(dirObjectId);
       distResponse.setFileSizeDist(dirFileSizeDist);
       return distResponse;
     }
   },
   KEY {
     @Override
-    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityUtils entityUtils) throws IOException {
       NamespaceSummaryResponse namespaceSummaryResponse = new NamespaceSummaryResponse(EntityType.KEY);
 
       return namespaceSummaryResponse;
@@ -449,28 +448,28 @@ public enum EntityType {
 
     @Override
     public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                    boolean withReplica, EntityHandler entityHandler) throws IOException {
+                                    boolean withReplica, EntityUtils entityUtils) throws IOException {
       DUResponse duResponse = new DUResponse();
       // DU for key doesn't have subpaths
       duResponse.setCount(0);
       // The object ID for the directory that the key is directly in
-      long parentObjectId = entityHandler.getDirObjectId(names, names.length - 1);
+      long parentObjectId = entityUtils.getDirObjectId(names, names.length - 1);
       String fileName = names[names.length - 1];
-      ReconOMMetadataManager omMetadataManager = entityHandler.getOmMetadataManager();
+      ReconOMMetadataManager omMetadataManager = entityUtils.getOmMetadataManager();
       String ozoneKey =
               omMetadataManager.getOzonePathKey(parentObjectId, fileName);
       OmKeyInfo keyInfo =
               omMetadataManager.getFileTable().getSkipCache(ozoneKey);
       duResponse.setSize(keyInfo.getDataSize());
       if (withReplica) {
-        long keySizeWithReplica = entityHandler.getKeySizeWithReplication(keyInfo);
+        long keySizeWithReplica = entityUtils.getKeySizeWithReplication(keyInfo);
         duResponse.setSizeWithReplica(keySizeWithReplica);
       }
       return duResponse;
     }
 
     @Override
-    public QuotaUsageResponse getQuotaResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public QuotaUsageResponse getQuotaResponse(String[] names, EntityUtils entityUtils) throws IOException {
       QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
       quotaUsageResponse.setResponseCode(
               ResponseStatus.TYPE_NOT_APPLICABLE);
@@ -478,7 +477,7 @@ public enum EntityType {
     }
 
     @Override
-    public FileSizeDistributionResponse getDistResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public FileSizeDistributionResponse getDistResponse(String[] names, EntityUtils entityUtils) throws IOException {
       FileSizeDistributionResponse distResponse =
               new FileSizeDistributionResponse();
       // key itself doesn't have file size distribution
@@ -486,9 +485,9 @@ public enum EntityType {
       return distResponse;
     }
   },
-  UNKNOWN {
+  UNKNOWN { // if path is invalid
     @Override
-    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityUtils entityUtils) throws IOException {
       NamespaceSummaryResponse namespaceSummaryResponse =
               new NamespaceSummaryResponse(EntityType.UNKNOWN);
       namespaceSummaryResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
@@ -498,7 +497,7 @@ public enum EntityType {
 
     @Override
     public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                    boolean withReplica, EntityHandler entityHandler) throws IOException {
+                                    boolean withReplica, EntityUtils entityUtils) throws IOException {
       DUResponse duResponse = new DUResponse();
       duResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
 
@@ -506,7 +505,7 @@ public enum EntityType {
     }
 
     @Override
-    public QuotaUsageResponse getQuotaResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public QuotaUsageResponse getQuotaResponse(String[] names, EntityUtils entityUtils) throws IOException {
       QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
       quotaUsageResponse.setResponseCode(ResponseStatus.PATH_NOT_FOUND);
 
@@ -514,18 +513,18 @@ public enum EntityType {
     }
 
     @Override
-    public FileSizeDistributionResponse getDistResponse(String[] names, EntityHandler entityHandler) throws IOException {
+    public FileSizeDistributionResponse getDistResponse(String[] names, EntityUtils entityUtils) throws IOException {
       FileSizeDistributionResponse distResponse =
               new FileSizeDistributionResponse();
       distResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
       return distResponse;
     }
-  };// if path is invalid
+  };
 
-  abstract public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityHandler entityHandler) throws IOException;
+  abstract public NamespaceSummaryResponse getSummaryResponse(String[] names, EntityUtils entityUtils) throws IOException;
   abstract public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                           boolean withReplica, EntityHandler entityHandler) throws IOException;
-  abstract public QuotaUsageResponse getQuotaResponse(String[] names, EntityHandler entityHandler) throws IOException;
-  abstract public FileSizeDistributionResponse getDistResponse(String[] names, EntityHandler entityHandler) throws IOException;
+                                           boolean withReplica, EntityUtils entityUtils) throws IOException;
+  abstract public QuotaUsageResponse getQuotaResponse(String[] names, EntityUtils entityUtils) throws IOException;
+  abstract public FileSizeDistributionResponse getDistResponse(String[] names, EntityUtils entityUtils) throws IOException;
 
 }

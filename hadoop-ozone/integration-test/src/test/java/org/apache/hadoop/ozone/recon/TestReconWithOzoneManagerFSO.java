@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
+import org.apache.hadoop.ozone.recon.api.types.EntityUtils;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -123,8 +124,10 @@ public class TestReconWithOzoneManagerFSO {
                             .getOMMetadataManagerInstance();
     OzoneStorageContainerManager reconSCM =
             cluster.getReconServer().getReconStorageContainerManager();
-    NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
+    EntityUtils entityUtils = new EntityUtils(namespaceSummaryManager,
             omMetadataManagerInstance, reconSCM);
+    NSSummaryEndpoint endpoint = new NSSummaryEndpoint(omMetadataManagerInstance,
+            entityUtils);
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();

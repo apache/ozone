@@ -18,18 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
-import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.EntityType;
-import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.*;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -42,9 +33,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Iterator;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
@@ -57,26 +45,18 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 public class NSSummaryEndpoint {
 
   @Inject
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-
-  @Inject
   private ReconOMMetadataManager omMetadataManager;
 
-  private EntityHandler entityHandler;
+  @Inject
+  private EntityUtils entityUtils;
 
   @Inject
-  public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
-                           ReconOMMetadataManager omMetadataManager,
-                           OzoneStorageContainerManager reconSCM) {
-    this.reconNamespaceSummaryManager = namespaceSummaryManager;
+  public NSSummaryEndpoint(ReconOMMetadataManager omMetadataManager,
+                           EntityUtils entityUtils) {
     this.omMetadataManager = omMetadataManager;
-    entityHandler = new EntityHandler(namespaceSummaryManager, omMetadataManager, reconSCM);
+    this.entityUtils = entityUtils;
   }
-
-  public EntityHandler getEntityHandler() {
-    return entityHandler;
-  }
-
+  
   /**
    * This endpoint will return the entity type and aggregate count of objects.
    * @param path the request path.
@@ -103,9 +83,9 @@ public class NSSummaryEndpoint {
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
 
-    EntityType type = getEntityType(normalizedPath, names);
+    EntityType type = entityUtils.getEntityType(normalizedPath, names);
 
-    namespaceSummaryResponse = type.getSummaryResponse(names, entityHandler);
+    namespaceSummaryResponse = type.getSummaryResponse(names, entityUtils);
 
     return Response.ok(namespaceSummaryResponse).build();
   }
@@ -139,11 +119,11 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = getEntityType(normalizedPath, names);
+    EntityType type = entityUtils.getEntityType(normalizedPath, names);
 
     duResponse.setPath(normalizedPath);
 
-    duResponse = type.getDuResponse(normalizedPath, names, listFile, withReplica, entityHandler);
+    duResponse = type.getDuResponse(normalizedPath, names, listFile, withReplica, entityUtils);
 
     return Response.ok(duResponse).build();
   }
@@ -172,9 +152,9 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = getEntityType(normalizedPath, names);
+    EntityType type = entityUtils.getEntityType(normalizedPath, names);
 
-    quotaUsageResponse = type.getQuotaResponse(names, entityHandler);
+    quotaUsageResponse = type.getQuotaResponse(names, entityUtils);
 
     return Response.ok(quotaUsageResponse).build();
   }
@@ -203,54 +183,11 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = getEntityType(normalizedPath, names);
+    EntityType type = entityUtils.getEntityType(normalizedPath, names);
 
-    distResponse = type.getDistResponse(names, entityHandler);
+    distResponse = type.getDistResponse(names, entityUtils);
 
     return Response.ok(distResponse).build();
-  }
-
-  /**
-   * Return the entity type of client's request, check path existence.
-   * If path doesn't exist, return Entity.UNKNOWN
-   * @param path the original path request used to identify root level
-   * @param names the client's parsed request
-   * @return the entity type, unknown if path not found
-   */
-  @VisibleForTesting
-  public EntityType getEntityType(String path, String[] names)
-      throws IOException {
-    if (path.equals(OM_KEY_PREFIX)) {
-      return EntityType.ROOT;
-    }
-
-    if (names.length == 0) {
-      return EntityType.UNKNOWN;
-    } else if (names.length == 1) { // volume level check
-      String volName = names[0];
-      if (!entityHandler.volumeExists(volName)) {
-        return EntityType.UNKNOWN;
-      }
-      return EntityType.VOLUME;
-    } else if (names.length == 2) { // bucket level check
-      String volName = names[0];
-      String bucketName = names[1];
-      if (!bucketExists(volName, bucketName)) {
-        return EntityType.UNKNOWN;
-      }
-      return EntityType.BUCKET;
-    } else { // length > 3. check dir or key existence (FSO-enabled)
-      String volName = names[0];
-      String bucketName = names[1];
-      String keyName = getKeyName(names);
-      // check if either volume or bucket doesn't exist
-      if (!entityHandler.volumeExists(volName)
-          || !bucketExists(volName, bucketName)) {
-        return EntityType.UNKNOWN;
-      }
-      long bucketObjectId = entityHandler.getBucketObjectId(names);
-      return determineKeyPath(keyName, bucketObjectId);
-    }
   }
 
   static String[] parseRequestPath(String path) {
@@ -259,74 +196,6 @@ public class NSSummaryEndpoint {
     }
     String[] names = path.split(OM_KEY_PREFIX);
     return names;
-  }
-
-  /**
-   * Example: /vol1/buck1/a/b/c/d/e/file1.txt -> a/b/c/d/e/file1.txt.
-   * @param names parsed request
-   * @return key name
-   */
-  static String getKeyName(String[] names) {
-    String[] keyArr = Arrays.copyOfRange(names, 2, names.length);
-    return String.join(OM_KEY_PREFIX, keyArr);
-  }
-
-  private boolean bucketExists(String volName, String bucketName)
-      throws IOException {
-    String bucketDBKey = omMetadataManager.getBucketKey(volName, bucketName);
-    // Check if bucket exists
-    return omMetadataManager.getBucketTable().getSkipCache(bucketDBKey) != null;
-  }
-
-  /**
-   * Helper function to check if a path is a directory, key, or invalid.
-   * @param keyName key name
-   * @return DIRECTORY, KEY, or UNKNOWN
-   * @throws IOException
-   */
-  private EntityType determineKeyPath(String keyName, long bucketObjectId)
-      throws IOException {
-
-    java.nio.file.Path keyPath = Paths.get(keyName);
-    Iterator<java.nio.file.Path> elements = keyPath.iterator();
-
-    long lastKnownParentId = bucketObjectId;
-    OmDirectoryInfo omDirInfo = null;
-    while (elements.hasNext()) {
-      String fileName = elements.next().toString();
-
-      // For example, /vol1/buck1/a/b/c/d/e/file1.txt
-      // 1. Do lookup path component on directoryTable starting from bucket
-      // 'buck1' to the leaf node component, which is 'file1.txt'.
-      // 2. If there is no dir exists for the leaf node component 'file1.txt'
-      // then do look it on fileTable.
-      String dbNodeName = omMetadataManager.getOzonePathKey(
-          lastKnownParentId, fileName);
-      omDirInfo = omMetadataManager.getDirectoryTable()
-          .getSkipCache(dbNodeName);
-
-      if (omDirInfo != null) {
-        lastKnownParentId = omDirInfo.getObjectID();
-      } else if (!elements.hasNext()) {
-        // reached last path component. Check file exists for the given path.
-        OmKeyInfo omKeyInfo = omMetadataManager.getFileTable()
-            .getSkipCache(dbNodeName);
-        // The path exists as a file
-        if (omKeyInfo != null) {
-          omKeyInfo.setKeyName(keyName);
-          return EntityType.KEY;
-        }
-      } else {
-        // Missing intermediate directory and just return null;
-        // key not found in DB
-        return EntityType.UNKNOWN;
-      }
-    }
-
-    if (omDirInfo != null) {
-      return EntityType.DIRECTORY;
-    }
-    return EntityType.UNKNOWN;
   }
 
   /**

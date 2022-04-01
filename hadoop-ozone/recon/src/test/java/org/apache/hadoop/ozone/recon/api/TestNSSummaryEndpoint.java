@@ -36,12 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
-import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.EntityType;
-import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.*;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -240,9 +235,9 @@ public class TestNSSummaryEndpoint {
   public void testUtility() {
     String[] names = NSSummaryEndpoint.parseRequestPath(TEST_PATH_UTILITY);
     Assert.assertArrayEquals(TEST_NAMES, names);
-    String keyName = NSSummaryEndpoint.getKeyName(names);
+    String keyName = EntityUtils.getKeyName(names);
     Assert.assertEquals(TEST_KEY_NAMES, keyName);
-    String subpath = EntityHandler.buildSubpath(PARENT_DIR, "file1.txt");
+    String subpath = EntityUtils.buildSubpath(PARENT_DIR, "file1.txt");
     Assert.assertEquals(TEST_PATH_UTILITY, subpath);
   }
 

@@ -15,8 +15,9 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.recon.api;
+package org.apache.hadoop.ozone.recon.api.types;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -34,14 +36,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
-public class EntityHandler {
+public class EntityUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(
             NSSummaryEndpoint.class);
@@ -52,9 +54,9 @@ public class EntityHandler {
 
     private ContainerManager containerManager;
 
-    public EntityHandler(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                         ReconOMMetadataManager omMetadataManager,
-                         OzoneStorageContainerManager reconSCM) {
+    public EntityUtils(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                       ReconOMMetadataManager omMetadataManager,
+                       OzoneStorageContainerManager reconSCM) {
         this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
         this.omMetadataManager = omMetadataManager;
         this.containerManager = reconSCM.getContainerManager();
@@ -86,7 +88,7 @@ public class EntityHandler {
         return subpath;
     }
 
-    public long getKeySizeWithReplication(OmKeyInfo keyInfo) {
+    protected long getKeySizeWithReplication(OmKeyInfo keyInfo) {
         OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
         List<OmKeyLocationInfo> keyLocations =
                 locationGroup.getBlocksLatestVersionOnly();
@@ -108,12 +110,123 @@ public class EntityHandler {
     }
 
     /**
+     * Example: /vol1/buck1/a/b/c/d/e/file1.txt -> a/b/c/d/e/file1.txt.
+     * @param names parsed request
+     * @return key name
+     */
+    public static String getKeyName(String[] names) {
+        String[] keyArr = Arrays.copyOfRange(names, 2, names.length);
+        return String.join(OM_KEY_PREFIX, keyArr);
+    }
+
+    protected boolean bucketExists(String volName, String bucketName)
+            throws IOException {
+        String bucketDBKey = omMetadataManager.getBucketKey(volName, bucketName);
+        // Check if bucket exists
+        return omMetadataManager.getBucketTable().getSkipCache(bucketDBKey) != null;
+    }
+
+    /**
+     * Return the entity type of client's request, check path existence.
+     * If path doesn't exist, return Entity.UNKNOWN
+     * @param path the original path request used to identify root level
+     * @param names the client's parsed request
+     * @return the entity type, unknown if path not found
+     */
+    @VisibleForTesting
+    public EntityType getEntityType(String path, String[] names)
+            throws IOException {
+        if (path.equals(OM_KEY_PREFIX)) {
+            return EntityType.ROOT;
+        }
+
+        if (names.length == 0) {
+            return EntityType.UNKNOWN;
+        } else if (names.length == 1) { // volume level check
+            String volName = names[0];
+            if (!volumeExists(volName)) {
+                return EntityType.UNKNOWN;
+            }
+            return EntityType.VOLUME;
+        } else if (names.length == 2) { // bucket level check
+            String volName = names[0];
+            String bucketName = names[1];
+            if (!bucketExists(volName, bucketName)) {
+                return EntityType.UNKNOWN;
+            }
+            return EntityType.BUCKET;
+        } else { // length > 3. check dir or key existence (FSO-enabled)
+            String volName = names[0];
+            String bucketName = names[1];
+            String keyName = getKeyName(names);
+            // check if either volume or bucket doesn't exist
+            if (!volumeExists(volName)
+                    || !bucketExists(volName, bucketName)) {
+                return EntityType.UNKNOWN;
+            }
+            long bucketObjectId = getBucketObjectId(names);
+            return determineKeyPath(keyName, bucketObjectId);
+        }
+    }
+
+    /**
+     * Helper function to check if a path is a directory, key, or invalid.
+     * @param keyName key name
+     * @return DIRECTORY, KEY, or UNKNOWN
+     * @throws IOException
+     */
+    protected EntityType determineKeyPath(String keyName, long bucketObjectId)
+            throws IOException {
+
+        java.nio.file.Path keyPath = Paths.get(keyName);
+        Iterator<Path> elements = keyPath.iterator();
+
+        long lastKnownParentId = bucketObjectId;
+        OmDirectoryInfo omDirInfo = null;
+        while (elements.hasNext()) {
+            String fileName = elements.next().toString();
+
+            // For example, /vol1/buck1/a/b/c/d/e/file1.txt
+            // 1. Do lookup path component on directoryTable starting from bucket
+            // 'buck1' to the leaf node component, which is 'file1.txt'.
+            // 2. If there is no dir exists for the leaf node component 'file1.txt'
+            // then do look it on fileTable.
+            String dbNodeName = omMetadataManager.getOzonePathKey(
+                    lastKnownParentId, fileName);
+            omDirInfo = omMetadataManager.getDirectoryTable()
+                    .getSkipCache(dbNodeName);
+
+            if (omDirInfo != null) {
+                lastKnownParentId = omDirInfo.getObjectID();
+            } else if (!elements.hasNext()) {
+                // reached last path component. Check file exists for the given path.
+                OmKeyInfo omKeyInfo = omMetadataManager.getFileTable()
+                        .getSkipCache(dbNodeName);
+                // The path exists as a file
+                if (omKeyInfo != null) {
+                    omKeyInfo.setKeyName(keyName);
+                    return EntityType.KEY;
+                }
+            } else {
+                // Missing intermediate directory and just return null;
+                // key not found in DB
+                return EntityType.UNKNOWN;
+            }
+        }
+
+        if (omDirInfo != null) {
+            return EntityType.DIRECTORY;
+        }
+        return EntityType.UNKNOWN;
+    }
+
+    /**
      * Given an object ID, return the file size distribution.
      * @param objectId the object's ID
      * @return int array indicating file size distribution
      * @throws IOException ioEx
      */
-    public int[] getTotalFileSizeDist(long objectId) throws IOException {
+    protected int[] getTotalFileSizeDist(long objectId) throws IOException {
         NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
         if (nsSummary == null) {
             return new int[ReconConstants.NUM_OF_BINS];
@@ -133,7 +246,7 @@ public class EntityHandler {
      * This method can be optimized by using username as a filter.
      * @return a list of volume names under the system
      */
-    public List<OmVolumeArgs> listVolumes() throws IOException {
+    protected List<OmVolumeArgs> listVolumes() throws IOException {
         List<OmVolumeArgs> result = new ArrayList<>();
         Table volumeTable = omMetadataManager.getVolumeTable();
         TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
@@ -157,7 +270,7 @@ public class EntityHandler {
      * @return a list of buckets
      * @throws IOException IOE
      */
-    public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
+    protected List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
             throws IOException {
         List<OmBucketInfo> result = new ArrayList<>();
         // if volume name is null, seek prefix is an empty string
@@ -191,7 +304,7 @@ public class EntityHandler {
         return result;
     }
 
-    public boolean volumeExists(String volName) throws IOException {
+    protected boolean volumeExists(String volName) throws IOException {
         String volDBKey = omMetadataManager.getVolumeKey(volName);
         return omMetadataManager.getVolumeTable().getSkipCache(volDBKey) != null;
     }
@@ -202,7 +315,7 @@ public class EntityHandler {
      * @return count of keys
      * @throws IOException ioEx
      */
-    public long getTotalKeyCount(long objectId) throws IOException {
+    protected long getTotalKeyCount(long objectId) throws IOException {
         NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
         if (nsSummary == null) {
             return 0L;
@@ -220,7 +333,7 @@ public class EntityHandler {
      * @return count of directories
      * @throws IOException ioEx
      */
-    public int getTotalDirCount(long objectId) throws IOException {
+    protected int getTotalDirCount(long objectId) throws IOException {
         NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
         if (nsSummary == null) {
             return 0;
@@ -239,7 +352,7 @@ public class EntityHandler {
      * @return bucket objectID
      * @throws IOException
      */
-    public long getBucketObjectId(String[] names) throws IOException {
+    protected long getBucketObjectId(String[] names) throws IOException {
         String bucketKey = omMetadataManager.getBucketKey(names[0], names[1]);
         OmBucketInfo bucketInfo = omMetadataManager
                 .getBucketTable().getSkipCache(bucketKey);
@@ -252,7 +365,7 @@ public class EntityHandler {
      * @param names parsed path request in a list of names
      * @return directory object ID
      */
-    public long getDirObjectId(String[] names) throws IOException {
+    protected long getDirObjectId(String[] names) throws IOException {
         return getDirObjectId(names, names.length);
     }
 
@@ -265,7 +378,7 @@ public class EntityHandler {
      *               return the directory object id for the whole path
      * @return directory object ID
      */
-    public long getDirObjectId(String[] names, int cutoff) throws IOException {
+    protected long getDirObjectId(String[] names, int cutoff) throws IOException {
         long dirObjectId = getBucketObjectId(names);
         String dirKey = null;
         for (int i = 2; i < cutoff; ++i) {
@@ -284,7 +397,7 @@ public class EntityHandler {
      * @return total used data size in bytes
      * @throws IOException ioEx
      */
-    public long getTotalSize(long objectId) throws IOException {
+    protected long getTotalSize(long objectId) throws IOException {
         NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
         if (nsSummary == null) {
             return 0L;
@@ -296,7 +409,7 @@ public class EntityHandler {
         return totalSize;
     }
 
-    public long calculateDUForVolume(String volumeName)
+    protected long calculateDUForVolume(String volumeName)
             throws IOException {
         long result = 0L;
 
@@ -320,7 +433,7 @@ public class EntityHandler {
 
     // FileTable's key is in the format of "parentId/fileName"
     // Make use of RocksDB's order to seek to the prefix and avoid full iteration
-    public long calculateDUUnderObject(long parentId) throws IOException {
+    protected long calculateDUUnderObject(long parentId) throws IOException {
         Table keyTable = omMetadataManager.getFileTable();
 
         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -368,7 +481,7 @@ public class EntityHandler {
      * @return the total DU of all direct keys
      * @throws IOException IOE
      */
-    public long handleDirectKeys(long parentId, boolean withReplica,
+    protected long handleDirectKeys(long parentId, boolean withReplica,
                                   boolean listFile,
                                   List<DUResponse.DiskUsage> duData,
                                   String normalizedPath) throws IOException {
