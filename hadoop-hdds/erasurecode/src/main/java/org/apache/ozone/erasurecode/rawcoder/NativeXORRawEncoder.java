@@ -19,6 +19,8 @@ package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
+import org.apache.hadoop.io.erasurecode.rawcoder.HadoopNativeECAccessorUtil;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,42 +31,28 @@ import java.nio.ByteBuffer;
 @InterfaceAudience.Private
 public class NativeXORRawEncoder extends AbstractNativeRawEncoder {
 
-  static {
-    ErasureCodeNative.checkNativeCodeLoaded();
-  }
+  private org.apache.hadoop.io.erasurecode.rawcoder.NativeXORRawEncoder
+      hadoopNativeXORRawEncoder;
 
   public NativeXORRawEncoder(ECReplicationConfig ecReplicationConfig) {
     super(ecReplicationConfig);
-    encoderLock.writeLock().lock();
-    try {
-      initImpl(ecReplicationConfig.getData(), ecReplicationConfig.getParity());
-    } finally {
-      encoderLock.writeLock().unlock();
-    }
+    hadoopNativeXORRawEncoder =
+        new org.apache.hadoop.io.erasurecode.rawcoder.NativeXORRawEncoder(
+            new ErasureCoderOptions(ecReplicationConfig.getData(),
+                ecReplicationConfig.getParity()));
   }
 
   @Override
-  protected void performEncodeImpl(
-      ByteBuffer[] inputs, int[] inputOffsets, int dataLen,
-      ByteBuffer[] outputs, int[] outputOffsets) throws IOException {
-    encodeImpl(inputs, inputOffsets, dataLen, outputs, outputOffsets);
+  protected void performEncodeImpl(ByteBuffer[] inputs, int[] inputOffsets,
+      int dataLen, ByteBuffer[] outputs, int[] outputOffsets)
+      throws IOException {
+    HadoopNativeECAccessorUtil
+        .performEncodeImpl(hadoopNativeXORRawEncoder, inputs,
+            inputOffsets, dataLen, outputs, outputOffsets);
   }
 
   @Override
   public void release() {
-    encoderLock.writeLock().lock();
-    try {
-      destroyImpl();
-    } finally {
-      encoderLock.writeLock().unlock();
-    }
+    hadoopNativeXORRawEncoder.release();
   }
-
-  private native void initImpl(int numDataUnits, int numParityUnits);
-
-  private native void encodeImpl(ByteBuffer[] inputs, int[] inputOffsets,
-                                 int dataLen, ByteBuffer[] outputs,
-                                 int[] outputOffsets) throws IOException;
-
-  private native void destroyImpl();
 }
