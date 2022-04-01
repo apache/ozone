@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
  * which requires string to be of non-variable-length encoding(e.g. ASCII).
  * This is different from StringUtils which uses UTF-8 encoding which is
  * a variable-length encoding style.
- * This is mainly for PrefixedStringCodec which requires a fixed-length
+ * This is mainly for FixedLengthStringCodec which requires a fixed-length
  * prefix.
  */
 public final class FixedLengthStringUtils {

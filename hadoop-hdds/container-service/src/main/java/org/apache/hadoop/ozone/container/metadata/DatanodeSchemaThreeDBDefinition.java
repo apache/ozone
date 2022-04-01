@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.hdds.utils.db.PrefixedStringCodec;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
@@ -37,6 +37,17 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
  * version 3, where the block data, metadata, and transactions which are to be
  * deleted are put in their own separate column families and with containerID
  * as key prefix.
+ *
+ * Some key format illustrations for the column families:
+ * - block_data:     <containerID><blockID>
+ * - metadata:       <containerID><#BLOCKCOUNT>
+ *                   <containerID><#BYTESUSED>
+ *                   ...
+ * - deleted_blocks: <containerID><blockID>
+ * - delete_txns:    <containerID><TransactionID>
+ *
+ * The keys would be encoded in a fix-length encoding style in order to
+ * utilize the "Prefix Seek" feature from Rocksdb to optimize seek.
  */
 public class DatanodeSchemaThreeDBDefinition
     extends AbstractDatanodeDBDefinition {
@@ -45,7 +56,7 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "block_data",
           String.class,
-          new PrefixedStringCodec(),
+          new FixedLengthStringCodec(),
           BlockData.class,
           new BlockDataCodec());
 
@@ -54,7 +65,7 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "metadata",
           String.class,
-          new PrefixedStringCodec(),
+          new FixedLengthStringCodec(),
           Long.class,
           new LongCodec());
 
@@ -63,7 +74,7 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "deleted_blocks",
           String.class,
-          new PrefixedStringCodec(),
+          new FixedLengthStringCodec(),
           ChunkInfoList.class,
           new ChunkInfoListCodec());
 
@@ -72,7 +83,7 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "delete_txns",
           String.class,
-          new PrefixedStringCodec(),
+          new FixedLengthStringCodec(),
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 

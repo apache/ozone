@@ -37,6 +37,7 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   /**
    * @param dbPath The absolute path to the .db file corresponding to this
+   * @param config The ozone global configuration.
    * {@link DBDefinition}.
    */
   protected AbstractDatanodeDBDefinition(String dbPath,

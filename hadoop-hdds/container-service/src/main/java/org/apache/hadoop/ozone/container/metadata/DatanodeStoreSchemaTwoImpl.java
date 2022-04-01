@@ -46,8 +46,8 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
       boolean openReadOnly) throws IOException {
     super(config, new DatanodeSchemaTwoDBDefinition(dbPath, config),
         openReadOnly);
-    this.deleteTransactionTable = new DatanodeSchemaTwoDBDefinition(dbPath,
-        config).getDeleteTransactionsColumnFamily().getTable(getStore());
+    this.deleteTransactionTable = ((DatanodeSchemaTwoDBDefinition) getDbDef())
+        .getDeleteTransactionsColumnFamily().getTable(getStore());
   }
 
   public Table<Long, DeletedBlocksTransaction> getDeleteTransactionTable() {
