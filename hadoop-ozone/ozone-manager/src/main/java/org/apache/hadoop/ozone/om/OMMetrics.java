@@ -998,6 +998,90 @@ public class OMMetrics {
     return numRemoveAcl.value();
   }
 
+  public long getNumTenantOps() {
+    return numTenantOps.value();
+  }
+
+  public long getNumTenants() {
+    return numTenants.value();
+  }
+
+  public long getNumTenantCreates() {
+    return numTenantCreates.value();
+  }
+
+  public long getNumTenantCreateFails() {
+    return numTenantCreateFails.value();
+  }
+
+  public long getNumTenantDeletes() {
+    return numTenantDeletes.value();
+  }
+
+  public long getNumTenantDeleteFails() {
+    return numTenantDeleteFails.value();
+  }
+
+  public long getNumTenantAssignUsers() {
+    return numTenantAssignUsers.value();
+  }
+
+  public long getNumTenantAssignUserSuccesses() {
+    return numTenantAssignUserSuccesses.value();
+  }
+
+  public long getNumTenantAssignUserFails() {
+    return numTenantAssignUserFails.value();
+  }
+
+  public long getNumTenantRevokeUsers() {
+    return numTenantRevokeUsers.value();
+  }
+
+  public long getNumTenantRevokeUserSuccesses() {
+    return numTenantRevokeUserSuccesses.value();
+  }
+
+  public long getNumTenantRevokeUserFails() {
+    return numTenantRevokeUserFails.value();
+  }
+
+  public long getNumTenantAssignAdmins() {
+    return numTenantAssignAdmins.value();
+  }
+
+  public long getNumTenantAssignAdminSuccesses() {
+    return numTenantAssignAdminSuccesses.value();
+  }
+
+  public long getNumTenantAssignAdminFails() {
+    return numTenantAssignAdminFails.value();
+  }
+
+  public long getNumTenantRevokeAdmins() {
+    return numTenantRevokeAdmins.value();
+  }
+
+  public long getNumTenantRevokeAdminSuccesses() {
+    return numTenantRevokeAdminSuccesses.value();
+  }
+
+  public long getNumTenantRevokeAdminFails() {
+    return numTenantRevokeAdminFails.value();
+  }
+
+  public long getNumTenantLists() {
+    return numTenantLists.value();
+  }
+
+  public long getNumTenantGetUserInfos() {
+    return numTenantGetUserInfos.value();
+  }
+
+  public long getNumTenantTenantUserLists() {
+    return numTenantTenantUserLists.value();
+  }
+
   public void incNumTrashRenames() {
     numTrashRenames.incr();
   }
