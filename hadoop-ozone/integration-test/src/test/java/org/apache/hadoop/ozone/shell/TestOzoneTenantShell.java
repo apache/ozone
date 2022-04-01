@@ -685,7 +685,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "list", "--tenant=unknown"});
     checkOutput(err, "Failed to Get Users in tenant 'unknown': " +
-        "Tenant 'unknown' not found\n", true);
+        "Tenant 'unknown' doesn't exist.\n", true);
 
     // Clean up
     executeHA(tenantShell, new String[] {
