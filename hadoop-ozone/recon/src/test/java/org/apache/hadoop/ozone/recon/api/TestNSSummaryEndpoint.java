@@ -242,7 +242,7 @@ public class TestNSSummaryEndpoint {
     Assert.assertArrayEquals(TEST_NAMES, names);
     String keyName = NSSummaryEndpoint.getKeyName(names);
     Assert.assertEquals(TEST_KEY_NAMES, keyName);
-    String subpath = NSSummaryEndpoint.buildSubpath(PARENT_DIR, "file1.txt");
+    String subpath = EntityHandler.buildSubpath(PARENT_DIR, "file1.txt");
     Assert.assertEquals(TEST_PATH_UTILITY, subpath);
   }
 
