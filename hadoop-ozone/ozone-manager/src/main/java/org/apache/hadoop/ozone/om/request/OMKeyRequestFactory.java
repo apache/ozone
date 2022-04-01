@@ -18,22 +18,11 @@
 package org.apache.hadoop.ozone.om.request;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
-import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
-import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -66,33 +55,39 @@ public final class OMKeyRequestFactory {
     switch (cmdType) {
     case CreateDirectory:
       keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
-      omKeyRequest = OMDirectoryCreateRequest
-          .getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case CreateFile:
       keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
-      omKeyRequest =
-          OMFileCreateRequest.getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case CreateKey:
       keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
-      omKeyRequest =
-          OMKeyCreateRequest.getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case AllocateBlock:
       keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
-      omKeyRequest = OMAllocateBlockRequest
-          .getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case CommitKey:
       keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
-      omKeyRequest =
-          OMKeyCommitRequest.getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case DeleteKey:
       keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
-      omKeyRequest =
-          OMKeyDeleteRequest.getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case DeleteKeys:
       return OMKeysDeleteRequest
@@ -100,11 +95,18 @@ public final class OMKeyRequestFactory {
               omRequest, ozoneManager);
     case RenameKey:
       keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
-      omKeyRequest =
-          OMKeyRenameRequest.getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case RenameKeys:
-      return new OMKeysRenameRequest(omRequest);
+      RenameKeysArgs renameKeysArgs =
+          omRequest.getRenameKeysRequest().getRenameKeysArgs();
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          renameKeysArgs.getVolumeName(), renameKeysArgs.getBucketName(),
+          omRequest,
+          ozoneManager);
+      break;
     case PurgeKeys:
       omKeyRequest = new OMKeyPurgeRequest(omRequest);
       break;
@@ -113,26 +115,30 @@ public final class OMKeyRequestFactory {
       break;
     case InitiateMultiPartUpload:
       keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
-      omKeyRequest = S3InitiateMultipartUploadRequest
-          .getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case CommitMultiPartUpload:
       keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
-      omKeyRequest = S3MultipartUploadCommitPartRequest
-          .getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case AbortMultiPartUpload:
       keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
-      omKeyRequest = S3MultipartUploadAbortRequest
-          .getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     case CompleteMultiPartUpload:
       keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
-      omKeyRequest = S3MultipartUploadCompleteRequest
-          .getInstance(keyArgs, omRequest, ozoneManager);
+      omKeyRequest = BucketLayoutAwareOMKeyRequestFactory.createRequest(
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), omRequest,
+          ozoneManager);
       break;
     default:
-      // not required to handle here, its handled by the caller of
+      // not required to handle here, it's handled by the caller of
       // #createRequest() method.
       break;
     }
