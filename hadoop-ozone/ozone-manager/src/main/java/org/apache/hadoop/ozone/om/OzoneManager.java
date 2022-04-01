@@ -146,7 +146,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -254,7 +253,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -3070,13 +3068,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    if (!multiTenantManager.tenantExists(tenantId)) {
-      // Throw exception to the client, which will handle this gracefully
-      throw new OMException("Tenant '" + tenantId + "' not found",
-          TENANT_NOT_FOUND);
-    }
+    OMMultiTenantManagerImpl.checkTenantExistence(
+        multiTenantManager.getOmMetadataManager(), tenantId);
 
-    final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
+    final String volumeName = OMMultiTenantManagerImpl.getTenantVolumeName(
             getMetadataManager(), tenantId);
     // TODO: Maybe use multiTenantManager.getTenantInfo(tenantId)
     //  .getTenantBucketNameSpace() after refactoring

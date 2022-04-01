@@ -45,7 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.isUserAccessIdPrincipalOrTenantAdmin;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.isUserAccessIdPrincipalOrTenantAdmin;
 
 /**
  * Handles SetSecret request.

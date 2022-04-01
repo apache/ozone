@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -51,8 +52,8 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.checkTenantAdmin;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.checkTenantExistence;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
@@ -100,7 +101,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     // If tenantId is not specified, we can infer it from the accessId
     String tenantId = request.getTenantId();
     if (StringUtils.isEmpty(tenantId)) {
-      tenantId = OMTenantRequestHelper.getTenantIdFromAccessId(
+      tenantId = OMMultiTenantManagerImpl.getTenantIdFromAccessId(
           ozoneManager.getMetadataManager(), accessId);
       assert (tenantId != null);
     }
@@ -165,7 +166,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     String volumeName = null;
 
     try {
-      volumeName = OMTenantRequestHelper.getTenantVolumeName(
+      volumeName = OMMultiTenantManagerImpl.getTenantVolumeName(
           omMetadataManager, tenantId);
 
       acquiredVolumeLock =
