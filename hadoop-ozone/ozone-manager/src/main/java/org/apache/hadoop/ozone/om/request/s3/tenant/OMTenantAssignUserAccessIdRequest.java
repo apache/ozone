@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -283,13 +282,11 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           new S3SecretValue(accessId, awsSecret);
 
       // Add to tenantAccessIdTable
-      final String userRoleId = OMMultiTenantManager.getUserRoleName(tenantId);
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantId(tenantId)
           .setUserPrincipal(userPrincipal)
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
-          .addRoleName(userRoleId)
           .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),

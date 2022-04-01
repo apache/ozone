@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -42,10 +42,6 @@ public class GetUserInfoHandler extends TenantHandler {
   @CommandLine.Parameters(description = "List of user principal(s)")
   private List<String> userPrincipals = new ArrayList<>();
 
-  @CommandLine.Option(names = {"--print-roles"},
-      description = "Print role names assigned to the accessIds")
-  private boolean printRoles;
-
   // TODO: HDDS-6340. Add an option to print JSON result
 
   private boolean isEmptyList(List<String> list) {
@@ -65,7 +61,7 @@ public class GetUserInfoHandler extends TenantHandler {
       try {
         final TenantUserInfoValue tenantUserInfo =
             objStore.tenantGetUserInfo(userPrincipal);
-        List<ExtendedAccessIdInfo> accessIdInfoList =
+        List<ExtendedUserAccessIdInfo> accessIdInfoList =
             tenantUserInfo.getAccessIdInfoList();
         if (accessIdInfoList.size() == 0) {
           err().println("User '" + userPrincipal +
@@ -74,7 +70,7 @@ public class GetUserInfoHandler extends TenantHandler {
         }
         out().println("User '" + userPrincipal + "' is assigned to:");
 
-        for (ExtendedAccessIdInfo accessIdInfo : accessIdInfoList) {
+        for (ExtendedUserAccessIdInfo accessIdInfo : accessIdInfoList) {
           // Get admin info
           final String adminInfoString;
           if (accessIdInfo.getIsAdmin()) {
@@ -87,12 +83,6 @@ public class GetUserInfoHandler extends TenantHandler {
               accessIdInfo.getTenantId(),
               adminInfoString,
               accessIdInfo.getAccessId());
-          // Optionally print role names list for each accessId
-          if (printRoles) {
-            out().format(", roles: %s%n", accessIdInfo.getRoleNamesList());
-          } else {
-            out().format("%n");
-          }
         }
 
       } catch (IOException e) {

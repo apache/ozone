@@ -65,7 +65,7 @@ import org.apache.hadoop.ozone.om.multitenant.OzoneOwnerPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -455,7 +455,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       throw new IOException("Tenant '" + tenantID + "' not found!");
     }
 
-    List<ExtendedAccessIdInfo> userAccessIds = new ArrayList<>();
+    List<UserAccessIdInfo> userAccessIds = new ArrayList<>();
     CachedTenantState cachedTenantState = tenantCache.get(tenantID);
     if (cachedTenantState == null) {
       throw new IOException("Inconsistent in memory Tenant cache '" + tenantID
@@ -467,11 +467,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
             k -> StringUtils.isEmpty(prefix) || k.getKey().startsWith(prefix))
         .forEach(
             k -> userAccessIds.add(
-                ExtendedAccessIdInfo.newBuilder()
+                UserAccessIdInfo.newBuilder()
                     .setUserPrincipal(k.getKey())
                     .setAccessId(k.getValue())
                     .build()));
-    return new TenantUserList(tenantID, userAccessIds);
+
+    return new TenantUserList(userAccessIds);
   }
 
   @Override
@@ -587,36 +588,37 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   }
 
-  private AccessPolicy newDefaultVolumeAccessPolicy(String volumeName,
-      OzoneTenantRolePrincipal userPrinc, OzoneTenantRolePrincipal adminPrinc)
+  private AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,
+      OzoneTenantRolePrincipal userRole, OzoneTenantRolePrincipal adminRole)
       throws IOException {
 
-    AccessPolicy policy = new RangerAccessPolicy(
-        // principal already contains volume name
-        volumeName + " - VolumeAccess");
+    final String volumeAccessPolicyName =
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
+    AccessPolicy policy = new RangerAccessPolicy(volumeAccessPolicyName);
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(VOLUME).setStoreType(OZONE).setVolumeName(volumeName)
+        .setResType(VOLUME).setStoreType(OZONE).setVolumeName(tenantId)
         .setBucketName("").setKeyName("").build();
     // Tenant users have READ, LIST and READ_ACL access on the volume
-    policy.addAccessPolicyElem(obj, userPrinc, READ, ALLOW);
-    policy.addAccessPolicyElem(obj, userPrinc, LIST, ALLOW);
-    policy.addAccessPolicyElem(obj, userPrinc, READ_ACL, ALLOW);
+    policy.addAccessPolicyElem(obj, userRole, READ, ALLOW);
+    policy.addAccessPolicyElem(obj, userRole, LIST, ALLOW);
+    policy.addAccessPolicyElem(obj, userRole, READ_ACL, ALLOW);
     // Tenant admins have ALL access on the volume
-    policy.addAccessPolicyElem(obj, adminPrinc, ALL, ALLOW);
+    policy.addAccessPolicyElem(obj, adminRole, ALL, ALLOW);
     return policy;
   }
 
-  private AccessPolicy newDefaultBucketAccessPolicy(String volumeName,
-      OzoneTenantRolePrincipal userPrinc) throws IOException {
-    AccessPolicy policy = new RangerAccessPolicy(
-        // principal already contains volume name
-        volumeName + " - BucketAccess");
+  private AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
+      OzoneTenantRolePrincipal userRole) throws IOException {
+
+    final String bucketAccessPolicyName =
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
+    AccessPolicy policy = new RangerAccessPolicy(bucketAccessPolicyName);
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(BUCKET).setStoreType(OZONE).setVolumeName(volumeName)
+        .setResType(BUCKET).setStoreType(OZONE).setVolumeName(tenantId)
         .setBucketName("*").setKeyName("").build();
     // Tenant users have permission to CREATE buckets
-    policy.addAccessPolicyElem(obj, userPrinc, CREATE, ALLOW);
-    // Bucket owner have ALL access on their own buckets. TODO: Tentative
+    policy.addAccessPolicyElem(obj, userRole, CREATE, ALLOW);
+    // Bucket owner have ALL access on their own buckets
     policy.addAccessPolicyElem(obj, new OzoneOwnerPrincipal(), ALL, ALLOW);
     return policy;
   }

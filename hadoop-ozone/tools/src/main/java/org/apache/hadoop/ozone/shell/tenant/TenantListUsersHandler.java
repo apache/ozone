@@ -24,7 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.s3.S3Handler;
 
@@ -62,8 +62,7 @@ public class TenantListUsersHandler extends S3Handler {
     try {
       TenantUserList usersInTenant =
           objStore.listUsersInTenant(tenantId, prefix);
-      for (ExtendedAccessIdInfo accessIdInfo :
-          usersInTenant.getUserAccessIds()) {
+      for (UserAccessIdInfo accessIdInfo : usersInTenant.getUserAccessIds()) {
         out().println("- User '" + accessIdInfo.getUserPrincipal() +
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
       }

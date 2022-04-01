@@ -1408,44 +1408,43 @@ message SetS3SecretResponse {
 
 message TenantState {
     optional string tenantId = 1;
-    optional string bucketNamespaceName = 2;
-    repeated string policyNames = 3;
+    optional string bucketNamespaceName = 2;        // Volume name
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
+    optional string bucketNamespacePolicyName = 5;  // VolumeAccessPolicy name
+    optional string bucketPolicyName = 6;           // BucketAccessPolicy name
 }
 
 message TenantUserPrincipalInfo {
     repeated string accessIds = 1;
 }
 
+// Stores a basic user-accessId pair, used in TenantListUserResponse
+message UserAccessIdInfo {
+    optional string userPrincipal = 1;
+    optional string accessId = 2;
+}
+
 // Multi-purpose message for storing or transferring extra access ID information
 //
 // This is an extension to the S3Secret protobuf message, carrying supplementary
 //   information to the existing accessId (kerberosID) field.
-//
 // For now, all fields are related to multi-tenancy. New fields can be added
 //   when necessary in the future. e.g. when implementing new features.
 //
-// Usage 1: Stored as value in OmDBTenantState table.
-//   See OmDBAccessIdInfo.
+// Usage 1: Stored as value (OmDBAccessIdInfo) in TenantAccessIdTable.
 //   In this case, accessId field is not set to avoid duplication,
-//   because the key of the OmDBTenantState table is already the accessId.
+//   because the key of TenantAccessIdTable is already accessId.
 //
-// Usage 2: Used when transferring the result of `ozone tenant user list`.
-//   See TenantUserList.
-//   In this case, tenantId field is not set to avoid duplication.
-//   tenantId will be set once and only once in TenantListUserResponse.
-//
-// Usage 3: Used when transferring the result of `ozone tenant user info`
+// Usage 2: Used when transferring the result of `ozone tenant user info`
 //   See TenantUserInfoValue.
-//   In this case, userPrincipal field is not set to avoid duplication.
-//   userPrincipal will be set once and only once in TenantGetUserInfoResponse.
 //
-message ExtendedAccessIdInfo {
-    optional string accessId = 1;        // OmDBTenantState doesn't store this
-    optional string tenantId = 2;        // `tenant user list` doesn't set this
-    optional string userPrincipal = 3;   // `user info` doesn't set this
-    optional bool isAdmin = 4;           // `tenant user list` doesn't set this (yet)
-    optional bool isDelegatedAdmin = 5;  // `tenant user list` doesn't set this (yet)
-    repeated string roleNames = 6;       // `tenant user list` doesn't set this (yet)
+message ExtendedUserAccessIdInfo {
+    optional string userPrincipal = 1;
+    optional string accessId = 2;  // OmDBAccessIdInfo doesn't use this field
+    optional string tenantId = 3;
+    optional bool isAdmin = 4;
+    optional bool isDelegatedAdmin = 5;
 }
 
 message ListTenantRequest {
@@ -1456,23 +1455,21 @@ message ListTenantResponse {
     repeated TenantState tenantState = 1;
 }
 
-message TenantGetUserInfoRequest {
-    optional string userPrincipal = 1;
-}
-
 message TenantListUserRequest {
     optional string tenantId = 1;
     optional string prefix = 2;
 }
 
-message TenantGetUserInfoResponse {
-    optional string userPrincipal = 1;  // Set only once to avoid duplication
-    repeated ExtendedAccessIdInfo accessIdInfo = 2;
+message TenantListUserResponse {
+    repeated UserAccessIdInfo userAccessIdInfo = 1;
 }
 
-message TenantListUserResponse {
-    optional string tenantId = 1;  // Set only once to avoid duplication
-    repeated ExtendedAccessIdInfo userAccessIdInfo = 2;
+message TenantGetUserInfoRequest {
+    optional string userPrincipal = 1;
+}
+
+message TenantGetUserInfoResponse {
+    repeated ExtendedUserAccessIdInfo accessIdInfo = 1;
 }
 
 message LayoutVersion {

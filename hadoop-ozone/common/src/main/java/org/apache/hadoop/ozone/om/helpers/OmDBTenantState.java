@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -35,15 +34,31 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
    */
   private final String bucketNamespaceName;
   /**
-   * Bucket policy names stored as Strings.
+   * Name of the user role of this tenant.
    */
-  private final List<String> policyNames;
+  private final String userRoleName;
+  /**
+   * Name of the admin role of this tenant.
+   */
+  private final String adminRoleName;
+  /**
+   * Name of the volume access policy of this tenant.
+   */
+  private final String bucketNamespacePolicyName;
+  /**
+   * Name of the bucket access policy of this tenant.
+   */
+  private final String bucketPolicyName;
 
-  public OmDBTenantState(String tenantId,
-      String bucketNamespaceName, List<String> policyNames) {
+  public OmDBTenantState(String tenantId, String bucketNamespaceName,
+      String userRoleName, String adminRoleName,
+      String bucketNamespacePolicyName, String bucketPolicyName) {
     this.tenantId = tenantId;
     this.bucketNamespaceName = bucketNamespaceName;
-    this.policyNames = policyNames;
+    this.userRoleName = userRoleName;
+    this.adminRoleName = adminRoleName;
+    this.bucketNamespacePolicyName = bucketNamespacePolicyName;
+    this.bucketPolicyName = bucketPolicyName;
   }
 
   @Override
@@ -57,12 +72,18 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     OmDBTenantState that = (OmDBTenantState) o;
     return Objects.equals(tenantId, that.tenantId)
         && Objects.equals(bucketNamespaceName, that.bucketNamespaceName)
-        && Objects.equals(policyNames, that.policyNames);
+        && Objects.equals(userRoleName, that.userRoleName)
+        && Objects.equals(adminRoleName, that.adminRoleName)
+        && Objects.equals(
+            bucketNamespacePolicyName, that.bucketNamespacePolicyName)
+        && Objects.equals(bucketPolicyName, that.bucketPolicyName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tenantId, bucketNamespaceName, policyNames);
+    return Objects.hash(tenantId, bucketNamespaceName,
+        userRoleName, adminRoleName,
+        bucketNamespacePolicyName, bucketPolicyName);
   }
 
   @Override
@@ -84,8 +105,20 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     return bucketNamespaceName;
   }
 
-  public List<String> getPolicyNames() {
-    return policyNames;
+  public String getUserRoleName() {
+    return userRoleName;
+  }
+
+  public String getAdminRoleName() {
+    return adminRoleName;
+  }
+
+  public String getBucketNamespacePolicyName() {
+    return bucketNamespacePolicyName;
+  }
+
+  public String getBucketPolicyName() {
+    return bucketPolicyName;
   }
 
   /**
@@ -95,7 +128,10 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     return OzoneManagerProtocolProtos.TenantState.newBuilder()
         .setTenantId(tenantId)
         .setBucketNamespaceName(bucketNamespaceName)
-        .addAllPolicyNames(policyNames)
+        .setUserRoleName(userRoleName)
+        .setAdminRoleName(adminRoleName)
+        .setBucketNamespacePolicyName(bucketNamespacePolicyName)
+        .setBucketPolicyName(bucketPolicyName)
         .build();
   }
 
@@ -107,7 +143,10 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     return new Builder()
         .setTenantId(proto.getTenantId())
         .setBucketNamespaceName(proto.getBucketNamespaceName())
-        .setPolicyNamesList(proto.getPolicyNamesList())
+        .setUserRoleName(proto.getUserRoleName())
+        .setAdminRoleName(proto.getAdminRoleName())
+        .setBucketNamespacePolicyName(proto.getBucketNamespacePolicyName())
+        .setBucketPolicyName(proto.getBucketPolicyName())
         .build();
   }
 
@@ -118,7 +157,10 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   public static final class Builder {
     private String tenantId;
     private String bucketNamespaceName;
-    private List<String> policyNames;
+    private String userRoleName;
+    private String adminRoleName;
+    private String bucketNamespacePolicyName;
+    private String bucketPolicyName;
 
     private Builder() {
     }
@@ -133,13 +175,31 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
       return this;
     }
 
-    public Builder setPolicyNamesList(List<String> policyNames) {
-      this.policyNames = policyNames;
+    public Builder setUserRoleName(String userRoleName) {
+      this.userRoleName = userRoleName;
+      return this;
+    }
+
+    public Builder setAdminRoleName(String adminRoleName) {
+      this.adminRoleName = adminRoleName;
+      return this;
+    }
+
+    public Builder setBucketNamespacePolicyName(
+        String bucketNamespacePolicyName) {
+      this.bucketNamespacePolicyName = bucketNamespacePolicyName;
+      return this;
+    }
+
+    public Builder setBucketPolicyName(String bucketPolicyName) {
+      this.bucketPolicyName = bucketPolicyName;
       return this;
     }
 
     public OmDBTenantState build() {
-      return new OmDBTenantState(tenantId, bucketNamespaceName, policyNames);
+      return new OmDBTenantState(tenantId, bucketNamespaceName,
+          userRoleName, adminRoleName,
+          bucketNamespacePolicyName, bucketPolicyName);
     }
   }
 }

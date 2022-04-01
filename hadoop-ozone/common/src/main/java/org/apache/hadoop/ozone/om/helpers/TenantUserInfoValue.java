@@ -17,55 +17,43 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Utility class to handle protobuf message TenantUserInfo conversion.
+ * Utility class to handle TenantGetUserInfoResponse protobuf message.
  */
 public class TenantUserInfoValue {
 
-  // Usually this is the Kerberos principal of a user.
-  private final String userPrincipal;
+  // A list of ExtendedUserAccessIdInfo from protobuf.
+  private final List<ExtendedUserAccessIdInfo> accessIdInfoList;
 
-  // A list of ExtendedAccessIdInfo from protobuf.
-  private final List<ExtendedAccessIdInfo> accessIdInfoList;
-
-  public String getUserPrincipal() {
-    return userPrincipal;
-  }
-
-  public List<ExtendedAccessIdInfo> getAccessIdInfoList() {
+  public List<ExtendedUserAccessIdInfo> getAccessIdInfoList() {
     return accessIdInfoList;
   }
 
-  public TenantUserInfoValue(String kerberosID,
-      List<ExtendedAccessIdInfo> accessIdInfoList) {
-    this.userPrincipal = kerberosID;
+  public TenantUserInfoValue(List<ExtendedUserAccessIdInfo> accessIdInfoList) {
     this.accessIdInfoList = accessIdInfoList;
   }
 
   public static TenantUserInfoValue fromProtobuf(
       TenantGetUserInfoResponse tenantUserInfo) {
-    return new TenantUserInfoValue(tenantUserInfo.getUserPrincipal(),
-        tenantUserInfo.getAccessIdInfoList());
+    return new TenantUserInfoValue(tenantUserInfo.getAccessIdInfoList());
   }
 
   public TenantGetUserInfoResponse getProtobuf() {
     final TenantGetUserInfoResponse.Builder builder =
         TenantGetUserInfoResponse.newBuilder();
-    builder.setUserPrincipal(this.userPrincipal);
     accessIdInfoList.forEach(builder::addAccessIdInfo);
     return builder.build();
   }
 
   @Override
   public String toString() {
-    return "userPrincipal=" + userPrincipal +
-        "\naccessIdInfoList=" + accessIdInfoList;
+    return "accessIdInfoList=" + accessIdInfoList;
   }
 
   @Override
@@ -77,12 +65,11 @@ public class TenantUserInfoValue {
       return false;
     }
     TenantUserInfoValue that = (TenantUserInfoValue) o;
-    return userPrincipal.equals(that.userPrincipal) &&
-        accessIdInfoList.equals(that.accessIdInfoList);
+    return accessIdInfoList.equals(that.accessIdInfoList);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(userPrincipal, accessIdInfoList);
+    return Objects.hash(accessIdInfoList);
   }
 }

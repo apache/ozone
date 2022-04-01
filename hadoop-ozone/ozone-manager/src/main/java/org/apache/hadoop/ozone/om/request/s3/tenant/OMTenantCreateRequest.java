@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -54,9 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -292,18 +291,18 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Create tenant
       // Add to tenantStateTable. Redundant assignment for clarity
       final String bucketNamespaceName = volumeName;
-      final List<String> policyNamesList = new ArrayList<>();
       // Populate policy ID list
-      // TODO: Check if both policies are actually used. Remove if not
-      policyNamesList.add(tenantDefaultPolicies);
-      final String bucketPolicyGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
+      final String bucketNamespacePolicyName =
+          OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
       final String bucketPolicyName =
-          bucketPolicyGroupName + OzoneConsts.DEFAULT_TENANT_POLICY_NAME_SUFFIX;
-      policyNamesList.add(bucketPolicyName);
-
+          OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
+      final String userRoleName =
+          OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+      final String adminRoleName =
+          OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
       final OmDBTenantState omDBTenantState = new OmDBTenantState(
-          tenantId, bucketNamespaceName, policyNamesList);
+          tenantId, bucketNamespaceName, userRoleName, adminRoleName,
+          bucketNamespacePolicyName, bucketPolicyName);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
           new CacheValue<>(Optional.of(omDBTenantState), transactionLogIndex));

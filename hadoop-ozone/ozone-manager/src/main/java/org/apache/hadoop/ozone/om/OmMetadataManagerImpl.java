@@ -137,11 +137,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *
    * Multi-Tenant Tables:
    * |----------------------------------------------------------------------|
+   * | tenantStateTable          | tenantId -> OmDBTenantState              |
+   * |----------------------------------------------------------------------|
    * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
    * |----------------------------------------------------------------------|
-   * | principalToAccessIdsTable | Principal -> OmDBUserPrincipalInfo       |
-   * |----------------------------------------------------------------------|
-   * | tenantStateTable          | tenantId -> OmDBTenantState              |
+   * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
    * |----------------------------------------------------------------------|
    *
    * Simple Tables:

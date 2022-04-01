@@ -22,9 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 /**
  * This class is used for storing Ozone tenant accessId info.
@@ -47,23 +44,16 @@ public final class OmDBAccessIdInfo {
    * Only effective if isAdmin is true.
    */
   private final boolean isDelegatedAdmin;
-  /**
-   * Role names of the user (that this access ID is assigned to) in this tenant.
-   * e.g. OzoneConsts.TENANT_ROLE_USER, OzoneConsts.TENANT_ROLE_ADMIN,
-   *      or other custom role names.
-   */
-  private final Set<String> roleNames;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmDBAccessIdInfo.class);
 
   public OmDBAccessIdInfo(String tenantId, String userPrincipal,
-      boolean isAdmin, boolean isDelegatedAdmin, Set<String> roleName) {
+                          boolean isAdmin, boolean isDelegatedAdmin) {
     this.tenantId = tenantId;
     this.userPrincipal = userPrincipal;
     this.isAdmin = isAdmin;
     this.isDelegatedAdmin = isDelegatedAdmin;
-    this.roleNames = roleName;
   }
 
   public String getTenantId() {
@@ -73,13 +63,12 @@ public final class OmDBAccessIdInfo {
   /**
    * Convert OmDBAccessIdInfo to protobuf to be persisted to DB.
    */
-  public OzoneManagerProtocolProtos.ExtendedAccessIdInfo getProtobuf() {
-    return OzoneManagerProtocolProtos.ExtendedAccessIdInfo.newBuilder()
+  public OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo getProtobuf() {
+    return OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo.newBuilder()
         .setTenantId(tenantId)
         .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
         .setIsDelegatedAdmin(isDelegatedAdmin)
-        .addAllRoleNames(roleNames)
         .build();
   }
 
@@ -87,14 +76,13 @@ public final class OmDBAccessIdInfo {
    * Convert protobuf to OmDBAccessIdInfo.
    */
   public static OmDBAccessIdInfo getFromProtobuf(
-      OzoneManagerProtocolProtos.ExtendedAccessIdInfo infoProto)
+      OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo infoProto)
       throws IOException {
     return new Builder()
         .setTenantId(infoProto.getTenantId())
         .setUserPrincipal(infoProto.getUserPrincipal())
         .setIsAdmin(infoProto.getIsAdmin())
         .setIsDelegatedAdmin(infoProto.getIsDelegatedAdmin())
-        .setRoleNames(infoProto.getRoleNamesList())
         .build();
   }
 
@@ -110,30 +98,6 @@ public final class OmDBAccessIdInfo {
     return isDelegatedAdmin;
   }
 
-  public Set<String> getRoleNamesSet() {
-    return roleNames;
-  }
-
-  public OmDBAccessIdInfo addRoleName(String roleName) {
-    if (roleNames.contains(roleName)) {
-      LOG.warn("Role name '" + roleName + "' already exists. "
-          + "Ignored addRoleName");
-    } else {
-      roleNames.add(roleName);
-    }
-    return this;
-  }
-
-  public OmDBAccessIdInfo removeRoleName(String roleName) {
-    if (roleNames.contains(roleName)) {
-      roleNames.remove(roleName);
-    } else {
-      LOG.warn("Role name '" + roleName + "' doesn't exist. "
-          + "Ignored removeRoleName");
-    }
-    return this;
-  }
-
   /**
    * Builder for OmDBAccessIdInfo.
    */
@@ -141,7 +105,6 @@ public final class OmDBAccessIdInfo {
   public static final class Builder {
     private String tenantId;
     private String userPrincipal;
-    private Set<String> roleNames;
     private boolean isAdmin;
     private boolean isDelegatedAdmin;
 
@@ -165,28 +128,9 @@ public final class OmDBAccessIdInfo {
       return this;
     }
 
-    public Builder setRoleNames(Set<String> roleNames) {
-      this.roleNames = roleNames;
-      return this;
-    }
-
-    public Builder setRoleNames(List<String> roleNames) {
-      // Convert list to set
-      this.roleNames = new HashSet<>(roleNames);
-      return this;
-    }
-
-    public Builder addRoleName(String roleName) {
-      if (roleNames == null) {
-        roleNames = new HashSet<>();
-      }
-      this.roleNames.add(roleName);
-      return this;
-    }
-
     public OmDBAccessIdInfo build() {
       return new OmDBAccessIdInfo(
-          tenantId, userPrincipal, isAdmin, isDelegatedAdmin, roleNames);
+          tenantId, userPrincipal, isAdmin, isDelegatedAdmin);
     }
   }
 }

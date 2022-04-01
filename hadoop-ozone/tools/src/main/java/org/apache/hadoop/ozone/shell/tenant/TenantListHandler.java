@@ -55,27 +55,32 @@ public class TenantListHandler extends TenantHandler {
       TenantStateList tenantStateList = objStore.listTenant();
 
       if (printHeader) {
-        // default console width 80 / 5 = 16. +1 for extra room. Change later?
-        out().format(longFormat ? "%-17s" : "%s%n",
+        // Assuming default terminal width 120 / 6 ~= 20. +1 for space
+        out().format(longFormat ? "%-21s" : "%s%n",
             "Tenant");
         if (longFormat) {
-          out().format("%-17s%-17s%-17s%s%n",
+          out().format("%-21s%-21s%-21s%-21s%s%n",
               "BucketNS",
-              "AccountNS",
-              "UserPolicy",
+              "UserRole",
+              "AdminRole",
+              "BucketNSPolicy",
               "BucketPolicy");
         }
       }
 
       tenantStateList.getTenantStateList().forEach(tenantState -> {
-        out().format(longFormat ? "%-17s" : "%s%n",
+        out().format(longFormat ? "%-21s" : "%s%n",
             tenantState.getTenantId());
         if (longFormat) {
-          out().format("%-17s%-17s%n",
+          out().format("%-21s%-21s%-21s%-21s%s%n",
               tenantState.getBucketNamespaceName(),
-              tenantState.getPolicyNamesList());
+              tenantState.getUserRoleName(),
+              tenantState.getAdminRoleName(),
+              tenantState.getBucketNamespacePolicyName(),
+              tenantState.getBucketPolicyName());
         }
       });
+
     } catch (IOException e) {
       LOG.error("Failed to list tenants: {}", e.getMessage());
     }

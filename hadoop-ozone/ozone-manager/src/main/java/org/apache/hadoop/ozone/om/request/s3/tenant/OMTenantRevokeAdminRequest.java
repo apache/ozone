@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -173,11 +172,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
 
       assert (dbAccessIdInfo.getTenantId().equals(tenantId));
 
-      // Remove the admin role from dbAccessIdInfo
-      final String adminRoleId =
-          OMMultiTenantManager.getAdminRoleName(tenantId);
-      dbAccessIdInfo.removeRoleName(adminRoleId);
-
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
@@ -185,7 +179,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
               .setUserPrincipal(dbAccessIdInfo.getUserPrincipal())
               .setIsAdmin(false)
               .setIsDelegatedAdmin(false)
-              .setRoleNames(dbAccessIdInfo.getRoleNamesSet())
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),

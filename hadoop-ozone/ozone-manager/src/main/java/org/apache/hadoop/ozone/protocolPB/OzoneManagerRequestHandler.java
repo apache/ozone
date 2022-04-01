@@ -387,9 +387,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     TenantUserInfoValue ret = impl.tenantGetUserInfo(userPrincipal);
     // Note impl.tenantGetUserInfo() throws if errs
     if (ret != null) {
-      Preconditions.checkState(userPrincipal.equals(ret.getUserPrincipal()),
-          "Result's userPrincipal doesn't match TenantGetUserInfoRequest's");
-      resp.setUserPrincipal(userPrincipal);
       resp.addAllAccessIdInfo(ret.getAccessIdInfoList());
     }
 
@@ -405,7 +402,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         impl.listUsersInTenant(request.getTenantId(), request.getPrefix());
     // Note impl.listUsersInTenant() throws if errs
     if (usersInTenant != null) {
-      builder.setTenantId(request.getTenantId());
       builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
     }
     return builder.build();

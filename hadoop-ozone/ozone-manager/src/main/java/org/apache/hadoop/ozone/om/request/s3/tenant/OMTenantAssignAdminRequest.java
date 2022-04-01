@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -191,11 +190,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
 
       assert (dbAccessIdInfo.getTenantId().equals(tenantId));
 
-      // Add the admin role to dbAccessIdInfo
-      final String adminRoleName =
-          OMMultiTenantManager.getAdminRoleName(tenantId);
-      dbAccessIdInfo.addRoleName(adminRoleName);
-
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
@@ -203,7 +197,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
               .setUserPrincipal(dbAccessIdInfo.getUserPrincipal())
               .setIsAdmin(true)
               .setIsDelegatedAdmin(delegated)
-              .setRoleNames(dbAccessIdInfo.getRoleNamesSet())
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),

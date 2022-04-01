@@ -157,7 +157,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
@@ -2986,7 +2986,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       tenantStateList.add(TenantState.newBuilder()
           .setTenantId(omDBTenantState.getTenantId())
           .setBucketNamespaceName(omDBTenantState.getBucketNamespaceName())
-          .addAllPolicyNames(omDBTenantState.getPolicyNames())
+          .setUserRoleName(omDBTenantState.getUserRoleName())
+          .setAdminRoleName(omDBTenantState.getAdminRoleName())
+          .setBucketNamespacePolicyName(
+              omDBTenantState.getBucketNamespacePolicyName())
+          .setBucketPolicyName(omDBTenantState.getBucketPolicyName())
           .build());
     }
 
@@ -3006,7 +3010,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    final List<ExtendedAccessIdInfo> accessIdInfoList = new ArrayList<>();
+    final List<ExtendedUserAccessIdInfo> accessIdInfoList = new ArrayList<>();
 
     // Won't iterate cache here for a similar reason as in OM#listTenant
     //  tenantGetUserInfo lists all accessIds assigned to a user across
@@ -3036,12 +3040,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           return;
         }
         assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
-        accessIdInfoList.add(ExtendedAccessIdInfo.newBuilder()
+        accessIdInfoList.add(ExtendedUserAccessIdInfo.newBuilder()
+            .setUserPrincipal(userPrincipal)
             .setAccessId(accessId)
             .setTenantId(accessIdInfo.getTenantId())
             .setIsAdmin(accessIdInfo.getIsAdmin())
             .setIsDelegatedAdmin(accessIdInfo.getIsDelegatedAdmin())
-            .addAllRoleNames(accessIdInfo.getRoleNamesSet())
             .build());
       } catch (IOException e) {
         LOG.error("Potential DB issue. Failed to retrieve OmDBAccessIdInfo "
@@ -3057,7 +3061,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         OMAction.TENANT_GET_USER_INFO, auditMap));
 
-    return new TenantUserInfoValue(userPrincipal, accessIdInfoList);
+    return new TenantUserInfoValue(accessIdInfoList);
   }
 
   @Override

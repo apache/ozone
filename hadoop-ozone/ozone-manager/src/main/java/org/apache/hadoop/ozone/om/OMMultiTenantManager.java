@@ -222,21 +222,39 @@ public interface OMMultiTenantManager {
   Optional<String> getTenantForAccessID(String accessID) throws IOException;
 
   /**
-   * Get user role name given tenant name.
+   * Get default user role name given tenant name.
    * @param tenantId tenant name
    * @return user role name. e.g. tenant1-UserRole
    */
-  static String getUserRoleName(String tenantId) {
-    return tenantId + OzoneConsts.TENANT_ROLE_USER_SUFFIX;
+  static String getDefaultUserRoleName(String tenantId) {
+    return tenantId + OzoneConsts.DEFAULT_TENANT_ROLE_USER_SUFFIX;
   }
 
   /**
-   * Get admin role name given tenant name.
+   * Get default admin role name given tenant name.
    * @param tenantId tenant name
    * @return admin role name. e.g. tenant1-AdminRole
    */
-  static String getAdminRoleName(String tenantId) {
-    return tenantId + OzoneConsts.TENANT_ROLE_ADMIN_SUFFIX;
+  static String getDefaultAdminRoleName(String tenantId) {
+    return tenantId + OzoneConsts.DEFAULT_TENANT_ROLE_ADMIN_SUFFIX;
+  }
+
+  /**
+   * Get default bucket namespace (volume) policy name given tenant name.
+   * @param tenantId tenant name
+   * @return bucket namespace (volume) policy name. e.g. tenant1-VolumeAccess
+   */
+  static String getDefaultBucketNamespacePolicyName(String tenantId) {
+    return tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_NAMESPACE_POLICY_SUFFIX;
+  }
+
+  /**
+   * Get default bucket policy name given tenant name.
+   * @param tenantId tenant name
+   * @return bucket policy name. e.g. tenant1-BucketAccess
+   */
+  static String getDefaultBucketPolicyName(String tenantId) {
+    return tenantId + OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
   }
 
   /**

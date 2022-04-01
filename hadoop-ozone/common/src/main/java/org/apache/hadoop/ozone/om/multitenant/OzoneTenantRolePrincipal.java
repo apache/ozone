@@ -29,12 +29,12 @@ public final class OzoneTenantRolePrincipal implements Principal {
 
   public static OzoneTenantRolePrincipal getUserRole(String tenantId) {
     return new OzoneTenantRolePrincipal(
-        tenantId, OzoneConsts.TENANT_ROLE_USER_SUFFIX);
+        tenantId, OzoneConsts.DEFAULT_TENANT_ROLE_USER_SUFFIX);
   }
 
   public static OzoneTenantRolePrincipal getAdminRole(String tenantId) {
     return new OzoneTenantRolePrincipal(
-        tenantId, OzoneConsts.TENANT_ROLE_ADMIN_SUFFIX);
+        tenantId, OzoneConsts.DEFAULT_TENANT_ROLE_ADMIN_SUFFIX);
   }
 
   private OzoneTenantRolePrincipal(String tenantId, String roleNameSuffix) {

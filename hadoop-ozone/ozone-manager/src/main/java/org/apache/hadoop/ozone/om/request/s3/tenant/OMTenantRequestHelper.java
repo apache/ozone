@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
@@ -241,7 +241,7 @@ public final class OMTenantRequestHelper {
     //  (apart from it being populated on OM startup) right now.
     //  So unless tenantCache is updated on follower nodes later as well,
     //  we can't use listUsersInTenant to check tenant emptiness in followers.
-    final List<ExtendedAccessIdInfo> tenantUserAccessIdsList =
+    final List<UserAccessIdInfo> tenantUserAccessIdsList =
         tenantManager.listUsersInTenant(tenantId, "").getUserAccessIds();
     return tenantUserAccessIdsList.size() == 0;
   }
