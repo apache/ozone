@@ -508,7 +508,7 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-            metrics.incrementNumMovedContainersInLatestIteration(1);
+            metrics.incrementNumContainerMovesInLatestIteration(1);
             LOG.info("Container move completed for container {} to target {}",
                 container.containerID(),
                 moveSelection.getTargetNode().getUuidString());
@@ -541,10 +541,13 @@ public class ContainerBalancer {
         sourceToTargetMap.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
-    metrics.incrementDataSizeMovedGBInLatestIteration(
-        sizeMovedPerIteration / OzoneConsts.GB);
+    sizeMovedPerIteration /= OzoneConsts.GB;
+    metrics.incrementDataSizeMovedGBInLatestIteration(sizeMovedPerIteration);
+    metrics.incrementNumContainerMoves(
+        metrics.getNumContainerMovesInLatestIteration());
+    metrics.incrementDataSizeMovedGB(sizeMovedPerIteration);
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
-            "in this iteration: {}B.",
+            "in this iteration: {}GB.",
         countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
   }
 
@@ -814,7 +817,7 @@ public class ContainerBalancer {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
-    metrics.resetNumMovedContainersInLatestIteration();
+    metrics.resetNumContainerMovesInLatestIteration();
     metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();
