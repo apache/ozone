@@ -412,10 +412,7 @@ public class SCMNodeManager implements NodeManager {
                   datanodeDetails.getUuidString(),
                   datanodeInfo,
                   datanodeDetails);
-          if (clusterMap.contains(datanodeInfo)) {
-            clusterMap.remove(datanodeInfo);
-          }
-          clusterMap.add(datanodeDetails);
+          clusterMap.update(datanodeInfo, datanodeDetails);
 
           String oldDnsName;
           if (useHostname) {
@@ -423,8 +420,9 @@ public class SCMNodeManager implements NodeManager {
           } else {
             oldDnsName = datanodeInfo.getIpAddress();
           }
-          removeEntryFromDnsToUuidMap(oldDnsName);
-          addEntryToDnsToUuidMap(dnsName, datanodeDetails.getUuidString());
+          updateEntryFromDnsToUuidMap(oldDnsName,
+                  dnsName,
+                  datanodeDetails.getUuidString());
 
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
@@ -476,6 +474,13 @@ public class SCMNodeManager implements NodeManager {
     if (dnSet.isEmpty()) {
       dnsToUuidMap.remove(dnsName);
     }
+  }
+
+  private synchronized void updateEntryFromDnsToUuidMap(String oldDnsName,
+                                                        String newDnsName,
+                                                        String uuid) {
+    removeEntryFromDnsToUuidMap(oldDnsName);
+    addEntryToDnsToUuidMap(newDnsName, uuid);
   }
 
   /**
