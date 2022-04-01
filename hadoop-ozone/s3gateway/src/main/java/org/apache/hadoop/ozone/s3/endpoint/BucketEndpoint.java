@@ -115,7 +115,6 @@ public class BucketEndpoint extends EndpointBase {
       prefix = "";
     }
 
-    OzoneBucket bucket = getBucket(bucketName);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator;
 
@@ -127,6 +126,7 @@ public class BucketEndpoint extends EndpointBase {
       startAfter = marker;
     }
     try {
+      OzoneBucket bucket = getBucket(bucketName);
       if (startAfter != null && continueToken != null) {
         // If continuation token and start after both are provided, then we
         // ignore start After
@@ -145,6 +145,10 @@ public class BucketEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
+    } catch (OS3Exception ex) {
+      getMetrics().incGetBucketFailure();
+      LOG.error("Bucket Does not Exist " + bucketName, ex);
+      throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
     }
 
     ListObjectResponse response = new ListObjectResponse();
@@ -407,6 +411,10 @@ public class BucketEndpoint extends EndpointBase {
         LOG.error("Failed to get acl of Bucket " + bucketName, ex);
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       }
+    } catch (OS3Exception ex) {
+      getMetrics().incGetAclFailure();
+      LOG.error("Failed to get acl of Bucket " + bucketName, ex);
+      throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
     }
   }
 
@@ -474,7 +482,6 @@ public class BucketEndpoint extends EndpointBase {
               S3Acl.ACLType.FULL_CONTROL.getValue()));
         }
       }
-
       // A put request will reset all previous ACLs on bucket
       bucket.setAcl(ozoneAclListOnBucket);
       // A put request will reset input user/group's permission on volume
@@ -507,6 +514,10 @@ public class BucketEndpoint extends EndpointBase {
       LOG.error("Error in set ACL Request for bucket: {}", bucketName,
           exception);
       throw exception;
+    } catch (OS3Exception ex) {
+      getMetrics().incPutAclFailure();
+      LOG.error("Failed to put acl of Bucket " + bucketName, ex);
+      throw ex;
     }
     getMetrics().incPutAclSuccess();
     return Response.status(HttpStatus.SC_OK).build();

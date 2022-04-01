@@ -31,13 +31,23 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 
+import static java.net.HttpURLConnection.HTTP_OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for {@link S3GatewayMetrics}.
@@ -50,8 +60,10 @@ public class TestS3GatewayMetrics {
   private RootEndpoint rootEndpoint;
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
-
+  private HttpHeaders headers;
+  private static final String ACL_MARKER = "acl";
   private S3GatewayMetrics metrics;
+
 
   @Before
   public void setup() throws Exception {
@@ -69,6 +81,7 @@ public class TestS3GatewayMetrics {
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
 
+    headers = Mockito.mock(HttpHeaders.class);
     metrics = bucketEndpoint.getMetrics();
   }
 
@@ -109,5 +122,148 @@ public class TestS3GatewayMetrics {
 
     long curMetric = metrics.getHeadKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testGetBucketEndpointMetric() throws Exception {
+    long oriMetric = metrics.getGetBucketSuccess();
+
+    clientStub = createClientWithKeys("file1");
+    bucketEndpoint.setClient(clientStub);
+    bucketEndpoint.get(bucketName, null,
+        null, null, 1000, null,
+        null, null, "random", null,
+        null, null).getEntity();
+
+    long curMetric = metrics.getGetBucketSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+
+
+    oriMetric = metrics.getGetBucketFailure();
+
+    try {
+      // Searching for a bucket that does not exist
+      bucketEndpoint.get("newBucket", null,
+          null, null, 1000, null,
+          null, null, "random", null,
+          null, null);
+      fail();
+    } catch (OS3Exception e) {
+    }
+
+    curMetric = metrics.getGetBucketFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testCreateBucketEndpointMetric() throws Exception {
+
+    long oriMetric = metrics.getCreateBucketSuccess();
+
+    Response response = bucketEndpoint.put(bucketName, null,
+        null, null);
+    long curMetric = metrics.getCreateBucketSuccess();
+
+    assertEquals(1L, curMetric - oriMetric);
+
+
+    // Creating an error by trying to create a bucket that already exists
+    oriMetric = metrics.getCreateBucketFailure();
+
+    bucketEndpoint.put(bucketName, null, null, null);
+
+    curMetric = metrics.getCreateBucketFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testDeleteBucketEndpointMetric() throws Exception {
+    long oriMetric = metrics.getDeleteBucketSuccess();
+
+    bucketEndpoint.delete(bucketName);
+
+    long curMetric = metrics.getDeleteBucketSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+
+
+    oriMetric = metrics.getDeleteBucketFailure();
+    try {
+      // Deleting a bucket that does not exist will result in delete failure
+      bucketEndpoint.delete(bucketName);
+      fail();
+    } catch (OS3Exception ex) {
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
+          ex.getErrorMessage());
+    }
+
+    curMetric = metrics.getDeleteBucketFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testGetAclEndpointMetric() throws Exception {
+    long oriMetric = metrics.getGetAclSuccess();
+
+    Response response =
+        bucketEndpoint.get(bucketName, null, null,
+            null, 0, null, null, null,
+            null, null, "acl", null);
+    long curMetric = metrics.getGetAclSuccess();
+    assertEquals(HTTP_OK, response.getStatus());
+    assertEquals(1L, curMetric - oriMetric);
+
+
+    oriMetric = metrics.getGetAclFailure();
+    try {
+      // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
+      response =
+          bucketEndpoint.get("random_bucket", null,
+              null, null, 0, null, null,
+              null, null, null, "acl", null);
+      fail();
+    } catch (OS3Exception ex) {
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
+          ex.getErrorMessage());
+    }
+    curMetric = metrics.getGetAclFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testPutAclEndpointMetric() throws Exception {
+    long oriMetric = metrics.getPutAclSuccess();
+
+    clientStub.getObjectStore().createS3Bucket("b1");
+    InputStream inputBody = TestBucketAcl.class.getClassLoader()
+        .getResourceAsStream("userAccessControlList.xml");
+    Response response =
+        bucketEndpoint.put("b1", ACL_MARKER, headers, inputBody);
+
+    long curMetric = metrics.getPutAclSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+
+    // Failing the putACL endpoint by applying ACL on a non-Existent Bucket
+    oriMetric = metrics.getPutAclFailure();
+
+    try {
+      bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers, inputBody);
+      fail();
+    } catch (OS3Exception ex) {
+    }
+    curMetric = metrics.getPutAclFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  private OzoneClient createClientWithKeys(String... keys) throws IOException {
+    OzoneClient client = new OzoneClientStub();
+
+    client.getObjectStore().createS3Bucket(bucketName);
+    OzoneBucket bkt = client.getObjectStore().getS3Bucket(bucketName);
+    for (String key : keys) {
+      bkt.createKey(key, 0).close();
+    }
+    return client;
   }
 }
