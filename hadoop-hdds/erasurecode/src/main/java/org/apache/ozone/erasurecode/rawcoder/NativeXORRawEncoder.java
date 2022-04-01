@@ -44,7 +44,6 @@ public class NativeXORRawEncoder extends AbstractNativeRawEncoder {
         new org.apache.hadoop.io.erasurecode.rawcoder.NativeXORRawEncoder(
             new ErasureCoderOptions(ecReplicationConfig.getData(),
                 ecReplicationConfig.getParity()));
-    LOG.info("Using the Native ISA-l Library........");
   }
 
   @Override

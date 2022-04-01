@@ -23,7 +23,7 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
- * the class of Hadoop Native EC.
+ * the class of Ozone Native EC.
  */
 @InterfaceAudience.Private
 public final class HadoopNativeECAccessorUtil {

@@ -41,10 +41,6 @@ abstract class AbstractNativeRawDecoder extends RawErasureDecoder {
   protected final ReentrantReadWriteLock decoderLock =
       new ReentrantReadWriteLock();
 
-  // To link with the underlying data structure in the native layer.
-  // No get/set as only used by native codes.
-  private long nativeCoder;
-
   AbstractNativeRawDecoder(ECReplicationConfig replicationConfig) {
     super(replicationConfig);
   }
