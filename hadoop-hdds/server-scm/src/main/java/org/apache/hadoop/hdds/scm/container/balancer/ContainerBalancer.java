@@ -920,10 +920,11 @@ public class ContainerBalancer implements SCMService {
   }
 
   private void stopBalancingThread() {
-    Thread balancingThread = currentBalancingThread;
+    Thread balancingThread;
     lock.lock();
     try {
       balancerRunning = false;
+      balancingThread = currentBalancingThread;
       currentBalancingThread = null;
     } finally {
       lock.unlock();
