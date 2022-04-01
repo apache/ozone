@@ -65,7 +65,7 @@ public class TestOMMultiTenantManagerImpl {
     final String bucketNamespacePolicyName =
         OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantName);
     final String bucketPolicyName =
-        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantName);
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantName);
     final String userRoleName =
         OMMultiTenantManager.getDefaultUserRoleName(tenantName);
     final String adminRoleName =

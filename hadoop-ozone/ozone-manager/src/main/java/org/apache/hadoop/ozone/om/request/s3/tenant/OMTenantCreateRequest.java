@@ -295,7 +295,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       final String bucketNamespacePolicyName =
           OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
       final String bucketPolicyName =
-          OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
+          OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
       final String userRoleName =
           OMMultiTenantManager.getDefaultUserRoleName(tenantId);
       final String adminRoleName =
