@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -40,8 +39,8 @@ public class NodeIpOrHostnameUpdateHandler
   private final SCMServiceManager serviceManager;
 
   public NodeIpOrHostnameUpdateHandler(PipelineManager pipelineManager,
-                                   NodeDecommissionManager decommissionManager,
-                                   SCMServiceManager serviceManager) {
+                                       NodeDecommissionManager decommissionManager,
+                                       SCMServiceManager serviceManager) {
     this.pipelineManager = pipelineManager;
     this.decommissionManager = decommissionManager;
     this.serviceManager = serviceManager;
@@ -51,18 +50,16 @@ public class NodeIpOrHostnameUpdateHandler
   public void onMessage(DatanodeDetails datanodeDetails,
                         EventPublisher publisher) {
     try {
+      LOG.info("Closing stale pipelines for datanode: {}", datanodeDetails);
       pipelineManager.closeStalePipelines(datanodeDetails);
       serviceManager.notifyEventTriggered(SCMService.Event
               .NODE_IP_OR_HOSTNAME_UPDATE_HANDLER_TRIGGERED);
 
-      if (datanodeDetails.getPersistedOpState()
-              != HddsProtos.NodeOperationalState.IN_SERVICE) {
-        decommissionManager.continueAdminForNode(datanodeDetails);
-      }
+      decommissionManager.continueAdminForNode(datanodeDetails);
     } catch (NodeNotFoundException e) {
       // Should not happen, as the node has just registered to call this event
       // handler.
-      LOG.warn(
+      LOG.error(
               "NodeNotFound when updating the node Ip or host name to the " +
                       "decommissionManager",
               e);
