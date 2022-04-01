@@ -178,12 +178,12 @@ public class OzoneManagerLock {
     } else {
       long startWaitingTimeNanos = Time.monotonicNowNanos();
       /**
-       *  holdCount helps in metric updation only once in case of reentrant
+       *  readHoldCount helps in metrics updation only once in case of reentrant
        *  locks.
        */
-      int holdCount = manager.getActiveLockCount(resourceName);
+      int readHoldCount = manager.getReadHoldCount(resourceName);
       lockFn.accept(resourceName);
-      if (holdCount == 0) {
+      if (readHoldCount == 0) {
         updateReadLockMetrics(resource, lockType, startWaitingTimeNanos);
       }
       if (LOG.isDebugEnabled()) {
@@ -390,10 +390,11 @@ public class OzoneManagerLock {
     // locks, as some locks support acquiring lock again.
     lockFn.accept(resourceName);
     /**
-     *  holdCount helps in metric updation only once in case of reentrant locks.
+     *  readHoldCount helps in metrics updation only once in case of reentrant
+     *  locks.
      */
-    int holdCount = manager.getActiveLockCount(resourceName);
-    if (holdCount == 0) {
+    int readHoldCount = manager.getReadHoldCount(resourceName);
+    if (readHoldCount == 0) {
       updateReadUnlockMetrics(resource, lockType);
     }
     // clear lock
@@ -412,19 +413,18 @@ public class OzoneManagerLock {
       // Adds a snapshot to the metric readLockHeldTimeMsStat.
       omLockMetrics.setReadLockHeldTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
-
     }
   }
 
   /**
-   * Returns holdCount for a given resource lock name.
+   * Returns readHoldCount for a given resource lock name.
    *
    * @param resourceName resource lock name
-   * @return holdCount
+   * @return readHoldCount
    */
   @VisibleForTesting
-  public int getHoldCount(String resourceName) {
-    return manager.getActiveLockCount(resourceName);
+  public int getReadHoldCount(String resourceName) {
+    return manager.getReadHoldCount(resourceName);
   }
 
   /**

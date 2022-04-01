@@ -235,15 +235,17 @@ public class LockManager<R> {
   }
 
   /**
-   * Returns the active lock count on a given resource.
+   * Returns the number of reentrant read holds on this lock by the current
+   * thread on a given resource.
    *
-   * @param resource for which the active lock count has to be returned
-   * @return active lock count
+   * @param resource for which the read lock hold count has to be returned
+   * @return the number of holds on the read lock by the current thread,
+   *         or zero if the read lock is not held by the current thread
    */
-  public int getActiveLockCount(final R resource) {
+  public int getReadHoldCount(final R resource) {
     ActiveLock activeLock = activeLocks.get(resource);
     if (activeLock != null) {
-      return activeLock.getActiveLockCount();
+      return activeLock.getReadHoldCount();
     }
     return 0;
   }
