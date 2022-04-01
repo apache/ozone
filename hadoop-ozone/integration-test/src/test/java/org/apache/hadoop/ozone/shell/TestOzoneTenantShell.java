@@ -508,18 +508,6 @@ public class TestOzoneTenantShell {
         + "- Tenant 'dev' with accessId 'dev$bob'\n", true);
     checkOutput(err, "", true);
 
-    // Get user info with role names
-    executeHA(tenantShell, new String[] {
-        "user", "info", "bob", "--print-roles"});
-    checkOutput(out, "User 'bob' is assigned to:\n"
-        + "- Tenant 'research' with accessId 'research$bob', "
-        + "roles: [research-UserRole]\n"
-        + "- Tenant 'finance' with accessId 'finance$bob', "
-        + "roles: [finance-UserRole]\n"
-        + "- Tenant 'dev' with accessId 'dev$bob', roles: [dev-UserRole]\n",
-        true);
-    checkOutput(err, "", true);
-
     // Assign admin
     executeHA(tenantShell, new String[] {
         "user", "assign-admin", "dev$bob", "--tenant=dev"});
@@ -722,7 +710,6 @@ public class TestOzoneTenantShell {
   }
 
   @Test
-  @SuppressWarnings("methodlength")
   public void testTenantSetSecret() throws IOException, InterruptedException {
 
     final String tenantName = "tenant-test-set-secret";
@@ -818,17 +805,6 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Assigned admin", false);
 
-    // Get user info should print AdminRoles
-    executeHA(tenantShell, new String[] {
-        "user", "info", "bob", "--print-roles"});
-    checkOutput(out, "User 'bob' is assigned to:\n"
-            + "- Tenant 'tenant-test-set-secret' delegated admin "
-            + "with accessId 'tenant-test-set-secret$bob', "
-            + "roles: [tenant-test-set-secret-UserRole, "
-            + "tenant-test-set-secret-AdminRole]\n",
-        true);
-    checkOutput(err, "", true);
-
     // Set secret should succeed now
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
@@ -845,16 +821,6 @@ public class TestOzoneTenantShell {
         tenantName + "$" + ugiBob.getShortUserName()});
     checkOutput(out, "", true);
     checkOutput(err, "Revoked admin", false);
-
-    // Get user info should no longer print AdminRoles
-    executeHA(tenantShell, new String[] {
-        "user", "info", "bob", "--print-roles"});
-    checkOutput(out, "User 'bob' is assigned to:\n"
-            + "- Tenant 'tenant-test-set-secret' "
-            + "with accessId 'tenant-test-set-secret$bob', "
-            + "roles: [tenant-test-set-secret-UserRole]\n",
-        true);
-    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "user", "revoke", tenantName + "$bob"});
