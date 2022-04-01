@@ -930,7 +930,8 @@ public class ContainerBalancer implements SCMService {
       lock.unlock();
     }
     // wait for balancingThread to die
-    if (Thread.currentThread().getId() != balancingThread.getId()) {
+    if (balancingThread != null &&
+        balancingThread.getId() != Thread.currentThread().getId()) {
       balancingThread.interrupt();
       try {
         balancingThread.join();
