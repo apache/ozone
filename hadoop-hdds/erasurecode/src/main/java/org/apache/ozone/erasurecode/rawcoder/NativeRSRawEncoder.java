@@ -35,8 +35,6 @@ public class NativeRSRawEncoder extends AbstractNativeRawEncoder {
 
   private org.apache.hadoop.io.erasurecode.rawcoder.NativeRSRawEncoder
       hadoopNativeRSRawEncoder;
-  public static final Logger LOG =
-      LoggerFactory.getLogger(NativeRSRawEncoder.class);
 
   public NativeRSRawEncoder(ECReplicationConfig ecReplicationConfig) {
     super(ecReplicationConfig);

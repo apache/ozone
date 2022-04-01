@@ -23,7 +23,9 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
- * the class of Ozone Native EC.
+ * This class is used to access some of the protected API
+ * from hadoop native EC java code.
+ * This is needed until we adapt the native ec code from hadoop.
  */
 @InterfaceAudience.Private
 public final class HadoopNativeECAccessorUtil {
