@@ -536,7 +536,7 @@ public class TestDatanodeUpgradeToScmHA {
       Assert.assertEquals(expectedMlv, mlv);
     } else {
       Assert.assertTrue("Expected minimum mlv(" + expectedMlv
-          +") is smaller than mlv(" + mlv +").", expectedMlv <= mlv);
+          + ") is smaller than mlv(" + mlv + ").", expectedMlv <= mlv);
     }
 
     callVersionEndpointTask();
