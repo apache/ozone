@@ -25,11 +25,18 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -252,5 +259,24 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.AllocateBlock
+  )
+  public static OMRequest disallowAllocateBlockWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws ServiceException {
+    if (ctx.versionManager().getMetadataLayoutVersion()
+        < OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion()) {
+      if (req.getAllocateBlockRequest().getKeyArgs().hasEcReplicationConfig()) {
+        throw new ServiceException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.");
+      }
+    }
+    return req;
   }
 }
