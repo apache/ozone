@@ -160,7 +160,7 @@ public class TestS3GatewayMetrics {
 
     long oriMetric = metrics.getCreateBucketSuccess();
 
-    Response response = bucketEndpoint.put(bucketName, null,
+    bucketEndpoint.put(bucketName, null,
         null, null);
     long curMetric = metrics.getCreateBucketSuccess();
 
@@ -217,10 +217,9 @@ public class TestS3GatewayMetrics {
     oriMetric = metrics.getGetAclFailure();
     try {
       // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
-      response =
-          bucketEndpoint.get("random_bucket", null,
-              null, null, 0, null, null,
-              null, null, null, "acl", null);
+      bucketEndpoint.get("random_bucket", null,
+          null, null, 0, null, null,
+          null, null, null, "acl", null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
@@ -238,8 +237,8 @@ public class TestS3GatewayMetrics {
     clientStub.getObjectStore().createS3Bucket("b1");
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
-    Response response =
-        bucketEndpoint.put("b1", ACL_MARKER, headers, inputBody);
+
+    bucketEndpoint.put("b1", ACL_MARKER, headers, inputBody);
 
     long curMetric = metrics.getPutAclSuccess();
     assertEquals(1L, curMetric - oriMetric);
