@@ -56,8 +56,8 @@ public class VolumeEntityHandler extends EntityHandler {
       long volDataSize = 0L;
       long volDataSizeWithReplica = 0L;
       for (OmBucketInfo bucket: buckets) {
-        BucketHandler bucketHandler = BucketHandler.getBucketHandler(path, reconNamespaceSummaryManager,
-            omMetadataManager, )
+        BucketHandler bucketHandler = BucketHandler.getBucketHandler(bucket, reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM);
         String bucketName = bucket.getBucketName();
         long bucketObjectID = bucket.getObjectID();
         String subpath = omMetadataManager.getBucketKey(volName, bucketName);
@@ -66,7 +66,7 @@ public class VolumeEntityHandler extends EntityHandler {
         long dataSize = getTotalSize(bucketObjectID);
         volDataSize += dataSize;
         if (withReplica) {
-          long bucketDU = calculateDUUnderObject(bucketObjectID);
+          long bucketDU = bucketHandler.calculateDUUnderObject(bucketObjectID);
           diskUsage.setSizeWithReplica(bucketDU);
           volDataSizeWithReplica += bucketDU;
         }

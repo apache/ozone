@@ -5,10 +5,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -123,11 +120,22 @@ abstract public class BucketHandler {
 
   // NOTE: In next PR, Will be updated for other bucket types depending on the path
   //  For now only FSO buckets supported
+
   static public BucketHandler getBucketHandler(String path,
                                                ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-    ReconOMMetadataManager omMetadataManager,
-    OzoneStorageContainerManager reconSCM) {
+                                               ReconOMMetadataManager omMetadataManager,
+                                               OzoneStorageContainerManager reconSCM) {
 
     return new FSOBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM);
-    }
+  }
+
+  static public BucketHandler getBucketHandler(OmBucketInfo bucketInfo,
+                                               ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                               ReconOMMetadataManager omMetadataManager,
+                                               OzoneStorageContainerManager reconSCM) {
+
+    return new FSOBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM);
+  }
+
+
 }

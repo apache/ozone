@@ -235,9 +235,9 @@ public class TestNSSummaryEndpoint {
   public void testUtility() {
     String[] names = NSSummaryEndpoint.parseRequestPath(TEST_PATH_UTILITY);
     Assert.assertArrayEquals(TEST_NAMES, names);
-    String keyName = EntityUtils.getKeyName(names);
+    String keyName = BucketHandler.getKeyName(names);
     Assert.assertEquals(TEST_KEY_NAMES, keyName);
-    String subpath = EntityUtils.buildSubpath(PARENT_DIR, "file1.txt");
+    String subpath = BucketHandler.buildSubpath(PARENT_DIR, "file1.txt");
     Assert.assertEquals(TEST_PATH_UTILITY, subpath);
   }
 

@@ -53,10 +53,11 @@ public abstract class EntityHandler {
 
   protected ReconOMMetadataManager omMetadataManager;
 
-  private ContainerManager containerManager;
+  protected ContainerManager containerManager;
 
-  private BucketHandler bucketHandler;
+  protected BucketHandler bucketHandler;
 
+  protected OzoneStorageContainerManager reconSCM;
   public EntityHandler(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                      ReconOMMetadataManager omMetadataManager,
                      OzoneStorageContainerManager reconSCM,
@@ -64,6 +65,7 @@ public abstract class EntityHandler {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.containerManager = reconSCM.getContainerManager();
+    this.reconSCM = reconSCM;
     this.bucketHandler = bucketHandler;
   }
   abstract public NamespaceSummaryResponse getSummaryResponse(String[] names) throws IOException;
@@ -88,43 +90,46 @@ public abstract class EntityHandler {
    * @return the entity type, unknown if path not found
    */
   @VisibleForTesting
-  public EntityHandler getEntityHandler(String path, String[] names, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+  static public EntityHandler getEntityHandler(String path, String[] names, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                         ReconOMMetadataManager omMetadataManager,
                                         OzoneStorageContainerManager reconSCM)
       throws IOException {
-    BucketHandler bucketHandler = BucketHandler.getBucketHandler(path, reconNamespaceSummaryManager, omMetadataManager,
-        reconSCM);
+    BucketHandler bucketHandler;
     if (path.equals(OM_KEY_PREFIX)) {
-      return EntityType.ROOT;
+      return EntityType.ROOT.create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, null);
     }
 
     if (names.length == 0) {
-      return EntityType.UNKNOWN;
+      return EntityType.UNKNOWN.create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, null);
     } else if (names.length == 1) { // volume level check
       String volName = names[0];
-      if (!volumeExists(volName)) {
-        return EntityType.UNKNOWN;
+      if (!volumeExists(omMetadataManager, volName)) {
+        return EntityType.UNKNOWN.create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, null);
       }
-      return EntityType.VOLUME;
+      return EntityType.VOLUME.create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, null);
     } else if (names.length == 2) { // bucket level check
+      bucketHandler = BucketHandler.getBucketHandler(path, reconNamespaceSummaryManager, omMetadataManager,
+        reconSCM);
       String volName = names[0];
       String bucketName = names[1];
       if (!bucketHandler.bucketExists(volName, bucketName)) {
-        return EntityType.UNKNOWN;
+        return EntityType.UNKNOWN.create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, null);
       }
-      return EntityType.BUCKET;
+      return EntityType.BUCKET.create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketHandler);
     } else { // length > 3. check dir or key existence (FSO-enabled)
+      bucketHandler = BucketHandler.getBucketHandler(path, reconNamespaceSummaryManager, omMetadataManager,
+        reconSCM);
       String volName = names[0];
       String bucketName = names[1];
       String keyName = bucketHandler.getKeyName(names);
       // check if either volume or bucket doesn't exist
-      if (!volumeExists(volName)
+      if (!volumeExists(omMetadataManager, volName)
           || !bucketHandler.bucketExists(volName, bucketName)) {
-        return EntityType.UNKNOWN;
+        return EntityType.UNKNOWN.create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, null);
       }
       long bucketObjectId = bucketHandler.getBucketObjectId(names);
       return bucketHandler.determineKeyPath(keyName,
-          bucketObjectId);
+          bucketObjectId).create(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketHandler);
     }
   }
 
@@ -190,7 +195,7 @@ public abstract class EntityHandler {
         iterator = bucketTable.iterator();
 
     if (volumeName != null) {
-      if (!volumeExists(volumeName)) {
+      if (!volumeExists(omMetadataManager, volumeName)) {
         return result;
       }
       seekPrefix = omMetadataManager.getVolumeKey(volumeName + OM_KEY_PREFIX);
@@ -212,7 +217,7 @@ public abstract class EntityHandler {
     return result;
   }
 
-  protected boolean volumeExists(String volName) throws IOException {
+  static boolean volumeExists(ReconOMMetadataManager omMetadataManager, String volName) throws IOException {
     String volDBKey = omMetadataManager.getVolumeKey(volName);
     return omMetadataManager.getVolumeTable().getSkipCache(volDBKey) != null;
   }

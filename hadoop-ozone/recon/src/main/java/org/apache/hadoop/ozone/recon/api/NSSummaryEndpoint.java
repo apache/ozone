@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.recon.api.types.*;
@@ -45,11 +46,22 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 public class NSSummaryEndpoint {
 
   @Inject
-  private ReconOMMetadataManager omMetadataManager;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   @Inject
-  public NSSummaryEndpoint(ReconOMMetadataManager omMetadataManager) {
+  private ReconOMMetadataManager omMetadataManager;
+
+  private ContainerManager containerManager;
+
+  private OzoneStorageContainerManager reconSCM;
+  @Inject
+  public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
+                           ReconOMMetadataManager omMetadataManager,
+                           OzoneStorageContainerManager reconSCM) {
+    this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
+    this.containerManager = reconSCM.getContainerManager();
+    this.reconSCM = reconSCM;
   }
   
   /**
@@ -78,9 +90,10 @@ public class NSSummaryEndpoint {
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
 
-    EntityType type = entityUtils.getEntityType(normalizedPath, names);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
+                                                           omMetadataManager, reconSCM);
 
-    namespaceSummaryResponse = type.getSummaryResponse(names, entityUtils);
+    namespaceSummaryResponse = handler.getSummaryResponse(names);
 
     return Response.ok(namespaceSummaryResponse).build();
   }
@@ -114,11 +127,12 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = entityUtils.getEntityType(normalizedPath, names);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
+                                                           omMetadataManager, reconSCM);
 
     duResponse.setPath(normalizedPath);
 
-    duResponse = type.getDuResponse(normalizedPath, names, listFile, withReplica, entityUtils);
+    duResponse = handler.getDuResponse(normalizedPath, names, listFile, withReplica);
 
     return Response.ok(duResponse).build();
   }
@@ -147,9 +161,10 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = entityUtils.getEntityType(normalizedPath, names);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
+                                                           omMetadataManager, reconSCM);
 
-    quotaUsageResponse = type.getQuotaResponse(names, entityUtils);
+    quotaUsageResponse = handler.getQuotaResponse(names);
 
     return Response.ok(quotaUsageResponse).build();
   }
@@ -178,9 +193,10 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityType type = entityUtils.getEntityType(normalizedPath, names);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
+                                                           omMetadataManager, reconSCM);
 
-    distResponse = type.getDistResponse(names, entityUtils);
+    distResponse = handler.getDistResponse(names);
 
     return Response.ok(distResponse).build();
   }
