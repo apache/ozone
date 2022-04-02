@@ -30,7 +30,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_POLICY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
@@ -39,7 +38,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
  */
 @CleanupTableInfo(cleanupTables = {
     TENANT_STATE_TABLE,
-    TENANT_POLICY_TABLE,
     VOLUME_TABLE
 })
 public class OMTenantDeleteResponse extends OMClientResponse {
@@ -47,21 +45,15 @@ public class OMTenantDeleteResponse extends OMClientResponse {
   private String volumeName;
   private OmVolumeArgs omVolumeArgs;
   private String tenantId;
-  private String userPolicyGroupName;
-  private String bucketPolicyGroupName;
 
   public OMTenantDeleteResponse(@Nonnull OMResponse omResponse,
                                 @Nonnull String volumeName,
                                 @Nullable OmVolumeArgs omVolumeArgs,
-                                @Nonnull String tenantId,
-                                @Nonnull String userPolicyGroupName,
-                                @Nonnull String bucketPolicyGroupName) {
+                                @Nonnull String tenantId) {
     super(omResponse);
     this.volumeName = volumeName;
     this.omVolumeArgs = omVolumeArgs;
     this.tenantId = tenantId;
-    this.userPolicyGroupName = userPolicyGroupName;
-    this.bucketPolicyGroupName = bucketPolicyGroupName;
   }
 
   /**
@@ -79,12 +71,6 @@ public class OMTenantDeleteResponse extends OMClientResponse {
 
     omMetadataManager.getTenantStateTable().deleteWithBatch(
         batchOperation, tenantId);
-
-    omMetadataManager.getTenantPolicyTable().deleteWithBatch(
-        batchOperation, userPolicyGroupName);
-
-    omMetadataManager.getTenantPolicyTable().deleteWithBatch(
-        batchOperation, bucketPolicyGroupName);
 
     if (volumeName.length() > 0) {
       Preconditions.checkNotNull(omVolumeArgs);

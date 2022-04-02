@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -53,7 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -615,9 +615,9 @@ public interface ClientProtocol {
    * Delete a tenant.
    * @param tenantId tenant name.
    * @throws IOException
-   * @return DeleteTenantInfo
+   * @return DeleteTenantState
    */
-  DeleteTenantInfo deleteTenant(String tenantId) throws IOException;
+  DeleteTenantState deleteTenant(String tenantId) throws IOException;
 
   /**
    * Assign a user to a tenant.
@@ -675,10 +675,10 @@ public interface ClientProtocol {
 
   /**
    * List tenants.
-   * @return TenantInfoList
+   * @return TenantStateList
    * @throws IOException
    */
-  TenantInfoList listTenant() throws IOException;
+  TenantStateList listTenant() throws IOException;
 
   /**
    * Get KMS client provider.
