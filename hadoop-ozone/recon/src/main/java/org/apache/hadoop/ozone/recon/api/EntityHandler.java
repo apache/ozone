@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -89,7 +88,6 @@ public abstract class EntityHandler {
    * @param names the client's parsed request
    * @return the entity type, unknown if path not found
    */
-  @VisibleForTesting
   static public EntityHandler getEntityHandler(String path, String[] names, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                         ReconOMMetadataManager omMetadataManager,
                                         OzoneStorageContainerManager reconSCM)
