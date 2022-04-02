@@ -48,13 +48,8 @@ public class NSSummaryEndpoint {
   private ReconOMMetadataManager omMetadataManager;
 
   @Inject
-  private EntityUtils entityUtils;
-
-  @Inject
-  public NSSummaryEndpoint(ReconOMMetadataManager omMetadataManager,
-                           EntityUtils entityUtils) {
+  public NSSummaryEndpoint(ReconOMMetadataManager omMetadataManager) {
     this.omMetadataManager = omMetadataManager;
-    this.entityUtils = entityUtils;
   }
   
   /**

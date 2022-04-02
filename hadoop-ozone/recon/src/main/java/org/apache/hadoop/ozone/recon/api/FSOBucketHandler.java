@@ -1,5 +1,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -7,7 +8,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
-import org.apache.hadoop.ozone.recon.api.types.EntityUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -23,16 +23,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 public class FSOBucketHandler extends BucketHandler {
 
-    private EntityUtils entityUtils;
 
-    private ReconOMMetadataManager omMetadataManager;
-
-    private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-
-    public FSOBucketHandler(EntityUtils entityUtils) {
-        this.entityUtils = entityUtils;
-        this.omMetadataManager = entityUtils.getOmMetadataManager();
-        this.reconNamespaceSummaryManager = entityUtils.getReconNamespaceSummaryManager();
+    public FSOBucketHandler(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+    ReconOMMetadataManager omMetadataManager,
+    OzoneStorageContainerManager reconSCM) {
+        super(reconNamespaceSummaryManager, omMetadataManager, reconSCM);
     }
 
     /**
@@ -42,10 +37,8 @@ public class FSOBucketHandler extends BucketHandler {
      * @throws IOException
      */
     @Override
-    public EntityType determineKeyPath(String keyName, long bucketObjectId,
-                                       BucketLayout bucketLayout) throws IOException {
+    public EntityType determineKeyPath(String keyName, long bucketObjectId) throws IOException {
 
-        ReconOMMetadataManager omMetadataManager = entityUtils.getOmMetadataManager();
         java.nio.file.Path keyPath = Paths.get(keyName);
         Iterator<Path> elements = keyPath.iterator();
 
@@ -92,7 +85,7 @@ public class FSOBucketHandler extends BucketHandler {
     // FileTable's key is in the format of "parentId/fileName"
     // Make use of RocksDB's order to seek to the prefix and avoid full iteration
     @Override
-    public long calculateDUUnderObject(long parentId, BucketLayout bucketLayout) throws IOException {
+    public long calculateDUUnderObject(long parentId) throws IOException {
         Table keyTable = omMetadataManager.getFileTable();
 
         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -111,7 +104,7 @@ public class FSOBucketHandler extends BucketHandler {
             }
             OmKeyInfo keyInfo = kv.getValue();
             if (keyInfo != null) {
-                totalDU += entityUtils.getKeySizeWithReplication(keyInfo);
+                totalDU += getKeySizeWithReplication(keyInfo);
             }
         }
 
@@ -144,7 +137,7 @@ public class FSOBucketHandler extends BucketHandler {
     public long handleDirectKeys(long parentId, boolean withReplica,
                                     boolean listFile,
                                     List<DUResponse.DiskUsage> duData,
-                                    String normalizedPath, BucketLayout bucketLayout) throws IOException {
+                                    String normalizedPath) throws IOException {
 
         Table keyTable = omMetadataManager.getFileTable();
         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -165,14 +158,14 @@ public class FSOBucketHandler extends BucketHandler {
             OmKeyInfo keyInfo = kv.getValue();
             if (keyInfo != null) {
                 DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-                String subpath = EntityUtils.buildSubpath(normalizedPath,
+                String subpath = buildSubpath(normalizedPath,
                         keyInfo.getFileName());
                 diskUsage.setSubpath(subpath);
                 diskUsage.setKey(true);
                 diskUsage.setSize(keyInfo.getDataSize());
 
                 if (withReplica) {
-                    long keyDU = entityUtils.getKeySizeWithReplication(keyInfo);
+                    long keyDU = getKeySizeWithReplication(keyInfo);
                     keyDataSizeWithReplica += keyDU;
                     diskUsage.setSizeWithReplica(keyDU);
                 }
@@ -193,9 +186,8 @@ public class FSOBucketHandler extends BucketHandler {
      * @return directory object ID
      */
     @Override
-    public long getDirObjectId(String[] names, BucketLayout bucketLayout) throws IOException {
-        return getDirObjectId(names, names.length,
-                BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    public long getDirObjectId(String[] names) throws IOException {
+        return getDirObjectId(names, names.length);
     }
 
     /**
@@ -208,9 +200,8 @@ public class FSOBucketHandler extends BucketHandler {
      * @return directory object ID
      */
     @Override
-    public long getDirObjectId(String[] names, int cutoff,
-                               BucketLayout bucketLayout) throws IOException {
-        long dirObjectId = entityUtils.getBucketObjectId(names);
+    public long getDirObjectId(String[] names, int cutoff) throws IOException {
+        long dirObjectId = getBucketObjectId(names);
         String dirKey = null;
         for (int i = 2; i < cutoff; ++i) {
             dirKey = omMetadataManager.getOzonePathKey(dirObjectId, names[i]);
