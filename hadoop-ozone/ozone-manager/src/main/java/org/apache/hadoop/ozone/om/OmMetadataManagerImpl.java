@@ -50,12 +50,12 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBAccessIdInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBKerberosPrincipalInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBUserPrincipalInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBTenantInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
@@ -65,14 +65,14 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -137,17 +137,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *
    * Multi-Tenant Tables:
    * |----------------------------------------------------------------------|
+   * | tenantStateTable          | tenantId -> OmDBTenantState              |
+   * |----------------------------------------------------------------------|
    * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
    * |----------------------------------------------------------------------|
-   * | principalToAccessIdsTable | Principal -> OmDBKerberosPrincipalInfo   |
-   * |----------------------------------------------------------------------|
-   * | tenantStateTable          | tenantId -> OmDBTenantInfo               |
-   * |----------------------------------------------------------------------|
-   * | tenantGroupTable          | accessId -> [tenant group A, B, ...]     |
-   * |----------------------------------------------------------------------|
-   * | tenantRoleTable           | accessId -> roles [admin, roleB, ...]    |
-   * |----------------------------------------------------------------------|
-   * | tenantPolicyTable         | policyGroup -> [policyId1, policyId2]    |
+   * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
    * |----------------------------------------------------------------------|
    *
    * Simple Tables:
@@ -198,9 +192,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
-  public static final String TENANT_GROUP_TABLE = "tenantGroupTable";
-  public static final String TENANT_ROLE_TABLE = "tenantRoleTable";
-  public static final String TENANT_POLICY_TABLE = "tenantPolicyTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -221,10 +212,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       META_TABLE,
       TENANT_ACCESS_ID_TABLE,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
-      TENANT_STATE_TABLE,
-      TENANT_GROUP_TABLE,
-      TENANT_ROLE_TABLE,
-      TENANT_POLICY_TABLE
+      TENANT_STATE_TABLE
   };
 
   private DBStore store;
@@ -248,13 +236,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table transactionInfoTable;
   private Table metaTable;
 
-  // Tables for multi-tenancy
+  // Tables required for multi-tenancy
   private Table tenantAccessIdTable;
   private Table principalToAccessIdsTable;
   private Table tenantStateTable;
-  private Table tenantGroupTable;
-  private Table tenantRoleTable;
-  private Table tenantPolicyTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -463,9 +448,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(TENANT_ACCESS_ID_TABLE)
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
-        .addTable(TENANT_GROUP_TABLE)
-        .addTable(TENANT_ROLE_TABLE)
-        .addTable(TENANT_POLICY_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -478,10 +460,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(TransactionInfo.class, new TransactionInfoCodec())
         .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
-        .addCodec(OmDBTenantInfo.class, new OmDBTenantInfoCodec())
+        .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
-        .addCodec(OmDBKerberosPrincipalInfo.class,
-            new OmDBKerberosPrincipalInfoCodec());
+        .addCodec(OmDBUserPrincipalInfo.class,
+            new OmDBUserPrincipalInfoCodec());
   }
 
   /**
@@ -563,31 +545,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         String.class, OmDBAccessIdInfo.class);
     checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE);
 
-    // User principal -> OmDBKerberosPrincipalInfo (A list of accessIds)
+    // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
     principalToAccessIdsTable = this.store.getTable(
         PRINCIPAL_TO_ACCESS_IDS_TABLE,
-        String.class, OmDBKerberosPrincipalInfo.class);
+        String.class, OmDBUserPrincipalInfo.class);
     checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE);
 
     // tenant name -> tenant (tenant states)
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
-        String.class, OmDBTenantInfo.class);
+        String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
-
-    // accessId -> list of tenant groups the user belongs to
-    tenantGroupTable = this.store.getTable(TENANT_GROUP_TABLE,
-        String.class, String.class /* TODO: Use custom list */);
-    checkTableStatus(tenantGroupTable, TENANT_GROUP_TABLE);
-
-    // accessId -> list of roles in a tenant. e.g. admin for "finance"
-    tenantRoleTable = this.store.getTable(TENANT_ROLE_TABLE,
-        String.class, String.class /* TODO: Use custom list */);
-    checkTableStatus(tenantRoleTable, TENANT_ROLE_TABLE);
-
-    // tenant policy name -> list of tenant policies
-    tenantPolicyTable = this.store.getTable(TENANT_POLICY_TABLE,
-        String.class, String.class /* TODO: Use custom list */);
-    checkTableStatus(tenantPolicyTable, TENANT_POLICY_TABLE);
   }
 
   /**
@@ -1332,29 +1299,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, OmDBKerberosPrincipalInfo>
+  public Table<String, OmDBUserPrincipalInfo>
       getPrincipalToAccessIdsTable() {
     return principalToAccessIdsTable;
   }
 
   @Override
-  public Table<String, OmDBTenantInfo> getTenantStateTable() {
+  public Table<String, OmDBTenantState> getTenantStateTable() {
     return tenantStateTable;
-  }
-
-  @Override
-  public Table<String, String> getTenantGroupTable() {
-    return tenantGroupTable;
-  }
-
-  @Override
-  public Table<String, String> getTenantRoleTable() {
-    return tenantRoleTable;
-  }
-
-  @Override
-  public Table<String, String> getTenantPolicyTable() {
-    return tenantPolicyTable;
   }
 
   /**

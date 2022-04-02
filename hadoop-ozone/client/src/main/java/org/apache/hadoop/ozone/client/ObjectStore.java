@@ -33,11 +33,11 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -235,9 +235,9 @@ public class ObjectStore {
    * Delete a tenant.
    * @param tenantId tenant name.
    * @throws IOException
-   * @return DeleteTenantInfo
+   * @return DeleteTenantState
    */
-  public DeleteTenantInfo deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantState deleteTenant(String tenantId) throws IOException {
     return proxy.deleteTenant(tenantId);
   }
 
@@ -304,10 +304,10 @@ public class ObjectStore {
 
   /**
    * List tenants.
-   * @return TenantInfoList
+   * @return TenantStateList
    * @throws IOException
    */
-  public TenantInfoList listTenant() throws IOException {
+  public TenantStateList listTenant() throws IOException {
     return proxy.listTenant();
   }
 

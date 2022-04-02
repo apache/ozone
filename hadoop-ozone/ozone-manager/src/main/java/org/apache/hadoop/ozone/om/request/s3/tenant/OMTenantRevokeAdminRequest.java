@@ -142,14 +142,15 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     final Map<String, String> auditMap = new HashMap<>();
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    final OMMetadataManager omMetadataManager =
+        ozoneManager.getMetadataManager();
 
     final TenantRevokeAdminRequest request =
         getOmRequest().getTenantRevokeAdminRequest();
     final String accessId = request.getAccessId();
     final String tenantId = request.getTenantId();
 
-    boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
+    boolean acquiredVolumeLock = false;
     IOException exception = null;
 
     String volumeName = null;
@@ -161,34 +162,28 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
 
-      final OmDBAccessIdInfo oldAccessIdInfo =
+      final OmDBAccessIdInfo dbAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
 
-      if (oldAccessIdInfo == null) {
+      if (dbAccessIdInfo == null) {
         throw new OMException("OmDBAccessIdInfo entry is missing for accessId '"
-            + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
+            + accessId + "'", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert (oldAccessIdInfo.getTenantId().equals(tenantId));
+      assert (dbAccessIdInfo.getTenantId().equals(tenantId));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-          .setTenantId(oldAccessIdInfo.getTenantId())
-          .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
-          .setIsAdmin(false)
-          .setIsDelegatedAdmin(false)
-          .build();
+              .setTenantId(dbAccessIdInfo.getTenantId())
+              .setUserPrincipal(dbAccessIdInfo.getUserPrincipal())
+              .setIsAdmin(false)
+              .setIsDelegatedAdmin(false)
+              .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
-
-      // Update tenantRoleTable?
-//      final String roleName = "role_admin";
-//      omMetadataManager.getTenantRoleTable().addCacheEntry(
-//          new CacheKey<>(accessId),
-//          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()

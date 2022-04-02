@@ -25,12 +25,12 @@ import org.apache.commons.lang3.tuple.Pair;
 /**
  * A collection of things that we want to maintain about a tenant in memory.
  */
-public class CachedTenantInfo {
+public class CachedTenantState {
 
   private String tenantId;
   private Set<Pair<String, String>> tenantUserAccessIds;
 
-  public CachedTenantInfo(String tenantId) {
+  public CachedTenantState(String tenantId) {
     this.tenantId = tenantId;
     tenantUserAccessIds = new HashSet<>();
   }

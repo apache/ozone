@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,32 +28,30 @@ import java.io.IOException;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Codec to encode OmDBKerberosPrincipalInfo as byte array.
+ * Codec to encode OmDBTenantState as byte array.
  */
-public class OmDBKerberosPrincipalInfoCodec
-    implements Codec<OmDBKerberosPrincipalInfo> {
+public class OmDBTenantStateCodec implements Codec<OmDBTenantState> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmDBKerberosPrincipalInfoCodec.class);
+      LoggerFactory.getLogger(OmDBTenantStateCodec.class);
 
   @Override
-  public byte[] toPersistedFormat(OmDBKerberosPrincipalInfo object)
-      throws IOException {
+  public byte[] toPersistedFormat(OmDBTenantState object) throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.convertToByteArray();
+    return object.getProtobuf().toByteArray();
   }
 
   @Override
-  public OmDBKerberosPrincipalInfo fromPersistedFormat(byte[] rawData)
+  public OmDBTenantState fromPersistedFormat(byte[] rawData)
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OmDBKerberosPrincipalInfo.getFromByteArray(rawData);
+    return OmDBTenantState.getFromProtobuf(
+        OzoneManagerProtocolProtos.TenantState.parseFrom(rawData));
   }
 
   @Override
-  public OmDBKerberosPrincipalInfo copyObject(
-      OmDBKerberosPrincipalInfo object) {
-    // TODO: Not really a "copy". See OMTransactionInfoCodec
+  public OmDBTenantState copyObject(OmDBTenantState object) {
+    // Note: Not really a "copy". from OMTransactionInfoCodec
     return object;
   }
 }
