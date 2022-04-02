@@ -55,7 +55,14 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (type == HddsProtos.ReplicationType.CHAINED) {
+    // Once we support creating EC containers/pipelines from the client, the
+    // client should check if SCM is able to fulfil the request, and
+    // understands an EcReplicationConfig. For that we also need to have SCM's
+    // version here from ScmInfo response.
+    // As I see there is no way to specify ECReplicationConfig properly here
+    // so failing the request if type is EC, seems to be safe.
+    if (type == HddsProtos.ReplicationType.CHAINED
+        || type == HddsProtos.ReplicationType.EC) {
       throw new IllegalArgumentException(type.name()
           + " is not supported yet.");
     }

@@ -172,6 +172,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
           ((RatisReplicationConfig) replicationConfig).getReplicationFactor());
       break;
     case EC:
+      // We do not check for server support here, as this call is used only
+      // from OM which has the same software version as SCM.
+      // TODO: Rolling upgrade support needs to change this.
       requestBuilder.setEcReplicationConfig(
           ((ECReplicationConfig)replicationConfig).toProto());
       break;

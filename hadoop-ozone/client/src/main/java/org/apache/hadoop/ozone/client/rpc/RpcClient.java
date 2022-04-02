@@ -190,6 +190,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
+  private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
 
   /**
@@ -221,8 +222,9 @@ public class RpcClient implements ClientProtocol {
         OzoneManagerClientProtocol.class, conf);
     dtService = omTransport.getDelegationTokenService();
     List<X509Certificate> x509Certificates = null;
+    ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
+    omVersion = getOmVersion(serviceInfoEx);
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
       // If the client is authenticating using S3 style auth, all future
       // requests serviced by this client will need S3 Auth set.
       boolean isS3 = conf.getBoolean(S3Auth.S3_AUTH_CHECK, false);
@@ -314,6 +316,18 @@ public class RpcClient implements ClientProtocol {
 
   public XceiverClientFactory getXceiverClientManager() {
     return xceiverClientManager;
+  }
+
+  private OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
+    OzoneManagerVersion version = OzoneManagerVersion.CURRENT;
+    for (ServiceInfo si : info.getServiceInfoList()) {
+      OzoneManagerVersion current =
+          OzoneManagerVersion.fromProtoValue(si.getProtobuf().getOMVersion());
+      if (version.compareTo(current) > 0) {
+        version = current;
+      }
+    }
+    return version;
   }
 
   static boolean validateOmVersion(OzoneManagerVersion minimumVersion,
@@ -554,6 +568,15 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkNotNull(bucketArgs);
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (bucketArgs.getDefaultReplicationConfig().getType()
+          == ReplicationType.EC) {
+        throw new IOException("Can not set the default replication of the"
+            + " bucket to Erasure Coded replication, as OzoneManager does"
+            + " not support Erasure Coded replication.");
+      }
+    }
 
     String owner = bucketArgs.getOwner() == null ?
             ugi.getShortUserName() : bucketArgs.getOwner();
@@ -793,6 +816,15 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Preconditions.checkNotNull(replicationConfig);
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (replicationConfig.getReplicationType()
+          == HddsProtos.ReplicationType.EC) {
+        throw new IOException("Can not set the default replication of the"
+            + " bucket to Erasure Coded replication, as OzoneManager does"
+            + " not support Erasure Coded replication.");
+      }
+    }
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -899,6 +931,15 @@ public class RpcClient implements ClientProtocol {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName);
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (replicationConfig.getReplicationType()
+          == HddsProtos.ReplicationType.EC) {
+        throw new IOException("Can not set the replication of the key to"
+            + " Erasure Coded replication, as OzoneManager does not support"
+            + " Erasure Coded replication.");
+      }
+    }
     String requestId = UUID.randomUUID().toString();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
@@ -1194,6 +1235,15 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (replicationConfig.getReplicationType()
+          == HddsProtos.ReplicationType.EC) {
+        throw new IOException("Can not set the replication of the file to"
+            + " Erasure Coded replication, as OzoneManager does not support"
+            + " Erasure Coded replication.");
+      }
+    }
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1441,6 +1491,15 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException {
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (replicationConfig.getReplicationType()
+          == HddsProtos.ReplicationType.EC) {
+        throw new IOException("Can not set the replication of the file to"
+            + " Erasure Coded replication, as OzoneManager does not support"
+            + " Erasure Coded replication.");
+      }
+    }
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
