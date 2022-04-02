@@ -151,7 +151,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           volumeName, bucketName);
 
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
 
       // Check if toKey exists
       fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,

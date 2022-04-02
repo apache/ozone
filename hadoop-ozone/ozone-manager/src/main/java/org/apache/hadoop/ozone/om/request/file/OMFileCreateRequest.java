@@ -211,7 +211,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
 
       if (keyName.length() == 0) {
         // Check if this is the root of the filesystem.

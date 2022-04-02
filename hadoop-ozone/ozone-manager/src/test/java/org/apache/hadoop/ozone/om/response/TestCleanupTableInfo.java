@@ -123,6 +123,7 @@ public class TestCleanupTableInfo {
       throws IOException {
     om = mock(OzoneManager.class);
     OMMetadataManager metaMgr = createOMMetadataManagerSpy();
+    when(om.getConfiguration()).thenReturn(new OzoneConfiguration());
     when(om.getMetrics()).thenReturn(omMetrics);
     when(om.getMetadataManager()).thenReturn(metaMgr);
     when(om.resolveBucketLink(any(KeyArgs.class), any(OMClientRequest.class)))

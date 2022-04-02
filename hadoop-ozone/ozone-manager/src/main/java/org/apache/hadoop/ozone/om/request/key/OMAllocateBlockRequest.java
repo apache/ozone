@@ -181,7 +181,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
 
-      validateBucketAndVolume(omMetadataManager, volumeName,
+      validateBucketAndVolume(ozoneManager, volumeName,
           bucketName);
 
       // Here we don't acquire bucket/volume lock because for a single client

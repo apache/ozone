@@ -79,7 +79,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Add volume and bucket entries to DB.
     addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
 
@@ -206,7 +206,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Add volume and bucket entries to DB.
     addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
 
