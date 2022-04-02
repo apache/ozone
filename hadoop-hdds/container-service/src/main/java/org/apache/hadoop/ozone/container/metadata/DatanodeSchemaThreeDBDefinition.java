@@ -39,12 +39,12 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
  * as key prefix.
  *
  * Some key format illustrations for the column families:
- * - block_data:     | containerID | blockID |
- * - metadata:       | containerID | #BLOCKCOUNT |
- *                   | containerID | #BYTESUSED |
+ * - block_data:     containerID | blockID
+ * - metadata:       containerID | #BLOCKCOUNT
+ *                   containerID | #BYTESUSED
  *                   ...
- * - deleted_blocks: | containerID | blockID |
- * - delete_txns:    | containerID | TransactionID |
+ * - deleted_blocks: containerID | blockID
+ * - delete_txns:    containerID | TransactionID
  *
  * The keys would be encoded in a fix-length encoding style in order to
  * utilize the "Prefix Seek" feature from Rocksdb to optimize seek.
