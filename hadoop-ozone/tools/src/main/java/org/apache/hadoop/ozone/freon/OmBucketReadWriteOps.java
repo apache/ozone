@@ -54,7 +54,7 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(OmBucketReadWriteOps.class);
 
-  @Option(names = {"-P", "root-path", "--rootPath"},
+  @Option(names = {"-P", "--root-path", "--rootPath"},
       description = "Prefix path. Full name --prefixPath will be " +
           "removed in later versions.",
       defaultValue = "o3fs://bucket1.vol1/dir1/dir2")
