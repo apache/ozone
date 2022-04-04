@@ -187,7 +187,7 @@ public class TestOmBucketReadWriteOps {
     Assert.assertEquals("Mismatch Count!", expectedCount, actual);
   }
 
-  private class ParameterBuilder {
+  private static class ParameterBuilder {
 
     private String volumeName = "vol1";
     private String bucketName = "bucket1";
