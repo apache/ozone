@@ -45,7 +45,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.isUserAccessIdPrincipalOrTenantAdmin;
 
 /**
  * Handles SetSecret request.
@@ -108,7 +107,8 @@ public class OMSetSecretRequest extends OMClientRequest {
 
     if (!username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
       // Attempt to retrieve tenant info using the accessId
-      if (!isUserAccessIdPrincipalOrTenantAdmin(ozoneManager, accessId, ugi)) {
+      if (!ozoneManager.getMultiTenantManager()
+          .isUserAccessIdPrincipalOrTenantAdmin(ozoneManager, accessId, ugi)) {
         throw new OMException("Permission denied. Requested accessId '" +
                 accessId + "' and user doesn't satisfy any of:\n" +
                 "1) accessId match current username: '" + username + "';\n" +

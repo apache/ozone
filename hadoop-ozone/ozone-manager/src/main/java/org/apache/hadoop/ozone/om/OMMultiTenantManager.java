@@ -19,8 +19,10 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.auth.BasicUserPrincipal;
 
 /**
@@ -150,4 +152,46 @@ public interface OMMultiTenantManager {
    * Given a user, remove him as admin of the corresponding Tenant.
    */
   void revokeTenantAdmin(String accessID) throws IOException;
+
+  /**
+   * Passes check only when caller is an Ozone (cluster) admin, throws
+   * OMException otherwise.
+   * @throws OMException PERMISSION_DENIED
+   */
+  void checkAdmin(OzoneManager ozoneManager) throws OMException;
+
+  /**
+   * Passes check if caller is an Ozone cluster admin or tenant delegated admin,
+   * throws OMException otherwise.
+   * @throws OMException PERMISSION_DENIED
+   */
+  void checkTenantAdmin(OzoneManager ozoneManager, String tenantId)
+      throws OMException;
+
+  /**
+   * Check if the tenantId exists in the table, throws TENANT_NOT_FOUND if not.
+   */
+  void checkTenantExistence(String tenantId) throws OMException;
+
+  /**
+   * Retrieve volume name of the tenant.
+   *
+   * Throws OMException TENANT_NOT_FOUND if tenantId doesn't exist.
+   */
+  String getTenantVolumeName(String tenantId) throws IOException;
+
+  boolean isUserAccessIdPrincipalOrTenantAdmin(OzoneManager ozoneManager,
+      String accessId, UserGroupInformation ugi) throws IOException;
+
+  /**
+   * Scans (Slow!) TenantAccessIdTable for the given tenantId.
+   * Returns true if the tenant doesn't have any accessIds assigned to it
+   * (i.e. the tenantId is not found in this table for any existing accessIds);
+   * Returns false otherwise.
+   *
+   * @param tenantId
+   * @return
+   * @throws IOException
+   */
+  boolean isTenantEmpty(String tenantId) throws IOException;
 }

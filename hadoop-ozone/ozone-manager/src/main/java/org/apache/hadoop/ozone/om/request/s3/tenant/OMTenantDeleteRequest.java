@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
@@ -70,7 +69,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     // Check Ozone cluster admin privilege
-    OMMultiTenantManagerImpl.checkAdmin(ozoneManager);
+    ozoneManager.getMultiTenantManager().checkAdmin(ozoneManager);
 
     // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
 
@@ -122,8 +121,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
           VOLUME_LOCK, volumeName);
 
       // Check if there are any accessIds in the tenant
-      if (!OMMultiTenantManagerImpl
-          .isTenantEmpty(omMetadataManager, tenantId)) {
+      if (!ozoneManager.getMultiTenantManager().isTenantEmpty(tenantId)) {
         LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
             tenantId);
         throw new OMException("Tenant '" + tenantId + "' is not empty. " +

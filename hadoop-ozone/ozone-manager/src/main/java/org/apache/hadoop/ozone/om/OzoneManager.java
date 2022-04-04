@@ -3068,11 +3068,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    OMMultiTenantManagerImpl.checkTenantExistence(
-        multiTenantManager.getOmMetadataManager(), tenantId);
+    multiTenantManager.checkTenantExistence(tenantId);
 
-    final String volumeName = OMMultiTenantManagerImpl.getTenantVolumeName(
-            getMetadataManager(), tenantId);
+    final String volumeName = multiTenantManager.getTenantVolumeName(tenantId);
     // TODO: Maybe use multiTenantManager.getTenantInfo(tenantId)
     //  .getTenantBucketNameSpace() after refactoring
 
