@@ -268,6 +268,15 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
      */
   }
 
+  public void markCommitWithTimestamp(final byte[] xid, final byte[] ts)
+      throws RocksDBException {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
+
+  }
+
   /**
    * Get List of events.
    * @return List of events.
