@@ -570,7 +570,8 @@ public class RpcClient implements ClientProtocol {
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
     if (omVersion
         .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
-      if (bucketArgs.getDefaultReplicationConfig().getType()
+      if (bucketArgs.getDefaultReplicationConfig() != null &&
+          bucketArgs.getDefaultReplicationConfig().getType()
           == ReplicationType.EC) {
         throw new IOException("Can not set the default replication of the"
             + " bucket to Erasure Coded replication, as OzoneManager does"
@@ -933,8 +934,9 @@ public class RpcClient implements ClientProtocol {
     HddsClientUtils.checkNotNull(keyName);
     if (omVersion
         .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
-      if (replicationConfig.getReplicationType()
-          == HddsProtos.ReplicationType.EC) {
+      if (replicationConfig != null &&
+          replicationConfig.getReplicationType()
+              == HddsProtos.ReplicationType.EC) {
         throw new IOException("Can not set the replication of the key to"
             + " Erasure Coded replication, as OzoneManager does not support"
             + " Erasure Coded replication.");
