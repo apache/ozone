@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,6 +50,8 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
+  private HashMap<String, OMDBUpdateEvent> omdbLatestUpdateEvents
+      = new HashMap<>();
   private OMDBDefinition omdbDefinition;
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
@@ -106,14 +109,10 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       // Delete non-existing
       Table table = omMetadataManager.getTable(tableName);
 
-      OMDBUpdateEvent previousEvent = omdbUpdateEvents.stream()
-          .filter(event -> key.equals(event.getKey()))
-          .reduce((first, second) -> second)
-          .orElse(null);
-
+      OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
       Object oldValue;
-      if (previousEvent != null) {
-        oldValue = previousEvent.getValue();
+      if (latestEvent != null) {
+        oldValue = latestEvent.getValue();
       } else {
         // Recon does not add entries to cache and it is safer to always use
         // getSkipCache in Recon.
@@ -127,7 +126,9 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
         // as an "UPDATE" event.
         if (oldValue != null) {
           builder.setOldValue(oldValue);
-          builder.setAction(UPDATE);
+          if (latestEvent == null || latestEvent.getAction() != DELETE) {
+            builder.setAction(UPDATE);
+          }
         }
       } else if (action.equals(DELETE)) {
         // When you delete a Key, we add the old value to the event so that
@@ -141,6 +142,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
                 "action = %s", tableName, action));
       }
       omdbUpdateEvents.add(event);
+      omdbLatestUpdateEvents.put(key, event);
     } else {
       // key type or value type cannot be determined for this table.
       // log a warn message and ignore the update.
