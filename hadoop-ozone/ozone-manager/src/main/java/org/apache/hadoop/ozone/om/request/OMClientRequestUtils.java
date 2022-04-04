@@ -19,23 +19,31 @@ package org.apache.hadoop.ozone.om.request;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for OMClientRequest. Validates that the bucket layout expected
  * by the Request class is the same as the layout of the bucket being worked on.
  */
 public final class OMClientRequestUtils {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMClientRequestUtils.class);
+
   private OMClientRequestUtils() {
   }
 
-  public static void checkClientRequestPreconditions(
+  public static void checkClientRequestPrecondition(
       BucketLayout dbBucketLayout, BucketLayout reqClassBucketLayout)
       throws OMException {
     if (dbBucketLayout.isFileSystemOptimized() !=
         reqClassBucketLayout.isFileSystemOptimized()) {
-      throw new OMException(
+      String errMsg =
           "BucketLayout mismatch. DB BucketLayout " + dbBucketLayout +
-              " and OMRequestClass BucketLayout " + reqClassBucketLayout,
+              " and OMRequestClass BucketLayout " + reqClassBucketLayout;
+      LOG.error(errMsg);
+      throw new OMException(
+          errMsg,
           OMException.ResultCodes.INTERNAL_ERROR);
     }
   }

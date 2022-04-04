@@ -207,7 +207,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // Make sure associated bucket's layout matches the one associated with
     // the request.
-    OMClientRequestUtils.checkClientRequestPreconditions(
+    OMClientRequestUtils.checkClientRequestPrecondition(
         omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout(),
         getBucketLayout());
   }
