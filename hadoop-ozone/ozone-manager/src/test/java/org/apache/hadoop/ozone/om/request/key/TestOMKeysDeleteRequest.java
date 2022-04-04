@@ -51,7 +51,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     createPreRequisites();
 
     OMKeysDeleteRequest omKeysDeleteRequest =
-        new OMKeysDeleteRequest(omRequest, BucketLayout.LEGACY);
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponse(omKeysDeleteRequest);
   }
 
@@ -95,7 +95,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
                     .addAllKeys(deleteKeyList).addKeys("dummy"))).build();
 
     OMKeysDeleteRequest omKeysDeleteRequest =
-        new OMKeysDeleteRequest(omRequest, BucketLayout.LEGACY);
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest);
   }
 

@@ -118,6 +118,9 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     addRequestClass(Type.DeleteKeys,
         OMKeysDeleteRequest.class,
         BucketLayout.OBJECT_STORE);
+    addRequestClass(Type.DeleteKeys,
+        OmKeysDeleteRequestWithFSO.class,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // RenameKey
     addRequestClass(Type.RenameKey,
@@ -246,6 +249,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     if (OM_KEY_REQUEST_CLASSES.containsKey(classKey)) {
       try {
         // Get the constructor of the request class.
+        // The constructor takes OMRequest and BucketLayout as parameters.
         Constructor<? extends OMKeyRequest> declaredConstructor =
             OM_KEY_REQUEST_CLASSES.get(classKey)
                 .getDeclaredConstructor(OMRequest.class, BucketLayout.class);
@@ -254,8 +258,9 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
         return declaredConstructor.newInstance(omRequest, bucketLayout);
       } catch (NoSuchMethodException | InvocationTargetException |
           InstantiationException | IllegalAccessException e) {
-        String errMsg = "Exception while creating OMKeyRequest of type " +
-            requestType + " for bucket layout " + bucketLayout;
+        String errMsg = "Exception while instantiating OMKeyRequest of type " +
+            requestType + " for bucket layout " + bucketLayout +
+            ". Please check the OMKeyRequest class constructor.";
         LOG.error(errMsg, e);
         throw new OMException(errMsg,
             OMException.ResultCodes.INTERNAL_ERROR);

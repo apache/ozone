@@ -71,8 +71,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeysDeleteRequest.class);
 
-  public OMKeysDeleteRequest(OMRequest omRequest, BucketLayout layout) {
-    super(omRequest, layout);
+  public OMKeysDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override @SuppressWarnings("methodlength")
@@ -297,17 +297,4 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     auditMap.put(UNDELETED_KEYS_LIST, String.join(",", unDeletedKeys));
   }
 
-  public static OMKeysDeleteRequest getInstance(
-      OzoneManagerProtocolProtos.DeleteKeyArgs keyArgs,
-      OzoneManagerProtocolProtos.OMRequest omRequest, OzoneManager ozoneManager)
-      throws IOException {
-
-    BucketLayout bucketLayout = OzoneManagerUtils
-        .getBucketLayout(keyArgs.getVolumeName(), keyArgs.getBucketName(),
-            ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new OmKeysDeleteRequestWithFSO(omRequest, bucketLayout);
-    }
-    return new OMKeysDeleteRequest(omRequest, bucketLayout);
-  }
 }
