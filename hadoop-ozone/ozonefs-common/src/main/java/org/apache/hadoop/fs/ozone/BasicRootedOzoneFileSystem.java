@@ -485,6 +485,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       OFSPath ofsPath = new OFSPath(f);
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
+      LOG.debug("Deleting bucket with name {} is via DeleteIteratorWithFSO.",
+          bucket.getName());
     }
 
     @Override
@@ -503,6 +505,30 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
+  private class DeleteIteratorFactory {
+    private Path path;
+    private boolean recursive;
+    private OFSPath ofsPath;
+
+    DeleteIteratorFactory(Path f, boolean recursive) {
+      this.path = f;
+      this.recursive = recursive;
+      this.ofsPath = new OFSPath(f);
+    }
+
+    OzoneListingIterator getDeleteIterator()
+        throws IOException {
+      OzoneListingIterator deleteIterator;
+      if (ofsPath.isBucket() &&
+          isFSObucket(ofsPath.getVolumeName(), ofsPath.getBucketName())) {
+        deleteIterator = new DeleteIteratorWithFSO(path, recursive);
+      } else {
+        deleteIterator = new DeleteIterator(path, recursive);
+      }
+      return deleteIterator;
+    }
+  }
+
 
   /**
    * Deletes the children of the input dir path by iterating though the
@@ -515,29 +541,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private boolean innerDelete(Path f, boolean recursive) throws IOException {
     LOG.trace("delete() path:{} recursive:{}", f, recursive);
     try {
-      DeleteIterator iterator = new DeleteIterator(f, recursive);
-      return iterator.iterate();
-    } catch (FileNotFoundException e) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Couldn't delete {} - does not exist", f);
-      }
-      return false;
-    }
-  }
-
-  /**
-   * Deletes the children of the bucket i.e all files and dirs under it's
-   * path by iterating though th DeleteIteratorWithFSO.
-   *
-   * @param f directory path to be deleted
-   * @return true if successfully deletes all required keys, false otherwise
-   * @throws IOException
-   */
-  private boolean recursiveBucketDelete(Path f, boolean recursive)
-      throws IOException {
-    LOG.trace("delete() path:{}", f);
-    try {
-      DeleteIteratorWithFSO iterator = new DeleteIteratorWithFSO(f, recursive);
+      OzoneListingIterator iterator =
+          new DeleteIteratorFactory(f, recursive).getDeleteIterator();
       return iterator.iterate();
     } catch (FileNotFoundException e) {
       if (LOG.isDebugEnabled()) {
@@ -626,12 +631,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
 
-      if (ofsPath.isBucket() && isFSObucket(ofsPath.getVolumeName(),
-          ofsPath.getBucketName())) {
-        result = recursiveBucketDelete(f, recursive);
-      } else {
-        result = innerDelete(f, recursive);
-      }
+
+      result = innerDelete(f, recursive);
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {
@@ -1082,8 +1083,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           for (FileStatus fileStatus : fileStatuses) {
             String keyName =
                 new OFSPath(fileStatus.getPath().toString()).getKeyName();
-            keyName = status.isDirectory() ? addTrailingSlashIfNeeded(keyName) :
-                keyName;
             keyPathList.add(ofsPathPrefix + keyName);
           }
           if (keyPathList.size() >= batchSize) {
