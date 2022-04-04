@@ -90,8 +90,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
    * @param conf - Configuration
    */
   public XceiverServerGrpc(DatanodeDetails datanodeDetails,
-                           ConfigurationSource conf,
-                           ContainerDispatcher dispatcher, CertificateClient caClient) {
+    ConfigurationSource conf,
+    ContainerDispatcher dispatcher, CertificateClient caClient) {
     Preconditions.checkNotNull(conf);
 
     this.id = datanodeDetails.getUuid();
@@ -210,7 +210,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
-                            HddsProtos.PipelineID pipelineID) throws IOException {
+    HddsProtos.PipelineID pipelineID) throws IOException {
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
