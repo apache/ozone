@@ -50,7 +50,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
-  private HashMap<String, OMDBUpdateEvent> omdbLatestUpdateEvents
+  private Map<String, OMDBUpdateEvent> omdbLatestUpdateEvents
       = new HashMap<>();
   private OMDBDefinition omdbDefinition;
 

@@ -140,7 +140,8 @@ public class TestOMDBUpdatesHandler {
   public void testDelete() throws Exception {
     // Write 1 volume, 1 key into source and target OM DBs.
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");
-    String nonExistVolumeKey = omMetadataManager.getVolumeKey("nonExistingVolume");
+    String nonExistVolumeKey = omMetadataManager
+        .getVolumeKey("nonExistingVolume");
     OmVolumeArgs args =
         OmVolumeArgs.newBuilder()
             .setVolume("sampleVol")
@@ -163,7 +164,8 @@ public class TestOMDBUpdatesHandler {
     // Delete a non-existing volume and key
     omMetadataManager.getKeyTable(getBucketLayout())
         .delete("/sampleVol/bucketOne/key_two");
-    omMetadataManager.getVolumeTable().delete(omMetadataManager.getVolumeKey("nonExistingVolume"));
+    omMetadataManager.getVolumeTable()
+        .delete(omMetadataManager.getVolumeKey("nonExistingVolume"));
 
     List<byte[]> writeBatches = getBytesFromOmMetaManager(3);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
@@ -243,13 +245,15 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdateEvent keyPutEvent = events.get(1);
     assertEquals(PUT, keyPutEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyPutEvent.getKey());
-    assertEquals("key", ((OmKeyInfo)keyPutEvent.getValue()).getKeyName());
+    assertEquals("key",
+        ((OmKeyInfo)keyPutEvent.getValue()).getKeyName());
     assertNull(keyPutEvent.getOldValue());
 
     OMDBUpdateEvent keyUpdateEvent = events.get(2);
     assertEquals(UPDATE, keyUpdateEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyUpdateEvent.getKey());
-    assertEquals("key_new", ((OmKeyInfo)keyUpdateEvent.getValue()).getKeyName());
+    assertEquals("key_new",
+        ((OmKeyInfo)keyUpdateEvent.getValue()).getKeyName());
     assertNotNull(keyUpdateEvent.getOldValue());
     assertEquals("key",
         ((OmKeyInfo)keyUpdateEvent.getOldValue()).getKeyName());
@@ -257,7 +261,8 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdateEvent keyUpdateEvent2 = events.get(3);
     assertEquals(UPDATE, keyUpdateEvent2.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyUpdateEvent2.getKey());
-    assertEquals("key_new2", ((OmKeyInfo)keyUpdateEvent2.getValue()).getKeyName());
+    assertEquals("key_new2",
+        ((OmKeyInfo)keyUpdateEvent2.getValue()).getKeyName());
     assertNotNull(keyUpdateEvent2.getOldValue());
     assertEquals("key_new",
         ((OmKeyInfo)keyUpdateEvent2.getOldValue()).getKeyName());
@@ -265,17 +270,20 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdateEvent keyDeleteEvent = events.get(4);
     assertEquals(DELETE, keyDeleteEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyDeleteEvent.getKey());
-    assertEquals("key_new2", ((OmKeyInfo)keyDeleteEvent.getValue()).getKeyName());
+    assertEquals("key_new2",
+        ((OmKeyInfo)keyDeleteEvent.getValue()).getKeyName());
 
     OMDBUpdateEvent keyDeleteEvent2 = events.get(5);
     assertEquals(DELETE, keyDeleteEvent2.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyDeleteEvent2.getKey());
-    assertEquals("key_new2", ((OmKeyInfo)keyDeleteEvent2.getValue()).getKeyName());
+    assertEquals("key_new2",
+        ((OmKeyInfo)keyDeleteEvent2.getValue()).getKeyName());
 
     OMDBUpdateEvent keyPut2 = events.get(6);
-    assertEquals(UPDATE, keyPut2.getAction());
+    assertEquals(PUT, keyPut2.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyPut2.getKey());
-    assertEquals("key_new2", ((OmKeyInfo)keyPut2.getValue()).getKeyName());
+    assertEquals("key_new2",
+        ((OmKeyInfo)keyPut2.getValue()).getKeyName());
     assertNotNull(keyPut2.getOldValue());
     assertEquals("key_new2",
         ((OmKeyInfo)keyPut2.getOldValue()).getKeyName());
@@ -300,7 +308,8 @@ public class TestOMDBUpdatesHandler {
   }
 
   @NotNull
-  private List<byte[]> getBytesFromOmMetaManager(int getUpdatesSince) throws RocksDBException {
+  private List<byte[]> getBytesFromOmMetaManager(int getUpdatesSince)
+      throws RocksDBException {
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDB rocksDB = rdbStore.getDb();
     // Get all updates from source DB
@@ -320,7 +329,8 @@ public class TestOMDBUpdatesHandler {
   }
 
   @NotNull
-  private OMDBUpdatesHandler captureEvents(List<byte[]> writeBatches) throws RocksDBException {
+  private OMDBUpdatesHandler captureEvents(List<byte[]> writeBatches)
+      throws RocksDBException {
     OMDBUpdatesHandler omdbUpdatesHandler =
         new OMDBUpdatesHandler(reconOmMetadataManager);
     for (byte[] data : writeBatches) {
