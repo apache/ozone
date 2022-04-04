@@ -126,7 +126,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       OmKeyInfo dbFileInfo = null;
 

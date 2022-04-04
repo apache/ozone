@@ -144,7 +144,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
           volumeName, bucketName);
 

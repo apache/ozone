@@ -170,7 +170,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
 
-      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.

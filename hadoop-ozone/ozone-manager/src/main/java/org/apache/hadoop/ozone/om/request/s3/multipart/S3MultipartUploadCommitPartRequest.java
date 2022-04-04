@@ -135,7 +135,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String uploadID = keyArgs.getMultipartUploadID();
       multipartKey = getMultipartKey(volumeName, bucketName, keyName,

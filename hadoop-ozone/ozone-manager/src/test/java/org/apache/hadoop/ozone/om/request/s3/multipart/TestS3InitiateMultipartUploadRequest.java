@@ -50,7 +50,7 @@ public class TestS3InitiateMultipartUploadRequest
 
     // Add volume and bucket to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
+        omMetadataManager);
 
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);

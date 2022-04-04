@@ -29,23 +29,10 @@ public final class OMClientRequestUtils {
   }
 
   public static void checkClientRequestPreconditions(
-      BucketLayout dbBucketLayout, BucketLayout reqClassBucketLayout,
-      boolean isFileSystemPathsEnabled)
+      BucketLayout dbBucketLayout, BucketLayout reqClassBucketLayout)
       throws OMException {
-    // Check if the bucket layout is the same as the one expected by the
-    // request class.
     if (dbBucketLayout.isFileSystemOptimized() !=
         reqClassBucketLayout.isFileSystemOptimized()) {
-      // In case there was a bucket layout mismatch, there is still a
-      // possibility that the request class is trying to work on a cluster which
-      // has config key OZONE_OM_ENABLE_FILESYSTEM_PATHS set to true.
-      // In this case we can expect the dbBucketLayout to be LEGACY and
-      // request class bucket layout to be FILE_SYSTEM_OPTIMIZED.
-      if ((dbBucketLayout.equals(BucketLayout.LEGACY) &&
-          isFileSystemPathsEnabled) &&
-          reqClassBucketLayout.isFileSystemOptimized()) {
-        return;
-      }
       throw new OMException(
           "BucketLayout mismatch. DB BucketLayout " + dbBucketLayout +
               " and OMRequestClass BucketLayout " + reqClassBucketLayout,

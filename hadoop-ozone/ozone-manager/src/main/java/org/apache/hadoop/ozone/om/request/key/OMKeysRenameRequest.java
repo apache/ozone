@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -69,8 +68,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeysRenameRequest.class);
 
-  public OMKeysRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
-    super(omRequest, bucketLayout);
+  public OMKeysRenameRequest(OMRequest omRequest) {
+    super(omRequest);
   }
 
   @Override
@@ -119,7 +118,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
               volumeName, bucketName);
 
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
       for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
 

@@ -139,10 +139,5 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
-
 }
 

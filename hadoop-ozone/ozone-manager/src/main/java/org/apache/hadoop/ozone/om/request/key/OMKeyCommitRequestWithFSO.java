@@ -118,7 +118,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
                       volumeName, bucketName);
 
-      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String fileName = OzoneFSUtils.getFileName(keyName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);

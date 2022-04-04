@@ -39,10 +39,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -72,6 +68,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -181,19 +180,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Validates bucket and volume associated with the request.
-   * - Volume and bucket should exist.
-   * - Bucket should be of the correct layout.
-   *
-   * @param ozoneManager Ozone Manager instance.
-   * @param volumeName   Name of the volume associated with this request.
-   * @param bucketName   Name of the bucket associated with this request.
+   * Validate bucket and volume exists or not.
+   * @param omMetadataManager
+   * @param volumeName
+   * @param bucketName
    * @throws IOException
    */
-  public void validateBucketAndVolume(OzoneManager ozoneManager,
-                                      String volumeName, String bucketName)
+  public void validateBucketAndVolume(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName)
       throws IOException {
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     // Check if bucket exists
     if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
@@ -212,12 +207,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // Make sure associated bucket's layout matches the one associated with
     // the request.
-    boolean isFileSystemPathsEnabled = ozoneManager.getConfiguration()
-        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
     OMClientRequestUtils.checkClientRequestPreconditions(
         omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout(),
-        getBucketLayout(), isFileSystemPathsEnabled);
+        getBucketLayout());
   }
 
   // For keys batch delete and rename only

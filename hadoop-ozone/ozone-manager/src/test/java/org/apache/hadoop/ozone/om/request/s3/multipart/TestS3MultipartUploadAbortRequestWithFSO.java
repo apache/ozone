@@ -69,9 +69,4 @@ public class TestS3MultipartUploadAbortRequestWithFSO
     return omMetadataManager.getMultipartKey(parentID, fileName,
         multipartUploadID);
   }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }

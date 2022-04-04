@@ -119,7 +119,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         false, true);
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
+        omMetadataManager);
     OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
@@ -309,7 +309,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         overWrite, recursive);
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
+        omMetadataManager);
     OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);

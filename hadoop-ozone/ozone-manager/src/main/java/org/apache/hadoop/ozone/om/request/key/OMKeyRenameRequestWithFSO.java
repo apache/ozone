@@ -124,7 +124,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
               volumeName, bucketName);
 
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(ozoneManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       // Check if fromKey exists
       OzoneFileStatus fromKeyFileStatus =
