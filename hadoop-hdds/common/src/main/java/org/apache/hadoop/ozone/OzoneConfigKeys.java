@@ -42,6 +42,10 @@ public final class OzoneConfigKeys {
       "dfs.container.ipc";
   public static final int DFS_CONTAINER_IPC_PORT_DEFAULT = 9859;
 
+  public static final String DFS_CONTAINER_EC_IPC_PORT =
+      "dfs.container.ec.ipc";
+  public static final int DFS_CONTAINER_EC_IPC_PORT_DEFAULT = 9860;
+
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
   /**
@@ -345,7 +349,7 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
-          = "ozone.client.read.timeout";
+      = "ozone.client.read.timeout";
   public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";
   public static final String OZONE_ACL_AUTHORIZER_CLASS =
       "ozone.acl.authorizer.class";
@@ -358,9 +362,9 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_ACL_ENABLED_DEFAULT =
       false;
   public static final String OZONE_S3_VOLUME_NAME =
-          "ozone.s3g.volume.name";
+      "ozone.s3g.volume.name";
   public static final String OZONE_S3_VOLUME_NAME_DEFAULT =
-          "s3v";
+      "s3v";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
       "ozone.s3.token.max.lifetime";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";

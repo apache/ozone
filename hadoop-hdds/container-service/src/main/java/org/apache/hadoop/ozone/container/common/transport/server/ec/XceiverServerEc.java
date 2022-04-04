@@ -16,17 +16,12 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.common.transport.server;
+package org.apache.hadoop.ozone.container.common.transport.server.ec;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
+import com.google.common.base.Preconditions;
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -44,12 +39,9 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-
-import com.google.common.base.Preconditions;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.transport.server.GrpcXceiverService;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.ratis.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
@@ -66,13 +58,22 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
  * Ozone containers.
  */
-public final class XceiverServerGrpc implements XceiverServerSpi {
+public final class XceiverServerEc implements XceiverServerSpi {
   private static final Logger
-      LOG = LoggerFactory.getLogger(XceiverServerGrpc.class);
+      LOG = LoggerFactory.getLogger(XceiverServerEc.class);
   private static final String COMPONENT = "dn";
   private int port;
   private UUID id;
@@ -80,7 +81,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private final ContainerDispatcher storageContainer;
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
-  private ThreadPoolExecutor readExecutors;
+  private ThreadPoolExecutor writeExecutors;
   private EventLoopGroup eventLoopGroup;
   private Class<? extends ServerChannel> channelType;
 
@@ -89,15 +90,15 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
    *
    * @param conf - Configuration
    */
-  public XceiverServerGrpc(DatanodeDetails datanodeDetails,
-                           ConfigurationSource conf,
-                           ContainerDispatcher dispatcher, CertificateClient caClient) {
+  public XceiverServerEc(DatanodeDetails datanodeDetails,
+                         ConfigurationSource conf,
+                         ContainerDispatcher dispatcher, CertificateClient caClient) {
     Preconditions.checkNotNull(conf);
 
     this.id = datanodeDetails.getUuid();
     this.datanodeDetails = datanodeDetails;
-    this.port = conf.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+    this.port = conf.getInt(OzoneConfigKeys.DFS_CONTAINER_EC_IPC_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_EC_IPC_PORT_DEFAULT);
 
     if (conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT)) {
@@ -110,15 +111,15 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     final int poolSize = threadCountPerDisk * numberOfDisks;
 
-    readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
+    writeExecutors = new ThreadPoolExecutor(poolSize, poolSize,
         60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("ChunkReader-%d")
+            .setNameFormat("ChunkWriter-%d")
             .build());
 
     ThreadFactory factory = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("ChunkReader-ELG-%d")
+        .setNameFormat("ChunkWriter-ELG-%d")
         .build();
 
     if (Epoll.isAvailable()) {
@@ -135,7 +136,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .bossEventLoopGroup(eventLoopGroup)
         .workerEventLoopGroup(eventLoopGroup)
         .channelType(channelType)
-        .executor(readExecutors)
+        .executor(writeExecutors)
         .addService(ServerInterceptors.intercept(
             new GrpcXceiverService(dispatcher), new GrpcServerInterceptor()));
 
@@ -195,8 +196,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   public void stop() {
     if (isStarted) {
       try {
-        readExecutors.shutdown();
-        readExecutors.awaitTermination(5L, TimeUnit.SECONDS);
+        writeExecutors.shutdown();
+        writeExecutors.awaitTermination(5L, TimeUnit.SECONDS);
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
         eventLoopGroup.shutdownGracefully().sync();
@@ -213,7 +214,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
                             HddsProtos.PipelineID pipelineID) throws IOException {
     Span span = TracingUtil
         .importAndCreateSpan(
-            "XceiverServerGrpc." + request.getCmdType().name(),
+            "XceiverServerEc." + request.getCmdType().name(),
             request.getTraceID());
     try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       ContainerProtos.ContainerCommandResponseProto response =

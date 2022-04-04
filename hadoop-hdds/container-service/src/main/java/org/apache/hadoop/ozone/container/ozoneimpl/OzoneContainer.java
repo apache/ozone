@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
+import org.apache.hadoop.ozone.container.common.transport.server.ec.XceiverServerEc;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -91,6 +92,7 @@ public class OzoneContainer {
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
+  private final XceiverServerSpi writeChannel_ec;
   private final ContainerController controller;
   private ContainerMetadataScanner metadataScanner;
   private List<ContainerDataScanner> dataScanners;
@@ -178,7 +180,10 @@ public class OzoneContainer {
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
     Duration svcInterval = conf.getObject(
-            DatanodeConfiguration.class).getBlockDeletionInterval();
+        DatanodeConfiguration.class).getBlockDeletionInterval();
+
+    writeChannel_ec = new XceiverServerEc(
+        datanodeDetails, config, hddsDispatcher, certClient);
 
     long serviceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
@@ -320,6 +325,7 @@ public class OzoneContainer {
 
     writeChannel.start();
     readChannel.start();
+    writeChannel_ec.start();
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
@@ -338,6 +344,7 @@ public class OzoneContainer {
     replicationServer.stop();
     writeChannel.stop();
     readChannel.stop();
+    writeChannel_ec.stop();
     this.handlers.values().forEach(Handler::stop);
     hddsDispatcher.shutdown();
     volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
@@ -379,6 +386,10 @@ public class OzoneContainer {
     return readChannel;
   }
 
+  public XceiverServerSpi getWriteChannel_ec() {
+    return writeChannel_ec;
+  }
+
   public ContainerController getController() {
     return controller;
   }
@@ -387,11 +398,11 @@ public class OzoneContainer {
    * Returns node report of container storage usage.
    */
   public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
-          throws IOException {
+      throws IOException {
     StorageLocationReport[] reports = volumeSet.getStorageReport();
     StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
-            = StorageContainerDatanodeProtocolProtos.
-            NodeReportProto.newBuilder();
+        = StorageContainerDatanodeProtocolProtos.
+        NodeReportProto.newBuilder();
     for (int i = 0; i < reports.length; i++) {
       nrb.addStorageReport(reports[i].getProtoBufMessage());
     }
