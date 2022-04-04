@@ -321,12 +321,15 @@ public class RpcClient implements ClientProtocol {
   private OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
     OzoneManagerVersion version = OzoneManagerVersion.CURRENT;
     for (ServiceInfo si : info.getServiceInfoList()) {
-      OzoneManagerVersion current =
-          OzoneManagerVersion.fromProtoValue(si.getProtobuf().getOMVersion());
-      if (version.compareTo(current) > 0) {
-        version = current;
+      if (si.getNodeType() == HddsProtos.NodeType.OM) {
+        OzoneManagerVersion current =
+            OzoneManagerVersion.fromProtoValue(si.getProtobuf().getOMVersion());
+        if (version.compareTo(current) > 0) {
+          version = current;
+        }
       }
     }
+    LOG.trace("Ozone Manager version is {}", version.name());
     return version;
   }
 
