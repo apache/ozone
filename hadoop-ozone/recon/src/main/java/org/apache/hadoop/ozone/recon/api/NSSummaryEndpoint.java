@@ -18,10 +18,15 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.recon.api.types.*;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -51,8 +56,6 @@ public class NSSummaryEndpoint {
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
-  private ContainerManager containerManager;
-
   private OzoneStorageContainerManager reconSCM;
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
@@ -60,7 +63,6 @@ public class NSSummaryEndpoint {
                            OzoneStorageContainerManager reconSCM) {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
-    this.containerManager = reconSCM.getContainerManager();
     this.reconSCM = reconSCM;
   }
   
@@ -90,8 +92,9 @@ public class NSSummaryEndpoint {
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
 
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
-                                                           omMetadataManager, reconSCM);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
+            names, reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM);
 
     namespaceSummaryResponse = handler.getSummaryResponse(names);
 
@@ -127,12 +130,14 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
-                                                           omMetadataManager, reconSCM);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
+            names, reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM);
 
     duResponse.setPath(normalizedPath);
 
-    duResponse = handler.getDuResponse(normalizedPath, names, listFile, withReplica);
+    duResponse = handler.getDuResponse(normalizedPath,
+            names, listFile, withReplica);
 
     return Response.ok(duResponse).build();
   }
@@ -161,8 +166,9 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
-                                                           omMetadataManager, reconSCM);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
+            names, reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM);
 
     quotaUsageResponse = handler.getQuotaResponse(names);
 
@@ -193,8 +199,9 @@ public class NSSummaryEndpoint {
 
     String normalizedPath = normalizePath(path);
     String[] names = parseRequestPath(normalizedPath);
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath, names, reconNamespaceSummaryManager,
-                                                           omMetadataManager, reconSCM);
+    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
+            names, reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM);
 
     distResponse = handler.getDistResponse(names);
 

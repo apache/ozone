@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,26 +19,17 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.api.BucketHandler;
-import org.apache.hadoop.ozone.recon.api.EntityHandler;
-import org.apache.hadoop.ozone.recon.api.RootEntityHandler;
-import org.apache.hadoop.ozone.recon.api.VolumeEntityHandler;
-import org.apache.hadoop.ozone.recon.api.DirectoryEntityHandler;
-import org.apache.hadoop.ozone.recon.api.KeyEntityHandler;
-import org.apache.hadoop.ozone.recon.api.BucketEntityHandler;
-import org.apache.hadoop.ozone.recon.api.UnknownEntityHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.RootEntityHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.VolumeEntityHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.DirectoryEntityHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.KeyEntityHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.BucketEntityHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.UnknownEntityHandler;
 
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
 
 /**
  * Enum class for namespace type.
@@ -46,66 +37,66 @@ import java.util.Set;
 public enum EntityType {
   ROOT {
     public EntityHandler create(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler){
-      return new RootEntityHandler(reconNamespaceSummaryManager, omMetadataManager,
-                               reconSCM);
+        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+        ReconOMMetadataManager omMetadataManager,
+        OzoneStorageContainerManager reconSCM,
+        BucketHandler bucketHandler) {
+      return new RootEntityHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM);
     }
   },
   VOLUME {
     public EntityHandler create(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler){
-      return new VolumeEntityHandler(reconNamespaceSummaryManager, omMetadataManager,
-                               reconSCM);
+        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+        ReconOMMetadataManager omMetadataManager,
+        OzoneStorageContainerManager reconSCM,
+        BucketHandler bucketHandler) {
+      return new VolumeEntityHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM);
     }
   },
   BUCKET {
     public EntityHandler create(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler){
-      return new BucketEntityHandler(reconNamespaceSummaryManager, omMetadataManager,
-                                 reconSCM, bucketHandler);
+        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+        ReconOMMetadataManager omMetadataManager,
+        OzoneStorageContainerManager reconSCM,
+        BucketHandler bucketHandler) {
+      return new BucketEntityHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, bucketHandler);
     }
   },
   DIRECTORY {
     public EntityHandler create(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler){
-      return new DirectoryEntityHandler(reconNamespaceSummaryManager, omMetadataManager,
-                                 reconSCM, bucketHandler);
+        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+        ReconOMMetadataManager omMetadataManager,
+        OzoneStorageContainerManager reconSCM,
+        BucketHandler bucketHandler) {
+      return new DirectoryEntityHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, bucketHandler);
     }
   },
   KEY {
     public EntityHandler create(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler){
-      return new KeyEntityHandler(reconNamespaceSummaryManager, omMetadataManager,
-                                 reconSCM, bucketHandler);
+        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+        ReconOMMetadataManager omMetadataManager,
+        OzoneStorageContainerManager reconSCM,
+        BucketHandler bucketHandler) {
+      return new KeyEntityHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, bucketHandler);
     }
   },
   UNKNOWN { // if path is invalid
     public EntityHandler create(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler){
-      return new UnknownEntityHandler(reconNamespaceSummaryManager, omMetadataManager,
-                               reconSCM);
+        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+        ReconOMMetadataManager omMetadataManager,
+        OzoneStorageContainerManager reconSCM,
+        BucketHandler bucketHandler) {
+      return new UnknownEntityHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM);
     }
   };
 
-  abstract public EntityHandler create(
+  public abstract EntityHandler create(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM,

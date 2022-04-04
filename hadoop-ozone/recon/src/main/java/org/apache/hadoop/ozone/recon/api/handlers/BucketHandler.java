@@ -1,11 +1,31 @@
-package org.apache.hadoop.ozone.recon.api;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -19,35 +39,58 @@ import java.util.List;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
-abstract public class BucketHandler {
+/**
+ * Abstract class for handling all bucket types.
+ * The abstract methods have different implementation for each bucket type.
+ */
+public abstract class BucketHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       BucketHandler.class);
 
-  protected ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  protected ReconOMMetadataManager omMetadataManager;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
-  protected ContainerManager containerManager;
+  private ReconOMMetadataManager omMetadataManager;
 
-  public BucketHandler(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                       ReconOMMetadataManager omMetadataManager,
-                     OzoneStorageContainerManager reconSCM) {
+  private ContainerManager containerManager;
+
+  public BucketHandler(
+          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+          ReconOMMetadataManager omMetadataManager,
+          OzoneStorageContainerManager reconSCM) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.containerManager = reconSCM.getContainerManager();
   }
-    abstract public EntityType determineKeyPath(String keyName, long bucketObjectId) throws IOException;
 
-    abstract public long calculateDUUnderObject(long parentId) throws IOException;
+  public ReconOMMetadataManager getOmMetadataManager() {
+    return omMetadataManager;
+  }
 
-    abstract public long handleDirectKeys(long parentId, boolean withReplica,
-                                          boolean listFile,
-                                          List<DUResponse.DiskUsage> duData,
-                                          String normalizedPath) throws IOException;
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
+  }
 
-    abstract public long getDirObjectId(String[] names) throws IOException;
+  public ContainerManager getContainerManager() {
+    return containerManager;
+  }
 
-    abstract public long getDirObjectId(String[] names, int cutoff) throws IOException;
+  public abstract EntityType determineKeyPath(String keyName,
+                             long bucketObjectId) throws IOException;
+
+  public abstract long calculateDUUnderObject(long parentId)
+          throws IOException;
+
+  public abstract long handleDirectKeys(long parentId,
+                       boolean withReplica, boolean listFile,
+                       List<DUResponse.DiskUsage> duData,
+                       String normalizedPath) throws IOException;
+
+  public abstract long getDirObjectId(String[] names)
+          throws IOException;
+
+  public abstract long getDirObjectId(String[] names, int cutoff)
+          throws IOException;
 
   /**
    *
@@ -118,23 +161,27 @@ abstract public class BucketHandler {
     return bucketInfo.getObjectID();
   }
 
-  // NOTE: In next PR, Will be updated for other bucket types depending on the path
-  //  For now only FSO buckets supported
+  // NOTE: In the next PR,
+  // it will be updated for other bucket types depending on the path
+  // For now only FSO buckets supported
 
-  static public BucketHandler getBucketHandler(String path,
-                                               ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                               ReconOMMetadataManager omMetadataManager,
-                                               OzoneStorageContainerManager reconSCM) {
+  public static BucketHandler getBucketHandler(
+          String path,
+          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+          ReconOMMetadataManager omMetadataManager,
+          OzoneStorageContainerManager reconSCM) {
 
-    return new FSOBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM);
+    return new FSOBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM);
   }
 
-  static public BucketHandler getBucketHandler(OmBucketInfo bucketInfo,
-                                               ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                               ReconOMMetadataManager omMetadataManager,
-                                               OzoneStorageContainerManager reconSCM) {
+  public static BucketHandler getBucketHandler(OmBucketInfo bucketInfo,
+                ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                ReconOMMetadataManager omMetadataManager,
+                OzoneStorageContainerManager reconSCM) {
 
-    return new FSOBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM);
+    return new FSOBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM);
   }
 
 
