@@ -32,7 +32,7 @@ start_docker_env
 
 execute_robot_test ${SCM} basic/ozone-shell-single.robot
 execute_robot_test ${SCM} basic/links.robot
-#execute_robot_test ${SCM} s3
+execute_robot_test ${SCM} s3
 execute_robot_test ${SCM} freon
 
 stop_docker_env
