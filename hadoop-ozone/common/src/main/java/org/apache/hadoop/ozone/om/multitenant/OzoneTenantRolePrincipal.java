@@ -24,24 +24,26 @@ import java.security.Principal;
  * Used to identify a tenant's role in Ranger.
  */
 public final class OzoneTenantRolePrincipal implements Principal {
-  private final String tenantID;
-  private final String roleName;
+  private final String tenantId;
+  private final String roleNameSuffix;
 
-  public static OzoneTenantRolePrincipal getUserRole(String tenantID) {
-    return new OzoneTenantRolePrincipal(tenantID, "UserRole");
+  public static OzoneTenantRolePrincipal getUserRole(String tenantId) {
+    return new OzoneTenantRolePrincipal(
+        tenantId, OzoneConsts.DEFAULT_TENANT_ROLE_USER_SUFFIX);
   }
 
-  public static OzoneTenantRolePrincipal getAdminRole(String tenantID) {
-    return new OzoneTenantRolePrincipal(tenantID, "AdminRole");
+  public static OzoneTenantRolePrincipal getAdminRole(String tenantId) {
+    return new OzoneTenantRolePrincipal(
+        tenantId, OzoneConsts.DEFAULT_TENANT_ROLE_ADMIN_SUFFIX);
   }
 
-  private OzoneTenantRolePrincipal(String tenantID, String roleName) {
-    this.tenantID = tenantID;
-    this.roleName = roleName;
+  private OzoneTenantRolePrincipal(String tenantId, String roleNameSuffix) {
+    this.tenantId = tenantId;
+    this.roleNameSuffix = roleNameSuffix;
   }
 
-  public String getTenantID() {
-    return tenantID;
+  public String getTenantId() {
+    return tenantId;
   }
 
   @Override
@@ -51,6 +53,6 @@ public final class OzoneTenantRolePrincipal implements Principal {
 
   @Override
   public String getName() {
-    return tenantID + OzoneConsts.TENANT_ID_ROLE_DELIMITER + roleName;
+    return tenantId + roleNameSuffix;
   }
 }

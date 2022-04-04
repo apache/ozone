@@ -108,7 +108,7 @@ public class OMSetSecretRequest extends OMClientRequest {
     if (!username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
       // Attempt to retrieve tenant info using the accessId
       if (!ozoneManager.getMultiTenantManager()
-          .isUserAccessIdPrincipalOrTenantAdmin(ozoneManager, accessId, ugi)) {
+          .isUserAccessIdPrincipalOrTenantAdmin(accessId, ugi)) {
         throw new OMException("Permission denied. Requested accessId '" +
                 accessId + "' and user doesn't satisfy any of:\n" +
                 "1) accessId match current username: '" + username + "';\n" +

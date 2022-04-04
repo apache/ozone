@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -69,7 +69,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     // Check Ozone cluster admin privilege
-    ozoneManager.getMultiTenantManager().checkAdmin(ozoneManager);
+    ozoneManager.getMultiTenantManager().checkAdmin();
 
     // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
 
@@ -105,11 +105,11 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       }
 
       // Reading the TenantStateTable without lock as we don't have or need
-      // a TENANT_LOCK. The assumption is that OmDBTenantInfo is read-only
+      // a TENANT_LOCK. The assumption is that OmDBTenantState is read-only
       // once it is set during tenant creation.
-      final OmDBTenantInfo dbTenantInfo =
+      final OmDBTenantState dbTenantState =
           omMetadataManager.getTenantStateTable().get(tenantId);
-      volumeName = dbTenantInfo.getBucketNamespaceName();
+      volumeName = dbTenantState.getBucketNamespaceName();
       assert (volumeName != null);
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);
@@ -130,20 +130,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
             TENANT_NOT_EMPTY);
       }
 
-      // Invalidate cache entries
+      // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      final String userPolicyGroupName = dbTenantInfo.getUserPolicyGroupName();
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(userPolicyGroupName),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      final String bucketPolicyGroupName =
-          dbTenantInfo.getBucketPolicyGroupName();
-      omMetadataManager.getTenantPolicyTable().addCacheEntry(
-          new CacheKey<>(bucketPolicyGroupName),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
       // Decrement volume refCount
@@ -182,8 +171,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
       omClientResponse = new OMTenantDeleteResponse(
           omResponse.setDeleteTenantResponse(deleteTenantResponse).build(),
-          volumeName, omVolumeArgs, tenantId, userPolicyGroupName,
-          bucketPolicyGroupName);
+          volumeName, omVolumeArgs, tenantId);
 
     } catch (IOException ex) {
       exception = ex;

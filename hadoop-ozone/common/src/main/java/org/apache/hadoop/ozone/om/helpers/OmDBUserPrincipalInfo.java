@@ -17,38 +17,26 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * This class is used for storing info related to the Kerberos principal.
  *
- * For now this is merely used to store a list of accessIds associates with the
- * principal, but can be extended to store more fields later.
+ * For now this only stores a list of accessIds associates with the user
+ * principal.
  */
-public final class OmDBKerberosPrincipalInfo {
+public final class OmDBUserPrincipalInfo {
 
   /**
    * A set of accessIds.
    */
   private final Set<String> accessIds;
 
-  // This implies above String fields should NOT contain the split key.
-  // TODO: Reject user input accessId if it contains the split key.
-  public static final String SERIALIZATION_SPLIT_KEY = ";";
-
-  public OmDBKerberosPrincipalInfo(Set<String> accessIds) {
+  public OmDBUserPrincipalInfo(Set<String> accessIds) {
     this.accessIds = new HashSet<>(accessIds);
-  }
-
-  private OmDBKerberosPrincipalInfo(String serialized) {
-    accessIds = Arrays.stream(serialized.split(SERIALIZATION_SPLIT_KEY))
-        // Remove any empty accessId strings when deserializing
-        .filter(e -> !e.isEmpty()).collect(Collectors.toSet());
   }
 
   public Set<String> getAccessIds() {
@@ -67,28 +55,27 @@ public final class OmDBKerberosPrincipalInfo {
     return accessIds.contains(accessId);
   }
 
-  private String serialize() {
-    return String.join(SERIALIZATION_SPLIT_KEY, accessIds);
-  }
-
   /**
-   * Convert OmDBKerberosPrincipalInfo to byteArray to be persisted to DB.
-   * @return byte[]
+   * Convert OmDBUserPrincipalInfo to protobuf to be persisted to DB.
    */
-  public byte[] convertToByteArray() {
-    return StringUtils.string2Bytes(serialize());
+  public OzoneManagerProtocolProtos.TenantUserPrincipalInfo getProtobuf() {
+    return OzoneManagerProtocolProtos.TenantUserPrincipalInfo.newBuilder()
+        .addAllAccessIds(accessIds)
+        .build();
   }
 
   /**
-   * Convert byte array to OmDBKerberosPrincipalInfo.
+   * Convert protobuf to OmDBUserPrincipalInfo.
    */
-  public static OmDBKerberosPrincipalInfo getFromByteArray(byte[] bytes) {
-    String tInfo = StringUtils.bytes2String(bytes);
-    return new OmDBKerberosPrincipalInfo(tInfo);
+  public static OmDBUserPrincipalInfo getFromProtobuf(
+      OzoneManagerProtocolProtos.TenantUserPrincipalInfo proto) {
+    return new Builder()
+        .setAccessIds(new HashSet<>(proto.getAccessIdsList()))
+        .build();
   }
 
   /**
-   * Builder for OmDBKerberosPrincipalInfo.
+   * Builder for OmDBUserPrincipalInfo.
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
@@ -99,8 +86,8 @@ public final class OmDBKerberosPrincipalInfo {
       return this;
     }
 
-    public OmDBKerberosPrincipalInfo build() {
-      return new OmDBKerberosPrincipalInfo(accessIds);
+    public OmDBUserPrincipalInfo build() {
+      return new OmDBUserPrincipalInfo(accessIds);
     }
   }
 }

@@ -34,7 +34,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -59,7 +59,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -988,7 +988,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public DeleteTenantInfo deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantState deleteTenant(String tenantId) throws IOException {
     final DeleteTenantRequest request = DeleteTenantRequest.newBuilder()
         .setTenantId(tenantId)
         .build();
@@ -998,7 +998,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final OMResponse omResponse = submitRequest(omRequest);
     final DeleteTenantResponse resp =
         handleError(omResponse).getDeleteTenantResponse();
-    return DeleteTenantInfo.fromProtobuf(resp);
+    return DeleteTenantState.fromProtobuf(resp);
   }
 
   /**
@@ -1105,7 +1105,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final TenantGetUserInfoResponse resp = handleError(omResponse)
         .getTenantGetUserInfoResponse();
 
-    return TenantUserInfoValue.fromProtobuf(resp.getTenantUserInfo());
+    return TenantUserInfoValue.fromProtobuf(resp);
   }
 
   @Override
@@ -1144,7 +1144,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public TenantInfoList listTenant() throws IOException {
+  public TenantStateList listTenant() throws IOException {
 
     final ListTenantRequest request = ListTenantRequest.newBuilder()
         .build();
@@ -1155,7 +1155,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final ListTenantResponse resp = handleError(omResponse)
         .getListTenantResponse();
 
-    return TenantInfoList.fromProtobuf(resp.getTenantInfoList());
+    return TenantStateList.fromProtobuf(resp.getTenantStateList());
   }
 
   /**

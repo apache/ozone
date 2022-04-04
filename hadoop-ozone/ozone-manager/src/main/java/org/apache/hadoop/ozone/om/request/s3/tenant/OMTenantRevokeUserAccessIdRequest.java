@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -115,7 +115,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     multiTenantManager.checkTenantExistence(tenantId);
 
     // Caller should be an Ozone admin or this tenant's delegated admin
-    multiTenantManager.checkTenantAdmin(ozoneManager, tenantId);
+    multiTenantManager.checkTenantAdmin(tenantId);
 
     if (accessIdInfo.getIsAdmin()) {
       throw new OMException("accessId '" + accessId + "' is a tenant admin of "
@@ -183,7 +183,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       assert (omDBAccessIdInfo != null);
       userPrincipal = omDBAccessIdInfo.getUserPrincipal();
       assert (userPrincipal != null);
-      OmDBKerberosPrincipalInfo principalInfo = omMetadataManager
+      OmDBUserPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
       assert (principalInfo != null);
       principalInfo.removeAccessId(accessId);
@@ -196,16 +196,6 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
       // Remove from TenantAccessIdTable
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      // Remove from tenantGroupTable
-      omMetadataManager.getTenantGroupTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
-      // Remove from tenantRoleTable
-      omMetadataManager.getTenantRoleTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 

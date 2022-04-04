@@ -805,6 +805,7 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Assigned admin", false);
 
+    // Set secret should succeed now
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",

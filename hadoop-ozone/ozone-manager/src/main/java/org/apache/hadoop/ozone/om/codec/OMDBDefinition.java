@@ -28,9 +28,9 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -199,51 +199,23 @@ public class OMDBDefinition implements DBDefinition {
                     OmDBAccessIdInfo.class,  // tenantId, secret, principal
                     new OmDBAccessIdInfoCodec());
 
-  public static final DBColumnFamilyDefinition<String,
-            OmDBKerberosPrincipalInfo>
+  public static final DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo>
             PRINCIPAL_TO_ACCESS_IDS_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE,
-                    String.class,  // Kerberos principal
+                    String.class,  // User principal
                     new StringCodec(),
-                    OmDBKerberosPrincipalInfo.class,  // List of accessIds
-                    new OmDBKerberosPrincipalInfoCodec());
+                    OmDBUserPrincipalInfo.class,  // List of accessIds
+                    new OmDBUserPrincipalInfoCodec());
 
-  public static final DBColumnFamilyDefinition<String, OmDBTenantInfo>
+  public static final DBColumnFamilyDefinition<String, OmDBTenantState>
             TENANT_STATE_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TENANT_STATE_TABLE,
-                    String.class,
+                    String.class,  // tenantId (tenant name)
                     new StringCodec(),
-                    OmDBTenantInfo.class,
-                    new OmDBTenantInfoCodec());
-
-  public static final DBColumnFamilyDefinition<String, String>
-            TENANT_GROUP_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.TENANT_GROUP_TABLE,
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
-
-  public static final DBColumnFamilyDefinition<String, String>
-            TENANT_ROLE_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.TENANT_ROLE_TABLE,
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
-
-  public static final DBColumnFamilyDefinition<String, String>
-            TENANT_POLICY_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.TENANT_POLICY_TABLE,
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
+                    OmDBTenantState.class,
+                    new OmDBTenantStateCodec());
 
   // End tables for S3 multi-tenancy
 
@@ -265,8 +237,7 @@ public class OMDBDefinition implements DBDefinition {
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
-        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE, TENANT_GROUP_TABLE,
-        TENANT_ROLE_TABLE, TENANT_POLICY_TABLE };
+        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE};
   }
 }
 

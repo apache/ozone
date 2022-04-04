@@ -329,6 +329,9 @@ public class TestS3GetSecretRequest {
 
     // This effectively makes alice an admin.
     when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
+    when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, true))
+        .thenReturn(true);
+
     // Init LayoutVersionManager to prevent NPE in checkLayoutFeature
     final OMLayoutVersionManager lvm =
         new OMLayoutVersionManager(OMLayoutVersionManager.maxLayoutVersion());
@@ -354,13 +357,13 @@ public class TestS3GetSecretRequest {
     // Check response
     Assert.assertTrue(omTenantCreateResponse.getOMResponse().getSuccess());
     Assert.assertEquals(TENANT_ID,
-        omTenantCreateResponse.getOmDBTenantInfo().getTenantId());
+        omTenantCreateResponse.getOmDBTenantState().getTenantId());
 
 
     // 2. AssignUserToTenantRequest: Assign "bob@EXAMPLE.COM" to "finance".
     ++txLogIndex;
 
-    // Additional mock setup needed for pass accessId check
+    // Additional mock setup needed to pass accessId check
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
     when(omMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB))
         .thenReturn(ACCESS_ID_BOB);
@@ -373,6 +376,8 @@ public class TestS3GetSecretRequest {
             ).preExecute(ozoneManager)
         );
 
+    when(omMultiTenantManager.getTenantVolumeName(TENANT_ID))
+        .thenReturn(TENANT_ID);
     // Run validateAndUpdateCache
     omClientResponse =
         omTenantAssignUserAccessIdRequest.validateAndUpdateCache(ozoneManager,

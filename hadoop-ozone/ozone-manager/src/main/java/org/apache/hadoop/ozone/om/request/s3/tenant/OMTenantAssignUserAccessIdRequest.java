@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -54,7 +54,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
-import static org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo.SERIALIZATION_SPLIT_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -88,12 +87,8 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
              Example of accessId: finance$bob@EXAMPLE.COM
       - Value: OmDBAccessIdInfo. Has tenantId, kerberosPrincipal, sharedSecret.
     - New entry or update existing entry in principalToAccessIdsTable:
-      - Key: Kerberos principal of the user.
-      - Value: OmDBKerberosPrincipalInfo. Has accessIds.
-    - tenantGroupTable: Add this new user to the default tenant group.
-      - Key: finance$bob
-      - Value: finance-users
-    - tenantRoleTable: TBD. No-Op for now.
+      - Key: User principal. Usually the short name of the Kerberos principal.
+      - Value: OmDBUserPrincipalInfo. Has accessIds.
     - Release VOLUME_LOCK write lock
  */
 
@@ -117,8 +112,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String tenantId = request.getTenantId();
 
     // Caller should be an Ozone admin or tenant delegated admin
-    ozoneManager.getMultiTenantManager()
-        .checkTenantAdmin(ozoneManager, tenantId);
+    ozoneManager.getMultiTenantManager().checkTenantAdmin(tenantId);
 
     final String userPrincipal = request.getUserPrincipal();
     final String accessId = request.getAccessId();
@@ -144,13 +138,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       throw new OMException("Invalid accessId '" + accessId + "'. "
           + "Specifying a custom access ID disallowed. "
           + "Expected accessId to be assigned is '" + expectedAccessId + "'",
-          OMException.ResultCodes.INVALID_ACCESS_ID);
-    }
-
-    // Check accessId validity.
-    if (accessId.contains(SERIALIZATION_SPLIT_KEY)) {
-      throw new OMException("Invalid accessId '" + accessId +
-          "'. accessId should not contain '" + SERIALIZATION_SPLIT_KEY + "'",
           OMException.ResultCodes.INVALID_ACCESS_ID);
     }
 
@@ -230,8 +217,9 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
     boolean acquiredVolumeLock = false;
     boolean acquiredS3SecretLock = false;
-    Map<String, String> auditMap = new HashMap<>();
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    final Map<String, String> auditMap = new HashMap<>();
+    final OMMetadataManager omMetadataManager =
+        ozoneManager.getMetadataManager();
 
     final TenantAssignUserAccessIdRequest request =
         getOmRequest().getTenantAssignUserAccessIdRequest();
@@ -264,7 +252,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
             OMException.ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
       }
 
-      OmDBKerberosPrincipalInfo principalInfo = omMetadataManager
+      OmDBUserPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
       // Reject if the user is already assigned to the tenant
       if (principalInfo != null) {
@@ -294,7 +282,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantId(tenantId)
-          .setKerberosPrincipal(userPrincipal)
+          .setUserPrincipal(userPrincipal)
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
           .build();
@@ -304,7 +292,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
       // Add to principalToAccessIdsTable
       if (principalInfo == null) {
-        principalInfo = new OmDBKerberosPrincipalInfo.Builder()
+        principalInfo = new OmDBUserPrincipalInfo.Builder()
             .setAccessIds(new TreeSet<>(Collections.singleton(accessId)))
             .build();
       } else {
@@ -314,21 +302,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           new CacheKey<>(userPrincipal),
           new CacheValue<>(Optional.of(principalInfo),
               transactionLogIndex));
-
-      // Add to tenantGroupTable
-      // TODO: TenantGroupTable is unused for now.
-      final String defaultGroupName =
-          tenantId + OzoneConsts.DEFAULT_TENANT_USER_GROUP_SUFFIX;
-      omMetadataManager.getTenantGroupTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(defaultGroupName), transactionLogIndex));
-
-      // Add to tenantRoleTable
-      // TODO: TenantRoleTable is unused for now.
-      final String roleName = "user";
-      omMetadataManager.getTenantRoleTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
 
       // Add S3SecretTable cache entry
       acquiredS3SecretLock = omMetadataManager.getLock()
@@ -356,8 +329,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
                   .setAwsSecret(awsSecret).setKerberosID(accessId))
               .build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
-          omResponse.build(), s3SecretValue, userPrincipal, defaultGroupName,
-          roleName, accessId, omDBAccessIdInfo, principalInfo);
+          omResponse.build(), s3SecretValue, userPrincipal,
+          accessId, omDBAccessIdInfo, principalInfo);
     } catch (IOException ex) {
       handleRequestFailure(ozoneManager);
       exception = ex;

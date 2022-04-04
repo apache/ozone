@@ -22,41 +22,33 @@ import java.util.List;
 import java.util.Objects;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 
 /**
  * Class to encapsulate the list of users and corresponding accessIds
  * associated with a tenant.
  */
 public class TenantUserList {
+  /**
+   * List of user principal -> access ID pairs.
+   */
+  private final List<UserAccessIdInfo> userAccessIds;
 
-  private final String tenantId;
-
-  private final List<TenantUserAccessId> userAccessIds;
-  
-  public TenantUserList(String tenantId,
-                        List<TenantUserAccessId> userAccessIds) {
-    this.tenantId = tenantId;
+  public TenantUserList(List<UserAccessIdInfo> userAccessIds) {
     this.userAccessIds = userAccessIds;
   }
 
-  public String getTenantId() {
-    return tenantId;
-  }
-
-  public List<TenantUserAccessId> getUserAccessIds() {
+  public List<UserAccessIdInfo> getUserAccessIds() {
     return userAccessIds;
   }
 
   public static TenantUserList fromProtobuf(TenantListUserResponse response) {
-    return new TenantUserList(response.getTenantId(),
-        response.getUserAccessIdInfoList());
+    return new TenantUserList(response.getUserAccessIdInfoList());
   }
 
   @Override
   public String toString() {
-    return "tenantId=" + tenantId +
-        "\nuserAccessIds=" + userAccessIds;
+    return "userAccessIds=" + userAccessIds;
   }
 
   @Override
@@ -68,12 +60,11 @@ public class TenantUserList {
       return false;
     }
     TenantUserList that = (TenantUserList) o;
-    return tenantId.equals(that.tenantId) &&
-        userAccessIds.equals(that.userAccessIds);
+    return userAccessIds.equals(that.userAccessIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tenantId, userAccessIds);
+    return Objects.hash(userAccessIds);
   }
 }
