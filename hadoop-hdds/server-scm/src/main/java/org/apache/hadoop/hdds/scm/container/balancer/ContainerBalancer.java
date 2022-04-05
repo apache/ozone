@@ -51,11 +51,10 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
@@ -462,48 +461,71 @@ public class ContainerBalancer implements SCMService {
   private void checkIterationMoveResults(Set<DatanodeDetails> selectedTargets) {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
-    for (Map.Entry<ContainerMoveSelection,
-            CompletableFuture<ReplicationManager.MoveResult>>
-        futureEntry : moveSelectionToFutureMap.entrySet()) {
-      ContainerMoveSelection moveSelection = futureEntry.getKey();
-      CompletableFuture<ReplicationManager.MoveResult> future =
-          futureEntry.getValue();
+
+    CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(
+        moveSelectionToFutureMap.values()
+            .toArray(new CompletableFuture[moveSelectionToFutureMap.size()]));
+    try {
+      allFuturesResult.get(config.getMoveTimeout().toMillis(),
+          TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      // Ignore the exception here.
+    }
+
+    List<ContainerMoveSelection> completeKeyList =
+        moveSelectionToFutureMap.keySet().stream()
+        .filter(key -> moveSelectionToFutureMap.get(key).isDone())
+        .collect(Collectors.toList());
+
+    // Handle completed futures
+    for (ContainerMoveSelection moveSelection : completeKeyList) {
       try {
-        ReplicationManager.MoveResult result = future.get(
-            config.getMoveTimeout().toMillis(), TimeUnit.MILLISECONDS);
-        if (result == ReplicationManager.MoveResult.COMPLETED) {
-          try {
-            ContainerInfo container =
-                containerManager.getContainer(moveSelection.getContainerID());
-            this.sizeMovedPerIteration += container.getUsedBytes();
-            metrics.incrementNumContainerMovesInLatestIteration(1);
-            LOG.info("Container move completed for container {} to target {}",
-                container.containerID(),
-                moveSelection.getTargetNode().getUuidString());
-          } catch (ContainerNotFoundException e) {
-            LOG.warn("Could not find Container {} while " +
-                    "checking move results in ContainerBalancer",
-                moveSelection.getContainerID(), e);
-          }
+        CompletableFuture<ReplicationManager.MoveResult> future =
+            moveSelectionToFutureMap.get(moveSelection);
+        if (future.isCompletedExceptionally()) {
+          LOG.info("Container move for container {} to target {} " +
+                  "failed with exceptions",
+              moveSelection.getContainerID().toString(),
+              moveSelection.getTargetNode().getUuidString());
         } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Container move for container {} to target {} failed: {}",
-                moveSelection.getContainerID(),
-                moveSelection.getTargetNode().getUuidString(), result);
+          ReplicationManager.MoveResult result =
+              moveSelectionToFutureMap.get(moveSelection).join();
+
+          if (result == ReplicationManager.MoveResult.COMPLETED) {
+            try {
+              ContainerInfo container =
+                  containerManager.getContainer(moveSelection.getContainerID());
+              this.sizeMovedPerIteration += container.getUsedBytes();
+              metrics.incrementNumContainerMovesInLatestIteration(1);
+              LOG.info("Container move completed for container {} to target {}",
+                  container.containerID(),
+                  moveSelection.getTargetNode().getUuidString());
+            } catch (ContainerNotFoundException e) {
+              LOG.warn("Could not find Container {} while " +
+                      "checking move results in ContainerBalancer",
+                  moveSelection.getContainerID(), e);
+            }
+          } else {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(
+                  "Container move for container {} to target {} failed: {}",
+                  moveSelection.getContainerID(),
+                  moveSelection.getTargetNode().getUuidString(), result);
+            }
           }
         }
-      } catch (InterruptedException e) {
-        LOG.warn("Interrupted while waiting for container move result for " +
-                "container {}.",
-            moveSelection.getContainerID(), e);
-        Thread.currentThread().interrupt();
-      } catch (ExecutionException e) {
-        LOG.warn("Container move for container {} completed exceptionally.",
-            moveSelection.getContainerID(), e);
-      } catch (TimeoutException e) {
-        LOG.warn("Container move for container {} timed out.",
-            moveSelection.getContainerID(), e);
+      } finally {
+        // Remove complete
+        moveSelectionToFutureMap.remove(moveSelection);
       }
+    }
+
+    if (LOG.isDebugEnabled()) {
+      moveSelectionToFutureMap.keySet().forEach(entry -> {
+        LOG.debug("Container move timeout for container {} to target {}",
+            entry.getContainerID().toString(),
+            entry.getTargetNode().getUuidString());
+      });
     }
     countDatanodesInvolvedPerIteration =
         sourceToTargetMap.size() + selectedTargets.size();

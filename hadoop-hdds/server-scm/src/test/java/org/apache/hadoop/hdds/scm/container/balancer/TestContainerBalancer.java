@@ -642,6 +642,37 @@ public class TestContainerBalancer {
     containerBalancer.stop();
   }
 
+  @Test
+  public void checkIterationResultTimeout()
+      throws NodeNotFoundException, ContainerNotFoundException {
+
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
+        .thenReturn(genCompletableFuture(500), genCompletableFuture(2000));
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setMoveTimeout(Duration.ofMillis(1000));
+
+    startBalancer(balancerConfiguration);
+    sleepWhileBalancing(2000);
+
+    /*
+    According to the setup and configurations, this iteration's result should
+    be ITERATION_COMPLETED.
+     */
+    Assert.assertEquals(ContainerBalancer.IterationResult.ITERATION_COMPLETED,
+        containerBalancer.getIterationResult());
+    Assert.assertEquals(1,
+        containerBalancer.getMetrics().getNumContainerMovesInLatestIteration());
+    containerBalancer.stop();
+
+  }
+
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
@@ -832,6 +863,18 @@ public class TestContainerBalancer {
         InvalidContainerBalancerConfigurationException e) {
       LOG.info("Could not start ContainerBalancer while testing", e);
     }
+  }
+
+  private CompletableFuture<ReplicationManager.MoveResult>
+      genCompletableFuture(int sleepMilSec) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        Thread.sleep(sleepMilSec);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      return ReplicationManager.MoveResult.COMPLETED;
+    });
   }
 
 }
