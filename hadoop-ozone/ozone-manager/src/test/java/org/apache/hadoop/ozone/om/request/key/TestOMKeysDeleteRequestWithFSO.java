@@ -40,7 +40,7 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
     createPreRequisites();
     OmKeysDeleteRequestWithFSO omKeysDeleteRequest =
         new OmKeysDeleteRequestWithFSO(getOmRequest(),
-            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+            getBucketLayout());
     checkDeleteKeysResponse(omKeysDeleteRequest);
 
   }
@@ -56,7 +56,7 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
 
     OmKeysDeleteRequestWithFSO omKeysDeleteRequest =
         new OmKeysDeleteRequestWithFSO(getOmRequest(),
-            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+            getBucketLayout());
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest);
   }
 
@@ -66,7 +66,7 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
     // Add volume, bucket and key entries to OM DB.
     OMRequestTestUtils
         .addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
-            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+            getBucketLayout());
 
     OzoneManagerProtocolProtos.DeleteKeyArgs.Builder deleteKeyArgs =
         OzoneManagerProtocolProtos.DeleteKeyArgs.newBuilder()
@@ -100,5 +100,10 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
         .setDeleteKeysRequest(
             OzoneManagerProtocolProtos.DeleteKeysRequest.newBuilder()
                 .setDeleteKeys(deleteKeyArgs).build()).build());
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
