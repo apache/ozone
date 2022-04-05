@@ -1016,31 +1016,26 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     private final Path path;
     private final FileStatus status;
     private String pathKey;
-    private Iterator<BasicKeyInfo> keyIterator;
+    private Iterator<BasicKeyInfo> keyIterator = null;
     private boolean isFSO;
-
-    OzoneListingIterator(Path path)
-        throws IOException {
-      this.path = path;
-      this.status = getFileStatus(path);
-      this.pathKey = pathToKey(path);
-      if (status.isDirectory()) {
-        this.pathKey = addTrailingSlashIfNeeded(pathKey);
-      }
-      keyIterator = adapter.listKeys(pathKey);
-    }
 
     OzoneListingIterator(Path path, boolean isFSO)
         throws IOException {
       this.path = path;
       this.status = getFileStatus(path);
       this.pathKey = pathToKey(path);
-      if (status.isDirectory()) {
-        this.pathKey = addTrailingSlashIfNeeded(pathKey);
-      }
-      // For fso case we won't use listKeys
-      keyIterator = null;
       this.isFSO = isFSO;
+      if (!isFSO) {
+        if (status.isDirectory()) {
+          this.pathKey = addTrailingSlashIfNeeded(pathKey);
+        }
+        keyIterator = adapter.listKeys(pathKey);
+      }
+    }
+
+    OzoneListingIterator(Path path) throws IOException {
+      // non FSO implementation
+      this(path, false);
     }
 
 
