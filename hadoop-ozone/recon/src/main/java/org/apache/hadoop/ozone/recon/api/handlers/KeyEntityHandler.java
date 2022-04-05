@@ -62,10 +62,10 @@ public class KeyEntityHandler extends EntityHandler {
     long parentObjectId = getBucketHandler().getDirObjectId(names,
             names.length - 1);
     String fileName = names[names.length - 1];
-    String ozoneKey =
-            getOmMetadataManager().getOzonePathKey(parentObjectId, fileName);
-    OmKeyInfo keyInfo =
-            getOmMetadataManager().getFileTable().getSkipCache(ozoneKey);
+    String ozoneKey = getOmMetadataManager()
+            .getOzonePathKey(parentObjectId, fileName);
+    OmKeyInfo keyInfo = getOmMetadataManager()
+            .getFileTable().getSkipCache(ozoneKey);
     duResponse.setSize(keyInfo.getDataSize());
     if (withReplica) {
       long keySizeWithReplica = getBucketHandler()
