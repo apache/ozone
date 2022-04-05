@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -354,10 +353,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       String ozoneKey, TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
       List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
-    HddsProtos.ReplicationType type = partKeyInfoMap.lastEntry().getValue()
-        .getPartKeyInfo().getType();
-    HddsProtos.ReplicationFactor factor =
-        partKeyInfoMap.lastEntry().getValue().getPartKeyInfo().getFactor();
+    OzoneManagerProtocolProtos.KeyInfo partKeyInfo =
+        partKeyInfoMap.lastEntry().getValue().getPartKeyInfo();
 
     OmKeyInfo omKeyInfo = getOmKeyInfoFromKeyTable(ozoneKey, keyName,
             omMetadataManager);
@@ -374,8 +371,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmKeyInfo.Builder builder =
           new OmKeyInfo.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
-          .setReplicationConfig(
-              ReplicationConfig.fromProtoTypeAndFactor(type, factor))
+          .setReplicationConfig(ReplicationConfig.fromProto(
+              partKeyInfo.getType(), partKeyInfo.getFactor(),
+              partKeyInfo.getEcReplicationConfig()))
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setDataSize(dataSize)

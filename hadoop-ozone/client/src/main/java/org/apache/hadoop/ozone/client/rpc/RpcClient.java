@@ -1237,19 +1237,11 @@ public class RpcClient implements ClientProtocol {
         .build();
 
     OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
-    KeyOutputStream keyOutputStream =
-        new KeyOutputStream.Builder()
-            .setHandler(openKey)
-            .setXceiverClientManager(xceiverClientManager)
-            .setOmClient(ozoneManagerClient)
-            .setRequestID(requestId)
-            .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
-            .setMultipartNumber(partNumber)
-            .setMultipartUploadID(uploadID)
-            .setIsMultipartKey(true)
-            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
-            .build();
+    KeyOutputStream keyOutputStream = createKeyOutputStream(openKey, requestId)
+        .setMultipartNumber(partNumber)
+        .setMultipartUploadID(uploadID)
+        .setIsMultipartKey(true)
+        .build();
     keyOutputStream.addPreallocateBlocks(
         openKey.getKeyInfo().getLatestVersionLocations(),
         openKey.getOpenVersion());
@@ -1583,27 +1575,9 @@ public class RpcClient implements ClientProtocol {
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
       String requestId) throws IOException {
-    KeyOutputStream keyOutputStream = null;
 
-    if (openKey.getKeyInfo().getReplicationConfig()
-        .getReplicationType() == HddsProtos.ReplicationType.EC) {
-      keyOutputStream = new ECKeyOutputStream.Builder().setHandler(openKey)
-          .setXceiverClientManager(xceiverClientManager)
-          .setOmClient(ozoneManagerClient).setRequestID(requestId)
-          .setReplicationConfig(
-              (ECReplicationConfig)openKey.getKeyInfo().getReplicationConfig())
-          .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-          .setConfig(clientConfig)
-          .setByteBufferPool(byteBufferPool)
-          .build();
-    } else {
-      keyOutputStream = new KeyOutputStream.Builder().setHandler(openKey)
-          .setXceiverClientManager(xceiverClientManager)
-          .setOmClient(ozoneManagerClient).setRequestID(requestId)
-          .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
-          .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-          .setConfig(clientConfig).build();
-    }
+    KeyOutputStream keyOutputStream = createKeyOutputStream(openKey, requestId)
+        .build();
 
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
@@ -1637,6 +1611,30 @@ public class RpcClient implements ClientProtocol {
 
       return new OzoneOutputStream(keyOutputStream);
     }
+  }
+
+  private KeyOutputStream.Builder createKeyOutputStream(OpenKeySession openKey,
+      String requestId) {
+    KeyOutputStream.Builder builder;
+
+    ReplicationConfig replicationConfig =
+        openKey.getKeyInfo().getReplicationConfig();
+    if (replicationConfig.getReplicationType() ==
+        HddsProtos.ReplicationType.EC) {
+      builder = new ECKeyOutputStream.Builder()
+          .setReplicationConfig((ECReplicationConfig) replicationConfig)
+          .setByteBufferPool(byteBufferPool);
+    } else {
+      builder = new KeyOutputStream.Builder()
+        .setReplicationConfig(replicationConfig);
+    }
+
+    return builder.setHandler(openKey)
+        .setXceiverClientManager(xceiverClientManager)
+        .setOmClient(ozoneManagerClient)
+        .setRequestID(requestId)
+        .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+        .setConfig(clientConfig);
   }
 
   @Override

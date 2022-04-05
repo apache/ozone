@@ -1104,8 +1104,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OmMultipartUploadListParts omMultipartUploadListParts =
         new OmMultipartUploadListParts(
-                ReplicationConfig.fromProtoTypeAndFactor(response.getType(),
-                response.getFactor()),
+            ReplicationConfig.fromProto(
+                response.getType(), response.getFactor(),
+                response.getEcReplicationConfig()),
             response.getNextPartNumberMarker(), response.getIsTruncated());
     omMultipartUploadListParts.addProtoPartList(response.getPartsListList());
 
@@ -1140,8 +1141,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 proto.getKeyName(),
                 proto.getUploadId(),
                 Instant.ofEpochMilli(proto.getCreationTime()),
-                ReplicationConfig.fromProtoTypeAndFactor(proto.getType(),
-                        proto.getFactor())
+                ReplicationConfig.fromProto(proto.getType(), proto.getFactor(),
+                    proto.getEcReplicationConfig())
             ))
             .collect(Collectors.toList());
 
