@@ -33,12 +33,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 
 /**
  * Response for DeleteKeys request.
  */
-@CleanupTableInfo(cleanupTables = { KEY_TABLE, DIRECTORY_TABLE,
+@CleanupTableInfo(cleanupTables = { FILE_TABLE, DIRECTORY_TABLE,
     DELETED_DIR_TABLE, DELETED_TABLE, BUCKET_TABLE })
 public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
 
