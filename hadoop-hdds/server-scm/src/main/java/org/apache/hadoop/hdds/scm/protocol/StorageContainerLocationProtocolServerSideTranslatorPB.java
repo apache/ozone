@@ -122,7 +122,6 @@ import java.util.Optional;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.AllocatePipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipelineBatch;
@@ -196,15 +195,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     // this server interface, this should be removed and solved via new
     // annotated interceptors.
     boolean checkResponseForECRepConfig = false;
-    if (request.getCmdType() == GetContainer
+    if (request.getVersion() <
+        ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue()) {
+      if (request.getCmdType() == GetContainer
         || request.getCmdType() == ListContainer
         || request.getCmdType() == GetContainerWithPipeline
         || request.getCmdType() == GetContainerWithPipelineBatch
         || request.getCmdType() == GetExistContainerWithPipelinesInBatch
         || request.getCmdType() == ListPipelines
         || request.getCmdType() == GetPipeline) {
-      if (request.getVersion() <
-          ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue()) {
+
         checkResponseForECRepConfig = true;
       }
     }

@@ -401,8 +401,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
   )
   public static OMRequest disallowCreateFileWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws ServiceException {
-    if (ctx.versionManager().getMetadataLayoutVersion()
-        < OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion()) {
+    if (ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateFileRequest().getKeyArgs().hasEcReplicationConfig()) {
         throw new ServiceException("Cluster does not have the Erasure Coded"
             + " Storage support feature finalized yet, but the request contains"

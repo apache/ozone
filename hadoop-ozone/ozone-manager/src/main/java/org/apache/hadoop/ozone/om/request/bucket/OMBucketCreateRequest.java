@@ -379,8 +379,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
   )
   public static OMRequest disallowCreateBucketWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws ServiceException {
-    if (ctx.versionManager().getMetadataLayoutVersion()
-        < OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion()) {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateBucketRequest()
           .getBucketInfo().hasDefaultReplicationConfig()
           && req.getCreateBucketRequest().getBucketInfo()

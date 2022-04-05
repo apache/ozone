@@ -317,8 +317,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   )
   public static OMRequest disallowSetBucketPropertyWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws ServiceException {
-    if (ctx.versionManager().getMetadataLayoutVersion()
-        < OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion()) {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       SetBucketPropertyRequest propReq =
           req.getSetBucketPropertyRequest();
       if (propReq.hasBucketArgs()

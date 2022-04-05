@@ -727,7 +727,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throw new ServiceException("Key is a key with"
           + " Erasure Coded replication, which the client can not understand."
           + " Please upgrade the client before trying to read the key info"
-          + " for" + req.getGetFileStatusRequest().getKeyArgs().getVolumeName()
+          + " for " + req.getGetFileStatusRequest().getKeyArgs().getVolumeName()
           + "/" + req.getGetFileStatusRequest().getKeyArgs().getBucketName()
           + "/" + req.getGetFileStatusRequest().getKeyArgs().getKeyName()
           + ".");
@@ -766,7 +766,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throw new ServiceException("Key is a key with"
           + " Erasure Coded replication, which the client can not understand."
           + " Please upgrade the client before trying to read the key info"
-          + " for" + req.getLookupFileRequest().getKeyArgs().getVolumeName()
+          + " for " + req.getLookupFileRequest().getKeyArgs().getVolumeName()
           + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
           + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName() + ".");
     }

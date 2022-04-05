@@ -403,8 +403,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   )
   public static OMRequest disallowCreateDirectoryWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws ServiceException {
-    if (ctx.versionManager().getMetadataLayoutVersion()
-        < OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion()) {
+    if (!ctx.versionManager().
+        isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateDirectoryRequest().getKeyArgs()
           .hasEcReplicationConfig()) {
         throw new ServiceException("Cluster does not have the Erasure Coded"
