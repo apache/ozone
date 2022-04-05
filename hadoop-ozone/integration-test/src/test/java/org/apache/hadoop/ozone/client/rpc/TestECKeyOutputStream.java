@@ -194,6 +194,53 @@ public class TestECKeyOutputStream {
   }
 
   @Test
+  public void testOverwriteECKeyWithRatisKey() throws Exception {
+    String myBucket = UUID.randomUUID().toString();
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
+    bucketArgs.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+                chunkSize)));
+
+    volume.createBucket(myBucket, bucketArgs.build());
+    OzoneBucket bucket = volume.getBucket(myBucket);
+
+    try (OzoneOutputStream out = bucket.createKey(keyString, inputSize)) {
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+
+    //Overwrite with RATIS/THREE
+    try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        new HashMap<>())) {
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+    OzoneKeyDetails key = bucket.getKey(keyString);
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        key.getReplicationConfig());
+
+    //Overwrite with RATIS/ONE
+    try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        new HashMap<>())) {
+      for (int i = 0; i < inputChunks.length; i++) {
+        out.write(inputChunks[i]);
+      }
+    }
+    key = bucket.getKey(keyString);
+    Assert.assertEquals(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        key.getReplicationConfig());
+  }
+
+  @Test
   public void testCreateRatisKeyAndWithECBucketDefaults() throws Exception {
     OzoneBucket bucket = getOzoneBucket();
     try (OzoneOutputStream out = bucket.createKey(
