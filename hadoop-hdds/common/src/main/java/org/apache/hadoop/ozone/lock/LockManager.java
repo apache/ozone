@@ -249,4 +249,37 @@ public class LockManager<R> {
     }
     return 0;
   }
+
+  /**
+   * Returns the number of reentrant write holds on this lock by the current
+   * thread on a given resource.
+   *
+   * @param resource for which the write lock hold count has to be returned
+   * @return the number of holds on the write lock by the current thread,
+   *         or zero if the write lock is not held by the current thread
+   */
+  public int getWriteHoldCount(final R resource) {
+    ActiveLock activeLock = activeLocks.get(resource);
+    if (activeLock != null) {
+      return activeLock.getWriteHoldCount();
+    }
+    return 0;
+  }
+
+  /**
+   * Queries if the write lock is held by the current thread on a given
+   * resource.
+   *
+   * @param resource for which the query has to be returned
+   * @return {@code true} if the current thread holds the write lock and
+   *         {@code false} otherwise
+   */
+  public boolean isWriteLockedByCurrentThread(final R resource) {
+    ActiveLock activeLock = activeLocks.get(resource);
+    if (activeLock != null) {
+      return activeLock.isWriteLockedByCurrentThread();
+    }
+    return false;
+  }
+
 }
