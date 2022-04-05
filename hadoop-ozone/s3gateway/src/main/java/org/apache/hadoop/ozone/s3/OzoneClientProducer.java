@@ -54,7 +54,8 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 @RequestScoped
 public class OzoneClientProducer {
 
-  private static final Logger LOG =
+  @VisibleForTesting
+  public static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
 
   private static OzoneClient client;
@@ -102,12 +103,12 @@ public class OzoneClientProducer {
           signatureInfo.getSignature(),
           awsAccessId);
     } catch (OS3Exception ex) {
-      LOG.debug("Error during Client Creation: ", ex);
+      LOG.error("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);
     } catch (Exception e) {
       // For any other critical errors during object creation throw Internal
       // error.
-      LOG.debug("Error during Client Creation: ", e);
+      LOG.error("Error during Client Creation: ", e);
       throw wrapOS3Exception(S3ErrorTable.newError(INTERNAL_ERROR, null, e));
     }
   }

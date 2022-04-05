@@ -43,6 +43,7 @@ import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_D
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
 import static org.junit.Assert.fail;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -199,6 +200,22 @@ public class TestOzoneClientProducer {
       // the service id check.
       Assert.assertFalse(ex.getMessage().contains(
           "More than 1 OzoneManager ServiceID"));
+    }
+  }
+
+  @Test
+  public void testLogLevelWithGetSignature() {
+    GenericTestUtils.LogCapturer
+        log = GenericTestUtils.LogCapturer.captureLogs(OzoneClientProducer.LOG);
+    try {
+      OzoneConfiguration configuration = new OzoneConfiguration();
+      producer.setOzoneConfiguration(configuration);
+      producer.getSignature();
+    } catch (Exception ex) {
+      Assert.assertTrue(
+          log.getOutput().contains("Error during Client Creation"));
+    } finally {
+      log.stopCapturing();
     }
   }
 
