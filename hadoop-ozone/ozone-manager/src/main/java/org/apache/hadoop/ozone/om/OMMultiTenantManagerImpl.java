@@ -589,8 +589,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   public void checkTenantAdmin(String tenantId) throws OMException {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    if (!ozoneManager.getMultiTenantManager().isTenantAdmin(
-        ugi, tenantId, true)) {
+    if (!isTenantAdmin(ugi, tenantId, true)) {
       throw new OMException("User '" + ugi.getUserName() +
           "' is neither an Ozone admin nor a delegated admin of tenant '" +
           tenantId + "'.", OMException.ResultCodes.PERMISSION_DENIED);
@@ -645,9 +644,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   public boolean isUserAccessIdPrincipalOrTenantAdmin(String accessId,
       UserGroupInformation ugi) throws IOException {
 
-    final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
     final OmDBAccessIdInfo accessIdInfo =
-        metadataManager.getTenantAccessIdTable().get(accessId);
+        omMetadataManager.getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
       // Doesn't have the accessId entry in TenantAccessIdTable.
@@ -677,9 +675,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
 
     // Check if ugi is a tenant admin (or an Ozone cluster admin)
-    final OMMultiTenantManager multiTenantManager =
-        ozoneManager.getMultiTenantManager();
-    if (multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
+    if (isTenantAdmin(ugi, tenantId, false)) {
       return true;
     }
 
@@ -690,9 +686,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   @Override
   public boolean isTenantEmpty(String tenantId) throws IOException {
 
-    // TODO: Do we need to iterate cache here as well? Very cumbersome if so.
-    //  This helper function is a placeholder for the isTenantEmpty check,
-    //  once tenantCache/Ranger is fixed this will be removed.
+    if (tenantCache.containsKey(tenantId) &&
+        !tenantCache.get(tenantId).isTenantEmpty()) {
+      return false;
+    }
+
     try (TableIterator<String,
         ? extends KeyValue<String, OmDBAccessIdInfo>> iter =
              omMetadataManager.getTenantAccessIdTable().iterator()) {

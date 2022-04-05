@@ -3073,9 +3073,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     multiTenantManager.checkTenantExistence(tenantId);
 
     final String volumeName = multiTenantManager.getTenantVolumeName(tenantId);
-    // TODO: Maybe use multiTenantManager.getTenantState(tenantId)
-    //  .getTenantBucketNameSpace() after refactoring
-
     final Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put(OzoneConsts.VOLUME, volumeName);
