@@ -67,6 +67,7 @@ public class TestOzoneClientProducer {
   private String contentType;
   private ContainerRequestContext context;
   private UriInfo uriInfo;
+  private AWSSignatureProcessor awsSignatureProcessor;
 
   public TestOzoneClientProducer(
       String authHeader, String contentMd5,
@@ -84,6 +85,7 @@ public class TestOzoneClientProducer {
     queryMap = new MultivaluedHashMap<>();
     uriInfo = Mockito.mock(UriInfo.class);
     context = Mockito.mock(ContainerRequestContext.class);
+    awsSignatureProcessor = new AWSSignatureProcessor();
     OzoneConfiguration config = new OzoneConfiguration();
     config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
     config.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
@@ -208,14 +210,20 @@ public class TestOzoneClientProducer {
     GenericTestUtils.LogCapturer
         log = GenericTestUtils.LogCapturer.captureLogs(OzoneClientProducer.LOG);
     try {
+      AWSSignatureProcessor mockProcessor =
+          Mockito.mock(AWSSignatureProcessor.class);
+      Mockito.when(mockProcessor.parseSignature())
+          .thenThrow(new RuntimeException("test fail"));
       OzoneConfiguration configuration = new OzoneConfiguration();
       producer.setOzoneConfiguration(configuration);
+      producer.setSignatureParser(mockProcessor);
       producer.getSignature();
     } catch (Exception ex) {
       Assert.assertTrue(
           log.getOutput().contains("Error during Client Creation"));
     } finally {
       log.stopCapturing();
+      producer.setSignatureParser(awsSignatureProcessor);
     }
   }
 
@@ -237,7 +245,6 @@ public class TestOzoneClientProducer {
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryMap);
 
-    AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
     awsSignatureProcessor.setContext(context);
 
     producer.setSignatureParser(awsSignatureProcessor);

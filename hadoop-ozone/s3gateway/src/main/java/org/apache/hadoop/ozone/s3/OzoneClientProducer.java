@@ -103,7 +103,7 @@ public class OzoneClientProducer {
           signatureInfo.getSignature(),
           awsAccessId);
     } catch (OS3Exception ex) {
-      LOG.error("Error during Client Creation: ", ex);
+      LOG.debug("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);
     } catch (Exception e) {
       // For any other critical errors during object creation throw Internal
