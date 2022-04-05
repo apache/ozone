@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -54,6 +55,9 @@ public abstract class EntityHandler {
 
   private OzoneStorageContainerManager reconSCM;
 
+  private static String normalizedPath;
+  private static String[] names;
+
   public EntityHandler(
           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
           ReconOMMetadataManager omMetadataManager,
@@ -65,18 +69,17 @@ public abstract class EntityHandler {
     this.bucketHandler = bucketHandler;
   }
 
-  public abstract NamespaceSummaryResponse getSummaryResponse(String[] names)
+  public abstract NamespaceSummaryResponse getSummaryResponse()
           throws IOException;
 
   public abstract DUResponse getDuResponse(
-          String path, String[] names,
           boolean listFile, boolean withReplica)
           throws IOException;
 
-  public abstract QuotaUsageResponse getQuotaResponse(String[] names)
+  public abstract QuotaUsageResponse getQuotaResponse()
           throws IOException;
 
-  public abstract FileSizeDistributionResponse getDistResponse(String[] names)
+  public abstract FileSizeDistributionResponse getDistResponse()
           throws IOException;
 
   public ReconOMMetadataManager getOmMetadataManager() {
@@ -95,19 +98,30 @@ public abstract class EntityHandler {
     return bucketHandler;
   }
 
+  public String getNormalizedPath() {
+    return normalizedPath;
+  }
+
+  public String[] getNames() {
+    return names;
+  }
+
   /**
    * Return the entity type of client's request, check path existence.
    * If path doesn't exist, return Entity.UNKNOWN
    * @param path the original path request used to identify root level
-   * @param names the client's parsed request
    * @return the entity type, unknown if path not found
    */
   public static EntityHandler getEntityHandler(
-          String path, String[] names,
+          String path,
           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
           ReconOMMetadataManager omMetadataManager,
           OzoneStorageContainerManager reconSCM) throws IOException {
     BucketHandler bucketHandler;
+
+    normalizedPath = normalizePath(path);
+    names = parseRequestPath(normalizedPath);
+
     if (path.equals(OM_KEY_PREFIX)) {
       return EntityType.ROOT.create(reconNamespaceSummaryManager,
               omMetadataManager, reconSCM, null);
@@ -322,5 +336,17 @@ public abstract class EntityHandler {
       }
     }
     return result;
+  }
+
+  public static String[] parseRequestPath(String path) {
+    if (path.startsWith(OM_KEY_PREFIX)) {
+      path = path.substring(1);
+    }
+    String[] namesArray = path.split(OM_KEY_PREFIX);
+    return namesArray;
+  }
+
+  private static String normalizePath(String path) {
+    return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
   }
 }

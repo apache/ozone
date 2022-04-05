@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -39,8 +38,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * REST APIs for namespace metadata summary.
@@ -89,14 +86,11 @@ public class NSSummaryEndpoint {
       return Response.ok(namespaceSummaryResponse).build();
     }
 
-    String normalizedPath = normalizePath(path);
-    String[] names = parseRequestPath(normalizedPath);
-
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
-            names, reconNamespaceSummaryManager,
+    EntityHandler handler = EntityHandler.getEntityHandler(
+            path, reconNamespaceSummaryManager,
             omMetadataManager, reconSCM);
 
-    namespaceSummaryResponse = handler.getSummaryResponse(names);
+    namespaceSummaryResponse = handler.getSummaryResponse();
 
     return Response.ok(namespaceSummaryResponse).build();
   }
@@ -128,16 +122,14 @@ public class NSSummaryEndpoint {
       return Response.ok(duResponse).build();
     }
 
-    String normalizedPath = normalizePath(path);
-    String[] names = parseRequestPath(normalizedPath);
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
-            names, reconNamespaceSummaryManager,
+    EntityHandler handler = EntityHandler.getEntityHandler(
+            path, reconNamespaceSummaryManager,
             omMetadataManager, reconSCM);
 
-    duResponse.setPath(normalizedPath);
+    duResponse.setPath(handler.getNormalizedPath());
 
-    duResponse = handler.getDuResponse(normalizedPath,
-            names, listFile, withReplica);
+    duResponse = handler.getDuResponse(
+            listFile, withReplica);
 
     return Response.ok(duResponse).build();
   }
@@ -164,13 +156,11 @@ public class NSSummaryEndpoint {
       return Response.ok(quotaUsageResponse).build();
     }
 
-    String normalizedPath = normalizePath(path);
-    String[] names = parseRequestPath(normalizedPath);
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
-            names, reconNamespaceSummaryManager,
+    EntityHandler handler = EntityHandler.getEntityHandler(
+            path, reconNamespaceSummaryManager,
             omMetadataManager, reconSCM);
 
-    quotaUsageResponse = handler.getQuotaResponse(names);
+    quotaUsageResponse = handler.getQuotaResponse();
 
     return Response.ok(quotaUsageResponse).build();
   }
@@ -197,23 +187,13 @@ public class NSSummaryEndpoint {
       return Response.ok(distResponse).build();
     }
 
-    String normalizedPath = normalizePath(path);
-    String[] names = parseRequestPath(normalizedPath);
-    EntityHandler handler = EntityHandler.getEntityHandler(normalizedPath,
-            names, reconNamespaceSummaryManager,
+    EntityHandler handler = EntityHandler.getEntityHandler(
+            path, reconNamespaceSummaryManager,
             omMetadataManager, reconSCM);
 
-    distResponse = handler.getDistResponse(names);
+    distResponse = handler.getDistResponse();
 
     return Response.ok(distResponse).build();
-  }
-
-  static String[] parseRequestPath(String path) {
-    if (path.startsWith(OM_KEY_PREFIX)) {
-      path = path.substring(1);
-    }
-    String[] names = path.split(OM_KEY_PREFIX);
-    return names;
   }
 
   /**
@@ -230,7 +210,4 @@ public class NSSummaryEndpoint {
         && omMetadataManager.getFileTable() != null;
   }
 
-  private static String normalizePath(String path) {
-    return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
-  }
 }

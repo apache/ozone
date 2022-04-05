@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
@@ -239,7 +240,7 @@ public class TestNSSummaryEndpoint {
 
   @Test
   public void testUtility() {
-    String[] names = NSSummaryEndpoint.parseRequestPath(TEST_PATH_UTILITY);
+    String[] names = EntityHandler.parseRequestPath(TEST_PATH_UTILITY);
     Assert.assertArrayEquals(TEST_NAMES, names);
     String keyName = BucketHandler.getKeyName(names);
     Assert.assertEquals(TEST_KEY_NAMES, keyName);

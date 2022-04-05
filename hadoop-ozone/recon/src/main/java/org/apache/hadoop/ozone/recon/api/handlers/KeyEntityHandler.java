@@ -44,7 +44,7 @@ public class KeyEntityHandler extends EntityHandler {
   }
 
   @Override
-  public NamespaceSummaryResponse getSummaryResponse(String[] names) throws
+  public NamespaceSummaryResponse getSummaryResponse() throws
       IOException {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.KEY);
@@ -53,11 +53,13 @@ public class KeyEntityHandler extends EntityHandler {
   }
 
   @Override
-  public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                  boolean withReplica) throws IOException {
+  public DUResponse getDuResponse(
+          boolean listFile, boolean withReplica)
+          throws IOException {
     DUResponse duResponse = new DUResponse();
     // DU for key doesn't have subpaths
     duResponse.setCount(0);
+    String[] names = getNames();
     // The object ID for the directory that the key is directly in
     long parentObjectId = getBucketHandler().getDirObjectId(names,
             names.length - 1);
@@ -76,7 +78,7 @@ public class KeyEntityHandler extends EntityHandler {
   }
 
   @Override
-  public QuotaUsageResponse getQuotaResponse(String[] names)
+  public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     quotaUsageResponse.setResponseCode(
@@ -85,7 +87,7 @@ public class KeyEntityHandler extends EntityHandler {
   }
 
   @Override
-  public FileSizeDistributionResponse getDistResponse(String[] names)
+  public FileSizeDistributionResponse getDistResponse()
           throws IOException {
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();

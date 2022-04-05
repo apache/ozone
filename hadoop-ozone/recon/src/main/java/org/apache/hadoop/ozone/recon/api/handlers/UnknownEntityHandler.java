@@ -42,8 +42,8 @@ public class UnknownEntityHandler extends EntityHandler {
   }
 
   @Override
-  public NamespaceSummaryResponse getSummaryResponse(String[] names) throws
-      IOException {
+  public NamespaceSummaryResponse getSummaryResponse()
+          throws IOException {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.UNKNOWN);
     namespaceSummaryResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
@@ -52,8 +52,9 @@ public class UnknownEntityHandler extends EntityHandler {
   }
 
   @Override
-  public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                  boolean withReplica) throws IOException {
+  public DUResponse getDuResponse(
+          boolean listFile, boolean withReplica)
+          throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
 
@@ -61,7 +62,7 @@ public class UnknownEntityHandler extends EntityHandler {
   }
 
   @Override
-  public QuotaUsageResponse getQuotaResponse(String[] names)
+  public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     quotaUsageResponse.setResponseCode(ResponseStatus.PATH_NOT_FOUND);
@@ -70,7 +71,7 @@ public class UnknownEntityHandler extends EntityHandler {
   }
 
   @Override
-  public FileSizeDistributionResponse getDistResponse(String[] names)
+  public FileSizeDistributionResponse getDistResponse()
           throws IOException {
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();

@@ -47,10 +47,11 @@ public class BucketEntityHandler extends EntityHandler {
   }
 
   @Override
-  public NamespaceSummaryResponse getSummaryResponse(String[] names)
+  public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.BUCKET);
+    String[] names = getNames();
     assert (names.length == 2);
     long bucketObjectId = getBucketHandler().getBucketObjectId(names);
     namespaceSummaryResponse.setNumTotalDir(getTotalDirCount(bucketObjectId));
@@ -60,10 +61,11 @@ public class BucketEntityHandler extends EntityHandler {
   }
 
   @Override
-  public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                  boolean withReplica) throws IOException {
+  public DUResponse getDuResponse(
+          boolean listFile, boolean withReplica)
+          throws IOException {
     DUResponse duResponse = new DUResponse();
-    long bucketObjectId = getBucketHandler().getBucketObjectId(names);
+    long bucketObjectId = getBucketHandler().getBucketObjectId(getNames());
     NSSummary bucketNSSummary =
             getReconNamespaceSummaryManager().getNSSummary(bucketObjectId);
     // empty bucket, because it's not a parent of any directory or key
@@ -86,7 +88,7 @@ public class BucketEntityHandler extends EntityHandler {
 
       // get directory's name and generate the next-level subpath.
       String dirName = subdirNSSummary.getDirName();
-      String subpath = BucketHandler.buildSubpath(path, dirName);
+      String subpath = BucketHandler.buildSubpath(getNormalizedPath(), dirName);
       // we need to reformat the subpath in the response in a
       // format with leading slash and without trailing slash
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
@@ -106,7 +108,7 @@ public class BucketEntityHandler extends EntityHandler {
     if (listFile || withReplica) {
       bucketDataSizeWithReplica += getBucketHandler()
               .handleDirectKeys(bucketObjectId,
-              withReplica, listFile, dirDUData, path);
+              withReplica, listFile, dirDUData, getNormalizedPath());
     }
     if (withReplica) {
       duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
@@ -118,9 +120,10 @@ public class BucketEntityHandler extends EntityHandler {
   }
 
   @Override
-  public QuotaUsageResponse getQuotaResponse(String[] names)
+  public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
+    String[] names = getNames();
     String bucketKey = getOmMetadataManager().getBucketKey(names[0], names[1]);
     OmBucketInfo bucketInfo = getOmMetadataManager()
             .getBucketTable().getSkipCache(bucketKey);
@@ -133,11 +136,11 @@ public class BucketEntityHandler extends EntityHandler {
   }
 
   @Override
-  public FileSizeDistributionResponse getDistResponse(String[] names)
+  public FileSizeDistributionResponse getDistResponse()
           throws IOException {
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();
-    long bucketObjectId = getBucketHandler().getBucketObjectId(names);
+    long bucketObjectId = getBucketHandler().getBucketObjectId(getNames());
     int[] bucketFileSizeDist = getTotalFileSizeDist(bucketObjectId);
     distResponse.setFileSizeDist(bucketFileSizeDist);
     return distResponse;

@@ -46,10 +46,11 @@ public class VolumeEntityHandler extends EntityHandler {
   }
 
   @Override
-  public NamespaceSummaryResponse getSummaryResponse(String[] names)
+  public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.VOLUME);
+    String[] names = getNames();
     List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
     namespaceSummaryResponse.setNumBucket(buckets.size());
     int totalDir = 0;
@@ -69,9 +70,11 @@ public class VolumeEntityHandler extends EntityHandler {
   }
 
   @Override
-  public DUResponse getDuResponse(String path, String[] names, boolean listFile,
-                                  boolean withReplica) throws IOException {
+  public DUResponse getDuResponse(
+          boolean listFile, boolean withReplica)
+          throws IOException {
     DUResponse duResponse = new DUResponse();
+    String[] names = getNames();
     String volName = names[0];
     List<OmBucketInfo> buckets = listBucketsUnderVolume(volName);
     duResponse.setCount(buckets.size());
@@ -109,9 +112,10 @@ public class VolumeEntityHandler extends EntityHandler {
   }
 
   @Override
-  public QuotaUsageResponse getQuotaResponse(String[] names)
+  public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
+    String[] names = getNames();
     List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
     String volKey = getOmMetadataManager().getVolumeKey(names[0]);
     OmVolumeArgs volumeArgs =
@@ -130,10 +134,11 @@ public class VolumeEntityHandler extends EntityHandler {
   }
 
   @Override
-  public FileSizeDistributionResponse getDistResponse(String[] names)
+  public FileSizeDistributionResponse getDistResponse()
           throws IOException {
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();
+    String[] names = getNames();
     List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
     int[] volumeFileSizeDist = new int[ReconConstants.NUM_OF_BINS];
 
