@@ -85,6 +85,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSIN
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_NON_EMPTY_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_OPEN_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
@@ -1052,6 +1053,18 @@ public class KeyValueHandler extends Handler {
           throw new StorageContainerException(
               "Deletion of Open Container is not allowed.",
               DELETE_ON_OPEN_CONTAINER);
+        }
+        // Safety check that the container is empty.
+        // If the container is not empty, it should not be deleted unless the
+        // container is beinf forcefully deleted (which happens when
+        // container is unhealthy or over-replicated).
+        if (container.getContainerData().getBlockCount() != 0) {
+          LOG.error("Received container deletion command for container {} but" +
+              " the container is not empty.",
+              container.getContainerData().getContainerID());
+          throw new StorageContainerException("Non-force deletion of " +
+              "non-empty container is not allowed.",
+              DELETE_ON_NON_EMPTY_CONTAINER);
         }
       }
       long containerId = container.getContainerData().getContainerID();

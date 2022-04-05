@@ -954,6 +954,10 @@ public class ReplicationManager implements SCMService {
 
   /**
    * Returns true if the container is empty and CLOSED.
+   * A container is deemed empty if its keyCount (num of blocks) is 0. The
+   * usedBytes counter is not checked here because usedBytes is not a
+   * accurate representation of the committed blocks. There could be orphaned
+   * chunks in the container which contribute to the usedBytes.
    *
    * @param container Container to check
    * @param replicas Set of ContainerReplicas
@@ -962,9 +966,8 @@ public class ReplicationManager implements SCMService {
   private boolean isContainerEmpty(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     return container.getState() == LifeCycleState.CLOSED &&
-        (container.getUsedBytes() == 0 && container.getNumberOfKeys() == 0) &&
-        replicas.stream().allMatch(r -> r.getState() == State.CLOSED &&
-            r.getBytesUsed() == 0 && r.getKeyCount() == 0);
+        container.getNumberOfKeys() == 0 && replicas.stream().allMatch(
+            r -> r.getState() == State.CLOSED && r.getKeyCount() == 0);
   }
 
   /**
@@ -1061,7 +1064,6 @@ public class ReplicationManager implements SCMService {
 
     replicas.stream().forEach(rp -> {
       Preconditions.assertTrue(rp.getState() == State.CLOSED);
-      Preconditions.assertTrue(rp.getBytesUsed() == 0);
       Preconditions.assertTrue(rp.getKeyCount() == 0);
       sendDeleteCommand(container, rp.getDatanodeDetails(), false);
     });
@@ -1518,7 +1520,7 @@ public class ReplicationManager implements SCMService {
      */
 
     unhealthyReplicas.stream().findFirst().ifPresent(replica ->
-        sendDeleteCommand(container, replica.getDatanodeDetails(), false));
+        sendDeleteCommand(container, replica.getDatanodeDetails(), true));
 
   }
 
