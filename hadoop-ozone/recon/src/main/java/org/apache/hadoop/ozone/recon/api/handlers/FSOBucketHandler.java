@@ -71,8 +71,8 @@ public class FSOBucketHandler extends BucketHandler {
       // 'buck1' to the leaf node component, which is 'file1.txt'.
       // 2. If there is no dir exists for the leaf node component 'file1.txt'
       // then do look it on fileTable.
-      String dbNodeName = getOmMetadataManager().getOzonePathKey(lastKnownParentId,
-              fileName);
+      String dbNodeName = getOmMetadataManager()
+              .getOzonePathKey(lastKnownParentId, fileName);
       omDirInfo = getOmMetadataManager().getDirectoryTable()
               .getSkipCache(dbNodeName);
 
@@ -128,7 +128,8 @@ public class FSOBucketHandler extends BucketHandler {
     }
 
     // handle nested keys (DFS)
-    NSSummary nsSummary = getReconNamespaceSummaryManager().getNSSummary(parentId);
+    NSSummary nsSummary = getReconNamespaceSummaryManager()
+            .getNSSummary(parentId);
     // empty bucket
     if (nsSummary == null) {
       return 0;
