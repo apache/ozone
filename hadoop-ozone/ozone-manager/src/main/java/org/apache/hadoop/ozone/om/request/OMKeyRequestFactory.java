@@ -95,7 +95,9 @@ public final class OMKeyRequestFactory {
           OMKeyDeleteRequest.getInstance(keyArgs, omRequest, ozoneManager);
       break;
     case DeleteKeys:
-      return new OMKeysDeleteRequest(omRequest);
+      return OMKeysDeleteRequest
+          .getInstance(omRequest.getDeleteKeysRequest().getDeleteKeys(),
+              omRequest, ozoneManager);
     case RenameKey:
       keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
       omKeyRequest =
