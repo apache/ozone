@@ -198,12 +198,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     if (request.getVersion() <
         ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue()) {
       if (request.getCmdType() == GetContainer
-        || request.getCmdType() == ListContainer
-        || request.getCmdType() == GetContainerWithPipeline
-        || request.getCmdType() == GetContainerWithPipelineBatch
-        || request.getCmdType() == GetExistContainerWithPipelinesInBatch
-        || request.getCmdType() == ListPipelines
-        || request.getCmdType() == GetPipeline) {
+          || request.getCmdType() == ListContainer
+          || request.getCmdType() == GetContainerWithPipeline
+          || request.getCmdType() == GetContainerWithPipelineBatch
+          || request.getCmdType() == GetExistContainerWithPipelinesInBatch
+          || request.getCmdType() == ListPipelines
+          || request.getCmdType() == GetPipeline) {
 
         checkResponseForECRepConfig = true;
       }
