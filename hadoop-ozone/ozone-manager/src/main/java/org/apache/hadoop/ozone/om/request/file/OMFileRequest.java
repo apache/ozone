@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.HashSet;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
@@ -42,7 +41,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -108,8 +107,7 @@ public final class OMFileRequest {
           bucketName, pathName);
 
       if (omMetadataManager.getKeyTable(
-              OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                  ozoneManager, new HashSet<>()))
+              getBucketLayout(ozoneManager, volumeName, bucketName))
           .isExist(dbKeyName)) {
         // Found a file in the given path.
         // Check if this is actual file or a file in the given path
@@ -119,8 +117,7 @@ public final class OMFileRequest {
           result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
       } else if (omMetadataManager.getKeyTable(
-          OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-              ozoneManager, new HashSet<>()))
+              getBucketLayout(ozoneManager, volumeName, bucketName))
           .isExist(dbDirKeyName)) {
         // Found a directory in the given path.
         // Check if this is actual directory or a directory in the given path
@@ -129,8 +126,7 @@ public final class OMFileRequest {
         } else {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
           inheritAcls = omMetadataManager.getKeyTable(
-                  OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                      ozoneManager, new HashSet<>()))
+                  getBucketLayout(ozoneManager, volumeName, bucketName))
               .get(dbDirKeyName).getAcls();
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
@@ -399,7 +395,7 @@ public final class OMFileRequest {
 
   /**
    * Add entries to the Key Table cache.
-   * @param omMetadataManager
+   * @param ozoneManager
    * @param volumeName
    * @param bucketName
    * @param keyInfo
@@ -417,8 +413,7 @@ public final class OMFileRequest {
 
     for (OmKeyInfo parentInfo : parentInfoList.get()) {
       omMetadataManager.getKeyTable(
-              OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                  ozoneManager, new HashSet<>()))
+              getBucketLayout(ozoneManager, volumeName, bucketName))
           .addCacheEntry(new CacheKey<>(omMetadataManager
           .getOzoneKey(volumeName, bucketName, parentInfo.getKeyName())),
               new CacheValue<>(Optional.of(parentInfo), index));
@@ -426,8 +421,7 @@ public final class OMFileRequest {
 
     if (keyInfo.isPresent()) {
       omMetadataManager.getKeyTable(
-              OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                  ozoneManager, new HashSet<>()))
+              getBucketLayout(ozoneManager, volumeName, bucketName))
           .addCacheEntry(new CacheKey<>(omMetadataManager
           .getOzoneKey(volumeName, bucketName, keyInfo.get().getKeyName())),
               new CacheValue<>(keyInfo, index));
@@ -512,8 +506,8 @@ public final class OMFileRequest {
     omFileInfo.setFileName(fileName);
 
     ozoneManager.getMetadataManager().getKeyTable(
-            OzoneManagerUtils.getBucketLayout(omFileInfo.getVolumeName(),
-                omFileInfo.getBucketName(), ozoneManager, new HashSet<>()))
+            getBucketLayout(ozoneManager, omFileInfo.getVolumeName(),
+                omFileInfo.getBucketName()))
         .addCacheEntry(new CacheKey<>(dbFileKey),
             new CacheValue<>(Optional.of(omFileInfo), trxnLogIndex));
   }
@@ -848,8 +842,8 @@ public final class OMFileRequest {
   /**
    * Check if there are any sub path exist for the given user key path.
    *
-   * @param omKeyInfo om key path
-   * @param metaMgr   OMMetadataManager
+   * @param omKeyInfo       om key path
+   * @param ozoneManager    ozone manager
    * @return true if there are any sub path, false otherwise
    * @throws IOException DB exception
    */
@@ -899,10 +893,11 @@ public final class OMFileRequest {
   private static boolean checkSubFileExists(OmKeyInfo omKeyInfo,
       OzoneManager ozoneManager) throws IOException {
     OMMetadataManager metaMgr = ozoneManager.getMetadataManager();
+    BucketLayout bucketLayout =
+        getBucketLayout(ozoneManager, omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName());
     // Check all fileTable cache for any sub paths.
-    Table fileTable = metaMgr.getKeyTable(
-        OzoneManagerUtils.getBucketLayout(omKeyInfo.getVolumeName(),
-            omKeyInfo.getKeyName(), ozoneManager, new HashSet<>()));
+    Table fileTable = metaMgr.getKeyTable(bucketLayout);
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = fileTable.cacheIterator();
 

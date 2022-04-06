@@ -57,7 +57,6 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
-import java.util.HashSet;
 
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
@@ -217,7 +216,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     // While doing this we make sure we are resolving the real bucket in case of
     // link buckets.
     BucketLayout bucketLayout =
-        getBucketLayout(volumeName, bucketName, ozoneManager, new HashSet<>());
+        getBucketLayout(ozoneManager, volumeName, bucketName);
 
     // Get the CmdType.
     Type requestType = omRequest.getCmdType();

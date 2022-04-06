@@ -120,6 +120,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -338,8 +339,8 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
 
     BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(args.getVolumeName(),
-            args.getBucketName(), ozoneManager, new HashSet<>());
+        getBucketLayout(ozoneManager, args.getVolumeName(),
+            args.getBucketName());
     keyName = OMClientRequest
         .validateAndNormalizeKey(enableFileSystemPaths, keyName,
             bucketLayout);
@@ -403,9 +404,10 @@ public class KeyManagerImpl implements KeyManager {
       String keyName) throws IOException {
     String keyBytes =
         metadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    BucketLayout bucketLayout = getBucketLayout(ozoneManager, volumeName,
+        bucketName);
     return metadataManager
-        .getKeyTable(OzoneManagerUtils.getBucketLayout(volumeName,
-            bucketName, ozoneManager, new HashSet<>()))
+        .getKeyTable(bucketLayout)
         .get(keyBytes);
   }
 
@@ -830,10 +832,9 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
+      BucketLayout bucketLayout = getBucketLayout(ozoneManager, volume, bucket);
       OmKeyInfo keyInfo = metadataManager
-          .getKeyTable(
-              OzoneManagerUtils.getBucketLayout(volume, bucket, ozoneManager,
-                  new HashSet<>()))
+          .getKeyTable(bucketLayout)
           .get(objectKey);
       if (keyInfo == null) {
         throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
@@ -846,8 +847,7 @@ public class KeyManagerImpl implements KeyManager {
       if (changed) {
         metadataManager
             .getKeyTable(
-                OzoneManagerUtils.getBucketLayout(volume, bucket, ozoneManager,
-                    new HashSet<>()))
+                getBucketLayout(ozoneManager, volume, bucket))
             .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
@@ -882,10 +882,9 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
+      BucketLayout bucketLayout = getBucketLayout(ozoneManager, volume, bucket);
       OmKeyInfo keyInfo = metadataManager
-          .getKeyTable(
-              OzoneManagerUtils.getBucketLayout(volume, bucket, ozoneManager,
-                  new HashSet<>()))
+          .getKeyTable(bucketLayout)
           .get(objectKey);
       if (keyInfo == null) {
         throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
@@ -895,8 +894,7 @@ public class KeyManagerImpl implements KeyManager {
       if (changed) {
         metadataManager
             .getKeyTable(
-                OzoneManagerUtils.getBucketLayout(volume, bucket, ozoneManager,
-                    new HashSet<>()))
+                getBucketLayout(ozoneManager, volume, bucket))
             .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
@@ -931,10 +929,9 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
       String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
+      BucketLayout bucketLayout = getBucketLayout(ozoneManager, volume, bucket);
       OmKeyInfo keyInfo = metadataManager
-          .getKeyTable(
-              OzoneManagerUtils.getBucketLayout(volume, bucket, ozoneManager,
-                  new HashSet<>()))
+          .getKeyTable(bucketLayout)
           .get(objectKey);
       if (keyInfo == null) {
         throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
@@ -945,8 +942,7 @@ public class KeyManagerImpl implements KeyManager {
       if (changed) {
         metadataManager
             .getKeyTable(
-                OzoneManagerUtils.getBucketLayout(volume, bucket, ozoneManager,
-                    new HashSet<>()))
+                getBucketLayout(ozoneManager, volume, bucket))
             .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
@@ -1235,9 +1231,7 @@ public class KeyManagerImpl implements KeyManager {
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
       fileKeyInfo = metadataManager
-          .getKeyTable(
-              OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                  ozoneManager, new HashSet<>()))
+          .getKeyTable(getBucketLayout(ozoneManager, volumeName, bucketName))
           .get(fileKeyBytes);
 
       // Check if the key is a directory.
@@ -1246,8 +1240,7 @@ public class KeyManagerImpl implements KeyManager {
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
         OmKeyInfo dirKeyInfo = metadataManager.getKeyTable(
-                OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                    ozoneManager, new HashSet<>()))
+                getBucketLayout(ozoneManager, volumeName, bucketName))
             .get(dirKeyBytes);
         if (dirKeyInfo != null) {
           return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
@@ -1532,8 +1525,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     Table keyTable = metadataManager
         .getKeyTable(
-            OzoneManagerUtils.getBucketLayout(volName, buckName,
-                ozoneManager, new HashSet<>()));
+            getBucketLayout(ozoneManager, volName, buckName));
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator;
     try {
@@ -1735,10 +1727,9 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
           bucketName);
       try {
-        iterator = metadataManager.getKeyTable(
-                OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                    ozoneManager, new HashSet<>()))
-            .iterator();
+        BucketLayout bucketLayout =
+            getBucketLayout(ozoneManager, volumeName, bucketName);
+        iterator = metadataManager.getKeyTable(bucketLayout).iterator();
         countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
             bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
             prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
@@ -1825,9 +1816,9 @@ public class KeyManagerImpl implements KeyManager {
           metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
               bucketName);
           try {
-            iterator = metadataManager.getKeyTable(
-                    OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
-                        ozoneManager, new HashSet<>()))
+            BucketLayout bucketLayout =
+                getBucketLayout(ozoneManager, volumeName, bucketName);
+            iterator = metadataManager.getKeyTable(bucketLayout)
                 .iterator();
             countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
                 bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
@@ -1926,9 +1917,10 @@ public class KeyManagerImpl implements KeyManager {
 
     // First under lock obtain both entries from dir/file cache and generate
     // entries marked for delete.
+    BucketLayout bucketLayout = getBucketLayout(ozoneManager, volumeName,
+        bucketName);
     countEntries = listStatusFindFilesInTableCache(cacheFileMap, metadataManager
-            .getKeyTable(OzoneManagerUtils.getBucketLayout(volumeName,
-                bucketName, ozoneManager, new HashSet<>())),
+            .getKeyTable(bucketLayout),
         prefixKeyInDB, seekFileInDB, prefixPath, startKey, countEntries,
         numEntries, deletedKeySet);
 
@@ -2359,9 +2351,10 @@ public class KeyManagerImpl implements KeyManager {
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
-    Table fileTable = metadataManager.getKeyTable(
-        OzoneManagerUtils.getBucketLayout(parentInfo.getVolumeName(),
-            parentInfo.getBucketName(), ozoneManager, new HashSet<>()));
+    BucketLayout bucketLayout =
+        getBucketLayout(ozoneManager, parentInfo.getVolumeName(),
+            parentInfo.getBucketName());
+    Table fileTable = metadataManager.getKeyTable(bucketLayout);
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = fileTable.iterator();
 

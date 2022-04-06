@@ -22,13 +22,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -63,17 +63,26 @@ public final class OzoneManagerUtils {
    */
 
   private static OmBucketInfo getOmBucketInfo(OzoneManager ozoneManager,
-      String volName, String buckName) {
+      String volName, String buckName) throws IOException {
     String buckKey =
         ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
-    OmBucketInfo buckInfo = null;
-    try {
-      buckInfo =
-          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
-    } catch (IOException e) {
-      LOG.debug("Failed to get the value for the key: " + buckKey);
-    }
-    return buckInfo;
+    return ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+  }
+
+  /**
+   * Get bucket layout for the given volume and bucket name.
+   *
+   * @param ozoneManager ozone manager
+   * @param volName      volume name
+   * @param buckName     bucket name
+   * @return bucket layout
+   * @throws IOException
+   */
+  public static BucketLayout getBucketLayout(OzoneManager ozoneManager,
+                                             String volName,
+                                             String buckName)
+      throws IOException {
+    return getBucketLayout(ozoneManager, volName, buckName, new HashSet<>());
   }
 
   /**
@@ -82,13 +91,14 @@ public final class OzoneManagerUtils {
    * @param volName      volume name
    * @param buckName     bucket name
    * @param ozoneManager ozone manager
-   * @param visited      set contains visited bucket details
    * @return bucket layout
    * @throws IOException
    */
-  public static BucketLayout getBucketLayout(String volName,
-      String buckName, OzoneManager ozoneManager,
-      Set<Pair<String, String>> visited) throws IOException {
+  private static BucketLayout getBucketLayout(OzoneManager ozoneManager,
+                                              String volName,
+                                              String buckName,
+                                              Set<Pair<String, String>> visited)
+      throws IOException {
 
     OmBucketInfo buckInfo = getOmBucketInfo(ozoneManager, volName, buckName);
 
@@ -115,25 +125,23 @@ public final class OzoneManagerUtils {
            * links.
            */
           if (sourceBuckInfo.isLink()) {
-            return getBucketLayout(sourceBuckInfo.getVolumeName(),
-                sourceBuckInfo.getBucketName(), ozoneManager, visited);
+            return getBucketLayout(ozoneManager, sourceBuckInfo.getVolumeName(),
+                sourceBuckInfo.getBucketName(), visited);
           }
           return sourceBuckInfo.getBucketLayout();
         }
       }
       return buckInfo.getBucketLayout();
     }
-    LOG.error("Could not get BucketLayout. Volume: {}, Bucket: {} ", volName,
-        buckName);
+
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmVolumeArgs volumeArgs = omMetadataManager.getVolumeTable()
-        .get(omMetadataManager.getVolumeKey(volName));
-    if (volumeArgs == null) {
-      throw new OMException("Could not get BucketLayout. Volume not found: "
-          + volName, OMException.ResultCodes.VOLUME_NOT_FOUND);
+    if (!omMetadataManager.getVolumeTable()
+        .isExist(omMetadataManager.getVolumeKey(volName))) {
+      throw new OMException("Volume not found: " + volName,
+          OMException.ResultCodes.VOLUME_NOT_FOUND);
     }
-    throw new OMException("Could not get BucketLayout." +
-        "Bucket not found: " + volName + "/" + buckName,
+
+    throw new OMException("Bucket not found: " + volName + "/" + buckName,
         OMException.ResultCodes.BUCKET_NOT_FOUND);
   }
 
