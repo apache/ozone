@@ -125,7 +125,7 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testGetBucketEndpointMetric() throws Exception {
+  public void testGetBucket() throws Exception {
     long oriMetric = metrics.getGetBucketSuccess();
 
     clientStub = createClientWithKeys("file1");
@@ -156,7 +156,7 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testCreateBucketEndpointMetric() throws Exception {
+  public void testCreateBucket() throws Exception {
 
     long oriMetric = metrics.getCreateBucketSuccess();
 
@@ -177,7 +177,7 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testDeleteBucketEndpointMetric() throws Exception {
+  public void testDeleteBucket() throws Exception {
     long oriMetric = metrics.getDeleteBucketSuccess();
 
     bucketEndpoint.delete(bucketName);
@@ -202,7 +202,7 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testGetAclEndpointMetric() throws Exception {
+  public void testGetAcl() throws Exception {
     long oriMetric = metrics.getGetAclSuccess();
 
     Response response =
@@ -231,7 +231,7 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testPutAclEndpointMetric() throws Exception {
+  public void testPutAcl() throws Exception {
     long oriMetric = metrics.getPutAclSuccess();
 
     clientStub.getObjectStore().createS3Bucket("b1");

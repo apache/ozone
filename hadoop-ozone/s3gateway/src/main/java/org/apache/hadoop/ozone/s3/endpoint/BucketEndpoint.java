@@ -147,7 +147,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     } catch (OS3Exception ex) {
       getMetrics().incGetBucketFailure();
-      LOG.error("Bucket Does not Exist " + bucketName, ex);
+      LOG.debug("Bucket Does not Exist " + bucketName, ex);
       throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
     }
 
