@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -468,8 +469,11 @@ public class ContainerBalancer implements SCMService {
     try {
       allFuturesResult.get(config.getMoveTimeout().toMillis(),
           TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
-      // Ignore the exception here.
+      // For exceptions other than InterruptedException, we ignore them.
+      e.printStackTrace();
     }
 
     List<ContainerMoveSelection> completeKeyList =
@@ -483,14 +487,17 @@ public class ContainerBalancer implements SCMService {
         CompletableFuture<ReplicationManager.MoveResult> future =
             moveSelectionToFutureMap.get(moveSelection);
         if (future.isCompletedExceptionally()) {
-          LOG.info("Container move for container {} to target {} " +
-                  "failed with exceptions",
-              moveSelection.getContainerID().toString(),
-              moveSelection.getTargetNode().getUuidString());
+          try {
+            future.join();
+          } catch (CompletionException ex) {
+            LOG.info("Container move for container {} to target {} " +
+                    "failed with exceptions",
+                moveSelection.getContainerID().toString(),
+                moveSelection.getTargetNode().getUuidString(),
+                ex.getCause());
+          }
         } else {
-          ReplicationManager.MoveResult result =
-              moveSelectionToFutureMap.get(moveSelection).join();
-
+          ReplicationManager.MoveResult result = future.join();
           if (result == ReplicationManager.MoveResult.COMPLETED) {
             try {
               ContainerInfo container =
@@ -515,11 +522,12 @@ public class ContainerBalancer implements SCMService {
           }
         }
       } finally {
-        // Remove complete
+        // Remove completed moves.
         moveSelectionToFutureMap.remove(moveSelection);
       }
     }
 
+    // Handle timeout moves.
     if (LOG.isDebugEnabled()) {
       moveSelectionToFutureMap.keySet().forEach(entry -> {
         LOG.debug("Container move timeout for container {} to target {}",
@@ -527,6 +535,7 @@ public class ContainerBalancer implements SCMService {
             entry.getTargetNode().getUuidString());
       });
     }
+
     countDatanodesInvolvedPerIteration =
         sourceToTargetMap.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
