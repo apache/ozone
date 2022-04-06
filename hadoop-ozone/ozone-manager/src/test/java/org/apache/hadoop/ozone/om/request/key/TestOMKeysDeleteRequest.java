@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -51,7 +50,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     createPreRequisites();
 
     OMKeysDeleteRequest omKeysDeleteRequest =
-        new OMKeysDeleteRequest(omRequest, BucketLayout.LEGACY);
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponse(omKeysDeleteRequest);
   }
 
@@ -95,7 +94,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
                     .addAllKeys(deleteKeyList).addKeys("dummy"))).build();
 
     OMKeysDeleteRequest omKeysDeleteRequest =
-        new OMKeysDeleteRequest(omRequest, BucketLayout.LEGACY);
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest);
   }
 

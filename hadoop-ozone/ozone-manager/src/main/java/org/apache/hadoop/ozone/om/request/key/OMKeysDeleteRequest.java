@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -49,7 +48,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,8 +69,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeysDeleteRequest.class);
 
-  public OMKeysDeleteRequest(OMRequest omRequest, BucketLayout layout) {
-    super(omRequest, layout);
+  public OMKeysDeleteRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override @SuppressWarnings("methodlength")
@@ -297,17 +295,4 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     auditMap.put(UNDELETED_KEYS_LIST, String.join(",", unDeletedKeys));
   }
 
-  public static OMKeysDeleteRequest getInstance(
-      OzoneManagerProtocolProtos.DeleteKeyArgs keyArgs,
-      OzoneManagerProtocolProtos.OMRequest omRequest, OzoneManager ozoneManager)
-      throws IOException {
-
-    BucketLayout bucketLayout = OzoneManagerUtils
-        .getBucketLayout(keyArgs.getVolumeName(), keyArgs.getBucketName(),
-            ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new OmKeysDeleteRequestWithFSO(omRequest, bucketLayout);
-    }
-    return new OMKeysDeleteRequest(omRequest, bucketLayout);
-  }
 }

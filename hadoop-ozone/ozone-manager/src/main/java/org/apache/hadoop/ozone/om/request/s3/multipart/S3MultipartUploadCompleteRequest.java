@@ -25,7 +25,6 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -566,19 +564,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           new CacheKey<>(dbBucketKey),
           new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
     }
-  }
-
-  public static S3MultipartUploadCompleteRequest getInstance(KeyArgs keyArgs,
-      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new S3MultipartUploadCompleteRequestWithFSO(omRequest,
-          bucketLayout);
-    }
-    return new S3MultipartUploadCompleteRequest(omRequest, bucketLayout);
   }
 }
 
