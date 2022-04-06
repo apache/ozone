@@ -65,6 +65,7 @@ public class DirectoryEntityHandler extends EntityHandler {
           boolean listFile, boolean withReplica)
           throws IOException {
     DUResponse duResponse = new DUResponse();
+    duResponse.setPath(getNormalizedPath());
     long dirObjectId = getBucketHandler().getDirObjectId(getNames());
     NSSummary dirNSSummary =
             getReconNamespaceSummaryManager().getNSSummary(dirObjectId);

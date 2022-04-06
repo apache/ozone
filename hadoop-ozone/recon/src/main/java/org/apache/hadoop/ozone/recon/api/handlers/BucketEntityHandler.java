@@ -65,6 +65,7 @@ public class BucketEntityHandler extends EntityHandler {
           boolean listFile, boolean withReplica)
           throws IOException {
     DUResponse duResponse = new DUResponse();
+    duResponse.setPath(getNormalizedPath());
     long bucketObjectId = getBucketHandler().getBucketObjectId(getNames());
     NSSummary bucketNSSummary =
             getReconNamespaceSummaryManager().getNSSummary(bucketObjectId);

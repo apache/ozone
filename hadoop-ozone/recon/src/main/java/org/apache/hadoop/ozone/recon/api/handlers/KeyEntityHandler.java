@@ -57,6 +57,7 @@ public class KeyEntityHandler extends EntityHandler {
           boolean listFile, boolean withReplica)
           throws IOException {
     DUResponse duResponse = new DUResponse();
+    duResponse.setPath(getNormalizedPath());
     // DU for key doesn't have subpaths
     duResponse.setCount(0);
     String[] names = getNames();

@@ -126,8 +126,6 @@ public class NSSummaryEndpoint {
             path, reconNamespaceSummaryManager,
             omMetadataManager, reconSCM);
 
-    duResponse.setPath(handler.getNormalizedPath());
-
     duResponse = handler.getDuResponse(
             listFile, withReplica);
 

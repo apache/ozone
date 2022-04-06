@@ -73,6 +73,7 @@ public class RootEntityHandler extends EntityHandler {
           boolean listFile, boolean withReplica)
           throws IOException {
     DUResponse duResponse = new DUResponse();
+    duResponse.setPath(getNormalizedPath());
     ReconOMMetadataManager omMetadataManager = getOmMetadataManager();
     List<OmVolumeArgs> volumes = listVolumes();
     duResponse.setCount(volumes.size());

@@ -74,6 +74,7 @@ public class VolumeEntityHandler extends EntityHandler {
           boolean listFile, boolean withReplica)
           throws IOException {
     DUResponse duResponse = new DUResponse();
+    duResponse.setPath(getNormalizedPath());
     String[] names = getNames();
     String volName = names[0];
     List<OmBucketInfo> buckets = listBucketsUnderVolume(volName);
