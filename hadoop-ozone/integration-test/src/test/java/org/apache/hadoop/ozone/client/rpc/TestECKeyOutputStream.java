@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -198,46 +199,48 @@ public class TestECKeyOutputStream {
     String myBucket = UUID.randomUUID().toString();
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
-    bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-                chunkSize)));
+    volume.createBucket(myBucket, bucketArgs.build());
+    OzoneBucket bucket = volume.getBucket(myBucket);
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize));
 
+    //Overwrite with RATIS/THREE
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+
+    //Overwrite with RATIS/ONE
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
+  }
+
+  @Test
+  public void testOverwriteRatisKeyWithECKey() throws Exception {
+    String myBucket = UUID.randomUUID().toString();
+    OzoneVolume volume = objectStore.getVolume(volumeName);
+    final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     volume.createBucket(myBucket, bucketArgs.build());
     OzoneBucket bucket = volume.getBucket(myBucket);
 
-    try (OzoneOutputStream out = bucket.createKey(keyString, inputSize)) {
-      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
-      }
-    }
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    // Overwrite with EC key
+    createKeyAndCheckReplicationConfig(keyString, bucket,
+        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+            chunkSize));
+  }
 
-    //Overwrite with RATIS/THREE
-    try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        new HashMap<>())) {
+  private void createKeyAndCheckReplicationConfig(String keyName,
+      OzoneBucket bucket, ReplicationConfig replicationConfig)
+      throws IOException {
+    try (OzoneOutputStream out = bucket
+        .createKey(keyName, inputSize, replicationConfig, new HashMap<>())) {
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);
       }
     }
-    OzoneKeyDetails key = bucket.getKey(keyString);
-    Assert.assertEquals(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        key.getReplicationConfig());
-
-    //Overwrite with RATIS/ONE
-    try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-        new HashMap<>())) {
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
-      }
-    }
-    key = bucket.getKey(keyString);
-    Assert.assertEquals(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-        key.getReplicationConfig());
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    Assert.assertEquals(replicationConfig, key.getReplicationConfig());
   }
 
   @Test
