@@ -179,7 +179,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       // Need to check if any files exist in the given path, if they exist we
       // cannot create a directory with the given key.
       OMFileRequest.OMPathInfo omPathInfo =
-          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
+          OMFileRequest.verifyFilesInPath(ozoneManager, volumeName,
               bucketName, keyName, keyPath);
       OMFileRequest.OMDirectoryResult omDirectoryResult =
           omPathInfo.getDirectoryResult();
@@ -204,7 +204,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             missingParents, inheritAcls, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
-        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+        OMFileRequest.addKeyTableCacheEntries(ozoneManager, volumeName,
             bucketName, Optional.of(dirKeyInfo),
             Optional.of(missingParentInfos), trxnLogIndex);
         result = Result.SUCCESS;

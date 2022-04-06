@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
@@ -40,6 +41,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -70,21 +73,24 @@ public final class OMFileRequest {
 
   private OMFileRequest() {
   }
+
   /**
    * Verify any files exist in the given path in the specified volume/bucket.
-   * @param omMetadataManager
-   * @param volumeName
-   * @param bucketName
-   * @param keyPath
+   *
+   * @param ozoneManager Ozone Manager
+   * @param volumeName   Volume Name
+   * @param bucketName   Bucket Name
+   * @param keyPath      Key Path
    * @return true - if file exist in the given path, else false.
    * @throws IOException
    */
   public static OMPathInfo verifyFilesInPath(
-      @Nonnull OMMetadataManager omMetadataManager,
+      @Nonnull OzoneManager ozoneManager,
       @Nonnull String volumeName,
       @Nonnull String bucketName, @Nonnull String keyName,
       @Nonnull Path keyPath) throws IOException {
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     String fileNameFromDetails = omMetadataManager.getOzoneKey(volumeName,
         bucketName, keyName);
     String dirNameFromDetails = omMetadataManager.getOzoneDirKey(volumeName,
@@ -102,7 +108,8 @@ public final class OMFileRequest {
           bucketName, pathName);
 
       if (omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, volumeName, bucketName))
+              OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
+                  ozoneManager, new HashSet<>()))
           .isExist(dbKeyName)) {
         // Found a file in the given path.
         // Check if this is actual file or a file in the given path
@@ -112,7 +119,8 @@ public final class OMFileRequest {
           result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
       } else if (omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, volumeName, bucketName))
+          OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
+              ozoneManager, new HashSet<>()))
           .isExist(dbDirKeyName)) {
         // Found a directory in the given path.
         // Check if this is actual directory or a directory in the given path
@@ -121,7 +129,8 @@ public final class OMFileRequest {
         } else {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
           inheritAcls = omMetadataManager.getKeyTable(
-              getBucketLayout(omMetadataManager, volumeName, bucketName))
+                  OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
+                      ozoneManager, new HashSet<>()))
               .get(dbDirKeyName).getAcls();
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
@@ -400,13 +409,16 @@ public final class OMFileRequest {
    * TODO : move code to a separate utility class.
    */
   public static void addKeyTableCacheEntries(
-      OMMetadataManager omMetadataManager, String volumeName,
+      OzoneManager ozoneManager, String volumeName,
       String bucketName, Optional<OmKeyInfo> keyInfo,
       Optional<List<OmKeyInfo>> parentInfoList,
-      long index) {
+      long index) throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
     for (OmKeyInfo parentInfo : parentInfoList.get()) {
       omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, volumeName, bucketName))
+              OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
+                  ozoneManager, new HashSet<>()))
           .addCacheEntry(new CacheKey<>(omMetadataManager
           .getOzoneKey(volumeName, bucketName, parentInfo.getKeyName())),
               new CacheValue<>(Optional.of(parentInfo), index));
@@ -414,7 +426,8 @@ public final class OMFileRequest {
 
     if (keyInfo.isPresent()) {
       omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, volumeName, bucketName))
+              OzoneManagerUtils.getBucketLayout(volumeName, bucketName,
+                  ozoneManager, new HashSet<>()))
           .addCacheEntry(new CacheKey<>(omMetadataManager
           .getOzoneKey(volumeName, bucketName, keyInfo.get().getKeyName())),
               new CacheValue<>(keyInfo, index));
@@ -481,15 +494,16 @@ public final class OMFileRequest {
   /**
    * Adding Key info to the file table cache.
    *
-   * @param omMetadataManager OM Metadata Manager
+   * @param ozoneManager      ozone manager
    * @param dbFileKey         file name key
    * @param omFileInfo        key info
    * @param fileName          file name
    * @param trxnLogIndex      transaction log index
    */
   public static void addFileTableCacheEntry(
-          OMMetadataManager omMetadataManager, String dbFileKey,
-          OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
+      OzoneManager ozoneManager, String dbFileKey,
+      OmKeyInfo omFileInfo, String fileName, long trxnLogIndex)
+      throws IOException {
 
     // New key format for the fileTable.
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
@@ -497,26 +511,11 @@ public final class OMFileRequest {
     omFileInfo.setKeyName(fileName);
     omFileInfo.setFileName(fileName);
 
-    omMetadataManager.getKeyTable(
-        getBucketLayout(omMetadataManager, omFileInfo.getVolumeName(),
-            omFileInfo.getBucketName()))
+    ozoneManager.getMetadataManager().getKeyTable(
+            OzoneManagerUtils.getBucketLayout(omFileInfo.getVolumeName(),
+                omFileInfo.getBucketName(), ozoneManager, new HashSet<>()))
         .addCacheEntry(new CacheKey<>(dbFileKey),
             new CacheValue<>(Optional.of(omFileInfo), trxnLogIndex));
-  }
-
-  public static BucketLayout getBucketLayout(
-      OMMetadataManager omMetadataManager, String volName, String buckName) {
-    if (omMetadataManager == null) {
-      return BucketLayout.DEFAULT;
-    }
-    String buckKey = omMetadataManager.getBucketKey(volName, buckName);
-    try {
-      OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
-      return buckInfo.getBucketLayout();
-    } catch (IOException e) {
-      LOG.error("Cannot find the key: " + buckKey, e);
-    }
-    return BucketLayout.DEFAULT;
   }
 
   /**
@@ -855,9 +854,10 @@ public final class OMFileRequest {
    * @throws IOException DB exception
    */
   public static boolean hasChildren(OmKeyInfo omKeyInfo,
-      OMMetadataManager metaMgr) throws IOException {
-    return checkSubDirectoryExists(omKeyInfo, metaMgr) ||
-            checkSubFileExists(omKeyInfo, metaMgr);
+      OzoneManager ozoneManager) throws IOException {
+    return
+        checkSubDirectoryExists(omKeyInfo, ozoneManager.getMetadataManager()) ||
+            checkSubFileExists(omKeyInfo, ozoneManager);
   }
 
   private static boolean checkSubDirectoryExists(OmKeyInfo omKeyInfo,
@@ -897,11 +897,12 @@ public final class OMFileRequest {
   }
 
   private static boolean checkSubFileExists(OmKeyInfo omKeyInfo,
-      OMMetadataManager metaMgr) throws IOException {
+      OzoneManager ozoneManager) throws IOException {
+    OMMetadataManager metaMgr = ozoneManager.getMetadataManager();
     // Check all fileTable cache for any sub paths.
     Table fileTable = metaMgr.getKeyTable(
-        getBucketLayout(metaMgr, omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName()));
+        OzoneManagerUtils.getBucketLayout(omKeyInfo.getVolumeName(),
+            omKeyInfo.getKeyName(), ozoneManager, new HashSet<>()));
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = fileTable.cacheIterator();
 

@@ -1318,7 +1318,7 @@ public class TestOzoneFileSystem {
     // unknown keyname
     try {
       new OzonePrefixPathImpl(getVolumeName(), getBucketName(), "invalidKey",
-          cluster.getOzoneManager().getKeyManager());
+          cluster.getOzoneManager());
       Assert.fail("Non-existent key name!");
     } catch (OMException ome) {
       Assert.assertEquals(OMException.ResultCodes.KEY_NOT_FOUND,
@@ -1327,7 +1327,7 @@ public class TestOzoneFileSystem {
 
     OzonePrefixPathImpl ozonePrefixPath =
         new OzonePrefixPathImpl(getVolumeName(), getBucketName(), keyName,
-            cluster.getOzoneManager().getKeyManager());
+            cluster.getOzoneManager());
 
     OzoneFileStatus status = ozonePrefixPath.getOzoneFileStatus();
     Assert.assertNotNull(status);

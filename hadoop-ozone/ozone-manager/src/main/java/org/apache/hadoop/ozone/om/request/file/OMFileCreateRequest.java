@@ -225,7 +225,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .getIfExist(ozoneKey);
 
       OMFileRequest.OMPathInfo pathInfo =
-          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
+          OMFileRequest.verifyFilesInPath(ozoneManager, volumeName,
               bucketName, keyName, Paths.get(keyName));
       OMFileRequest.OMDirectoryResult omDirectoryResult =
           pathInfo.getDirectoryResult();
@@ -280,7 +280,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
-      OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+      OMFileRequest.addKeyTableCacheEntries(ozoneManager, volumeName,
           bucketName, Optional.absent(), Optional.of(missingParentInfos),
           trxnLogIndex);
 

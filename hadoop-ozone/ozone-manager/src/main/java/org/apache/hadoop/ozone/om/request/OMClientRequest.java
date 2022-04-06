@@ -217,7 +217,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     //  lock. Need to revisit this to handle any concurrent operations
     //  along with this.
     OzonePrefixPathImpl pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, keyName, ozoneManager.getKeyManager());
+        bucketName, keyName, ozoneManager);
 
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.KEY)

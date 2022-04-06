@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
@@ -121,11 +122,19 @@ public final class OzoneManagerUtils {
         }
       }
       return buckInfo.getBucketLayout();
-    } else {
-      LOG.error("Bucket not found: {}/{} ", volName, buckName);
-      // TODO: Handle bucket validation
     }
-    return BucketLayout.DEFAULT;
+    LOG.error("Could not get BucketLayout. Volume: {}, Bucket: {} ", volName,
+        buckName);
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmVolumeArgs volumeArgs = omMetadataManager.getVolumeTable()
+        .get(omMetadataManager.getVolumeKey(volName));
+    if (volumeArgs == null) {
+      throw new OMException("Could not get BucketLayout. Volume not found: "
+          + volName, OMException.ResultCodes.VOLUME_NOT_FOUND);
+    }
+    throw new OMException("Could not get BucketLayout." +
+        "Bucket not found: " + volName + "/" + buckName,
+        OMException.ResultCodes.BUCKET_NOT_FOUND);
   }
 
   /**

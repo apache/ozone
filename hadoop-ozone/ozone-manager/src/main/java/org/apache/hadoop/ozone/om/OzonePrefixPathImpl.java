@@ -47,10 +47,10 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
   private boolean checkRecursiveAccess = false;
 
   public OzonePrefixPathImpl(String volumeName, String bucketName,
-      String keyPrefix, KeyManager keyManagerImpl) throws IOException {
+      String keyPrefix, OzoneManager ozoneManager) throws IOException {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
-    this.keyManager = keyManagerImpl;
+    this.keyManager = ozoneManager.getKeyManager();
 
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -76,7 +76,7 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
       // set recursive access check to true if this directory contains
       // sub-directories or sub-files.
       checkRecursiveAccess = OMFileRequest.hasChildren(
-          pathStatus.getKeyInfo(), keyManager.getMetadataManager());
+          pathStatus.getKeyInfo(), ozoneManager);
     }
   }
 

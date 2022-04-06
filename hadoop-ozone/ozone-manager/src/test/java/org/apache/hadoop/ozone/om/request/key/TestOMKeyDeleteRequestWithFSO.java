@@ -108,7 +108,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // OzonePrefixPathImpl on a directory
     OzonePrefixPathImpl ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
-        bucketName, "c", keyManager);
+        bucketName, "c", ozoneManager);
     OzoneFileStatus status = ozonePrefixPath.getOzoneFileStatus();
     Assert.assertNotNull(status);
     Assert.assertEquals("c", status.getTrimmedName());
@@ -127,7 +127,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // OzonePrefixPathImpl on a file
     ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
-        bucketName, "c/d/e/file1", keyManager);
+        bucketName, "c/d/e/file1", ozoneManager);
     status = ozonePrefixPath.getOzoneFileStatus();
     Assert.assertNotNull(status);
     Assert.assertEquals("c/d/e/file1", status.getTrimmedName());
@@ -164,7 +164,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete key.
     OzonePrefixPathImpl pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, key, ozoneManager.getKeyManager());
+        bucketName, key, ozoneManager);
 
     // 'x/y/z' has no sub-directories or sub files - recursive access check
     // should not be enabled for this case.
@@ -172,7 +172,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for parent key.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, parentKey, ozoneManager.getKeyManager());
+        bucketName, parentKey, ozoneManager);
 
     // 'x/y/' has a sub-directory 'z', hence, we should be performing recursive
     // access check.
@@ -191,7 +191,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for parent key 'c/d/'.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, INTERMEDIATE_DIR, ozoneManager.getKeyManager());
+        bucketName, INTERMEDIATE_DIR, ozoneManager);
 
     // 'c/d' has a sub-directory 'e', hence, we should be performing recursive
     // access check.
@@ -199,7 +199,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete directory structure (without file).
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, PARENT_DIR, ozoneManager.getKeyManager());
+        bucketName, PARENT_DIR, ozoneManager);
 
     // 'c/d/e/' has a 'file1' under it, hence, we should be performing recursive
     // access check.
@@ -207,7 +207,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete file1.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, FILE_KEY, ozoneManager.getKeyManager());
+        bucketName, FILE_KEY, ozoneManager);
 
     // Recursive access check is only enabled for directories, hence should be
     // false for file1.
