@@ -83,7 +83,7 @@ public class ContentGenerator {
   }
 
   /**
-   * Write the required bytes to the output stream.
+   * Write the required bytes to the streaming output stream.
    */
   public void write(OzoneDataStreamOutput out) throws IOException {
     for (long nrRemaining = keySize;

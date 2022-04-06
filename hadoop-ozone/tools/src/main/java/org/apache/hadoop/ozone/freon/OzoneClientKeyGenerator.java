@@ -82,7 +82,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private String omServiceID = null;
 
   @Option(
-      names = {"--enable_streaming", "--stream"},
+      names = {"--enable-streaming", "--stream"},
       description = "Specify whether the write will be through ratis streaming"
   )
   private boolean enableRatisStreaming = false;
