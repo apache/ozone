@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 /**
@@ -70,10 +73,12 @@ public enum S3StorageType {
         ? REDUCED_REDUNDANCY : STANDARD;
   }
 
-  public static S3StorageType fromReplicationType(
-      ReplicationType replicationType, ReplicationFactor factor) {
-    if ((replicationType == ReplicationType.STAND_ALONE) ||
-        (factor == ReplicationFactor.ONE)) {
+  public static S3StorageType fromReplicationConfig(ReplicationConfig config) {
+    if (config instanceof ECReplicationConfig) {
+      return S3StorageType.STANDARD;
+    }
+    if (config.getReplicationType() == HddsProtos.ReplicationType.STAND_ALONE ||
+        config.getRequiredNodes() == 1) {
       return S3StorageType.REDUCED_REDUNDANCY;
     } else {
       return S3StorageType.STANDARD;

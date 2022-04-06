@@ -35,8 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -49,7 +47,7 @@ import org.slf4j.LoggerFactory;
  * ECKeyOutputStream handles the EC writes by writing the data into underlying
  * block output streams chunk by chunk.
  */
-public class ECKeyOutputStream extends KeyOutputStream {
+public final class ECKeyOutputStream extends KeyOutputStream {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private int ecChunkSize;
@@ -88,31 +86,31 @@ public class ECKeyOutputStream extends KeyOutputStream {
     return blockOutputStreamEntryPool.getLocationInfoList();
   }
 
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public ECKeyOutputStream(OzoneClientConfig config, OpenKeySession handler,
-      XceiverClientFactory xceiverClientManager, OzoneManagerProtocol omClient,
-      int chunkSize, String requestId, ECReplicationConfig replicationConfig,
-      String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion, ByteBufferPool byteBufferPool) {
-    this.config = config;
-    this.bufferPool = byteBufferPool;
+  private ECKeyOutputStream(Builder builder) {
+    this.config = builder.getClientConfig();
+    this.bufferPool = builder.getByteBufferPool();
     // For EC, cell/chunk size and buffer size can be same for now.
-    ecChunkSize = replicationConfig.getEcChunkSize();
+    ecChunkSize = builder.getReplicationConfig().getEcChunkSize();
     this.config.setStreamBufferMaxSize(ecChunkSize);
     this.config.setStreamBufferFlushSize(ecChunkSize);
     this.config.setStreamBufferSize(ecChunkSize);
-    this.numDataBlks = replicationConfig.getData();
-    this.numParityBlks = replicationConfig.getParity();
+    this.numDataBlks = builder.getReplicationConfig().getData();
+    this.numParityBlks = builder.getReplicationConfig().getParity();
     ecChunkBufferCache = new ECChunkBuffers(
         ecChunkSize, numDataBlks, numParityBlks, bufferPool);
-    OmKeyInfo info = handler.getKeyInfo();
+    OmKeyInfo info = builder.getOpenHandler().getKeyInfo();
     blockOutputStreamEntryPool =
-        new ECBlockOutputStreamEntryPool(config, omClient, requestId,
-            replicationConfig, uploadID, partNumber, isMultipart, info,
-            unsafeByteBufferConversion, xceiverClientManager, handler.getId());
+        new ECBlockOutputStreamEntryPool(config,
+            builder.getOmClient(), builder.getRequestID(),
+            builder.getReplicationConfig(),
+            builder.getMultipartUploadID(), builder.getMultipartNumber(),
+            builder.isMultipartKey(),
+            info, builder.isUnsafeByteBufferConversionEnabled(),
+            builder.getXceiverManager(), builder.getOpenHandler().getId());
 
     this.writeOffset = 0;
-    this.encoder = CodecUtil.createRawEncoderWithFallback(replicationConfig);
+    this.encoder = CodecUtil.createRawEncoderWithFallback(
+        builder.getReplicationConfig());
   }
 
   /**
@@ -593,68 +591,13 @@ public class ECKeyOutputStream extends KeyOutputStream {
   /**
    * Builder class of ECKeyOutputStream.
    */
-  public static class Builder {
-    private OpenKeySession openHandler;
-    private XceiverClientFactory xceiverManager;
-    private OzoneManagerProtocol omClient;
-    private int chunkSize;
-    private String requestID;
-    private String multipartUploadID;
-    private int multipartNumber;
-    private boolean isMultipartKey;
-    private boolean unsafeByteBufferConversion;
-    private OzoneClientConfig clientConfig;
+  public static class Builder extends KeyOutputStream.Builder {
     private ECReplicationConfig replicationConfig;
     private ByteBufferPool byteBufferPool;
 
-    public Builder setMultipartUploadID(String uploadID) {
-      this.multipartUploadID = uploadID;
-      return this;
-    }
-
-    public Builder setMultipartNumber(int partNumber) {
-      this.multipartNumber = partNumber;
-      return this;
-    }
-
-    public Builder setHandler(OpenKeySession handler) {
-      this.openHandler = handler;
-      return this;
-    }
-
-    public Builder setXceiverClientManager(XceiverClientFactory manager) {
-      this.xceiverManager = manager;
-      return this;
-    }
-
-    public Builder setOmClient(OzoneManagerProtocol client) {
-      this.omClient = client;
-      return this;
-    }
-
-    public Builder setChunkSize(int size) {
-      this.chunkSize = size;
-      return this;
-    }
-
-    public Builder setRequestID(String id) {
-      this.requestID = id;
-      return this;
-    }
-
-    public Builder setIsMultipartKey(boolean isMultipart) {
-      this.isMultipartKey = isMultipart;
-      return this;
-    }
-
-    public Builder setConfig(OzoneClientConfig config) {
-      this.clientConfig = config;
-      return this;
-    }
-
-    public Builder enableUnsafeByteBufferConversion(boolean enabled) {
-      this.unsafeByteBufferConversion = enabled;
-      return this;
+    @Override
+    public ECReplicationConfig getReplicationConfig() {
+      return replicationConfig;
     }
 
     public ECKeyOutputStream.Builder setReplicationConfig(
@@ -663,17 +606,19 @@ public class ECKeyOutputStream extends KeyOutputStream {
       return this;
     }
 
+    public ByteBufferPool getByteBufferPool() {
+      return byteBufferPool;
+    }
+
     public ECKeyOutputStream.Builder setByteBufferPool(
         ByteBufferPool bufferPool) {
       this.byteBufferPool = bufferPool;
       return this;
     }
 
+    @Override
     public ECKeyOutputStream build() {
-      return new ECKeyOutputStream(clientConfig, openHandler, xceiverManager,
-          omClient, chunkSize, requestID, replicationConfig, multipartUploadID,
-          multipartNumber, isMultipartKey, unsafeByteBufferConversion,
-          byteBufferPool);
+      return new ECKeyOutputStream(this);
     }
   }
 
