@@ -623,8 +623,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
         bucket.listParts(keyName, uploadID, 0, 3);
 
     Assert.assertEquals(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
         ozoneMultipartUploadPartListParts.getReplicationConfig());
+
+    Assert.assertEquals(3,
+        ozoneMultipartUploadPartListParts.getPartInfoList().size());
 
     verifyPartNamesInDB(volumeName, bucketName, keyName, partsMap,
         ozoneMultipartUploadPartListParts, uploadID);
@@ -724,7 +727,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
         bucket.listParts(keyName, uploadID, 0, 2);
 
     Assert.assertEquals(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
         ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     Assert.assertEquals(2,
@@ -824,7 +827,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     Assert.assertEquals(0,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
     Assert.assertEquals(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
         ozoneMultipartUploadPartListParts.getReplicationConfig());
 
     // As we don't have any parts with greater than partNumberMarker and list
