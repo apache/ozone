@@ -37,8 +37,6 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
-import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OmKeysDeleteRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequestWithFSO;
@@ -50,6 +48,7 @@ import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortReq
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +68,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketLayoutAwareOMKeyRequestFactory.class);
 
-  private static final HashMap<String, Class<? extends OMKeyRequest>>
+  static final HashMap<String, Class<? extends OMKeyRequest>>
       OM_KEY_REQUEST_CLASSES = new HashMap<>();
 
   static {
@@ -150,16 +149,6 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
         OMKeysRenameRequest.class,
         BucketLayout.OBJECT_STORE);
 
-    // PurgeKeys
-    addRequestClass(Type.PurgeKeys,
-        OMKeyPurgeRequest.class,
-        BucketLayout.OBJECT_STORE);
-
-    // PurgePaths
-    addRequestClass(Type.PurgePaths,
-        OMPathsPurgeRequestWithFSO.class,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
     // InitiateMultiPartUpload
     addRequestClass(Type.InitiateMultiPartUpload,
         S3InitiateMultipartUploadRequest.class,
@@ -218,8 +207,34 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     // link buckets.
     BucketLayout bucketLayout =
         getBucketLayout(volumeName, bucketName, ozoneManager, new HashSet<>());
-    // Instantiate the request class based on the bucket layout.
-    return getRequestInstance(omRequest, bucketLayout);
+
+    // Get the CmdType.
+    Type requestType = omRequest.getCmdType();
+
+    // If the request class is associated to FSO bucket layout,
+    // we add a suffix to its key in the map.
+    String classKey = getKey(requestType, bucketLayout);
+
+    // Check if the key is present in the map.
+    if (OM_KEY_REQUEST_CLASSES.containsKey(classKey)) {
+      try {
+        return getRequestInstanceFromMap(omRequest, classKey, bucketLayout);
+      } catch (NoSuchMethodException | InvocationTargetException |
+          InstantiationException | IllegalAccessException e) {
+        String errMsg = "Exception while instantiating OMKeyRequest of type " +
+            requestType + " for bucket layout " + bucketLayout +
+            ". Please check the OMKeyRequest class constructor.";
+        LOG.error(errMsg, e);
+        throw new OMException(errMsg,
+            OMException.ResultCodes.INTERNAL_ERROR);
+      }
+    }
+
+    // We did not find this key in the map, it means this request type is not
+    // supported.
+    throw new OMException(
+        "Request type " + requestType + " not supported with bucket layout " +
+            bucketLayout, OMException.ResultCodes.INTERNAL_ERROR);
 
   }
 
@@ -242,51 +257,36 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
   }
 
   /**
-   * Helper method to instantiate the specific request class based on the
-   * bucket layout associated with the request.
+   * Finds the Request class associated with the given OMRequest and bucket
+   * layout, and returns an instance of the same.
    *
-   * @param omRequest    OMRequest which is to be instantiated.
-   * @param bucketLayout BucketLayout associated with the request.
-   * @return OMKeyRequest instance.
-   * @throws OMException if the request type is not supported with the
-   *                     associated bucket layout.
+   * @param omRequest    OMRequest object
+   * @param classKey     key to be looked up in the map.
+   * @param bucketLayout Bucket layout of the bucket associated with the
+   *                     request.
+   * @return OMKeyRequest object
+   * @throws NoSuchMethodException     if the request class does not have a
+   *                                   constructor that takes OMRequest and
+   *                                   BucketLayout as arguments.
+   * @throws InstantiationException    if the request class is abstract.
+   * @throws IllegalAccessException    if the request class is not public.
+   * @throws InvocationTargetException if the request class constructor throws
+   *                                   an exception.
    */
-  private static OMKeyRequest getRequestInstance(OMRequest omRequest,
-                                                 BucketLayout bucketLayout)
-      throws OMException {
-    Type requestType = omRequest.getCmdType();
+  @NotNull
+  static OMKeyRequest getRequestInstanceFromMap(OMRequest omRequest,
+                                                String classKey,
+                                                BucketLayout bucketLayout)
+      throws NoSuchMethodException, InstantiationException,
+      IllegalAccessException, InvocationTargetException {
+    // Get the constructor of the request class.
+    // The constructor takes OMRequest and BucketLayout as parameters.
+    Constructor<? extends OMKeyRequest> declaredConstructor =
+        OM_KEY_REQUEST_CLASSES.get(classKey)
+            .getDeclaredConstructor(OMRequest.class, BucketLayout.class);
 
-    // If the request class is associated to FSO bucket layout,
-    // we add a suffix to its key in the map.
-    String classKey = getKey(requestType, bucketLayout);
-
-    // Check if the key is present in the map.
-    if (OM_KEY_REQUEST_CLASSES.containsKey(classKey)) {
-      try {
-        // Get the constructor of the request class.
-        // The constructor takes OMRequest and BucketLayout as parameters.
-        Constructor<? extends OMKeyRequest> declaredConstructor =
-            OM_KEY_REQUEST_CLASSES.get(classKey)
-                .getDeclaredConstructor(OMRequest.class, BucketLayout.class);
-
-        // Invoke the constructor.
-        return declaredConstructor.newInstance(omRequest, bucketLayout);
-      } catch (NoSuchMethodException | InvocationTargetException |
-          InstantiationException | IllegalAccessException e) {
-        String errMsg = "Exception while instantiating OMKeyRequest of type " +
-            requestType + " for bucket layout " + bucketLayout +
-            ". Please check the OMKeyRequest class constructor.";
-        LOG.error(errMsg, e);
-        throw new OMException(errMsg,
-            OMException.ResultCodes.INTERNAL_ERROR);
-      }
-    }
-
-    // We did not find this key in the map, it means this request type is not
-    // supported.
-    throw new OMException(
-        "Request type " + requestType + " not supported with bucket layout " +
-            bucketLayout, OMException.ResultCodes.INTERNAL_ERROR);
+    // Invoke the constructor.
+    return declaredConstructor.newInstance(omRequest, bucketLayout);
   }
 
   /**
