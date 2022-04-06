@@ -1193,13 +1193,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold,
       int limit) throws IOException {
+    return getExpiredOpenKeys(expireThreshold, limit, BucketLayout.DEFAULT);
+  }
+
+  private List<OmOpenKeyInfo> getExpiredOpenKeys(Duration expireThreshold,
+      int limit, BucketLayout bucketLayout) throws IOException {
     List<OmOpenKeyInfo> expiredKeys = new ArrayList<>();
 
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-        keyValueTableIterator = getOpenKeyTable(getBucketLayout()).iterator()) {
+        keyValueTableIterator = getOpenKeyTable(bucketLayout).iterator()) {
 
       final long expiredCreationTimestamp =
           Instant.now().minus(expireThreshold).toEpochMilli();
@@ -1218,7 +1223,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
               .setVolumeName(omKeyInfo.getVolumeName())
               .setClientID(clientID)
               .setParentID(omKeyInfo.getParentObjectID())
-              .setBucketLayout(getBucketLayout())
+              .setBucketLayout(bucketLayout)
               .build());
         }
       }
