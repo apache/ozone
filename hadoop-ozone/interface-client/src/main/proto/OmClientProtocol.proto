@@ -1299,7 +1299,7 @@ message MultipartUploadInfo {
     required string uploadId = 4;
     required uint64 creationTime = 5;
     required hadoop.hdds.ReplicationType type = 6;
-    required hadoop.hdds.ReplicationFactor factor = 7;
+    optional hadoop.hdds.ReplicationFactor factor = 7;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
 }
 
