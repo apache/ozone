@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -101,8 +102,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return List of ReplicaInfo for the container or an empty list if none.
    * @throws IOException
    */
-  List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerId) throws IOException;
+  List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId, int clientVersion) throws IOException;
 
   /**
    * Ask SCM the location of a batch of containers. SCM responds with a group of
@@ -329,8 +330,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   /**
    * Start ContainerBalancer.
+   * @return {@link StartContainerBalancerResponseProto} that contains the
+   * start status and an optional message.
    */
-  boolean startContainerBalancer(Optional<Double> threshold,
+  StartContainerBalancerResponseProto startContainerBalancer(
+      Optional<Double> threshold,
       Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,

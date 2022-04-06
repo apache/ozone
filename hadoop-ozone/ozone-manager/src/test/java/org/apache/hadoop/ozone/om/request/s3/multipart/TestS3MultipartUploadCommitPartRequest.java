@@ -55,7 +55,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -117,7 +117,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -156,7 +156,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
 
     long clientID = Time.now();

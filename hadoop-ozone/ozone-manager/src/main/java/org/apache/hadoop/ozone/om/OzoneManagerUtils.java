@@ -54,7 +54,7 @@ public final class OzoneManagerUtils {
    * OzoneManagerStateMachine#runCommand ->
    * OzoneManagerRequestHandler#handleWriteRequest ->
    * OzoneManagerRatisUtils#createClientRequest ->
-   * OMKeyRequestFactory#createRequest ->
+   * BucketLayoutAwareOMKeyRequestFactory#createRequest ->
    * ...
    * OzoneManagerUtils#getBucketLayout ->
    * OzoneManagerUtils#getOmBucketInfo ->

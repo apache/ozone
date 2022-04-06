@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -63,7 +64,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DE
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
  */
-public class ContainerBalancer {
+public class ContainerBalancer implements SCMService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
@@ -138,39 +139,6 @@ public class ContainerBalancer {
   }
 
   /**
-   * Starts ContainerBalancer. Current implementation is incomplete.
-   *
-   * @param balancerConfiguration Configuration values.
-   */
-  public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
-    lock.lock();
-    try {
-      if (balancerRunning || currentBalancingThread != null) {
-        LOG.error("Container Balancer is already running.");
-        return false;
-      }
-
-      this.config = balancerConfiguration;
-      if (!validateConfiguration(config)) {
-        return false;
-      }
-      ozoneConfiguration.setFromObject(balancerConfiguration);
-      balancerRunning = true;
-      LOG.info("Starting Container Balancer...{}", this);
-
-      //we should start a new balancer thread async
-      //and response to cli as soon as possible
-      currentBalancingThread = new Thread(this::balance);
-      currentBalancingThread.setName("ContainerBalancer");
-      currentBalancingThread.setDaemon(true);
-      currentBalancingThread.start();
-    } finally {
-      lock.unlock();
-    }
-    return true;
-  }
-
-  /**
    * Balances the cluster.
    */
   private void balance() {
@@ -212,7 +180,7 @@ public class ContainerBalancer {
 
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
-        stop();
+        stopBalancer();
         return;
       }
 
@@ -222,7 +190,7 @@ public class ContainerBalancer {
       metrics.incrementNumIterations(1);
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        stop();
+        stopBalancer();
         return;
       }
 
@@ -246,7 +214,7 @@ public class ContainerBalancer {
         }
       }
     }
-    stop();
+    stopBalancer();
   }
 
   /**
@@ -508,7 +476,7 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-            metrics.incrementNumMovedContainersInLatestIteration(1);
+            metrics.incrementNumContainerMovesInLatestIteration(1);
             LOG.info("Container move completed for container {} to target {}",
                 container.containerID(),
                 moveSelection.getTargetNode().getUuidString());
@@ -541,10 +509,13 @@ public class ContainerBalancer {
         sourceToTargetMap.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
-    metrics.incrementDataSizeMovedGBInLatestIteration(
-        sizeMovedPerIteration / OzoneConsts.GB);
+    sizeMovedPerIteration /= OzoneConsts.GB;
+    metrics.incrementDataSizeMovedGBInLatestIteration(sizeMovedPerIteration);
+    metrics.incrementNumContainerMoves(
+        metrics.getNumContainerMovesInLatestIteration());
+    metrics.incrementDataSizeMovedGB(sizeMovedPerIteration);
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
-            "in this iteration: {}B.",
+            "in this iteration: {}GB.",
         countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
   }
 
@@ -814,42 +785,168 @@ public class ContainerBalancer {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
-    metrics.resetNumMovedContainersInLatestIteration();
+    metrics.resetNumContainerMovesInLatestIteration();
     metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();
   }
 
   /**
-   * Stops ContainerBalancer.
+   * Receives a notification for raft or safe mode related status changes.
+   * Stops ContainerBalancer if it's running and the current SCM becomes a
+   * follower or enters safe mode.
    */
-  public void stop() {
+  @Override
+  public void notifyStatusChanged() {
+    if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
+      if (isBalancerRunning()) {
+        stopBalancingThread();
+      }
+    }
+  }
+
+  /**
+   * Checks if ContainerBalancer should run.
+   * @return false
+   */
+  @Override
+  public boolean shouldRun() {
+    return false;
+  }
+
+  /**
+   * @return Name of this service.
+   */
+  @Override
+  public String getServiceName() {
+    return ContainerBalancer.class.getSimpleName();
+  }
+
+  /**
+   * Starts ContainerBalancer as an SCMService.
+   */
+  @Override
+  public void start() {
+    if (shouldRun()) {
+      startBalancingThread();
+    }
+  }
+
+  /**
+   * Starts Container Balancer after checking its state and validating
+   * configuration.
+   *
+   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
+   * not in a start-appropriate state
+   * @throws InvalidContainerBalancerConfigurationException if
+   * {@link ContainerBalancerConfiguration} config file is incorrectly
+   * configured
+   */
+  public void startBalancer() throws IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException {
     lock.lock();
     try {
-      // we should stop the balancer thread gracefully
-      if (!balancerRunning) {
-        LOG.info("Container Balancer is not running.");
-        return;
-      }
-      balancerRunning = false;
+      validateState();
+      validateConfiguration(this.config);
+      startBalancingThread();
     } finally {
       lock.unlock();
     }
+  }
 
-    // wait for currentBalancingThread to die
-    if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
-      currentBalancingThread.interrupt();
+  /**
+   * Starts a new balancing thread asynchronously.
+   */
+  private void startBalancingThread() {
+    lock.lock();
+    try {
+      balancerRunning = true;
+      currentBalancingThread = new Thread(this::balance);
+      currentBalancingThread.setName("ContainerBalancer");
+      currentBalancingThread.setDaemon(true);
+      currentBalancingThread.start();
+    } finally {
+      lock.unlock();
+    }
+    LOG.info("Starting Container Balancer... {}", this);
+  }
+
+  /**
+   * Checks if ContainerBalancer can start.
+   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
+   * already running, SCM is in safe mode, or SCM is not leader ready
+   */
+  private void validateState() throws IllegalContainerBalancerStateException {
+    if (!scmContext.isLeaderReady()) {
+      LOG.warn("SCM is not leader ready");
+      throw new IllegalContainerBalancerStateException("SCM is not leader " +
+          "ready");
+    }
+    if (scmContext.isInSafeMode()) {
+      LOG.warn("SCM is in safe mode");
+      throw new IllegalContainerBalancerStateException("SCM is in safe mode");
+    }
+    lock.lock();
+    try {
+      if (isBalancerRunning() || currentBalancingThread != null) {
+        LOG.warn("Cannot start ContainerBalancer because it's already running");
+        throw new IllegalContainerBalancerStateException(
+            "Cannot start ContainerBalancer because it's already running");
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Stops the SCM service.
+   */
+  @Override
+  public void stop() {
+    stopBalancer();
+  }
+
+  /**
+   * Stops ContainerBalancer gracefully.
+   */
+  public void stopBalancer() {
+    lock.lock();
+    try {
+      if (!isBalancerRunning()) {
+        LOG.info("Container Balancer is not running.");
+        return;
+      }
+      stopBalancingThread();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void stopBalancingThread() {
+    Thread balancingThread;
+    lock.lock();
+    try {
+      balancerRunning = false;
+      balancingThread = currentBalancingThread;
+      currentBalancingThread = null;
+    } finally {
+      lock.unlock();
+    }
+    // wait for balancingThread to die
+    if (balancingThread != null &&
+        balancingThread.getId() != Thread.currentThread().getId()) {
+      balancingThread.interrupt();
       try {
-        currentBalancingThread.join();
+        balancingThread.join();
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
       }
     }
-    currentBalancingThread = null;
     LOG.info("Container Balancer stopped successfully.");
   }
 
-  private boolean validateConfiguration(ContainerBalancerConfiguration conf) {
+  private void validateConfiguration(ContainerBalancerConfiguration conf)
+      throws InvalidContainerBalancerConfigurationException {
     // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
@@ -857,25 +954,30 @@ public class ContainerBalancer {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     if (conf.getMaxSizeEnteringTarget() <= size) {
-      LOG.info("MaxSizeEnteringTarget should be larger than " +
-          "ozone.scm.container.size");
-      return false;
+      LOG.warn("hdds.container.balancer.size.entering.target.max {} should " +
+          "be greater than ozone.scm.container.size {}",
+          conf.getMaxSizeEnteringTarget(), size);
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.entering.target.max should be greater" +
+              " than ozone.scm.container.size");
     }
     if (conf.getMaxSizeLeavingSource() <= size) {
-      LOG.info("MaxSizeLeavingSource should be larger than " +
-          "ozone.scm.container.size");
-      return false;
+      LOG.warn("hdds.container.balancer.size.leaving.source.max {} should " +
+              "be greater than ozone.scm.container.size {}",
+          conf.getMaxSizeLeavingSource(), size);
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.leaving.source.max should be greater" +
+              " than ozone.scm.container.size");
     }
 
     // balancing interval should be greater than DUFactory refresh period
     DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
-    long balancingInterval = duConf.getRefreshPeriod().toMillis();
-    if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
-      LOG.info("balancing.iteration.interval should be larger than " +
-          "hdds.datanode.du.refresh.period.");
-      return false;
+    long refreshPeriod = duConf.getRefreshPeriod().toMillis();
+    if (conf.getBalancingInterval().toMillis() <= refreshPeriod) {
+      LOG.warn("hdds.container.balancer.balancing.iteration.interval {} " +
+              "should be greater than hdds.datanode.du.refresh.period {}",
+          conf.getBalancingInterval(), refreshPeriod);
     }
-    return true;
   }
 
   public void setNodeManager(NodeManager nodeManager) {
@@ -895,6 +997,15 @@ public class ContainerBalancer {
   public void setOzoneConfiguration(
       OzoneConfiguration ozoneConfiguration) {
     this.ozoneConfiguration = ozoneConfiguration;
+  }
+
+  /**
+   * Sets the configuration that ContainerBalancer will use. This should be
+   * set before starting balancer.
+   * @param config ContainerBalancerConfiguration
+   */
+  public void setConfig(ContainerBalancerConfiguration config) {
+    this.config = config;
   }
 
   /**
