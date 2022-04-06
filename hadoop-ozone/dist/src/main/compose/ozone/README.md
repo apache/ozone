@@ -89,9 +89,10 @@ SCM: http://localhost:9876
 ### Monitoring
 
  * Prometheus: follows a pull based approach where metrics are published on an HTTP endpoint.  Metrics can be checked on [Prometheus' web UI](http://localhost:9090/)
- * Grafana: comes with two [dashboards](http://localhost:3000) for Ozone
+ * Grafana: comes with three [dashboards](http://localhost:3000) for Ozone
    * Ozone - Object Metrics
    * Ozone - RPC Metrics
+   * Ozone - Overall Metrics
  * Jaeger: collects distributed tracing information from Ozone, can be queried on the [Jaeger web UI](http://localhost:16686)
 
 ### Profiling
