@@ -179,11 +179,12 @@ public class OzoneContainer {
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
-    Duration svcInterval = conf.getObject(
-        DatanodeConfiguration.class).getBlockDeletionInterval();
 
     writeChannel_ec = new XceiverServerEc(
         datanodeDetails, config, hddsDispatcher, certClient);
+
+    Duration svcInterval = conf.getObject(
+        DatanodeConfiguration.class).getBlockDeletionInterval();
 
     long serviceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
