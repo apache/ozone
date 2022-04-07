@@ -87,8 +87,9 @@ public interface DatanodeStore {
 
   void compactDB() throws IOException;
 
-  BlockIterator<BlockData> getBlockIterator(long containerID);
+  BlockIterator<BlockData> getBlockIterator(long containerID)
+      throws IOException;
 
   BlockIterator<BlockData> getBlockIterator(long containerID,
-      KeyPrefixFilter filter);
+      KeyPrefixFilter filter) throws IOException;
 }
