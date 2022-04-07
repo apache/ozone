@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
-import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -74,6 +73,7 @@ import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
@@ -179,26 +179,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
   )
   private String jsonDir;
 
-  @Option(
-      names = {"--type", "--replication-type", "--replicationType"},
-      description = "Replication type (STAND_ALONE, RATIS, EC). Full name " +
-          "--replicationType will be removed in later versions."
-  )
-  private ReplicationType type;
-
-  @Option(names = {"--replication"},
-      description =
-          "Replication configuration of the new key."
-              + "(ONE, THREE) for RATIS or STAND_ALONE, "
-              + "(rs-3-2-1024k, rs-6-3-1024k or rs-10-4-1024k) for EC."
-  )
-  private String replication;
-
-  @Option(
-      names = "--factor",
-      description = "[Deprecated] Replication factor (ONE, THREE)"
-  )
-  private ReplicationFactor factor;
+  @Mixin
+  private FreonReplicationOptions replication;
 
   @Option(
       names = "--om-service-id",
@@ -312,17 +294,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     }
     init(ozoneConfiguration);
 
-    if (factor != null) {
-      // for backward compatibility
-      if (type == null) {
-        type = ReplicationType.STAND_ALONE;
-      }
-      replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
-    } else {
-      replicationConfig = OzoneClientUtils
-          .validateAndGetClientReplicationConfig(type, replication,
-              ozoneConfiguration);
-    }
+    replicationConfig = replication.replicationConfig().orElse(null);
 
     keyValueBuffer = StringUtils.string2Bytes(
         RandomStringUtils.randomAscii(bufferSize));
@@ -957,7 +929,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     private int numOfThreads;
     private String dataWritten;
     private String execTime;
-    private String replicationFactor;
+    private String replication;
     private String replicationType;
 
     private long keySize;
@@ -990,8 +962,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
       this.keySize = RandomKeyGenerator.this.keySize;
       this.bufferSize = RandomKeyGenerator.this.bufferSize;
       this.jobStartTime = Time.formatTime(RandomKeyGenerator.this.jobStartTime);
-      this.replicationFactor = RandomKeyGenerator.this.factor.name();
-      this.replicationType = RandomKeyGenerator.this.type.name();
+      replicationType = replicationConfig.getReplicationType().name();
+      replication = replicationConfig.getReplication();
 
       long totalBytes =
           (long) numOfVolumes * numOfBuckets * numOfKeys * keySize;
@@ -1128,8 +1100,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
       return execTime;
     }
 
-    public String getReplicationFactor() {
-      return replicationFactor;
+    public String getReplication() {
+      return replication;
     }
 
     public String getReplicationType() {
@@ -1276,17 +1248,17 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
   @VisibleForTesting
   public void setType(ReplicationType type) {
-    this.type = type;
+    this.replication.setReplicationType(type);
   }
 
   @VisibleForTesting
   public void setReplication(String replication) {
-    this.replication = replication;
+    this.replication.setReplication(replication);
   }
 
   @VisibleForTesting
   public void setFactor(ReplicationFactor factor) {
-    this.factor = factor;
+    this.replication.setFactor(factor);
   }
 
   @VisibleForTesting

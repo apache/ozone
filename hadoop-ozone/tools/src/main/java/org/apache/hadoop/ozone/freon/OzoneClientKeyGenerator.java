@@ -21,20 +21,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Spec;
 
 /**
  * Data generator tool test om performance.
@@ -47,8 +43,6 @@ import picocli.CommandLine.Spec;
     showDefaultValues = true)
 public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
-
-  @Spec private CommandSpec spec;
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -72,30 +66,13 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       defaultValue = "4096")
   private int bufferSize;
 
-  @Option(names = { "-F", "--factor" },
-      description = "[Deprecated] Replication factor (ONE, THREE)",
-      defaultValue = "THREE"
-  )
-  private ReplicationFactor factor = ReplicationFactor.THREE;
-
   @Option(names = "--om-service-id",
       description = "OM Service ID"
   )
   private String omServiceID;
 
-  @Option(names = {"--replication"},
-      description = "Replication level of the new keys. Example: THREE"
-          + " (for RATIS) or ONE (for STAND_ALONE). In case of EC, pass"
-          + " CODEC-DATA-PARITY-CHUNKSIZE, eg rs-3-2-1024k, rs-6-3-1024k,"
-          + " rs-10-4-1024k. Defaults to bucket or cluster config"
-  )
-  private String replication;
-
-  @Option(names = {"--type"},
-      description = "Replication type of the new key. Supported types are"
-          + " RATIS, STANDALONE, EC. Defaults to bucket or cluster config"
-  )
-  private ReplicationType type;
+  @Mixin
+  private FreonReplicationOptions replication;
 
   private Timer timer;
 
@@ -114,14 +91,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
 
-    if (spec.commandLine().getParseResult().hasMatchedOption("--factor")) {
-      replicationConfig = ReplicationConfig
-          .fromTypeAndFactor(ReplicationType.RATIS, factor);
-    } else {
-      replicationConfig = OzoneClientUtils
-          .validateAndGetClientReplicationConfig(type, replication,
-              ozoneConfiguration);
-    }
+    replicationConfig = replication.replicationConfig().orElse(null);
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {

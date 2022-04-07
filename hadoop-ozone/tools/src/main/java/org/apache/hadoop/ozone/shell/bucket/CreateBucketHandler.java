@@ -19,14 +19,8 @@ package org.apache.hadoop.ozone.shell.bucket;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -35,6 +29,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
+import org.apache.hadoop.ozone.shell.ReplicationOptions;
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
@@ -71,17 +66,8 @@ public class CreateBucketHandler extends BucketHandler {
       defaultValue = "OBJECT_STORE")
   private AllowedBucketLayouts allowedBucketLayout;
 
-  @Option(names = {"--replication", "-r"},
-      description = "Default replication level. Example: THREE"
-          + " (for RATIS) or ONE (for STAND_ALONE). In case of EC, pass"
-          + " CODEC-DATA-PARITY-CHUNKSIZE, eg rs-3-2-1024k, rs-6-3-1024k,"
-          + " rs-10-4-1024k")
-  private String replication;
-
-  @Option(names = {"--type", "-t"},
-      description = "Default replication type. Supported types are"
-          + " RATIS, STANDALONE, EC")
-  private String replicationType;
+  @CommandLine.Mixin
+  private ReplicationOptions replication;
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
@@ -122,25 +108,8 @@ public class CreateBucketHandler extends BucketHandler {
       }
     }
 
-    if (replicationType != null) {
-      if (replication != null) {
-        ReplicationConfig replicationConfig = ReplicationConfig
-            .parse(ReplicationType.valueOf(replicationType),
-                replication, new OzoneConfiguration());
-        boolean isEC = replicationConfig
-            .getReplicationType() == HddsProtos.ReplicationType.EC;
-        bb.setDefaultReplicationConfig(new DefaultReplicationConfig(
-            ReplicationType.fromProto(replicationConfig.getReplicationType()),
-            isEC ?
-                null :
-                ReplicationFactor.valueOf(replicationConfig.getRequiredNodes()),
-            isEC ? (ECReplicationConfig) replicationConfig : null));
-      } else {
-        throw new IOException(
-            "Replication can't be null. Replication type passed was : "
-                + replicationType);
-      }
-    }
+    replication.replicationConfig().ifPresent(config ->
+        bb.setDefaultReplicationConfig(new DefaultReplicationConfig(config)));
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
       bb.setQuotaInBytes(OzoneQuota.parseSpaceQuota(

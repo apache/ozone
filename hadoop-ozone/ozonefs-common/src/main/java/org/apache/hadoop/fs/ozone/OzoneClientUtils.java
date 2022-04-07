@@ -165,7 +165,7 @@ public final class OzoneClientUtils {
    */
   public static ReplicationConfig validateAndGetClientReplicationConfig(
       ReplicationType userPassedType, String userPassedReplication,
-      OzoneConfiguration clientSideConfig) {
+      ConfigurationSource clientSideConfig) {
     // Priority 1: User passed replication config values.
     // Priority 2: Client side configured replication config values.
     /* if above two are not available, we should just return null and clients
