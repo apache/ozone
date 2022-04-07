@@ -92,7 +92,6 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private OzoneBucket bucket;
   private ContentGenerator contentGenerator;
   private Map<String, String> metadata;
-  private ReplicationConfig replicationConfig;
 
   @Override
   public Void call() throws Exception {
@@ -103,9 +102,6 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
-    replicationConfig = ReplicationConfig
-        .fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
@@ -137,7 +133,6 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     });
   }
 
-  @SuppressWarnings("checkstyle:hiddenfield")
   private void createStreamKey(long counter) throws Exception {
     final ReplicationConfig replicationConfig = ReplicationConfig
         .fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
