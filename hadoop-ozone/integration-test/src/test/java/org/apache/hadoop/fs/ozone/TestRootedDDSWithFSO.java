@@ -64,10 +64,6 @@ public class TestRootedDDSWithFSO {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRootedDDSWithFSO.class);
 
-  private static boolean isBucketFSOptimized = true;
-  private static boolean enabledFileSystemPaths = true;
-  private static boolean omRatisEnabled = true;
-
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
   private static String volumeName;
@@ -82,15 +78,10 @@ public class TestRootedDDSWithFSO {
     conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    if (isBucketFSOptimized) {
-      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
-    } else {
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-          enabledFileSystemPaths);
-    }
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -170,7 +161,6 @@ public class TestRootedDDSWithFSO {
         file31  file32 file33 file34 file35
 
         Total dirs =10 , files = 6 , keys = 16
-
      */
 
     Table<String, OmKeyInfo> deletedDirTable =
