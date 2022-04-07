@@ -402,10 +402,10 @@ public class OzoneManagerLock {
 
   private void unlock(Resource resource, String resourceName,
       Consumer<String> lockFn, String lockType) {
+    boolean isWriteLocked = manager.isWriteLockedByCurrentThread(resourceName);
     // TODO: Not checking release of higher order level lock happened while
     // releasing lower order level lock, as for that we need counter for
     // locks, as some locks support acquiring lock again.
-    boolean isWriteLocked = manager.isWriteLockedByCurrentThread(resourceName);
     lockFn.accept(resourceName);
 
     /**
