@@ -23,16 +23,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
 import org.junit.Test;
-import com.google.common.base.Optional;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -388,32 +384,4 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
-  private void addVolumeToCacheAndDB(OmVolumeArgs volumeArgs) throws Exception {
-    String volumeKey = omMetadataManager.getVolumeKey(volumeArgs.getVolume());
-
-    omMetadataManager.getVolumeTable().addCacheEntry(
-        new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(volumeArgs), volumeArgs.getUpdateID())
-    );
-
-    omMetadataManager.getVolumeTable().put(volumeKey, volumeArgs);
-  }
-
-  private OmVolumeArgs getVolumeFromDB(String volume) throws Exception {
-    String volumeKey = omMetadataManager.getVolumeKey(volume);
-    return omMetadataManager.getVolumeTable().getSkipCache(volumeKey);
-  }
-
-  private OmVolumeArgs getVolumeFromCache(String volume) {
-    String volumeKey = omMetadataManager.getVolumeKey(volume);
-    CacheValue<OmVolumeArgs> value = omMetadataManager.getVolumeTable()
-        .getCacheValue(new CacheKey<>(volumeKey));
-
-    OmVolumeArgs result = null;
-    if (value != null) {
-      result = value.getCacheValue();
-    }
-
-    return result;
-  }
 }
