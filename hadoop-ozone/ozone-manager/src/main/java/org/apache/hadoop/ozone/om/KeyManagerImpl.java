@@ -846,8 +846,7 @@ public class KeyManagerImpl implements KeyManager {
       changed = keyInfo.addAcl(acl);
       if (changed) {
         metadataManager
-            .getKeyTable(
-                getBucketLayout(ozoneManager, volume, bucket))
+            .getKeyTable(getBucketLayout(ozoneManager, volume, bucket))
             .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
@@ -893,8 +892,7 @@ public class KeyManagerImpl implements KeyManager {
       changed = keyInfo.removeAcl(acl);
       if (changed) {
         metadataManager
-            .getKeyTable(
-                getBucketLayout(ozoneManager, volume, bucket))
+            .getKeyTable(getBucketLayout(ozoneManager, volume, bucket))
             .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
@@ -941,8 +939,7 @@ public class KeyManagerImpl implements KeyManager {
 
       if (changed) {
         metadataManager
-            .getKeyTable(
-                getBucketLayout(ozoneManager, volume, bucket))
+            .getKeyTable(getBucketLayout(ozoneManager, volume, bucket))
             .put(objectKey, keyInfo);
       }
     } catch (IOException ex) {
@@ -1524,8 +1521,7 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     Table keyTable = metadataManager
-        .getKeyTable(
-            getBucketLayout(ozoneManager, volName, buckName));
+        .getKeyTable(getBucketLayout(ozoneManager, volName, buckName));
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator;
     try {
