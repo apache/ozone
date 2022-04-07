@@ -235,7 +235,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       List< OzoneAcl > inheritAcls;
       if (ozoneManager.getEnableFileSystemPaths()) {
         OMFileRequest.OMPathInfo pathInfo =
-            OMFileRequest.verifyFilesInPath(ozoneManager, volumeName,
+            OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
                 bucketName, keyName, Paths.get(keyName));
         OMFileRequest.OMDirectoryResult omDirectoryResult =
             pathInfo.getDirectoryResult();
@@ -258,7 +258,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
         // Add cache entries for the prefix directories.
         // Skip adding for the file key itself, until Key Commit.
-        OMFileRequest.addKeyTableCacheEntries(ozoneManager, volumeName,
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.absent(), Optional.of(missingParentInfos),
             trxnLogIndex);
         numMissingParents = missingParentInfos.size();

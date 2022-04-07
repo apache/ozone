@@ -132,8 +132,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
       if (keyStatus.isDirectory()) {
         // Check if there are any sub path exists under the user requested path
-        if (!recursive && OMFileRequest.hasChildren(omKeyInfo,
-                ozoneManager)) {
+        if (!recursive &&
+            OMFileRequest.hasChildren(omKeyInfo, omMetadataManager)) {
           throw new OMException("Directory is not empty. Key:" + keyName,
                   DIRECTORY_NOT_EMPTY);
         }

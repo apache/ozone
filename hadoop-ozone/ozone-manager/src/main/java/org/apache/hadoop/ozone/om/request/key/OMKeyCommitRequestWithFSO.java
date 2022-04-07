@@ -165,7 +165,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
               null, fileName, trxnLogIndex);
 
-      OMFileRequest.addFileTableCacheEntry(ozoneManager, dbFileKey,
+      OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
               omKeyInfo, fileName, trxnLogIndex);
 
       if (oldKeyVersionsToDelete != null) {

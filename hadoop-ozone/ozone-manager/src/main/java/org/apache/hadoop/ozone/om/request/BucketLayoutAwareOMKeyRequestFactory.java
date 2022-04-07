@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
@@ -199,7 +199,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
    */
   public static OMKeyRequest createRequest(String volumeName, String bucketName,
                                            OMRequest omRequest,
-                                           OzoneManager ozoneManager)
+                                           OMMetadataManager omMetadataManager)
 
       throws IOException {
     if (StringUtils.isBlank(volumeName)) {
@@ -216,7 +216,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     // While doing this we make sure we are resolving the real bucket in case of
     // link buckets.
     BucketLayout bucketLayout =
-        getBucketLayout(ozoneManager, volumeName, bucketName);
+        getBucketLayout(omMetadataManager, volumeName, bucketName);
 
     // Get the CmdType.
     Type requestType = omRequest.getCmdType();

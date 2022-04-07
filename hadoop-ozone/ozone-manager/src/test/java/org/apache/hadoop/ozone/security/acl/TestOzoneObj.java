@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.security.acl;
 
 import org.apache.hadoop.ozone.om.KeyManager;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.junit.Test;
 
@@ -26,7 +25,6 @@ import java.io.IOException;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Unit test OzoneObjInfo cases.
@@ -64,11 +62,9 @@ public class TestOzoneObj {
   private OzoneObjInfo.Builder getBuilder(String withVolume,
       String withBucket, String withKey) throws IOException {
 
-    OzoneManager mockOzoneManager = mock(OzoneManager.class);
     KeyManager mockKeyManager = mock(KeyManager.class);
-    when(mockOzoneManager.getKeyManager()).thenReturn(mockKeyManager);
     OzonePrefixPath prefixPathViewer = new OzonePrefixPathImpl("vol1",
-        "buck1", "file", mockOzoneManager);
+        "buck1", "file", mockKeyManager);
 
     return OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.VOLUME)

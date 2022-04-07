@@ -62,45 +62,44 @@ public final class OzoneManagerUtils {
    * omMetadataManager().getBucketTable().get(buckKey)
    */
 
-  private static OmBucketInfo getOmBucketInfo(OzoneManager ozoneManager,
+  private static OmBucketInfo getOmBucketInfo(OMMetadataManager metaMgr,
       String volName, String buckName) throws IOException {
-    String buckKey =
-        ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
-    return ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+    String buckKey = metaMgr.getBucketKey(volName, buckName);
+    return metaMgr.getBucketTable().get(buckKey);
   }
 
   /**
    * Get bucket layout for the given volume and bucket name.
    *
-   * @param ozoneManager ozone manager
-   * @param volName      volume name
-   * @param buckName     bucket name
+   * @param metadataManager OMMetadataManager
+   * @param volName         volume name
+   * @param buckName        bucket name
    * @return bucket layout
    * @throws IOException
    */
-  public static BucketLayout getBucketLayout(OzoneManager ozoneManager,
+  public static BucketLayout getBucketLayout(OMMetadataManager metadataManager,
                                              String volName,
                                              String buckName)
       throws IOException {
-    return getBucketLayout(ozoneManager, volName, buckName, new HashSet<>());
+    return getBucketLayout(metadataManager, volName, buckName, new HashSet<>());
   }
 
   /**
    * Get bucket layout for the given volume and bucket name.
    *
-   * @param volName      volume name
-   * @param buckName     bucket name
-   * @param ozoneManager ozone manager
+   * @param metadataManager metadata manager
+   * @param volName         volume name
+   * @param buckName        bucket name
    * @return bucket layout
    * @throws IOException
    */
-  private static BucketLayout getBucketLayout(OzoneManager ozoneManager,
+  private static BucketLayout getBucketLayout(OMMetadataManager metadataManager,
                                               String volName,
                                               String buckName,
                                               Set<Pair<String, String>> visited)
       throws IOException {
 
-    OmBucketInfo buckInfo = getOmBucketInfo(ozoneManager, volName, buckName);
+    OmBucketInfo buckInfo = getOmBucketInfo(metadataManager, volName, buckName);
 
     if (buckInfo != null) {
       // If this is a link bucket, we fetch the BucketLayout from the
@@ -113,7 +112,7 @@ public final class OzoneManagerUtils {
               DETECTED_LOOP_IN_BUCKET_LINKS);
         }
         OmBucketInfo sourceBuckInfo =
-            getOmBucketInfo(ozoneManager, buckInfo.getSourceVolume(),
+            getOmBucketInfo(metadataManager, buckInfo.getSourceVolume(),
                 buckInfo.getSourceBucket());
         if (sourceBuckInfo != null) {
           /** If the source bucket is again a link, we recursively resolve the
@@ -125,7 +124,8 @@ public final class OzoneManagerUtils {
            * links.
            */
           if (sourceBuckInfo.isLink()) {
-            return getBucketLayout(ozoneManager, sourceBuckInfo.getVolumeName(),
+            return getBucketLayout(metadataManager,
+                sourceBuckInfo.getVolumeName(),
                 sourceBuckInfo.getBucketName(), visited);
           }
           return sourceBuckInfo.getBucketLayout();
@@ -134,9 +134,8 @@ public final class OzoneManagerUtils {
       return buckInfo.getBucketLayout();
     }
 
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    if (!omMetadataManager.getVolumeTable()
-        .isExist(omMetadataManager.getVolumeKey(volName))) {
+    if (!metadataManager.getVolumeTable()
+        .isExist(metadataManager.getVolumeKey(volName))) {
       throw new OMException("Volume not found: " + volName,
           OMException.ResultCodes.VOLUME_NOT_FOUND);
     }
