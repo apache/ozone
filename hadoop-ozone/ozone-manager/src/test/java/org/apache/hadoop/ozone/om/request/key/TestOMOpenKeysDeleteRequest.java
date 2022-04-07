@@ -82,9 +82,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3);
 
     OpenKeyBucket v1b2KeysToDelete = makeOpenKeys(volume1, bucket2, 3);
-    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 3);
+    OpenKeyBucket v1b2KeysToKeep = makeOpenKeys(volume1, bucket2, 2);
 
-    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 3);
+    OpenKeyBucket v2b2KeysToDelete = makeOpenKeys(volume2, bucket2, 2);
     OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3);
 
     addToOpenKeyTableDB(
@@ -222,18 +222,13 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       String bucket = openKeyBucket.getBucketName();
 
       for (OpenKey openKey: openKeyBucket.getKeysList()) {
+        OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket,
+            openKey.getName(), replicationType, replicationFactor);
         if (keySize > 0) {
-          OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket,
-              openKey.getName(), replicationType, replicationFactor);
-          OMRequestTestUtils.addKeyLocationInfo(keyInfo,  0, keySize);
-
-          OMRequestTestUtils.addKeyToTable(true, false,
-              keyInfo, openKey.getClientID(), 0L, omMetadataManager);
-        } else {
-          OMRequestTestUtils.addKeyToTable(true,
-              volume, bucket, openKey.getName(), openKey.getClientID(),
-              replicationType, replicationFactor, omMetadataManager);
+          OMRequestTestUtils.addKeyLocationInfo(keyInfo, 0, keySize);
         }
+        OMRequestTestUtils.addKeyToTable(true, false,
+            keyInfo, openKey.getClientID(), 0L, omMetadataManager);
       }
     }
 
