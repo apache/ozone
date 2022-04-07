@@ -25,13 +25,15 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -44,7 +46,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 /**
  * Tests for LeaderChoosePolicy.
  */
-@Ignore
+@Disabled("This test was never enabled")
 public class TestLeaderChoosePolicy {
 
   private MiniOzoneCluster cluster;
@@ -68,7 +70,7 @@ public class TestLeaderChoosePolicy {
     pipelineManager = scm.getPipelineManager();
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     cluster.shutdown();
   }
@@ -100,7 +102,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test(timeout = 360000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
   public void testRestoreSuggestedLeader() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -149,7 +151,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test(timeout = 360000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
   public void testMinLeaderCountChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -192,7 +194,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test(timeout = 60000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 60000)
   public void testDefaultLeaderChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,

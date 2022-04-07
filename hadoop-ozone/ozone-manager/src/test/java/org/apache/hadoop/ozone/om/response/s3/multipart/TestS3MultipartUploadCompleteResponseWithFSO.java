@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -95,6 +96,10 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     addS3MultipartUploadCommitPartResponseFSO(volumeName, bucketName, keyName,
             multipartUploadID, dbOpenKey);
 
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
+
     Assert.assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
     Assert.assertNotNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
@@ -103,8 +108,9 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
             createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName, multipartUploadID, omKeyInfoFSO,
-                OzoneManagerProtocolProtos.Status.OK, unUsedParts);
+                keyName, multipartUploadID, omKeyInfoFSO,
+                OzoneManagerProtocolProtos.Status.OK, unUsedParts,
+                omBucketInfo, null);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -209,6 +215,10 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             keyName, multipartUploadID, fileName, dbMultipartKey,
             omMultipartKeyInfo, deleteEntryCount);
 
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
     OmKeyInfo omKeyInfo =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
@@ -220,7 +230,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
             createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
                     keyName, multipartUploadID, omKeyInfoFSO,
-                    OzoneManagerProtocolProtos.Status.OK, unUsedParts);
+                    OzoneManagerProtocolProtos.Status.OK, unUsedParts,
+                    omBucketInfo, null);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
             batchOperation);

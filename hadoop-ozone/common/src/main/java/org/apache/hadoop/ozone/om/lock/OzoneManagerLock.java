@@ -21,8 +21,11 @@ package org.apache.hadoop.ozone.om.lock;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,9 +86,9 @@ public class OzoneManagerLock {
   private static final String WRITE_LOCK = "write";
 
   private final LockManager<String> manager;
+  private OMLockMetrics omLockMetrics;
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
-
 
   /**
    * Creates new OzoneManagerLock instance.
@@ -95,6 +98,7 @@ public class OzoneManagerLock {
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     manager = new LockManager<>(conf, fair);
+    omLockMetrics = OMLockMetrics.create();
   }
 
   /**
@@ -172,13 +176,36 @@ public class OzoneManagerLock {
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
     } else {
+      long startWaitingTimeNanos = Time.monotonicNowNanos();
+      /**
+       *  readHoldCount helps in metrics updation only once in case of reentrant
+       *  locks.
+       */
+      int readHoldCount = manager.getReadHoldCount(resourceName);
       lockFn.accept(resourceName);
+      if (readHoldCount == 0) {
+        updateReadLockMetrics(resource, lockType, startWaitingTimeNanos);
+      }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Acquired {} {} lock on resource {}", lockType, resource.name,
             resourceName);
       }
       lockSet.set(resource.setLock(lockSet.get()));
       return true;
+    }
+  }
+
+  private void updateReadLockMetrics(Resource resource, String lockType,
+                                     long startWaitingTimeNanos) {
+    if (lockType.equals(READ_LOCK)) {
+      long readLockWaitingTimeNanos =
+          Time.monotonicNowNanos() - startWaitingTimeNanos;
+
+      // Adds a snapshot to the metric readLockWaitingTimeMsStat.
+      omLockMetrics.setReadLockWaitingTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
+
+      resource.setStartHeldTimeNanos(Time.monotonicNowNanos());
     }
   }
 
@@ -362,12 +389,95 @@ public class OzoneManagerLock {
     // releasing lower order level lock, as for that we need counter for
     // locks, as some locks support acquiring lock again.
     lockFn.accept(resourceName);
+    /**
+     *  readHoldCount helps in metrics updation only once in case of reentrant
+     *  locks.
+     */
+    int readHoldCount = manager.getReadHoldCount(resourceName);
+    if (readHoldCount == 0) {
+      updateReadUnlockMetrics(resource, lockType);
+    }
     // clear lock
     if (LOG.isDebugEnabled()) {
       LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
           resourceName);
     }
     lockSet.set(resource.clearLock(lockSet.get()));
+  }
+
+  private void updateReadUnlockMetrics(Resource resource, String lockType) {
+    if (lockType.equals(READ_LOCK)) {
+      long readLockHeldTimeNanos =
+          Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
+
+      // Adds a snapshot to the metric readLockHeldTimeMsStat.
+      omLockMetrics.setReadLockHeldTimeMsStat(
+          TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
+    }
+  }
+
+  /**
+   * Returns readHoldCount for a given resource lock name.
+   *
+   * @param resourceName resource lock name
+   * @return readHoldCount
+   */
+  @VisibleForTesting
+  public int getReadHoldCount(String resourceName) {
+    return manager.getReadHoldCount(resourceName);
+  }
+
+  /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  @VisibleForTesting
+  public String getReadLockWaitingTimeMsStat() {
+    return omLockMetrics.getReadLockWaitingTimeMsStat();
+  }
+
+  /**
+   * Returns the longest time (ms) a read lock was waiting since the last
+   * measurement.
+   *
+   * @return longest read lock waiting time (ms)
+   */
+  @VisibleForTesting
+  public long getLongestReadLockWaitingTimeMs() {
+    return omLockMetrics.getLongestReadLockWaitingTimeMs();
+  }
+
+  /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  @VisibleForTesting
+  public String getReadLockHeldTimeMsStat() {
+    return omLockMetrics.getReadLockHeldTimeMsStat();
+  }
+
+  /**
+   * Returns the longest time (ms) a read lock was held since the last
+   * measurement.
+   *
+   * @return longest read lock held time (ms)
+   */
+  @VisibleForTesting
+  public long getLongestReadLockHeldTimeMs() {
+    return omLockMetrics.getLongestReadLockHeldTimeMs();
+  }
+
+  /**
+   * Unregisters OMLockMetrics source.
+   */
+  public void cleanup() {
+    omLockMetrics.unRegister();
   }
 
   /**
@@ -403,6 +513,31 @@ public class OzoneManagerLock {
 
     // Name of the resource.
     private String name;
+
+    // This helps in maintaining lock related variables locally confined to a
+    // given thread.
+    private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
+        ThreadLocal.withInitial(LockUsageInfo::new);
+
+    /**
+     * Sets the time (ns) when the lock holding period begins specific to a
+     * thread.
+     *
+     * @param startHeldTimeNanos lock held start time (ns)
+     */
+    void setStartHeldTimeNanos(long startHeldTimeNanos) {
+      readLockTimeStampNanos.get().setStartHeldTimeNanos(startHeldTimeNanos);
+    }
+
+    /**
+     * Returns the time (ns) when the lock holding period began specific to a
+     * thread.
+     *
+     * @return lock held start time (ns)
+     */
+    long getStartHeldTimeNanos() {
+      return readLockTimeStampNanos.get().getStartHeldTimeNanos();
+    }
 
     Resource(byte pos, String name) {
       this.lockLevel = pos;
@@ -472,6 +607,4 @@ public class OzoneManagerLock {
       return mask;
     }
   }
-
 }
-

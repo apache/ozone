@@ -247,7 +247,7 @@ public class TestRootedOzoneFileSystem {
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
   }
 
-  private OMMetrics getOMMetrics() {
+  protected OMMetrics getOMMetrics() {
     return cluster.getOzoneManager().getMetrics();
   }
 
@@ -372,7 +372,7 @@ public class TestRootedOzoneFileSystem {
   /**
    * OFS: Helper function for tests. Return a volume name that doesn't exist.
    */
-  private String getRandomNonExistVolumeName() throws IOException {
+  protected String getRandomNonExistVolumeName() throws IOException {
     final int numDigit = 5;
     long retriesLeft = Math.round(Math.pow(10, 5));
     String name = null;
@@ -1455,7 +1455,6 @@ public class TestRootedOzoneFileSystem {
     assertTrue("Renamed failed: /dir/file1", getFs().exists(file1Destin));
     FileStatus[] fStatus = getFs().listStatus(dirPath);
     assertEquals("Renamed failed", 1, fStatus.length);
-    getFs().delete(getBucketPath(), true);
   }
 
 
@@ -1512,7 +1511,6 @@ public class TestRootedOzoneFileSystem {
         new Path(getBucketPath() + root + "/file2");
     assertTrue("Rename failed",
         getFs().exists(expectedFilePathAfterRename));
-    getFs().delete(getBucketPath(), true);
   }
 
   /**

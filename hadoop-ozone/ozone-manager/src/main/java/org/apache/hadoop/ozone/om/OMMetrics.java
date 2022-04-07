@@ -122,6 +122,9 @@ public class OMMetrics {
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
 
+  // Metrics for total amount of data written
+  private @Metric MutableCounterLong totalDataCommitted;
+
   // Metrics for total number of volumes, buckets and keys
 
   private @Metric MutableCounterLong numVolumes;
@@ -199,6 +202,9 @@ public class OMMetrics {
     numBucketS3DeleteFails.incr();
   }
 
+  public void incDataCommittedBytes(long bytesWritten) {
+    totalDataCommitted.incr(bytesWritten);
+  }
 
   public void incNumS3Buckets() {
     numS3Buckets.incr();
@@ -842,6 +848,11 @@ public class OMMetrics {
   @VisibleForTesting
   public long getNumListS3BucketsFails() {
     return numBucketS3ListFails.value();
+  }
+
+  @VisibleForTesting
+  public long getDataCommittedBytes() {
+    return totalDataCommitted.value();
   }
 
   public long getNumInitiateMultipartUploads() {

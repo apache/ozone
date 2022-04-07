@@ -41,34 +41,34 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.protocol.TermIndex;
 
-// TODO: Move this class to test package after fixing Recon
 /**
- * Mock SCMHAManager implementation for testing.
+ * SCMHAManagerStub implementation for Recon and testing. It uses
+ * RatisServerStub for HA implementation of components in Recon.
  */
-public final class MockSCMHAManager implements SCMHAManager {
+public final class SCMHAManagerStub implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private boolean isLeader;
   private DBTransactionBuffer transactionBuffer;
 
   public static SCMHAManager getInstance(boolean isLeader) {
-    return new MockSCMHAManager(isLeader);
+    return new SCMHAManagerStub(isLeader);
   }
 
   public static SCMHAManager getInstance(boolean isLeader,
       DBTransactionBuffer buffer) {
-    return new MockSCMHAManager(isLeader, buffer);
+    return new SCMHAManagerStub(isLeader, buffer);
   }
 
   /**
-   * Creates MockSCMHAManager instance.
+   * Creates SCMHAManagerStub instance.
    */
-  private MockSCMHAManager(boolean isLeader) {
-    this(isLeader, new MockSCMHADBTransactionBuffer());
+  private SCMHAManagerStub(boolean isLeader) {
+    this(isLeader, new SCMHADBTransactionBufferStub());
   }
 
-  private MockSCMHAManager(boolean isLeader, DBTransactionBuffer buffer) {
-    this.ratisServer = new MockRatisServer();
+  private SCMHAManagerStub(boolean isLeader, DBTransactionBuffer buffer) {
+    this.ratisServer = new RatisServerStub();
     this.isLeader = isLeader;
     this.transactionBuffer = buffer;
   }
@@ -79,7 +79,7 @@ public final class MockSCMHAManager implements SCMHAManager {
   }
 
   /**
-   * Informs MockRatisServe to behaviour as a leader SCM or a follower SCM.
+   * Informs RatisServerStub to behaviour as a leader SCM or a follower SCM.
    */
   boolean isLeader() {
     return isLeader;
@@ -141,7 +141,7 @@ public final class MockSCMHAManager implements SCMHAManager {
     return null;
   }
 
-  private class MockRatisServer implements SCMRatisServer {
+  private class RatisServerStub implements SCMRatisServer {
 
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);

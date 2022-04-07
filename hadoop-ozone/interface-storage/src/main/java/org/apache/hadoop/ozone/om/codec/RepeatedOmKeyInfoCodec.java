@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.codec;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RepeatedKeyInfo;
@@ -26,8 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * Codec to encode RepeatedOmKeyInfo as byte array.
@@ -47,7 +46,8 @@ public class RepeatedOmKeyInfoCodec implements Codec<RepeatedOmKeyInfo> {
       throws IOException {
     Preconditions.checkNotNull(object,
         "Null object can't be converted to byte array.");
-    return object.getProto(ignorePipeline, CURRENT_VERSION).toByteArray();
+    return object.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION)
+        .toByteArray();
   }
 
   @Override

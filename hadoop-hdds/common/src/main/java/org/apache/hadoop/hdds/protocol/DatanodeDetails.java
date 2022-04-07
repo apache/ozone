@@ -27,7 +27,7 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
-import org.apache.hadoop.hdds.DatanodeVersions;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -37,11 +37,11 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
-import static org.apache.hadoop.ozone.ClientVersions.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 /**
  * DatanodeDetails class contains details about DataNode like:
@@ -373,7 +373,7 @@ public class DatanodeDetails extends NodeImpl implements
    */
   @JsonIgnore
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(CURRENT_VERSION);
+    return toProto(ClientVersion.CURRENT_VERSION);
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
@@ -415,7 +415,8 @@ public class DatanodeDetails extends NodeImpl implements
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     final boolean handlesUnknownPorts =
-        clientVersion >= VERSION_HANDLES_UNKNOWN_DN_PORTS;
+        ClientVersion.fromProtoValue(clientVersion)
+        .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
     for (Port port : ports) {
       if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
         builder.addPorts(port.toProto());
@@ -545,7 +546,7 @@ public class DatanodeDetails extends NodeImpl implements
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
-    private int currentVersion = DatanodeVersions.CURRENT_VERSION;
+    private int currentVersion = DatanodeVersion.CURRENT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use

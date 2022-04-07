@@ -72,7 +72,7 @@ jobs:
     strategy:
       matrix:
         java: [ 8, 11 ]
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -121,7 +121,7 @@ jobs:
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -203,7 +203,7 @@ jobs:
           - HA
           - MR
           - misc
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -277,7 +277,8 @@ jobs:
           - client
           - filesystem-hdds
           - ozone
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+          - flaky
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -292,6 +293,7 @@ jobs:
             maven-repo-
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+        continue-on-error: ${{ matrix.profile == 'flaky' }}
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
         if: always()

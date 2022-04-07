@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.lock;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -26,7 +25,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public final class ActiveLock {
 
-  private ReadWriteLock lock;
+  private ReentrantReadWriteLock lock;
   private AtomicInteger count;
 
   /**
@@ -125,6 +124,17 @@ public final class ActiveLock {
    */
   int getActiveLockCount() {
     return count.get();
+  }
+
+  /**
+   * Returns the number of reentrant read holds on this lock by the current
+   * thread.
+   *
+   * @return the number of holds on the read lock by the current thread,
+   *         or zero if the read lock is not held by the current thread
+   */
+  int getReadHoldCount() {
+    return lock.getReadHoldCount();
   }
 
   /**

@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
@@ -39,7 +40,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
  * Response for DeleteKey request.
  */
 @CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
-    DELETED_TABLE, DELETED_DIR_TABLE})
+    DELETED_TABLE, DELETED_DIR_TABLE, BUCKET_TABLE})
 public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
   private boolean isDeleteDirectory;
