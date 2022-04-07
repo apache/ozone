@@ -414,88 +414,156 @@ public class TestOzoneManagerLock {
   }
 
   @Test
-  public void testReadLockConcurrentStats() throws InterruptedException {
+  public void testLockConcurrentStats() throws InterruptedException {
     String[] resourceName;
     for (OzoneManagerLock.Resource resource :
         OzoneManagerLock.Resource.values()) {
       resourceName = generateResourceName(resource);
-
-      OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-      final int threadCount = 10;
-      Thread[] threads = new Thread[threadCount];
-
-      for (int i = 0; i < threads.length; i++) {
-        String[] finalResourceName = resourceName;
-        threads[i] = new Thread(() -> {
-          lock.acquireReadLock(resource, finalResourceName);
-          try {
-            Thread.sleep(1000);
-          } catch (InterruptedException e) {
-            e.printStackTrace();
-          }
-          lock.releaseReadLock(resource, finalResourceName);
-        });
-        threads[i].start();
-      }
-
-      for (Thread t : threads) {
-        t.join();
-      }
-
-      String readHeldStat = lock.getReadLockHeldTimeMsStat();
-      Assert.assertTrue(
-          "Expected " + threadCount +
-              " samples in readLockHeldTimeMsStat: " + readHeldStat,
-          readHeldStat.contains("Samples = " + threadCount));
-
-      String readWaitingStat = lock.getReadLockWaitingTimeMsStat();
-      Assert.assertTrue(
-          "Expected " + threadCount +
-              " samples in readLockWaitingTimeMsStat: " + readWaitingStat,
-          readWaitingStat.contains("Samples = " + threadCount));
+      testReadLockConcurrentStats(resource, resourceName, 10);
+      testWriteLockConcurrentStats(resource, resourceName, 5);
+      testSyntheticReadWriteLockConcurrentStats(resource, resourceName, 10, 3);
     }
   }
 
-  @Test
-  public void testWriteLockConcurrentStats() throws InterruptedException {
-    String[] resourceName;
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
-      resourceName = generateResourceName(resource);
 
-      OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-      final int threadCount = 5;
-      Thread[] threads = new Thread[threadCount];
+  public void testReadLockConcurrentStats(OzoneManagerLock.Resource resource,
+                                          String[] resourceName,
+                                          int threadCount)
+      throws InterruptedException {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    Thread[] threads = new Thread[threadCount];
 
-      for (int i = 0; i < threads.length; i++) {
-        String[] finalResourceName = resourceName;
-        threads[i] = new Thread(() -> {
-          lock.acquireWriteLock(resource, finalResourceName);
-          try {
-            Thread.sleep(500);
-          } catch (InterruptedException e) {
-            e.printStackTrace();
-          }
-          lock.releaseWriteLock(resource, finalResourceName);
-        });
-        threads[i].start();
-      }
-
-      for (Thread t : threads) {
-        t.join();
-      }
-
-      String writeHeldStat = lock.getWriteLockHeldTimeMsStat();
-      Assert.assertTrue(
-          "Expected " + threadCount +
-              " samples in writeLockHeldTimeMsStat: " + writeHeldStat,
-          writeHeldStat.contains("Samples = " + threadCount));
-
-      String writeWaitingStat = lock.getWriteLockWaitingTimeMsStat();
-      Assert.assertTrue(
-          "Expected " + threadCount +
-              " samples in writeLockWaitingTimeMsStat" + writeWaitingStat,
-          writeWaitingStat.contains("Samples = " + threadCount));
+    for (int i = 0; i < threads.length; i++) {
+      threads[i] = new Thread(() -> {
+        lock.acquireReadLock(resource, resourceName);
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        lock.releaseReadLock(resource, resourceName);
+      });
+      threads[i].start();
     }
+
+    for (Thread t : threads) {
+      t.join();
+    }
+
+    String readHeldStat = lock.getReadLockHeldTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + threadCount +
+            " samples in readLockHeldTimeMsStat: " + readHeldStat,
+        readHeldStat.contains("Samples = " + threadCount));
+
+    String readWaitingStat = lock.getReadLockWaitingTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + threadCount +
+            " samples in readLockWaitingTimeMsStat: " + readWaitingStat,
+        readWaitingStat.contains("Samples = " + threadCount));
+  }
+
+  public void testWriteLockConcurrentStats(OzoneManagerLock.Resource resource,
+                                           String[] resourceName,
+                                           int threadCount)
+      throws InterruptedException {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    Thread[] threads = new Thread[threadCount];
+
+    for (int i = 0; i < threads.length; i++) {
+      threads[i] = new Thread(() -> {
+        lock.acquireWriteLock(resource, resourceName);
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        lock.releaseWriteLock(resource, resourceName);
+      });
+      threads[i].start();
+    }
+
+    for (Thread t : threads) {
+      t.join();
+    }
+
+    String writeHeldStat = lock.getWriteLockHeldTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + threadCount +
+            " samples in writeLockHeldTimeMsStat: " + writeHeldStat,
+        writeHeldStat.contains("Samples = " + threadCount));
+
+    String writeWaitingStat = lock.getWriteLockWaitingTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + threadCount +
+            " samples in writeLockWaitingTimeMsStat" + writeWaitingStat,
+        writeWaitingStat.contains("Samples = " + threadCount));
+  }
+
+  public void testSyntheticReadWriteLockConcurrentStats(
+      OzoneManagerLock.Resource resource, String[] resourceName,
+      int readThreadCount, int writeThreadCount)
+      throws InterruptedException {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    Thread[] readThreads = new Thread[readThreadCount];
+    Thread[] writeThreads = new Thread[writeThreadCount];
+
+    for (int i = 0; i < readThreads.length; i++) {
+      readThreads[i] = new Thread(() -> {
+        lock.acquireReadLock(resource, resourceName);
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        lock.releaseReadLock(resource, resourceName);
+      });
+      readThreads[i].start();
+    }
+
+    for (int i = 0; i < writeThreads.length; i++) {
+      writeThreads[i] = new Thread(() -> {
+        lock.acquireWriteLock(resource, resourceName);
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        lock.releaseWriteLock(resource, resourceName);
+      });
+      writeThreads[i].start();
+    }
+
+    for (Thread r : readThreads) {
+      r.join();
+    }
+
+    for (Thread w : writeThreads) {
+      w.join();
+    }
+
+    String readHeldStat = lock.getReadLockHeldTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + readThreadCount +
+            " samples in readLockHeldTimeMsStat: " + readHeldStat,
+        readHeldStat.contains("Samples = " + readThreadCount));
+
+    String readWaitingStat = lock.getReadLockWaitingTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + readThreadCount +
+            " samples in readLockWaitingTimeMsStat: " + readWaitingStat,
+        readWaitingStat.contains("Samples = " + readThreadCount));
+
+    String writeHeldStat = lock.getWriteLockHeldTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + writeThreadCount +
+            " samples in writeLockHeldTimeMsStat: " + writeHeldStat,
+        writeHeldStat.contains("Samples = " + writeThreadCount));
+
+    String writeWaitingStat = lock.getWriteLockWaitingTimeMsStat();
+    Assert.assertTrue(
+        "Expected " + writeThreadCount +
+            " samples in writeLockWaitingTimeMsStat" + writeWaitingStat,
+        writeWaitingStat.contains("Samples = " + writeThreadCount));
   }
 }
