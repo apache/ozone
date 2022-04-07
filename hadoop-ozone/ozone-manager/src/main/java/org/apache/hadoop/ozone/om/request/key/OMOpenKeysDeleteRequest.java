@@ -170,8 +170,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
           // Update table cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-                  new CacheKey<>(fullKeyName),
-                  new CacheValue<>(Optional.absent(), trxnLogIndex));
+              new CacheKey<>(fullKeyName),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
 
           ozoneManager.getMetrics().incNumOpenKeysDeleted();
           LOG.debug("Open key {} deleted.", fullKeyName);
