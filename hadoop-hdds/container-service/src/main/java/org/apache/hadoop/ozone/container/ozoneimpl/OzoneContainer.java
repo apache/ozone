@@ -92,7 +92,7 @@ public class OzoneContainer {
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
-  private final XceiverServerSpi writeChannel_ec;
+  private final XceiverServerSpi writeChannelEC;
   private final ContainerController controller;
   private ContainerMetadataScanner metadataScanner;
   private List<ContainerDataScanner> dataScanners;
@@ -180,7 +180,7 @@ public class OzoneContainer {
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
 
-    writeChannel_ec = new XceiverServerEc(
+    writeChannelEC = new XceiverServerEc(
         datanodeDetails, config, hddsDispatcher, certClient);
 
     Duration svcInterval = conf.getObject(
@@ -326,7 +326,7 @@ public class OzoneContainer {
 
     writeChannel.start();
     readChannel.start();
-    writeChannel_ec.start();
+    writeChannelEC.start();
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
@@ -345,7 +345,7 @@ public class OzoneContainer {
     replicationServer.stop();
     writeChannel.stop();
     readChannel.stop();
-    writeChannel_ec.stop();
+    writeChannelEC.stop();
     this.handlers.values().forEach(Handler::stop);
     hddsDispatcher.shutdown();
     volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
@@ -387,8 +387,8 @@ public class OzoneContainer {
     return readChannel;
   }
 
-  public XceiverServerSpi getWriteChannel_ec() {
-    return writeChannel_ec;
+  public XceiverServerSpi getwriteChannelEC() {
+    return writeChannelEC;
   }
 
   public ContainerController getController() {

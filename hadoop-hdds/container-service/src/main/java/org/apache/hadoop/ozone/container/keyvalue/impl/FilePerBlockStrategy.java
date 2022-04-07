@@ -192,7 +192,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   @Override
   public void finishWriteChunks(KeyValueContainer container,
-    BlockData blockData) throws IOException {
+      BlockData blockData) throws IOException {
     File chunkFile = getChunkFile(container, blockData.getBlockID(), null);
     try {
       files.close(chunkFile);
@@ -231,7 +231,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   private File getChunkFile(Container container, BlockID blockID,
-    ChunkInfo info) throws StorageContainerException {
+      ChunkInfo info) throws StorageContainerException {
     return FILE_PER_BLOCK.getChunkFile(container.getContainerData(), blockID,
         info);
   }
