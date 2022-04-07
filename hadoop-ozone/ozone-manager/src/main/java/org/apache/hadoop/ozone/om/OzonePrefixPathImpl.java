@@ -76,7 +76,7 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
       // set recursive access check to true if this directory contains
       // sub-directories or sub-files.
       checkRecursiveAccess = OMFileRequest.hasChildren(
-          pathStatus.getKeyInfo(), keyManagerImpl.getMetadataManager());
+          pathStatus.getKeyInfo(), keyManager.getMetadataManager());
     }
   }
 

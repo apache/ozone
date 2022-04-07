@@ -105,7 +105,7 @@ public final class OMFileRequest {
           bucketName, pathName);
 
       if (omMetadataManager.getKeyTable(
-              getBucketLayout(omMetadataManager, volumeName, bucketName))
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
           .isExist(dbKeyName)) {
         // Found a file in the given path.
         // Check if this is actual file or a file in the given path
@@ -115,7 +115,7 @@ public final class OMFileRequest {
           result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
       } else if (omMetadataManager.getKeyTable(
-              getBucketLayout(omMetadataManager, volumeName, bucketName))
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
           .isExist(dbDirKeyName)) {
         // Found a directory in the given path.
         // Check if this is actual directory or a directory in the given path
@@ -124,7 +124,7 @@ public final class OMFileRequest {
         } else {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
           inheritAcls = omMetadataManager.getKeyTable(
-                  getBucketLayout(omMetadataManager, volumeName, bucketName))
+              getBucketLayout(omMetadataManager, volumeName, bucketName))
               .get(dbDirKeyName).getAcls();
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
@@ -409,7 +409,7 @@ public final class OMFileRequest {
       long index) throws IOException {
     for (OmKeyInfo parentInfo : parentInfoList.get()) {
       omMetadataManager.getKeyTable(
-              getBucketLayout(omMetadataManager, volumeName, bucketName))
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
           .addCacheEntry(new CacheKey<>(omMetadataManager
           .getOzoneKey(volumeName, bucketName, parentInfo.getKeyName())),
               new CacheValue<>(Optional.of(parentInfo), index));
@@ -417,7 +417,7 @@ public final class OMFileRequest {
 
     if (keyInfo.isPresent()) {
       omMetadataManager.getKeyTable(
-              getBucketLayout(omMetadataManager, volumeName, bucketName))
+          getBucketLayout(omMetadataManager, volumeName, bucketName))
           .addCacheEntry(new CacheKey<>(omMetadataManager
           .getOzoneKey(volumeName, bucketName, keyInfo.get().getKeyName())),
               new CacheValue<>(keyInfo, index));
