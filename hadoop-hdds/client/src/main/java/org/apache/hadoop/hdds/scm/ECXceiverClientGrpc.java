@@ -271,7 +271,7 @@ public class ECXceiverClientGrpc extends XceiverClientSpi {
     }
     try {
       for (Map.Entry<DatanodeDetails,
-        CompletableFuture<ContainerCommandResponseProto>>
+          CompletableFuture<ContainerCommandResponseProto>>
           entry : futureHashMap.entrySet()) {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
       }
