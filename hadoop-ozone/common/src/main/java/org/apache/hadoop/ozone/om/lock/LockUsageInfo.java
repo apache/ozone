@@ -22,23 +22,42 @@ package org.apache.hadoop.ozone.om.lock;
  */
 public class LockUsageInfo {
 
-  private long startHeldTimeNanos = -1;
+  private long startReadHeldTimeNanos = -1;
+  private long startWriteHeldTimeNanos = -1;
 
   /**
-   * Sets the time (ns) when the lock holding period begins.
+   * Sets the time (ns) when the read lock holding period begins.
    *
-   * @param startLockHeldTimeNanos lock held start time (ns)
+   * @param startReadLockHeldTimeNanos read lock held start time (ns)
    */
-  public void setStartHeldTimeNanos(long startLockHeldTimeNanos) {
-    this.startHeldTimeNanos = startLockHeldTimeNanos;
+  public void setStartReadHeldTimeNanos(long startReadLockHeldTimeNanos) {
+    this.startReadHeldTimeNanos = startReadLockHeldTimeNanos;
   }
 
   /**
-   * Returns the time (ns) when the lock holding period began.
+   * Sets the time (ns) when the write lock holding period begins.
    *
-   * @return lock held start time (ns)
+   * @param startWriteLockHeldTimeNanos write lock held start time (ns)
    */
-  public long getStartHeldTimeNanos() {
-    return startHeldTimeNanos;
+  public void setStartWriteHeldTimeNanos(long startWriteLockHeldTimeNanos) {
+    this.startWriteHeldTimeNanos = startWriteLockHeldTimeNanos;
+  }
+
+  /**
+   * Returns the time (ns) when the read lock holding period began.
+   *
+   * @return read lock held start time (ns)
+   */
+  public long getStartReadHeldTimeNanos() {
+    return startReadHeldTimeNanos;
+  }
+
+  /**
+   * Returns the time (ns) when the write lock holding period began.
+   *
+   * @return write lock held start time (ns)
+   */
+  public long getStartWriteHeldTimeNanos() {
+    return startWriteHeldTimeNanos;
   }
 };

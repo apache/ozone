@@ -211,7 +211,7 @@ public class OzoneManagerLock {
     omLockMetrics.setReadLockWaitingTimeMsStat(
         TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
 
-    resource.setStartHeldTimeNanos(Time.monotonicNowNanos());
+    resource.setStartReadHeldTimeNanos(Time.monotonicNowNanos());
   }
 
   private void updateWriteLockMetrics(Resource resource,
@@ -223,7 +223,7 @@ public class OzoneManagerLock {
     omLockMetrics.setWriteLockWaitingTimeMsStat(
         TimeUnit.NANOSECONDS.toMillis(writeLockWaitingTimeNanos));
 
-    resource.setStartHeldTimeNanos(Time.monotonicNowNanos());
+    resource.setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
   }
 
   /**
@@ -431,7 +431,7 @@ public class OzoneManagerLock {
 
   private void updateReadUnlockMetrics(Resource resource) {
     long readLockHeldTimeNanos =
-        Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
+        Time.monotonicNowNanos() - resource.getStartReadHeldTimeNanos();
 
     // Adds a snapshot to the metric readLockHeldTimeMsStat.
     omLockMetrics.setReadLockHeldTimeMsStat(
@@ -440,7 +440,7 @@ public class OzoneManagerLock {
 
   private void updateWriteUnlockMetrics(Resource resource) {
     long writeLockHeldTimeNanos =
-        Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
+        Time.monotonicNowNanos() - resource.getStartWriteHeldTimeNanos();
 
     // Adds a snapshot to the metric writeLockHeldTimeMsStat.
     omLockMetrics.setWriteLockHeldTimeMsStat(
@@ -615,29 +615,56 @@ public class OzoneManagerLock {
     // Name of the resource.
     private String name;
 
-    // This helps in maintaining lock related variables locally confined to a
-    // given thread.
+    // This helps in maintaining read lock related variables locally confined
+    // to a given thread.
     private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
         ThreadLocal.withInitial(LockUsageInfo::new);
 
+    // This helps in maintaining write lock related variables locally confined
+    // to a given thread.
+    private final ThreadLocal<LockUsageInfo> writeLockTimeStampNanos =
+        ThreadLocal.withInitial(LockUsageInfo::new);
+
     /**
-     * Sets the time (ns) when the lock holding period begins specific to a
+     * Sets the time (ns) when the read lock holding period begins specific to a
      * thread.
      *
-     * @param startHeldTimeNanos lock held start time (ns)
+     * @param startReadHeldTimeNanos read lock held start time (ns)
      */
-    void setStartHeldTimeNanos(long startHeldTimeNanos) {
-      readLockTimeStampNanos.get().setStartHeldTimeNanos(startHeldTimeNanos);
+    void setStartReadHeldTimeNanos(long startReadHeldTimeNanos) {
+      readLockTimeStampNanos.get()
+          .setStartReadHeldTimeNanos(startReadHeldTimeNanos);
     }
 
     /**
-     * Returns the time (ns) when the lock holding period began specific to a
-     * thread.
+     * Sets the time (ns) when the write lock holding period begins specific to
+     * a thread.
      *
-     * @return lock held start time (ns)
+     * @param startWriteHeldTimeNanos write lock held start time (ns)
      */
-    long getStartHeldTimeNanos() {
-      return readLockTimeStampNanos.get().getStartHeldTimeNanos();
+    void setStartWriteHeldTimeNanos(long startWriteHeldTimeNanos) {
+      writeLockTimeStampNanos.get()
+          .setStartWriteHeldTimeNanos(startWriteHeldTimeNanos);
+    }
+
+    /**
+     * Returns the time (ns) when the read lock holding period began specific to
+     * a thread.
+     *
+     * @return read lock held start time (ns)
+     */
+    long getStartReadHeldTimeNanos() {
+      return readLockTimeStampNanos.get().getStartReadHeldTimeNanos();
+    }
+
+    /**
+     * Returns the time (ns) when the write lock holding period began specific
+     * to a thread.
+     *
+     * @return write lock held start time (ns)
+     */
+    long getStartWriteHeldTimeNanos() {
+      return writeLockTimeStampNanos.get().getStartWriteHeldTimeNanos();
     }
 
     Resource(byte pos, String name) {
