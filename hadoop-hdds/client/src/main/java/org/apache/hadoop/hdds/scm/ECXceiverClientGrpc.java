@@ -164,7 +164,7 @@ public class ECXceiverClientGrpc extends XceiverClientSpi {
     }
     // read port from the data node, on failure use default configured
     // port.
-    int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
+    int port = dn.getPort(DatanodeDetails.Port.Name.EC).getValue();
     if (port == 0) {
       port = config.getInt(OzoneConfigKeys.DFS_CONTAINER_EC_IPC_PORT,
           OzoneConfigKeys.DFS_CONTAINER_EC_IPC_PORT_DEFAULT);

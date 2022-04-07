@@ -185,7 +185,7 @@ public final class XceiverServerEc implements XceiverServerSpi {
 
       //register the real port to the datanode details.
       datanodeDetails.setPort(DatanodeDetails
-          .newPort(Name.STANDALONE,
+          .newPort(Name.EC,
               realPort));
 
       isStarted = true;
