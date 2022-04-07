@@ -2338,9 +2338,7 @@ public class KeyManagerImpl implements KeyManager {
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
-    Table fileTable = metadataManager.getKeyTable(
-        getBucketLayout(metadataManager, parentInfo.getVolumeName(),
-            parentInfo.getBucketName()));
+    Table fileTable = metadataManager.getFileTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         iterator = fileTable.iterator();
 
