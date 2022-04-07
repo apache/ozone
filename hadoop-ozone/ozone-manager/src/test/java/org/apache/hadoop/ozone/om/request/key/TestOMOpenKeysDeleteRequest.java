@@ -73,10 +73,10 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteSubsetOfOpenKeys() throws Exception {
-    final String volume1 = "volume1";
-    final String volume2 = "bucket1";
-    final String bucket1 = "volume2";
-    final String bucket2 = "bucket2";
+    final String volume1 = UUID.randomUUID().toString();
+    final String volume2 = UUID.randomUUID().toString();
+    final String bucket1 = UUID.randomUUID().toString();
+    final String bucket2 = UUID.randomUUID().toString();
 
     OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3);
     OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3);
@@ -122,10 +122,13 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @Test
   public void testDeleteSameKeyNameDifferentClient() throws Exception {
+    final String volume = UUID.randomUUID().toString();
+    final String bucket = UUID.randomUUID().toString();
+
     OpenKeyBucket keysToKeep =
-        makeOpenKeys(volumeName, bucketName, 3, true);
+        makeOpenKeys(volume, bucket, 3, true);
     OpenKeyBucket keysToDelete =
-        makeOpenKeys(volumeName, bucketName, 3, true);
+        makeOpenKeys(volume, bucket, 3, true);
 
     addToOpenKeyTableDB(keysToKeep, keysToDelete);
     deleteOpenKeysFromCache(keysToDelete);
