@@ -518,6 +518,7 @@ public class TestOzoneManagerLock {
         }
         lock.releaseReadLock(resource, resourceName);
       });
+      readThreads[i].setName("ReadLockThread-" + i);
       readThreads[i].start();
     }
 
@@ -531,6 +532,7 @@ public class TestOzoneManagerLock {
         }
         lock.releaseWriteLock(resource, resourceName);
       });
+      writeThreads[i].setName("WriteLockThread-" + i);
       writeThreads[i].start();
     }
 

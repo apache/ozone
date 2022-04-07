@@ -60,4 +60,4 @@ public class LockUsageInfo {
   public long getStartWriteHeldTimeNanos() {
     return startWriteHeldTimeNanos;
   }
-};
+}
