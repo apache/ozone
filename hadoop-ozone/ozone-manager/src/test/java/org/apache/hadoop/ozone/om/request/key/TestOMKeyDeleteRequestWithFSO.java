@@ -164,7 +164,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete key.
     OzonePrefixPathImpl pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, key, keyManager);
+        bucketName, key, ozoneManager.getKeyManager());
 
     // 'x/y/z' has no sub-directories or sub files - recursive access check
     // should not be enabled for this case.
@@ -172,7 +172,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for parent key.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, parentKey, keyManager);
+        bucketName, parentKey, ozoneManager.getKeyManager());
 
     // 'x/y/' has a sub-directory 'z', hence, we should be performing recursive
     // access check.
@@ -191,7 +191,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for parent key 'c/d/'.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, INTERMEDIATE_DIR, keyManager);
+        bucketName, INTERMEDIATE_DIR, ozoneManager.getKeyManager());
 
     // 'c/d' has a sub-directory 'e', hence, we should be performing recursive
     // access check.
@@ -199,7 +199,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete directory structure (without file).
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, PARENT_DIR, keyManager);
+        bucketName, PARENT_DIR, ozoneManager.getKeyManager());
 
     // 'c/d/e/' has a 'file1' under it, hence, we should be performing recursive
     // access check.
@@ -207,7 +207,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Instantiate PrefixPath for complete file1.
     pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, FILE_KEY, keyManager);
+        bucketName, FILE_KEY, ozoneManager.getKeyManager());
 
     // Recursive access check is only enabled for directories, hence should be
     // false for file1.
