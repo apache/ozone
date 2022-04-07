@@ -17,11 +17,16 @@
  */
 package org.apache.hadoop.ozone.om.ratis;
 
+import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -58,6 +63,15 @@ public class TestOzoneManagerRatisRequest {
 
     String volumeName = "vol1";
     String bucketName = "invalidBuck";
+
+    // Add entry to Bucket Table.
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
+        new CacheValue<>(
+            Optional.of(OmBucketInfo.newBuilder().setVolumeName(volumeName)
+                .setBucketName(bucketName)
+                .setBucketLayout(BucketLayout.DEFAULT).build()), 100L));
+
     OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
         .createCompleteMPURequest(volumeName, bucketName, "mpuKey", "mpuKeyID",
             new ArrayList<>());
