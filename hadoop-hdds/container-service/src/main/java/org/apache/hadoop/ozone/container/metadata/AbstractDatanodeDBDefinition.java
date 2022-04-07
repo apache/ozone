@@ -33,12 +33,17 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   private File dbDir;
 
+  private ConfigurationSource config;
+
   /**
    * @param dbPath The absolute path to the .db file corresponding to this
+   * @param config The ozone global configuration.
    * {@link DBDefinition}.
    */
-  protected AbstractDatanodeDBDefinition(String dbPath) {
+  protected AbstractDatanodeDBDefinition(String dbPath,
+      ConfigurationSource config) {
     this.dbDir = new File(dbPath);
+    this.config = config;
   }
 
   @Override
@@ -55,6 +60,10 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
   public String getLocationConfigKey() {
     throw new UnsupportedOperationException(
             "No location config key available for datanode databases.");
+  }
+
+  public ConfigurationSource getConfig() {
+    return config;
   }
 
   @Override

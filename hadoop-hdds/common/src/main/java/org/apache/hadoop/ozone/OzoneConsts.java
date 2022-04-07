@@ -271,7 +271,11 @@ public final class OzoneConsts {
   // V2: Metadata, block data, and delete transactions in their own
   // column families.
   public static final String SCHEMA_V2 = "2";
+  // V3: Column families definitions are close to V2,
+  // but have containerID as key prefixes.
+  public static final String SCHEMA_V3 = "3";
 
+  // TODO(markgui): Add SCHEMA_V3 until it is fully supported.
   public static final String[] SCHEMA_VERSIONS =
       new String[] {SCHEMA_V1, SCHEMA_V2};
 

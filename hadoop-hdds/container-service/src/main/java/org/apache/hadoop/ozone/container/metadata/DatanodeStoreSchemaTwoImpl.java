@@ -44,9 +44,9 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
    */
   public DatanodeStoreSchemaTwoImpl(ConfigurationSource config, String dbPath,
       boolean openReadOnly) throws IOException {
-    super(config, new DatanodeSchemaTwoDBDefinition(dbPath),
+    super(config, new DatanodeSchemaTwoDBDefinition(dbPath, config),
         openReadOnly);
-    this.deleteTransactionTable = new DatanodeSchemaTwoDBDefinition(dbPath)
+    this.deleteTransactionTable = ((DatanodeSchemaTwoDBDefinition) getDbDef())
         .getDeleteTransactionsColumnFamily().getTable(getStore());
   }
 
