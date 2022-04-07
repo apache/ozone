@@ -123,9 +123,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   @Test
   public void testDeleteSameKeyNameDifferentClient() throws Exception {
     OpenKeyBucket keysToKeep =
-        makeOpenKeys(volumeName, bucketName, keyName, 3);
+        makeOpenKeys(volumeName, bucketName, 3, true);
     OpenKeyBucket keysToDelete =
-        makeOpenKeys(volumeName, bucketName, keyName, 3);
+        makeOpenKeys(volumeName, bucketName, 3, true);
 
     addToOpenKeyTableDB(keysToKeep, keysToDelete);
     deleteOpenKeysFromCache(keysToDelete);
@@ -153,9 +153,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     Assert.assertEquals(metrics.getNumOpenKeysDeleted(), 0);
 
     OpenKeyBucket existentKeys =
-        makeOpenKeys(volumeName, bucketName, keyName, numExistentKeys);
+        makeOpenKeys(volumeName, bucketName, numExistentKeys, true);
     OpenKeyBucket nonExistentKeys =
-        makeOpenKeys(volumeName, bucketName, keyName, numNonExistentKeys);
+        makeOpenKeys(volumeName, bucketName, numNonExistentKeys, true);
 
     addToOpenKeyTableDB(existentKeys);
     deleteOpenKeysFromCache(existentKeys, nonExistentKeys);
@@ -251,55 +251,38 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   private OpenKeyBucket makeOpenKeys(String volume, String bucket,
       int numKeys) {
+    return makeOpenKeys(volume, bucket, numKeys, false);
+  }
+
+  /**
+   * Constructs a list of {@link OpenKeyBucket} objects of size {@code numKeys}.
+   * The keys created will all have the same volume and bucket, but
+   * randomized key names and client IDs. These keys are not added to the
+   * open key table.
+   *
+   * @param volume The volume all open keys created will have.
+   * @param bucket The bucket all open keys created will have.
+   * @param numKeys The number of keys with randomized client IDs to create.
+   * @param fixedKeyName If set, get key name from the {@code keyName} field,
+   *                     otherwise, generate random key name.
+   * @return A list of new open keys with size {@code numKeys}.
+   */
+  private OpenKeyBucket makeOpenKeys(String volume, String bucket,
+      int numKeys, boolean fixedKeyName) {
 
     OpenKeyBucket.Builder keysPerBucketBuilder =
         OpenKeyBucket.newBuilder()
         .setVolumeName(volume)
         .setBucketName(bucket);
 
-    for (int i = 0; i < numKeys; i++) {
-      String keyName = UUID.randomUUID().toString();
-      long clientID = random.nextLong();
-
-      OpenKey openKey = OpenKey.newBuilder()
-          .setName(keyName)
-          .setClientID(clientID)
-          .build();
-      keysPerBucketBuilder.addKeys(openKey);
-    }
-
-    return keysPerBucketBuilder.build();
-  }
-
-  /**
-   * Constructs a list of {@link OpenKey} objects of size {@code numKeys}.
-   * The keys created will all have the same volume, bucket, and
-   * key names, but randomized client IDs. These keys are not added to the
-   * open key table.
-   *
-   * @param volume The volume all open keys created will have.
-   * @param bucket The bucket all open keys created will have.
-   * @param key The key name all open keys created will have.
-   * @param numKeys The number of keys with randomized key names and client
-   * IDs to create.
-   * @return A list of new open keys with size {@code numKeys}.
-   */
-  private OpenKeyBucket makeOpenKeys(String volume, String bucket,
-      String key, int numKeys) {
-
-    OpenKeyBucket.Builder keysPerBucketBuilder =
-        OpenKeyBucket.newBuilder()
-            .setVolumeName(volume)
-            .setBucketName(bucket);
+    OpenKey.Builder openKeyBuilder = OpenKey.newBuilder().setName(keyName);
 
     for (int i = 0; i < numKeys; i++) {
-      long clientID = random.nextLong();
-
-      OpenKey openKey = OpenKey.newBuilder()
-          .setName(key)
-          .setClientID(clientID)
-          .build();
-      keysPerBucketBuilder.addKeys(openKey);
+      openKeyBuilder.setClientID(random.nextLong());
+      if (!fixedKeyName) {
+        openKeyBuilder.setName(UUID.randomUUID().toString());
+      }
+      keysPerBucketBuilder.addKeys(openKeyBuilder.build());
     }
 
     return keysPerBucketBuilder.build();
