@@ -654,7 +654,10 @@ public class OzoneManagerLock {
      * @return read lock held start time (ns)
      */
     long getStartReadHeldTimeNanos() {
-      return readLockTimeStampNanos.get().getStartReadHeldTimeNanos();
+      long startReadHeldTimeNanos =
+          readLockTimeStampNanos.get().getStartReadHeldTimeNanos();
+      readLockTimeStampNanos.remove();
+      return startReadHeldTimeNanos;
     }
 
     /**
@@ -664,7 +667,10 @@ public class OzoneManagerLock {
      * @return write lock held start time (ns)
      */
     long getStartWriteHeldTimeNanos() {
-      return writeLockTimeStampNanos.get().getStartWriteHeldTimeNanos();
+      long startWriteHeldTimeNanos =
+          writeLockTimeStampNanos.get().getStartWriteHeldTimeNanos();
+      writeLockTimeStampNanos.remove();
+      return startWriteHeldTimeNanos;
     }
 
     Resource(byte pos, String name) {
