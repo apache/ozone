@@ -784,6 +784,19 @@ public class StateContext {
     this.addCmdStatus(command);
   }
 
+  public Map<SCMCommandProto.Type, Integer> getCommandQueueSummary() {
+    Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
+    lock.lock();
+    try {
+      for (SCMCommand cmd : commandQueue) {
+        summary.put(cmd.getType(), summary.getOrDefault(cmd.getType(), 0) + 1);
+      }
+    } finally {
+      lock.unlock();
+    }
+    return summary;
+  }
+
   /**
    * Returns the count of the Execution.
    * @return long
