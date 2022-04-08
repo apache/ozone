@@ -390,19 +390,17 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    super.close();
-    stop();
-    ExitUtils.terminate(1, "scm state machine terminated by ratis",
-        null, false, LOG);
-  }
-
-  public void stop() throws IOException {
-    if (!isInitialized) {
-      return;
+    //if ratis server is stopped , it indicates this `close` originates
+    // from `scm.stop()`, otherwise, it indicates this `close` originates
+    // from ratis.
+    if (scm.getScmHAManager().getRatisServer().isStopped()) {
+      super.close();
+      transactionBuffer.close();
+      HadoopExecutors.
+          shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    } else {
+      scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }
-    transactionBuffer.close();
-    HadoopExecutors.
-        shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }
 
   @VisibleForTesting

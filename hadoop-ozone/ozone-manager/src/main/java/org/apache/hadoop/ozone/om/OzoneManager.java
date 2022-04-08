@@ -251,6 +251,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -1881,6 +1882,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void stop() {
     LOG.info("{}: Stopping Ozone Manager", omNodeDetails.getOMPrintInfo());
+    if (isStopped()) {
+      return;
+    }
     try {
       omState = State.STOPPED;
       // Cancel the metrics timer and set to null.
@@ -1919,6 +1923,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
+  }
+
+  public void shutDown(String message) {
+    stop();
+    ExitUtils.terminate(1, message, LOG);
   }
 
   /**

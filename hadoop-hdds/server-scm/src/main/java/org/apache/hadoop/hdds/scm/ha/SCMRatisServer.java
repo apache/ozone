@@ -43,6 +43,8 @@ public interface SCMRatisServer {
 
   void stop() throws IOException;
 
+  boolean isStopped();
+
   RaftServer.Division getDivision();
 
   /**

@@ -83,6 +83,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREF
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
+import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -311,6 +312,12 @@ public class ReconStorageContainerManagerFacade
     } catch (Exception e) {
       LOG.error("Can't close dbStore ", e);
     }
+  }
+
+  @Override
+  public void shutDown(String message) {
+    stop();
+    ExitUtils.terminate(1, message, LOG);
   }
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {

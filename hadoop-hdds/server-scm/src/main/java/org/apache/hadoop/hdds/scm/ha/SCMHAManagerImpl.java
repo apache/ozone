@@ -334,10 +334,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
    * {@inheritDoc}
    */
   @Override
-  public void shutdown() throws IOException {
+  public void stop() throws IOException {
     if (ratisServer != null) {
       ratisServer.stop();
-      ratisServer.getSCMStateMachine().stop();
       grpcServer.stop();
     }
   }
