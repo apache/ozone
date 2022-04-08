@@ -166,23 +166,23 @@ public abstract class BucketHandler {
   // For now only FSO buckets supported
 
   public static BucketHandler getBucketHandler(
-          String path,
           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
           ReconOMMetadataManager omMetadataManager,
-          OzoneStorageContainerManager reconSCM) {
+          OzoneStorageContainerManager reconSCM,
+          String path) {
 
     return new FSOBucketHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM);
   }
 
-  public static BucketHandler getBucketHandler(OmBucketInfo bucketInfo,
+  public static BucketHandler getBucketHandler(
                 ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                 ReconOMMetadataManager omMetadataManager,
-                OzoneStorageContainerManager reconSCM) {
+                OzoneStorageContainerManager reconSCM,
+                OmBucketInfo bucketInfo) {
 
     return new FSOBucketHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM);
   }
-
 
 }

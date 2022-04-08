@@ -113,10 +113,10 @@ public abstract class EntityHandler {
    * @return the entity type, unknown if path not found
    */
   public static EntityHandler getEntityHandler(
-          String path,
           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
           ReconOMMetadataManager omMetadataManager,
-          OzoneStorageContainerManager reconSCM) throws IOException {
+          OzoneStorageContainerManager reconSCM,
+          String path) throws IOException {
     BucketHandler bucketHandler;
 
     normalizedPath = normalizePath(path);
@@ -140,8 +140,8 @@ public abstract class EntityHandler {
               omMetadataManager, reconSCM, null);
     } else if (names.length == 2) { // bucket level check
       bucketHandler = BucketHandler.getBucketHandler(
-              path, reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM);
+              reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, path);
       String volName = names[0];
       String bucketName = names[1];
       if (!bucketHandler.bucketExists(volName, bucketName)) {
@@ -152,8 +152,8 @@ public abstract class EntityHandler {
               omMetadataManager, reconSCM, bucketHandler);
     } else { // length > 3. check dir or key existence (FSO-enabled)
       bucketHandler = BucketHandler.getBucketHandler(
-              path, reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM);
+              reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, path);
       String volName = names[0];
       String bucketName = names[1];
       String keyName = BucketHandler.getKeyName(names);

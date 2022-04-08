@@ -44,8 +44,8 @@ public class KeyEntityHandler extends EntityHandler {
   }
 
   @Override
-  public NamespaceSummaryResponse getSummaryResponse() throws
-      IOException {
+  public NamespaceSummaryResponse getSummaryResponse()
+          throws IOException {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.KEY);
 

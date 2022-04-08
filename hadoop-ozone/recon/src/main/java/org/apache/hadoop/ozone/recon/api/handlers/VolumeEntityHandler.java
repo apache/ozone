@@ -86,9 +86,9 @@ public class VolumeEntityHandler extends EntityHandler {
     long volDataSizeWithReplica = 0L;
     for (OmBucketInfo bucket: buckets) {
       BucketHandler bucketHandler =
-              BucketHandler.getBucketHandler(bucket,
+              BucketHandler.getBucketHandler(
                       getReconNamespaceSummaryManager(),
-                      getOmMetadataManager(), getReconSCM());
+                      getOmMetadataManager(), getReconSCM(), bucket);
       String bucketName = bucket.getBucketName();
       long bucketObjectID = bucket.getObjectID();
       String subpath = getOmMetadataManager().getBucketKey(volName, bucketName);

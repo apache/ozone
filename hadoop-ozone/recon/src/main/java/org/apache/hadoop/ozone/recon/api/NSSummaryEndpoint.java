@@ -87,8 +87,8 @@ public class NSSummaryEndpoint {
     }
 
     EntityHandler handler = EntityHandler.getEntityHandler(
-            path, reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM);
+            reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, path);
 
     namespaceSummaryResponse = handler.getSummaryResponse();
 
@@ -123,8 +123,8 @@ public class NSSummaryEndpoint {
     }
 
     EntityHandler handler = EntityHandler.getEntityHandler(
-            path, reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM);
+            reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, path);
 
     duResponse = handler.getDuResponse(
             listFile, withReplica);
@@ -155,8 +155,8 @@ public class NSSummaryEndpoint {
     }
 
     EntityHandler handler = EntityHandler.getEntityHandler(
-            path, reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM);
+            reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, path);
 
     quotaUsageResponse = handler.getQuotaResponse();
 
@@ -186,8 +186,8 @@ public class NSSummaryEndpoint {
     }
 
     EntityHandler handler = EntityHandler.getEntityHandler(
-            path, reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM);
+            reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, path);
 
     distResponse = handler.getDistResponse();
 

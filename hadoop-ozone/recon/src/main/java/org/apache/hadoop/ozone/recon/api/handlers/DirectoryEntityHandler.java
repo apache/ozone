@@ -48,8 +48,8 @@ public class DirectoryEntityHandler extends EntityHandler {
   }
 
   @Override
-  public NamespaceSummaryResponse getSummaryResponse() throws
-      IOException {
+  public NamespaceSummaryResponse getSummaryResponse()
+          throws IOException {
     // path should exist so we don't need any extra verification/null check
     long dirObjectId = getBucketHandler().getDirObjectId(getNames());
     NamespaceSummaryResponse namespaceSummaryResponse =
