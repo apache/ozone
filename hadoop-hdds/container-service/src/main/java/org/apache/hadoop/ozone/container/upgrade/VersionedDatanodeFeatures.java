@@ -142,4 +142,19 @@ public final class VersionedDatanodeFeatures {
       return success;
     }
   }
+
+  /**
+   * Utilities for container Schema V3 layout feature.
+   * This schema put all container metadata info into a per-disk
+   * rocksdb instance instead of a per-container instance.
+   */
+  public static class SchemaV3 {
+    public static String chooseSchemaVersion() {
+      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
+        return OzoneConsts.SCHEMA_V3;
+      } else {
+        return SchemaV2.chooseSchemaVersion();
+      }
+    }
+  }
 }

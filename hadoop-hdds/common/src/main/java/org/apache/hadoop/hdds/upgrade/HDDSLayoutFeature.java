@@ -31,7 +31,9 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   INITIAL_VERSION(0, "Initial Layout Version"),
   DATANODE_SCHEMA_V2(1, "Datanode RocksDB Schema Version 2 (with column " +
       "families)"),
-  SCM_HA(2, "Storage Container Manager HA");
+  SCM_HA(2, "Storage Container Manager HA"),
+  DATANODE_SCHEMA_V3(3, "Datanode RocksDB Schema Version 3 (one rocksdb " +
+      "per disk)");
 
   //////////////////////////////  //////////////////////////////
 
