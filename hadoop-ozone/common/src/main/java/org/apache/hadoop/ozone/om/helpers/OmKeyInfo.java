@@ -351,6 +351,10 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.parentObjectID = parentObjectID;
   }
 
+  public void setReplicationConfig(ReplicationConfig repConfig) {
+    this.replicationConfig = repConfig;
+  }
+
   /**
    * Builder of OmKeyInfo.
    */

@@ -655,6 +655,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
       dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
+      dbKeyInfo.setReplicationConfig(replicationConfig);
       return dbKeyInfo;
     }
 
