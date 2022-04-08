@@ -39,7 +39,7 @@ execute_robot_test scm gdpr
 
 execute_robot_test scm security/ozone-secure-token.robot
 
-for bucket in link generated; do
+for bucket in erasure link generated; do
   execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket} s3
 done
 
