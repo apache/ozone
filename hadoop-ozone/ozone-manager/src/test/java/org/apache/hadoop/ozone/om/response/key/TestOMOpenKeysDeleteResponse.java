@@ -45,6 +45,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
+
     createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
@@ -100,6 +101,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
+
     createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
