@@ -64,12 +64,12 @@ public final class OMTenantRequestHelper {
    *
    * @throws OMException PERMISSION_DENIED
    */
-  static void checkTenantAdmin(OzoneManager ozoneManager, String tenantId)
-      throws OMException {
+  static void checkTenantAdmin(OzoneManager ozoneManager, String tenantId,
+      boolean isDelegated) throws OMException {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!ozoneManager.getMultiTenantManager().isTenantAdmin(
-        ugi, tenantId, true)) {
+        ugi, tenantId, isDelegated)) {
       throw new OMException("User '" + ugi.getUserName() +
           "' is neither an Ozone admin nor a delegated admin of tenant '" +
           tenantId + "'.", OMException.ResultCodes.PERMISSION_DENIED);

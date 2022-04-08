@@ -114,7 +114,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String tenantId = request.getTenantId();
 
     // Caller should be an Ozone admin or tenant delegated admin
-    checkTenantAdmin(ozoneManager, tenantId);
+    checkTenantAdmin(ozoneManager, tenantId, false);
 
     final String userPrincipal = request.getUserPrincipal();
     final String accessId = request.getAccessId();

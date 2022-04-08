@@ -109,7 +109,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
 
     // Caller should be an Ozone admin or this tenant's delegated admin
-    checkTenantAdmin(ozoneManager, tenantId);
+    checkTenantAdmin(ozoneManager, tenantId, false);
 
     if (accessIdInfo.getIsAdmin()) {
       throw new OMException("accessId '" + accessId + "' is a tenant admin of "
