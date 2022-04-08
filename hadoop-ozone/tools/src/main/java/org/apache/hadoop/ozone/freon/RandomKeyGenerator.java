@@ -42,8 +42,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -240,6 +238,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private ProgressBar progressbar;
 
   RandomKeyGenerator() {
+    // for picocli
   }
 
   @VisibleForTesting
@@ -1222,57 +1221,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   }
 
   @VisibleForTesting
-  public void setNumOfVolumes(int numOfVolumes) {
-    this.numOfVolumes = numOfVolumes;
-  }
-
-  @VisibleForTesting
-  public void setNumOfBuckets(int numOfBuckets) {
-    this.numOfBuckets = numOfBuckets;
-  }
-
-  @VisibleForTesting
-  public void setNumOfKeys(int numOfKeys) {
-    this.numOfKeys = numOfKeys;
-  }
-
-  @VisibleForTesting
-  public void setNumOfThreads(int numOfThreads) {
-    this.numOfThreads = numOfThreads;
-  }
-
-  @VisibleForTesting
-  public void setKeySize(long keySize) {
-    this.keySize = keySize;
-  }
-
-  @VisibleForTesting
-  public void setType(ReplicationType type) {
-    this.replication.setType(type);
-  }
-
-  @VisibleForTesting
-  public void setReplication(String replication) {
-    this.replication.setReplication(replication);
-  }
-
-  @VisibleForTesting
-  public void setFactor(ReplicationFactor factor) {
-    this.replication.setFactor(factor);
-  }
-
-  @VisibleForTesting
-  public void setValidateWrites(boolean validateWrites) {
-    this.validateWrites = validateWrites;
-  }
-
-  @VisibleForTesting
   public int getThreadPoolSize() {
     return threadPoolSize;
-  }
-
-  @VisibleForTesting
-  public void setCleanObjects(boolean cleanObjects) {
-    this.cleanObjects = cleanObjects;
   }
 }
