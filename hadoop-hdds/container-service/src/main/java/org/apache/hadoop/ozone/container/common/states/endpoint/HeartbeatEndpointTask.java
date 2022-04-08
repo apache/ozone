@@ -24,7 +24,7 @@ import com.google.protobuf.GeneratedMessage;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -277,15 +277,14 @@ public class HeartbeatEndpointTask
       SCMHeartbeatRequestProto.Builder requestBuilder) {
     Map<SCMCommandProto.Type, Integer> commandCount =
         context.getParent().getQueuedCommandCount();
+    CommandQueueReportProto.Builder reportProto =
+        CommandQueueReportProto.newBuilder();
     for (Map.Entry<SCMCommandProto.Type, Integer> entry
         : commandCount.entrySet()) {
-      requestBuilder.addQueuedCommandCount(
-          StorageContainerDatanodeProtocolProtos.CommandQueueReportProto
-              .newBuilder()
-              .setCommand(entry.getKey())
-              .setCount(entry.getValue())
-              .build());
+      reportProto.addCommand(entry.getKey())
+          .addCount(entry.getValue());
     }
+    requestBuilder.setQueuedCommandReport(reportProto.build());
   }
 
   /**

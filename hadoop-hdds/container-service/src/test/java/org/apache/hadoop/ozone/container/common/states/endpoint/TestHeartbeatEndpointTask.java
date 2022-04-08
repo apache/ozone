@@ -256,12 +256,13 @@ public class TestHeartbeatEndpointTask {
     Assert.assertTrue(heartbeat.hasContainerReport());
     Assert.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
     Assert.assertTrue(heartbeat.hasContainerActions());
-    Assert.assertEquals(heartbeat.getQueuedCommandCountCount(),
-        commands.size());
-    for (CommandQueueReportProto proto :
-        heartbeat.getQueuedCommandCountList()) {
-      Assert.assertEquals(commands.get(proto.getCommand()).intValue(),
-          proto.getCount());
+    Assert.assertTrue(heartbeat.hasQueuedCommandReport());
+    CommandQueueReportProto queueCount = heartbeat.getQueuedCommandReport();
+    Assert.assertEquals(queueCount.getCommandCount(), commands.size());
+    Assert.assertEquals(queueCount.getCountCount(), commands.size());
+    for (int i = 0; i < commands.size(); i++) {
+      Assert.assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
+          queueCount.getCount(i));
     }
   }
 

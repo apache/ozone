@@ -138,12 +138,12 @@ message SCMHeartbeatRequestProto {
   optional PipelineActionsProto pipelineActions = 7;
   optional PipelineReportsProto pipelineReports = 8;
   optional LayoutVersionProto dataNodeLayoutVersion = 9;
-  repeated CommandQueueReportProto queuedCommandCount = 10;
+  optional CommandQueueReportProto queuedCommandReport = 10;
 }
 
 message CommandQueueReportProto {
-  required SCMCommandProto.Type command = 1;
-  required uint32 count = 2;
+  repeated SCMCommandProto.Type command = 1;
+  repeated uint32 count = 2;
 }
 
 /*
