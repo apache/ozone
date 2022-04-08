@@ -435,7 +435,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
-      String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex) {
+      String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex)
+      throws IOException {
 
     // Add key entry to file table.
     omMetadataManager.getKeyTable(getBucketLayout())
@@ -540,7 +541,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   private void updateCache(OMMetadataManager omMetadataManager,
       String dbBucketKey, @Nullable OmBucketInfo omBucketInfo,
       String dbOzoneKey, String dbMultipartOpenKey, String dbMultipartKey,
-      OmKeyInfo omKeyInfo, long transactionLogIndex) {
+      OmKeyInfo omKeyInfo, long transactionLogIndex) throws IOException {
     // Update cache.
     // 1. Add key entry to key table.
     // 2. Delete multipartKey entry from openKeyTable and multipartInfo table.
@@ -549,9 +550,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
         transactionLogIndex);
 
-    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-        new CacheKey<>(dbMultipartOpenKey),
-        new CacheValue<>(Optional.absent(), transactionLogIndex));
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .addCacheEntry(
+            new CacheKey<>(dbMultipartOpenKey),
+            new CacheValue<>(Optional.absent(), transactionLogIndex));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(dbMultipartKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
