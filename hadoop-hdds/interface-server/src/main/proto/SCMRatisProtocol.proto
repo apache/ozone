@@ -27,6 +27,7 @@ enum RequestType {
     SEQUENCE_ID = 4;
     CERT_STORE = 5;
     MOVE = 6;
+    STATEFUL_SERVICE_CONFIG = 7;
 }
 
 message Method {
