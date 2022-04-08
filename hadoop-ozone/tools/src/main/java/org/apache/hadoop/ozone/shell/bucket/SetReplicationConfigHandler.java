@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.ReplicationOptions;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -36,7 +36,7 @@ import java.io.IOException;
 public class SetReplicationConfigHandler extends BucketHandler {
 
   @CommandLine.Mixin
-  private ReplicationOptions replication;
+  private ShellReplicationOptions replication;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)

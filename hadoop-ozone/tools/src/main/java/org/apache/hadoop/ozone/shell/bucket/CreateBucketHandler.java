@@ -29,8 +29,8 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
-import org.apache.hadoop.ozone.shell.ReplicationOptions;
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -67,7 +67,7 @@ public class CreateBucketHandler extends BucketHandler {
   private AllowedBucketLayouts allowedBucketLayout;
 
   @CommandLine.Mixin
-  private ReplicationOptions replication;
+  private ShellReplicationOptions replication;
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;

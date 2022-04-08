@@ -27,34 +27,33 @@ import picocli.CommandLine;
 import java.util.Optional;
 
 /**
- * Options for specifying replication config.
+ * Common options for specifying replication config: specialized for
+ * Ozone Shell and Freon commands.
  */
-public class ReplicationOptions {
+public abstract class ReplicationOptions {
+
+  private final ConfigurationSource conf = new OzoneConfiguration();
+
+  private ReplicationType type;
+  private String replication;
+
+  public Optional<ReplicationConfig> replicationConfig() {
+    return Optional.ofNullable(
+        OzoneClientUtils.validateAndGetClientReplicationConfig(
+            type, replication, conf));
+  }
 
   @CommandLine.Option(names = {"--replication", "-r"},
       description = "Replication definition. Valid values are replication"
           + " type-specific.  For RATIS: ONE or THREE."
           + " In case of EC, pass CODEC-DATA-PARITY-CHUNKSIZE, "
           + " e.g. rs-3-2-1024k, rs-6-3-1024k, rs-10-4-1024k")
-  private String replication;
-
-  @CommandLine.Option(names = {"--type", "--replication-type"},
-      description = "Replication type. Supported types are: RATIS, EC")
-  private ReplicationType replicationType;
-
-  private final ConfigurationSource conf = new OzoneConfiguration();
-
-  public Optional<ReplicationConfig> replicationConfig() {
-    return Optional.ofNullable(
-        OzoneClientUtils.validateAndGetClientReplicationConfig(
-            replicationType, replication, conf));
-  }
-
   public void setReplication(String replication) {
     this.replication = replication;
   }
 
-  public void setReplicationType(ReplicationType replicationType) {
-    this.replicationType = replicationType;
+  // Option is defined in subclasses
+  public void setType(ReplicationType type) {
+    this.type = type;
   }
 }

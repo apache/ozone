@@ -36,19 +36,30 @@ public class FreonReplicationOptions extends ReplicationOptions {
 
   private static final String FACTOR_OPT = "--factor";
 
-  @Option(names = { "-F", FACTOR_OPT},
-      description = "[deprecated] Replication factor (ONE, THREE)",
-      defaultValue = "THREE"
-  )
   private ReplicationFactor factor;
 
   @Spec(MIXEE)
   private CommandSpec spec;
 
+  @Option(names = { "-F", FACTOR_OPT },
+      description = "[deprecated] Replication factor (ONE, THREE)",
+      defaultValue = "THREE"
+  )
   public void setFactor(ReplicationFactor factor) {
     this.factor = factor;
   }
 
+  // -t is already taken for number of threads
+  @Option(names = {"--type", "--replication-type"},
+      description = "Replication type. Supported types are: RATIS, EC")
+  @Override
+  public void setType(ReplicationType type) {
+    super.setType(type);
+  }
+
+  /**
+   * Support legacy --factor option.
+   */
   @Override
   public Optional<ReplicationConfig> replicationConfig() {
     if (spec.commandLine().getParseResult().hasMatchedOption(FACTOR_OPT)) {

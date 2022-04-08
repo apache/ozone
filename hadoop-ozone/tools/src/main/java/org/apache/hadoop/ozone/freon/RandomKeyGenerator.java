@@ -1248,7 +1248,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
   @VisibleForTesting
   public void setType(ReplicationType type) {
-    this.replication.setReplicationType(type);
+    this.replication.setType(type);
   }
 
   @VisibleForTesting
