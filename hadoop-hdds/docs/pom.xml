@@ -28,9 +28,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone/HDDS Documentation</name>
   <packaging>jar</packaging>
 
-  <dependencies>
+  <properties>
+    <skipDocs>false</skipDocs>
+  </properties>
 
-  </dependencies>
   <build>
     <plugins>
       <plugin>
@@ -42,11 +43,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <goal>exec</goal>
             </goals>
             <phase>compile</phase>
+            <configuration>
+              <executable>../../hadoop-ozone/dev-support/checks/docs.sh</executable>
+              <skip>${skipDocs}</skip>
+            </configuration>
           </execution>
         </executions>
-        <configuration>
-          <executable>../../hadoop-ozone/dev-support/checks/docs.sh</executable>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.rat</groupId>
