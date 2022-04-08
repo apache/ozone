@@ -89,8 +89,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
-import static org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -1462,6 +1463,71 @@ public class TestReplicationManager {
   }
 
   /**
+   * When all the replicas are unstable (unhealthy or quasi-closed with bcsId <
+   * container bcsId), no replica should be deleted.
+   */
+  @Test
+  public void testAllUnstableReplicas() throws Exception {
+    // Default test bcsId for container = 10000L
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), QUASI_CLOSED, 990L);
+    addReplica(container, NodeStatus.inServiceHealthy(), QUASI_CLOSED, 990L);
+    addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY, 980L);
+
+    // If all the replicas are in unstable state then no replica should be
+    // deleted.
+    assertDeleteScheduled(0);
+  }
+
+  /**
+   * When an unhealthy replica has higher bcsId than the stable replicas
+   * bcsId, it should not be deleted.
+   */
+  @Test
+  public void testUnhealthyReplicaWithHigherBcsId() throws Exception {
+    // Default test bcsId for container = 10000L
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), QUASI_CLOSED, 10000L);
+    addReplica(container, NodeStatus.inServiceHealthy(), QUASI_CLOSED, 10000L);
+    addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY, 10010L);
+
+    // If an unhealthy replica has bcsId > all other stable replica's bcsId,
+    // it should not be deleted.
+    assertDeleteScheduled(0);
+  }
+
+  /**
+   * Replication Manager should replicate an unhealthy container replica (not
+   * unhealhty node) if there are no closed or quasi-closed replicas available.
+   */
+  @Test
+  public void testUnderReplicatedWithOnlyOneUnhealthyReplica()
+      throws Exception {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+    // There should be 2 replications scheduled for replicating the unhealthy
+    // replica.
+    assertReplicaScheduled(2);
+    assertUnderReplicatedCount(1);
+  }
+
+  /**
+   * Replication Manager should replicate an unhealthy container replica (not
+   * unhealhty node) if there are no closed or quasi-closed replicas available.
+   */
+  @Test
+  public void testUnderReplicatedWithTwoUnhealthyReplicas()
+      throws Exception {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+    addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+    // There should be 1 replications scheduled for replicating the unhealthy
+    // replica.
+    assertReplicaScheduled(1);
+    assertUnderReplicatedCount(1);
+  }
+
+  /**
    * if all the prerequisites are satisfied, move should work as expected.
    */
   @Test
@@ -1891,8 +1957,21 @@ public class TestReplicationManager {
     return addReplicaToDn(container, dn, replicaState);
   }
 
+  private ContainerReplica addReplica(ContainerInfo container,
+      NodeStatus nodeStatus, State replicaState, long bcsId)
+      throws ContainerNotFoundException {
+    DatanodeDetails dn = addNode(nodeStatus);
+    return addReplicaToDn(container, dn, replicaState, bcsId);
+  }
+
   private ContainerReplica addReplicaToDn(ContainerInfo container,
                                DatanodeDetails dn, State replicaState)
+      throws ContainerNotFoundException {
+    return addReplicaToDn(container, dn, replicaState, 1000L);
+  }
+
+  private ContainerReplica addReplicaToDn(ContainerInfo container,
+      DatanodeDetails dn, State replicaState, long bcsId)
       throws ContainerNotFoundException {
     // Using the same originID for all replica in the container set. If each
     // replica has a unique originID, it causes problems in ReplicationManager
@@ -1900,7 +1979,7 @@ public class TestReplicationManager {
     final UUID originNodeId =
         UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
     final ContainerReplica replica = getReplicas(
-        container.containerID(), replicaState, 1000L, originNodeId, dn);
+        container.containerID(), replicaState, bcsId, originNodeId, dn);
     containerStateManager
         .updateContainerReplica(container.containerID(), replica);
     return replica;

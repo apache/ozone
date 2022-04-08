@@ -1187,18 +1187,21 @@ public class ReplicationManager implements SCMService {
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
 
-      // If there is only 1 replica of a container remaining, replicate it
-      // even if it is unhealthy.
-      if (source.size() == 0 && replicas.size() == 1) {
+      // If there are no closed / quasi-closed replicas for a container,
+      // replicate the unhealthy replica. The unhealthy replica could still
+      // have good data and hence we should replicate it.
+      if (source.size() == 0) {
         source = replicas.stream()
             .filter(r -> r.getState() == State.UNHEALTHY)
             .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy())
             .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+            .sorted((r1, r2) ->
+                r2.getSequenceId().compareTo(r1.getSequenceId()))
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
         if (source.size() > 0) {
-          LOG.debug("Replicating an unhealthy container replica as there is " +
-              "only one replica available for container {}", id);
+          LOG.debug("Replicating an unhealthy container replica as there " +
+              "are no closed or quasi-closed replicas for container {}", id);
         }
       }
 
@@ -1333,7 +1336,7 @@ public class ReplicationManager implements SCMService {
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()
           .filter(r -> !compareState(container.getState(), r.getState()))
-          .filter(r -> r.getSequenceId() > container.getSequenceId())
+          .filter(r -> r.getSequenceId() < container.getSequenceId())
           .collect(Collectors.toList());
 
       for (ContainerReplica r : unhealthyReplicas) {
@@ -1549,8 +1552,9 @@ public class ReplicationManager implements SCMService {
     if (unhealthyReplicas.size() == replicas.size()) {
       // All the replicas are unstable.
       // This could happen when a closed replica is lost and all the other
-      // replicas are in quasi-closed state with bcsId < container bcsId
-      // (which was updated based on the now lost closed replica).
+      // replicas are in quasi-closed / unhealthy state with bcsId < container
+      // bcsId. Since we cannot determine which is the most upto date
+      // replica, no replica should be deleted.
       LOG.error("Cannot take any action on the unstable container {} as all " +
           "the replicas are unstable (either in unhealthy state or have bcsId" +
           " less than container bcsId", container.getContainerID());
@@ -1558,20 +1562,16 @@ public class ReplicationManager implements SCMService {
     }
 
     // Filter out the unhealthy replicas which have higher bcsId than
-    // healthy replicas.
+    // healthy (closed/ quasi-closed) replicas.
     unhealthyReplicas.removeIf(r -> r.getSequenceId() > sequenceId);
 
     if (unhealthyReplicas.isEmpty()) {
       return;
     }
 
-    boolean isClosedReplicaPresent = replicas.stream()
-        .anyMatch(replica -> replica.getState().equals(State.CLOSED));
-
-    // If there are quasi-closed replicas in the unhealthyReplicas list,
-    // ensure that there is a closed replica present before deleting it.
-    unhealthyReplicas.removeIf(r -> r.getState().equals(State.QUASI_CLOSED) &&
-        !isClosedReplicaPresent);
+    // There is at least one stable replica - either closed replica or
+    // quasi-closed replica with bcsId == container bcsId.
+    // Therefore, we can go ahead and deleted unstable replicas.
 
     /*
      * If we have unhealthy replicas we go under replicated and then
