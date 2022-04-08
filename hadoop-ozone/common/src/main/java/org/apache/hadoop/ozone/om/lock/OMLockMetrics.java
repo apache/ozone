@@ -40,14 +40,22 @@ public final class OMLockMetrics implements MetricsSource {
   private final MetricsRegistry registry;
   private final MutableStat readLockWaitingTimeMsStat;
   private final MutableStat readLockHeldTimeMsStat;
+  private final MutableStat writeLockWaitingTimeMsStat;
+  private final MutableStat writeLockHeldTimeMsStat;
 
   private OMLockMetrics() {
     registry = new MetricsRegistry(SOURCE_NAME);
-    readLockWaitingTimeMsStat = registry.newStat("ReadLockWaitTime",
-        "Time (in milliseconds) spent waiting for acquiring the lock",
+    readLockWaitingTimeMsStat = registry.newStat("ReadLockWaitingTime",
+        "Time (in milliseconds) spent waiting for acquiring the read lock",
         "Ops", "Time", true);
     readLockHeldTimeMsStat = registry.newStat("ReadLockHeldTime",
-        "Time (in milliseconds) spent holding the lock",
+        "Time (in milliseconds) spent holding the read lock",
+        "Ops", "Time", true);
+    writeLockWaitingTimeMsStat = registry.newStat("WriteLockWaitingTime",
+        "Time (in milliseconds) spent waiting for acquiring the write lock",
+        "Ops", "Time", true);
+    writeLockHeldTimeMsStat = registry.newStat("WriteLockHeldTime",
+        "Time (in milliseconds) spent holding the write lock",
         "Ops", "Time", true);
   }
 
@@ -86,6 +94,24 @@ public final class OMLockMetrics implements MetricsSource {
    */
   public void setReadLockHeldTimeMsStat(long readLockHeldTimeMs) {
     this.readLockHeldTimeMsStat.add(readLockHeldTimeMs);
+  }
+
+  /**
+   * Adds a snapshot to the metric writeLockWaitingTimeMsStat.
+   *
+   * @param writeLockWaitingTimeMs write lock waiting time (ms)
+   */
+  public void setWriteLockWaitingTimeMsStat(long writeLockWaitingTimeMs) {
+    this.writeLockWaitingTimeMsStat.add(writeLockWaitingTimeMs);
+  }
+
+  /**
+   * Adds a snapshot to the metric writeLockHeldTimeMsStat.
+   *
+   * @param writeLockHeldTimeMs write lock held time (ms)
+   */
+  public void setWriteLockHeldTimeMsStat(long writeLockHeldTimeMs) {
+    this.writeLockHeldTimeMsStat.add(writeLockHeldTimeMs);
   }
 
   /**
@@ -128,6 +154,48 @@ public final class OMLockMetrics implements MetricsSource {
    */
   public long getLongestReadLockHeldTimeMs() {
     return (long) readLockHeldTimeMsStat.lastStat().max();
+  }
+
+  /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  public String getWriteLockWaitingTimeMsStat() {
+    return writeLockWaitingTimeMsStat.toString();
+  }
+
+  /**
+   * Returns the longest time (ms) a write lock was waiting since the last
+   * measurement.
+   *
+   * @return longest write lock waiting time (ms)
+   */
+  public long getLongestWriteLockWaitingTimeMs() {
+    return (long) writeLockWaitingTimeMsStat.lastStat().max();
+  }
+
+  /**
+   * Returns a string representation of the object. Provides information on the
+   * total number of samples, minimum value, maximum value, arithmetic mean,
+   * standard deviation of all the samples added.
+   *
+   * @return String representation of object
+   */
+  public String getWriteLockHeldTimeMsStat() {
+    return writeLockHeldTimeMsStat.toString();
+  }
+
+  /**
+   * Returns the longest time (ms) a write lock was held since the last
+   * measurement.
+   *
+   * @return longest write lock held time (ms)
+   */
+  public long getLongestWriteLockHeldTimeMs() {
+    return (long) writeLockHeldTimeMsStat.lastStat().max();
   }
 
   @Override
