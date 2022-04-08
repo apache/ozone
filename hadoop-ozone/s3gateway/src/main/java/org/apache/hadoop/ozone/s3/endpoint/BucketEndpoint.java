@@ -244,7 +244,7 @@ public class BucketEndpoint extends EndpointBase {
       if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
         throw newError(S3ErrorTable.INVALID_BUCKET_NAME, bucketName, exception);
       }
-      LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
+      LOG.debug("Error in Create Bucket Request for bucket: {}", bucketName,
           exception);
       throw exception;
     }
@@ -413,7 +413,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     } catch (OS3Exception ex) {
       getMetrics().incGetAclFailure();
-      LOG.error("Failed to get acl of Bucket " + bucketName, ex);
+      LOG.debug("Failed to get acl of Bucket " + bucketName, ex);
       throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
     }
   }
@@ -516,7 +516,7 @@ public class BucketEndpoint extends EndpointBase {
       throw exception;
     } catch (OS3Exception ex) {
       getMetrics().incPutAclFailure();
-      LOG.error("Failed to put acl of Bucket " + bucketName, ex);
+      LOG.debug("Failed to put acl of Bucket " + bucketName, ex);
       throw ex;
     }
     getMetrics().incPutAclSuccess();
