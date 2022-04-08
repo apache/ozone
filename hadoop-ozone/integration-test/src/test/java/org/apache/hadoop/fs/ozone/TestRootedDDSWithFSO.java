@@ -188,7 +188,7 @@ public class TestRootedDDSWithFSO {
     long prevDeletes = omMetrics.getNumKeyDeletes();
     Assert.assertTrue(fs.delete(volumePath, true));
     long deletes = omMetrics.getNumKeyDeletes();
-    Assert.assertTrue(deletes == prevDeletes + 1);
+    Assert.assertEquals(prevDeletes + 1, deletes);
 
     // After Delete
     checkPath(volumePath);
