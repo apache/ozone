@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -84,6 +85,8 @@ public class TestOzoneManagerRatisRequest {
       fail("Expected OMException: Bucket not found");
     } catch (OMException oe) {
       // Expected exception.
+      Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
+          oe.getResult());
     }
   }
 }
