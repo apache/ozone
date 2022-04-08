@@ -24,10 +24,12 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -74,6 +76,12 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   @Mixin
   private FreonReplicationOptions replication;
 
+  @Option(
+      names = {"--enable-streaming", "--stream"},
+      description = "Specify whether the write will be through ratis streaming"
+  )
+  private boolean enableRatisStreaming = false;
+
   private Timer timer;
 
   private OzoneBucket bucket;
@@ -101,7 +109,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
       timer = getMetrics().timer("key-create");
 
-      runTests(this::createKey);
+      if (enableRatisStreaming) {
+        runTests(this::createStreamKey);
+      } else {
+        runTests(this::createKey);
+      }
     }
     return null;
   }
@@ -114,6 +126,21 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
           replicationConfig, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
+      }
+      return null;
+    });
+  }
+
+  private void createStreamKey(long counter) throws Exception {
+    final ReplicationConfig replicationConfig = ReplicationConfig
+        .fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
+    final String key = generateObjectName(counter);
+
+    timer.time(() -> {
+      try (OzoneDataStreamOutput stream = bucket
+          .createStreamKey(key, keySize, replicationConfig, metadata)) {
+        contentGenerator.write(stream);
       }
       return null;
     });
