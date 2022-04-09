@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.audit;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -110,6 +113,11 @@ public class TestOzoneAuditLogger {
     }
   }
 
+  @Before
+  public void init() {
+    AUDIT.refreshDebugCmdSet();
+  }
+
   /**
    * Test to verify default log level is INFO when logging success events.
    */
@@ -152,6 +160,19 @@ public class TestOzoneAuditLogger {
     verifyNoLog();
   }
 
+  /**
+   * Test to verify no WRITE event is logged.
+   */
+  @Test
+  public void notLogWriteEvents() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(AuditLogger.AUDIT_LOG_DEBUG_CMD_PREFIX +
+            AuditLoggerType.OMLOGGER.getType().toLowerCase(Locale.ROOT),
+        "CREATE_VOLUME");
+    AUDIT.refreshDebugCmdSet(conf);
+    AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
+    verifyNoLog();
+  }
   /**
    * Test to verify if multiline entries can be checked.
    */

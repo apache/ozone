@@ -3062,4 +3062,34 @@
       will create intermediate directories.
     </description>
   </property>
+
+  <property>
+    <name>ozone.audit.log.debug.cmd.list.omaudit</name>
+    <value></value>
+    <tag>OM</tag>
+    <description>
+      A comma separated list of OzoneManager commands that are written to the OzoneManager audit logs only if the audit
+      log level is debug.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.audit.log.debug.cmd.list.scmaudit</name>
+    <value></value>
+    <tag>SCM</tag>
+    <description>
+      A comma separated list of OzoneManager commands that are written to the SCM audit logs only if the audit
+      log level is debug.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.audit.log.debug.cmd.list.dnaudit</name>
+    <value></value>
+    <tag>DN</tag>
+    <description>
+      A comma separated list of OzoneManager commands that are written to the DN audit logs only if the audit
+      log level is debug.
+    </description>
+  </property>
 </configuration>
