@@ -71,7 +71,9 @@ public class AuditLogger {
   }
 
   public void logWriteSuccess(AuditMessage msg) {
-    if (!debugCmdSetRef.get().contains(msg.getOp().toLowerCase(Locale.ROOT))) {
+    if (debugCmdSetRef.get().contains(msg.getOp().toLowerCase(Locale.ROOT))) {
+      this.logger.logIfEnabled(FQCN, Level.DEBUG, WRITE_MARKER, msg, null);
+    } else {
       this.logger.logIfEnabled(FQCN, Level.INFO, WRITE_MARKER, msg, null);
     }
   }
@@ -82,7 +84,9 @@ public class AuditLogger {
   }
 
   public void logReadSuccess(AuditMessage msg) {
-    if (!debugCmdSetRef.get().contains(msg.getOp().toLowerCase(Locale.ROOT))) {
+    if (debugCmdSetRef.get().contains(msg.getOp().toLowerCase(Locale.ROOT))) {
+      this.logger.logIfEnabled(FQCN, Level.DEBUG, READ_MARKER, msg, null);
+    } else {
       this.logger.logIfEnabled(FQCN, Level.INFO, READ_MARKER, msg, null);
     }
   }
@@ -96,6 +100,9 @@ public class AuditLogger {
     if (auditMessage.getThrowable() == null) {
       if (debugCmdSetRef.get().contains(
           auditMessage.getOp().toLowerCase(Locale.ROOT))) {
+        this.logger.logIfEnabled(FQCN, Level.DEBUG, WRITE_MARKER, auditMessage,
+            auditMessage.getThrowable());
+      } else {
         this.logger.logIfEnabled(FQCN, Level.INFO, WRITE_MARKER, auditMessage,
             auditMessage.getThrowable());
       }
@@ -110,10 +117,10 @@ public class AuditLogger {
     refreshDebugCmdSet(conf);
   }
 
-  public synchronized void refreshDebugCmdSet(OzoneConfiguration conf) {
+  public void refreshDebugCmdSet(OzoneConfiguration conf) {
     Collection<String> cmds = conf.getTrimmedStringCollection(
         AUDIT_LOG_DEBUG_CMD_PREFIX + type.getType().toLowerCase(Locale.ROOT));
-    debugCmdSetRef = new AtomicReference<>(
+    debugCmdSetRef.set(
         cmds.stream().map(String::toLowerCase).collect(Collectors.toSet()));
   }
 }
