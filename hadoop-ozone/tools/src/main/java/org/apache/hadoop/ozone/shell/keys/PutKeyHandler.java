@@ -75,8 +75,8 @@ public class PutKeyHandler extends KeyHandler {
       }
     }
 
-    ReplicationConfig replicationConfig = replication.replicationConfig()
-        .orElse(null);
+    ReplicationConfig replicationConfig =
+        replication.fromParamsOrConfig(getConf());
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);

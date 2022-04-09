@@ -21,10 +21,13 @@ import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
 
 import java.util.Optional;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 
 /**
  * Common options for specifying replication config: specialized for
@@ -32,15 +35,35 @@ import java.util.Optional;
  */
 public abstract class ReplicationOptions {
 
-  private final ConfigurationSource conf = new OzoneConfiguration();
-
   private ReplicationType type;
   private String replication;
 
-  public Optional<ReplicationConfig> replicationConfig() {
+  public Optional<ReplicationConfig> fromParams(ConfigurationSource conf) {
+    if (replication == null && type == null) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        ReplicationConfig.parseWithoutFallback(type, replication, conf));
+  }
+
+  public Optional<ReplicationConfig> fromConfig(ConfigurationSource conf) {
+    ReplicationType defaultType = Optional
+        .ofNullable(conf.get(OZONE_REPLICATION_TYPE))
+        .map(ReplicationType::valueOf)
+        .orElse(null);
+    String defaultReplication =
+        conf.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
+
     return Optional.ofNullable(
         OzoneClientUtils.validateAndGetClientReplicationConfig(
-            type, replication, conf));
+            defaultType, defaultReplication, conf));
+  }
+
+  public ReplicationConfig fromParamsOrConfig(ConfigurationSource conf) {
+    return fromParams(conf)
+        .orElseGet(() -> fromConfig(conf)
+            .orElse(null));
   }
 
   @CommandLine.Option(names = {"--replication", "-r"},

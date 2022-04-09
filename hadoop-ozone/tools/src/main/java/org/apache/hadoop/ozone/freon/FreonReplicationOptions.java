@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.freon;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.shell.ReplicationOptions;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -61,12 +62,12 @@ public class FreonReplicationOptions extends ReplicationOptions {
    * Support legacy --factor option.
    */
   @Override
-  public Optional<ReplicationConfig> replicationConfig() {
+  public Optional<ReplicationConfig> fromParams(ConfigurationSource conf) {
     if (spec.commandLine().getParseResult().hasMatchedOption(FACTOR_OPT)) {
       return Optional.of(ReplicationConfig.fromTypeAndFactor(
           ReplicationType.RATIS, factor));
     }
 
-    return super.replicationConfig();
+    return super.fromParams(conf);
   }
 }

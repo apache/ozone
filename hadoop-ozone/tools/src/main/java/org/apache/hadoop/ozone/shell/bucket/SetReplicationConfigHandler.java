@@ -41,7 +41,7 @@ public class SetReplicationConfigHandler extends BucketHandler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
-    ReplicationConfig replicationConfig = replication.replicationConfig()
+    ReplicationConfig replicationConfig = replication.fromParams(getConf())
         .orElseThrow(() -> new OzoneIllegalArgumentException(
             "Replication type and config must be specified."));
 

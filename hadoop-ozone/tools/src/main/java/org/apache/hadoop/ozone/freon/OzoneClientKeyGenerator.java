@@ -91,7 +91,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
 
-    replicationConfig = replication.replicationConfig().orElse(null);
+    replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {

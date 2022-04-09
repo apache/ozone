@@ -72,8 +72,8 @@ public class CopyKeyHandler extends BucketHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
 
-    ReplicationConfig replicationConfig = replication.replicationConfig()
-        .orElse(null);
+    ReplicationConfig replicationConfig =
+        replication.fromParamsOrConfig(getConf());
 
     OzoneKeyDetails keyDetail = bucket.getKey(fromKey);
     Map<String, String> keyMetadata = new HashMap<>(keyDetail.getMetadata());

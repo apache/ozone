@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -72,19 +73,20 @@ public class OmKeyGenerator extends BaseFreonGenerator
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer timer;
+  private ReplicationConfig replicationConfig;
 
   @Override
   public Void call() throws Exception {
     init();
 
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    OzoneConfiguration conf = createOzoneConfiguration();
+    replicationConfig = replication.fromParams(conf).orElse(null);
 
-    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
-        ozoneConfiguration)) {
+    try (OzoneClient rpcClient = createOzoneClient(omServiceID, conf)) {
 
       ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
 
-      ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
+      ozoneManagerClient = createOmClient(conf, omServiceID);
 
       timer = getMetrics().timer("key-create");
 
@@ -100,16 +102,15 @@ public class OmKeyGenerator extends BaseFreonGenerator
 
   private void createKey(long counter) throws Exception {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    Builder builder = new Builder()
+    OmKeyArgs keyArgs = new Builder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
         .setKeyName(generateObjectName(counter))
+        .setReplicationConfig(replicationConfig)
         .setLocationInfoList(new ArrayList<>())
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-            ALL, ALL));
-    replication.replicationConfig().ifPresent(builder::setReplicationConfig);
-
-    OmKeyArgs keyArgs = builder.build();
+            ALL, ALL))
+        .build();
 
     timer.time(() -> {
       OpenKeySession openKeySession = ozoneManagerClient.openKey(keyArgs);

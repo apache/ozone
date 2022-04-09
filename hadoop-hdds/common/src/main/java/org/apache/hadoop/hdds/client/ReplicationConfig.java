@@ -159,6 +159,21 @@ public interface ReplicationConfig {
     replication = Objects.toString(replication,
         config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
 
+    return parseWithoutFallback(type, replication, config);
+  }
+
+  static ReplicationConfig parseWithoutFallback(ReplicationType type,
+      String replication, ConfigurationSource config) {
+
+    if (replication == null) {
+      throw new IllegalArgumentException(
+          "Replication can't be null. Replication type passed was : " + type);
+    }
+    if (type == null) {
+      throw new IllegalArgumentException(
+          "Replication type must be specified for: " + replication);
+    }
+
     ReplicationConfig replicationConfig;
     switch (type) {
     case RATIS:

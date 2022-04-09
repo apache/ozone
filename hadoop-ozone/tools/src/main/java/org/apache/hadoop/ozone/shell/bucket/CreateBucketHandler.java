@@ -108,7 +108,7 @@ public class CreateBucketHandler extends BucketHandler {
       }
     }
 
-    replication.replicationConfig().ifPresent(config ->
+    replication.fromParams(getConf()).ifPresent(config ->
         bb.setDefaultReplicationConfig(new DefaultReplicationConfig(config)));
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {

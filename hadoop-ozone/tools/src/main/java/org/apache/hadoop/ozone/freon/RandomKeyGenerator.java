@@ -293,7 +293,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     }
     init(ozoneConfiguration);
 
-    replicationConfig = replication.replicationConfig().orElse(null);
+    replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
 
     keyValueBuffer = StringUtils.string2Bytes(
         RandomStringUtils.randomAscii(bufferSize));
