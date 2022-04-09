@@ -19,10 +19,13 @@ package org.apache.hadoop.ozone.audit;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Marker;
 import org.apache.logging.log4j.spi.ExtendedLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -36,6 +39,8 @@ import java.util.stream.Collectors;
  * Class to define Audit Logger for Ozone.
  */
 public class AuditLogger {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AuditLogger.class);
 
   private ExtendedLogger logger;
   private static final String FQCN = AuditLogger.class.getName();
@@ -120,6 +125,7 @@ public class AuditLogger {
   public void refreshDebugCmdSet(OzoneConfiguration conf) {
     Collection<String> cmds = conf.getTrimmedStringCollection(
         AUDIT_LOG_DEBUG_CMD_PREFIX + type.getType().toLowerCase(Locale.ROOT));
+    LOG.info("Refresh DebugCmdSet for {} to {}.", type.getType(), cmds);
     debugCmdSetRef.set(
         cmds.stream().map(String::toLowerCase).collect(Collectors.toSet()));
   }
