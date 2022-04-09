@@ -43,6 +43,11 @@ public abstract class ReplicationOptions {
       return Optional.empty();
     }
 
+    // special case for backward compatibility: factor from config for RATIS
+    if (ReplicationType.RATIS == type && replication == null) {
+      replication = conf.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
+    }
+
     return Optional.of(
         ReplicationConfig.parseWithoutFallback(type, replication, conf));
   }
