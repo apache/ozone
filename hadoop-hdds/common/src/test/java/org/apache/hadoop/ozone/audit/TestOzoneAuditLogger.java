@@ -166,7 +166,7 @@ public class TestOzoneAuditLogger {
   @Test
   public void notLogWriteEvents() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(AuditLogger.AUDIT_LOG_DEBUG_CMD_PREFIX +
+    conf.set(AuditLogger.AUDIT_LOG_DEBUG_CMD_LIST_PREFIX +
             AuditLoggerType.OMLOGGER.getType().toLowerCase(Locale.ROOT),
         "CREATE_VOLUME");
     AUDIT.refreshDebugCmdSet(conf);

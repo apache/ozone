@@ -48,8 +48,8 @@ public class AuditLogger {
   private static final Marker READ_MARKER = AuditMarker.READ.getMarker();
   private AtomicReference<Set<String>> debugCmdSetRef =
       new AtomicReference<>(new HashSet<>());
-  public static final String AUDIT_LOG_DEBUG_CMD_PREFIX =
-      "ozone.audit.log.debug.cmd.";
+  public static final String AUDIT_LOG_DEBUG_CMD_LIST_PREFIX =
+      "ozone.audit.log.debug.cmd.list.";
   private AuditLoggerType type;
 
   /**
@@ -124,7 +124,8 @@ public class AuditLogger {
 
   public void refreshDebugCmdSet(OzoneConfiguration conf) {
     Collection<String> cmds = conf.getTrimmedStringCollection(
-        AUDIT_LOG_DEBUG_CMD_PREFIX + type.getType().toLowerCase(Locale.ROOT));
+        AUDIT_LOG_DEBUG_CMD_LIST_PREFIX +
+            type.getType().toLowerCase(Locale.ROOT));
     LOG.info("Refresh DebugCmdSet for {} to {}.", type.getType(), cmds);
     debugCmdSetRef.set(
         cmds.stream().map(String::toLowerCase).collect(Collectors.toSet()));
