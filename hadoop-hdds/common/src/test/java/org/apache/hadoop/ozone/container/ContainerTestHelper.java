@@ -147,6 +147,34 @@ public final class ContainerTestHelper {
     return builder.build();
   }
 
+  public static ContainerCommandRequestProto getListBlockRequest(
+      ContainerCommandRequestProto writeChunkRequest) {
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(writeChunkRequest.getContainerID())
+        .setCmdType(ContainerProtos.Type.ListBlock)
+        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setListBlock(ContainerProtos.ListBlockRequestProto.newBuilder()
+            .setCount(10).build())
+        .build();
+  }
+
+  public static ContainerCommandRequestProto getPutBlockRequest(
+      ContainerCommandRequestProto writeChunkRequest) {
+    ContainerProtos.BlockData.Builder block =
+        ContainerProtos.BlockData.newBuilder()
+            .setSize(writeChunkRequest.getWriteChunk().getChunkData().getLen())
+            .setBlockID(writeChunkRequest.getWriteChunk().getBlockID())
+            .addChunks(writeChunkRequest.getWriteChunk().getChunkData());
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(writeChunkRequest.getContainerID())
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(block.build())
+            .build())
+        .build();
+  }
+
   public static Builder newWriteChunkRequestBuilder(
       Pipeline pipeline, BlockID blockID, int datalen, int seq)
       throws IOException {

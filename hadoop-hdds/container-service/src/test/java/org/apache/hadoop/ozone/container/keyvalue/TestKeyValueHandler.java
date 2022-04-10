@@ -119,6 +119,7 @@ public class TestKeyValueHandler {
   /**
    * Test that Handler handles different command types correctly.
    */
+  @Test
   public void testHandlerCommandHandling() throws Exception {
     Mockito.reset(handler);
     // Test Create Container Request handling
@@ -136,7 +137,7 @@ public class TestKeyValueHandler {
     DispatcherContext context = new DispatcherContext.Builder().build();
     KeyValueHandler
         .dispatchRequest(handler, createContainerRequest, container, context);
-    Mockito.verify(handler, times(1)).handleCreateContainer(
+    Mockito.verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Read Container Request handling
@@ -202,7 +203,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
         .dispatchRequest(handler, listBlockRequest, container, context);
-    Mockito.verify(handler, times(2)).handleUnsupportedOp(
+    Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Read Chunk Request handling
@@ -229,7 +230,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
     KeyValueHandler
         .dispatchRequest(handler, listChunkRequest, container, context);
-    Mockito.verify(handler, times(3)).handleUnsupportedOp(
+    Mockito.verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Put Small File Request handling

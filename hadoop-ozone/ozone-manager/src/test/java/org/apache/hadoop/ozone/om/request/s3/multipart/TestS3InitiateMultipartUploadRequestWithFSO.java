@@ -56,7 +56,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
     // Add volume and bucket to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
