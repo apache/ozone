@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
@@ -105,23 +106,23 @@ public class TestOmBucketReadWriteOps {
       out.getFD().sync();
       out.close();
 
-      verifyFileGeneration(new ParameterBuilder());
-      verifyFileGeneration(
+      verifyFreonCommand(new ParameterBuilder());
+      verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3"));
-      verifyFileGeneration(
+      verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
               .setPrefixFilePath("/").setFileCountForRead(1000)
               .setFileCountForWrite(100).setTotalThreadCount(505));
-      verifyFileGeneration(
+      verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/").setFileSizeInBytes(128)
               .setBufferSize(32));
-      verifyFileGeneration(
+      verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3").setFileCountForRead(250)
               .setNumOfReadOperations(100).setNumOfWriteOperations(0));
-      verifyFileGeneration(
+      verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3").setNumOfReadOperations(0)
               .setFileCountForWrite(20).setNumOfWriteOperations(100));
@@ -130,7 +131,7 @@ public class TestOmBucketReadWriteOps {
     }
   }
 
-  private void verifyFileGeneration(ParameterBuilder parameterBuilder)
+  private void verifyFreonCommand(ParameterBuilder parameterBuilder)
       throws IOException {
     store.createVolume(parameterBuilder.volumeName);
     OzoneVolume volume = store.getVolume(parameterBuilder.volumeName);
@@ -156,22 +157,26 @@ public class TestOmBucketReadWriteOps {
         conf);
     Path rootDir = new Path(rootPath.concat(OzoneConsts.OM_KEY_PREFIX));
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
-    verifyUtil(2, fileStatuses, true);
+    verifyFileCreation(2, fileStatuses, true);
 
     Path readDir = new Path(rootPath.concat("/readPath"));
     FileStatus[] readFileStatuses = fileSystem.listStatus(readDir);
-    verifyUtil(parameterBuilder.fileCountForRead, readFileStatuses, false);
+    verifyFileCreation(parameterBuilder.fileCountForRead, readFileStatuses,
+        false);
 
     Path writeDir = new Path(rootPath.concat("/writePath"));
     FileStatus[] writeFileStatuses = fileSystem.listStatus(writeDir);
-    verifyUtil(parameterBuilder.fileCountForWrite *
+    verifyFileCreation(parameterBuilder.fileCountForWrite *
         parameterBuilder.numOfWriteOperations, writeFileStatuses, false);
+
+    verifyOMLockMetrics(cluster.getOzoneManager().getMetadataManager().getLock()
+        .getOMLockMetrics());
   }
 
-  private void verifyUtil(int expectedCount, FileStatus[] fileStatuses,
-                          boolean checkDir) {
+  private void verifyFileCreation(int expectedCount, FileStatus[] fileStatuses,
+                          boolean checkDirectoryCount) {
     int actual = 0;
-    if (checkDir) {
+    if (checkDirectoryCount) {
       for (FileStatus fileStatus : fileStatuses) {
         if (fileStatus.isDirectory()) {
           ++actual;
@@ -185,6 +190,46 @@ public class TestOmBucketReadWriteOps {
       }
     }
     Assert.assertEquals("Mismatch Count!", expectedCount, actual);
+  }
+
+  private void verifyOMLockMetrics(OMLockMetrics omLockMetrics) {
+    String readLockWaitingTimeMsStat =
+        omLockMetrics.getReadLockWaitingTimeMsStat();
+    LOG.info("Read Lock Waiting Time Stat: " + readLockWaitingTimeMsStat);
+    LOG.info("Longest Read Lock Waiting Time (ms): " +
+        omLockMetrics.getLongestReadLockWaitingTimeMs());
+    int readWaitingSamples =
+        Integer.parseInt(readLockWaitingTimeMsStat.split(" ")[2]);
+    Assert.assertTrue("Read Lock Waiting Samples should be positive",
+        readWaitingSamples > 0);
+
+    String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
+    LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
+    LOG.info("Longest Read Lock Held Time (ms): " +
+        omLockMetrics.getLongestReadLockHeldTimeMs());
+    int readHeldSamples =
+        Integer.parseInt(readLockHeldTimeMsStat.split(" ")[2]);
+    Assert.assertTrue("Read Lock Held Samples should be positive",
+        readHeldSamples > 0);
+
+    String writeLockWaitingTimeMsStat =
+        omLockMetrics.getWriteLockWaitingTimeMsStat();
+    LOG.info("Write Lock Waiting Time Stat: " + writeLockWaitingTimeMsStat);
+    LOG.info("Longest Write Lock Waiting Time (ms): " +
+        omLockMetrics.getLongestWriteLockWaitingTimeMs());
+    int writeWaitingSamples =
+        Integer.parseInt(writeLockWaitingTimeMsStat.split(" ")[2]);
+    Assert.assertTrue("Write Lock Waiting Samples should be positive",
+        writeWaitingSamples > 0);
+
+    String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
+    LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
+    LOG.info("Longest Write Lock Held Time (ms): " +
+        omLockMetrics.getLongestWriteLockHeldTimeMs());
+    int writeHeldSamples =
+        Integer.parseInt(writeLockHeldTimeMsStat.split(" ")[2]);
+    Assert.assertTrue("Write Lock Held Samples should be positive",
+        writeHeldSamples > 0);
   }
 
   private static class ParameterBuilder {
