@@ -259,8 +259,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerID) throws IOException {
+  public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerID, int clientVersion) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
 
@@ -775,7 +775,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean startContainerBalancer(
+  public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
@@ -830,13 +830,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       builder.setMaxSizeLeavingSourceInGB(msls);
     }
 
-
     StartContainerBalancerRequestProto request = builder.build();
-    StartContainerBalancerResponseProto response =
-        submitRequest(Type.StartContainerBalancer,
-            builder1 -> builder1.setStartContainerBalancerRequest(request))
-            .getStartContainerBalancerResponse();
-    return response.getStart();
+    return submitRequest(Type.StartContainerBalancer,
+        builder1 -> builder1.setStartContainerBalancerRequest(request))
+        .getStartContainerBalancerResponse();
   }
 
   @Override
