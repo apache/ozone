@@ -223,13 +223,10 @@ public interface OMMultiTenantManager {
       UserGroupInformation ugi) throws IOException;
 
   /**
-   * Scans (Slow!) TenantAccessIdTable for the given tenantId.
    * Returns true if the tenant doesn't have any accessIds assigned to it
-   * (i.e. the tenantId is not found in this table for any existing accessIds);
    * Returns false otherwise.
    *
    * @param tenantId
-   * @return
    * @throws IOException
    */
   boolean isTenantEmpty(String tenantId) throws IOException;

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
@@ -686,23 +687,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   @Override
   public boolean isTenantEmpty(String tenantId) throws IOException {
 
-    if (tenantCache.containsKey(tenantId) &&
-        !tenantCache.get(tenantId).isTenantEmpty()) {
-      return false;
+
+    if (!tenantCache.containsKey(tenantId)) {
+      throw new OMException("Tenant does not exist for tenantId: " + tenantId,
+          TENANT_NOT_FOUND);
     }
 
-    try (TableIterator<String,
-        ? extends KeyValue<String, OmDBAccessIdInfo>> iter =
-             omMetadataManager.getTenantAccessIdTable().iterator()) {
-      while (iter.hasNext()) {
-        final OmDBAccessIdInfo accessIdInfo = iter.next().getValue();
-        if (accessIdInfo.getTenantId().equals(tenantId)) {
-          return false;
-        }
-      }
-    }
-
-    return true;
+    return tenantCache.get(tenantId).isTenantEmpty();
   }
 
   @VisibleForTesting
