@@ -44,9 +44,7 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   // BucketEndpoint
   private @Metric MutableCounterLong getBucketSuccess;
-
   private @Metric MutableCounterLong getBucketFailure;
-
   private @Metric MutableCounterLong createBucketSuccess;
   private @Metric MutableCounterLong createBucketFailure;
   private @Metric MutableCounterLong headBucketSuccess;

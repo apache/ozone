@@ -125,7 +125,7 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testGetBucket() throws Exception {
+  public void testGetBucketSuccess() throws Exception {
     long oriMetric = metrics.getGetBucketSuccess();
 
     clientStub = createClientWithKeys("file1");
@@ -137,9 +137,11 @@ public class TestS3GatewayMetrics {
 
     long curMetric = metrics.getGetBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
+  }
 
-
-    oriMetric = metrics.getGetBucketFailure();
+  @Test
+  public void testGetBucketFailure() throws Exception {
+    long oriMetric = metrics.getGetBucketFailure();
 
     try {
       // Searching for a bucket that does not exist
@@ -151,12 +153,12 @@ public class TestS3GatewayMetrics {
     } catch (OS3Exception e) {
     }
 
-    curMetric = metrics.getGetBucketFailure();
+    long curMetric = metrics.getGetBucketFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testCreateBucket() throws Exception {
+  public void testCreateBucketSuccess() throws Exception {
 
     long oriMetric = metrics.getCreateBucketSuccess();
 
@@ -165,28 +167,33 @@ public class TestS3GatewayMetrics {
     long curMetric = metrics.getCreateBucketSuccess();
 
     assertEquals(1L, curMetric - oriMetric);
+  }
 
-
+  @Test
+  public void testCreateBucketFailure() throws Exception {
     // Creating an error by trying to create a bucket that already exists
-    oriMetric = metrics.getCreateBucketFailure();
+    long oriMetric = metrics.getCreateBucketFailure();
 
     bucketEndpoint.put(bucketName, null, null, null);
 
-    curMetric = metrics.getCreateBucketFailure();
+    long curMetric = metrics.getCreateBucketFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testDeleteBucket() throws Exception {
+  public void testDeleteBucketSuccess() throws Exception {
     long oriMetric = metrics.getDeleteBucketSuccess();
 
     bucketEndpoint.delete(bucketName);
 
     long curMetric = metrics.getDeleteBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
+  }
 
-
-    oriMetric = metrics.getDeleteBucketFailure();
+  @Test
+  public void testDeleteBucketFailure() throws Exception {
+    long oriMetric = metrics.getDeleteBucketFailure();
+    bucketEndpoint.delete(bucketName);
     try {
       // Deleting a bucket that does not exist will result in delete failure
       bucketEndpoint.delete(bucketName);
@@ -197,12 +204,12 @@ public class TestS3GatewayMetrics {
           ex.getErrorMessage());
     }
 
-    curMetric = metrics.getDeleteBucketFailure();
+    long curMetric = metrics.getDeleteBucketFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testGetAcl() throws Exception {
+  public void testGetAclSuccess() throws Exception {
     long oriMetric = metrics.getGetAclSuccess();
 
     Response response =
@@ -212,9 +219,11 @@ public class TestS3GatewayMetrics {
     long curMetric = metrics.getGetAclSuccess();
     assertEquals(HTTP_OK, response.getStatus());
     assertEquals(1L, curMetric - oriMetric);
+  }
 
-
-    oriMetric = metrics.getGetAclFailure();
+  @Test
+  public void testGetAclFailure() throws Exception {
+    long oriMetric = metrics.getGetAclFailure();
     try {
       // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
       bucketEndpoint.get("random_bucket", null,
@@ -226,12 +235,12 @@ public class TestS3GatewayMetrics {
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
           ex.getErrorMessage());
     }
-    curMetric = metrics.getGetAclFailure();
+    long curMetric = metrics.getGetAclFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   @Test
-  public void testPutAcl() throws Exception {
+  public void testPutAclSuccess() throws Exception {
     long oriMetric = metrics.getPutAclSuccess();
 
     clientStub.getObjectStore().createS3Bucket("b1");
@@ -239,30 +248,35 @@ public class TestS3GatewayMetrics {
         .getResourceAsStream("userAccessControlList.xml");
 
     bucketEndpoint.put("b1", ACL_MARKER, headers, inputBody);
-
+    inputBody.close();
     long curMetric = metrics.getPutAclSuccess();
     assertEquals(1L, curMetric - oriMetric);
+  }
 
+  @Test
+  public void testPutAclFailure() throws Exception {
     // Failing the putACL endpoint by applying ACL on a non-Existent Bucket
-    oriMetric = metrics.getPutAclFailure();
+    long oriMetric = metrics.getPutAclFailure();
+
+    clientStub.getObjectStore().createS3Bucket("b1");
+    InputStream inputBody = TestBucketAcl.class.getClassLoader()
+        .getResourceAsStream("userAccessControlList.xml");
 
     try {
       bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers, inputBody);
       fail();
     } catch (OS3Exception ex) {
     }
-    curMetric = metrics.getPutAclFailure();
+    inputBody.close();
+    long curMetric = metrics.getPutAclFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
 
   private OzoneClient createClientWithKeys(String... keys) throws IOException {
-    OzoneClient client = new OzoneClientStub();
-
-    client.getObjectStore().createS3Bucket(bucketName);
-    OzoneBucket bkt = client.getObjectStore().getS3Bucket(bucketName);
+    OzoneBucket bkt = clientStub.getObjectStore().getS3Bucket(bucketName);
     for (String key : keys) {
       bkt.createKey(key, 0).close();
     }
-    return client;
+    return clientStub;
   }
 }
