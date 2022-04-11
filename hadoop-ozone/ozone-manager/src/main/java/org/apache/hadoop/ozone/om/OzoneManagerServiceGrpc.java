@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import io.grpc.Status;
 import com.google.protobuf.RpcController;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto
@@ -68,6 +68,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
         "processing s3g client submit request - for command {}",
         request.getCmdType().name());
     AtomicInteger callCount = new AtomicInteger(0);
+    OMResponse omResponse = null;
 
     org.apache.hadoop.ipc.Server.getCurCall().set(new Server.Call(1,
         callCount.incrementAndGet(),
@@ -83,16 +84,42 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
     // for OMRequests.  Test through successful ratis-enabled OMRequest
     // handling without dependency on hadoop IPC based Server.
     try {
-      OMResponse omResponse = this.omTranslator.
+      omResponse = this.omTranslator.
           submitRequest(NULL_RPC_CONTROLLER, request);
-      responseObserver.onNext(omResponse);
     } catch (Throwable e) {
-      IOException ex = new IOException(e.getCause());
-      responseObserver.onError(Status
-          .INTERNAL
-          .withDescription(ex.getMessage())
-          .asRuntimeException());
+      IOException ioe = null;
+      Throwable se = e.getCause();
+      if (se == null) {
+        ioe = new IOException(e);
+      } else {
+        ioe = se instanceof IOException ?
+            (IOException) se : new IOException(e);
+      }
+      omResponse = createErrorResponse(
+          request,
+          ioe);
     }
+    responseObserver.onNext(omResponse);
     responseObserver.onCompleted();
+  }
+
+  /**
+   * Create OMResponse from the specified OMRequest and exception.
+   *
+   * @param omRequest
+   * @param exception
+   * @return OMResponse
+   */
+  private OMResponse createErrorResponse(
+      OMRequest omRequest, IOException exception) {
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
   }
 }

@@ -51,7 +51,6 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
-OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
