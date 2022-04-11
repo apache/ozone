@@ -143,7 +143,7 @@ public class TestOMFailovers {
         omProxyInfos.put(nodeId, null);
         omNodeIDList.add(nodeId);
       }
-      setProxies(omProxies, omProxyInfos, omNodeIDList);
+      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList);
     }
 
     @Override
