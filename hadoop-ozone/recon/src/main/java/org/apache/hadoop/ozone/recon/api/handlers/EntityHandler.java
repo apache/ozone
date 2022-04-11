@@ -110,7 +110,7 @@ public abstract class EntityHandler {
    * Return the entity type of client's request, check path existence.
    * If path doesn't exist, return Entity.UNKNOWN
    * @param path the original path request used to identify root level
-   * @return the entity type, unknown if path not found
+   * @return the entity type of client's request, check path existence
    */
   public static EntityHandler getEntityHandler(
           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
@@ -342,8 +342,8 @@ public abstract class EntityHandler {
     if (path.startsWith(OM_KEY_PREFIX)) {
       path = path.substring(1);
     }
-    String[] namesArray = path.split(OM_KEY_PREFIX);
-    return namesArray;
+    names = path.split(OM_KEY_PREFIX);
+    return names;
   }
 
   private static String normalizePath(String path) {
