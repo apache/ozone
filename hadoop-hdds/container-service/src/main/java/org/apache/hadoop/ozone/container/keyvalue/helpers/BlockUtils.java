@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
+import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -35,6 +37,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
@@ -73,6 +76,9 @@ public final class BlockUtils {
       store = new DatanodeStoreSchemaOneImpl(conf, containerDBPath, readOnly);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf, containerDBPath, readOnly);
+    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      store = new DatanodeStoreSchemaThreeImpl(conf, containerDBPath,
+          readOnly);
     } else {
       throw new IllegalArgumentException(
           "Unrecognized database schema version: " + schemaVersion);
@@ -112,13 +118,21 @@ public final class BlockUtils {
   public static DBHandle getDB(KeyValueContainerData containerData,
       ConfigurationSource conf) throws StorageContainerException {
     Preconditions.checkNotNull(containerData);
-    ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
     Preconditions.checkNotNull(containerData.getDbFile());
+
+    String containerDBPath = containerData.getDbFile().getAbsolutePath();
     try {
-      return cache.getDB(containerData.getContainerID(), containerData
-          .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
-              containerData.getSchemaVersion(), conf);
+      if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
+        Preconditions.checkNotNull(cache);
+        return cache.getDB(containerDBPath);
+      } else {
+        ContainerCache cache = ContainerCache.getInstance(conf);
+        Preconditions.checkNotNull(cache);
+        return cache.getDB(containerData.getContainerID(), containerData
+                .getContainerDBType(), containerDBPath,
+            containerData.getSchemaVersion(), conf);
+      }
     } catch (IOException ex) {
       onFailure(containerData.getVolume());
       String message = String.format("Error opening DB. Container:%s " +
@@ -136,18 +150,28 @@ public final class BlockUtils {
   public static void removeDB(KeyValueContainerData container,
       ConfigurationSource conf) {
     Preconditions.checkNotNull(container);
-    ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
-    cache.removeDB(container.getDbFile().getAbsolutePath());
+    Preconditions.checkNotNull(container.getDbFile());
+
+    String containerDBPath = container.getDbFile().getAbsolutePath();
+    if (container.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
+      Preconditions.checkNotNull(cache);
+      cache.removeDB(containerDBPath);
+    } else {
+      ContainerCache cache = ContainerCache.getInstance(conf);
+      Preconditions.checkNotNull(cache);
+      cache.removeDB(containerDBPath);
+    }
   }
 
   /**
    * Shutdown all DB Handles.
    *
-   * @param cache - Cache for DB Handles.
+   * @param config
    */
-  public static void shutdownCache(ContainerCache cache)  {
-    cache.shutdownCache();
+  public static void shutdownCache(ConfigurationSource config) {
+    ContainerCache.getInstance(config).shutdownCache();
+    DatanodeStoreCache.getInstance().shutdownCache();
   }
 
   /**
@@ -156,13 +180,20 @@ public final class BlockUtils {
    * @param store - low-level DatanodeStore for DB.
    * @param containerDBPath - DB path of the container.
    * @param conf configuration.
+   * @param schemaVersion schemaVersion.
    */
   public static void addDB(DatanodeStore store, String containerDBPath,
-      ConfigurationSource conf) {
-    ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
-    cache.addDB(containerDBPath,
-        new ReferenceCountedDB(store, containerDBPath));
+      ConfigurationSource conf, String schemaVersion) {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
+      Preconditions.checkNotNull(cache);
+      cache.addDB(containerDBPath, new RawDB(store, containerDBPath));
+    } else {
+      ContainerCache cache = ContainerCache.getInstance(conf);
+      Preconditions.checkNotNull(cache);
+      cache.addDB(containerDBPath,
+          new ReferenceCountedDB(store, containerDBPath));
+    }
   }
 
   /**

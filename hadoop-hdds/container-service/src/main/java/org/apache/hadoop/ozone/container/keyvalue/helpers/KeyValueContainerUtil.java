@@ -115,7 +115,7 @@ public final class KeyValueContainerUtil {
     }
 
     //add db handler into cache
-    BlockUtils.addDB(store, dbFile.getAbsolutePath(), conf);
+    BlockUtils.addDB(store, dbFile.getAbsolutePath(), conf, schemaVersion);
   }
 
   /**
