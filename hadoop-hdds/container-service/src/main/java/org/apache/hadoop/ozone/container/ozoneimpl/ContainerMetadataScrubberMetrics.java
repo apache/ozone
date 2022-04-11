@@ -30,7 +30,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
  * data-node.
  **/
 @InterfaceAudience.Private
-@Metrics(about="DataNode container data scrubber metrics", context="dfs")
+@Metrics(about = "DataNode container data scrubber metrics", context = "dfs")
 public final class ContainerMetadataScrubberMetrics {
 
   private final String name;

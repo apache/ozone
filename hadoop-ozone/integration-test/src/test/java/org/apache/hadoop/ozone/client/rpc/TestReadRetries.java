@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -117,7 +117,7 @@ public class TestReadRetries {
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    TestOMRequestUtils.configureFSOptimizedPaths(conf,
+    OMRequestTestUtils.configureFSOptimizedPaths(conf,
             true, BucketLayout.fromString(bucketLayout));
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -139,7 +139,7 @@ public class TestReadRetries {
    */
   @After
   public void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 

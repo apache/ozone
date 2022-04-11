@@ -54,7 +54,7 @@ public class RepeatedOmKeyInfo {
   public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo
       repeatedKeyInfo) {
     List<OmKeyInfo> list = new ArrayList<>();
-    for(KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
+    for (KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
       list.add(OmKeyInfo.getFromProtobuf(k));
     }
     return new RepeatedOmKeyInfo.Builder().setOmKeyInfos(list).build();
@@ -67,7 +67,7 @@ public class RepeatedOmKeyInfo {
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
     List<KeyInfo> list = new ArrayList<>();
-    for(OmKeyInfo k : omKeyInfoList) {
+    for (OmKeyInfo k : omKeyInfoList) {
       list.add(k.getProtobuf(compact, clientVersion));
     }
 
@@ -82,7 +82,7 @@ public class RepeatedOmKeyInfo {
   public static class Builder {
     private List<OmKeyInfo> omKeyInfos;
 
-    public Builder(){}
+    public Builder() { }
 
     public Builder setOmKeyInfos(List<OmKeyInfo> infoList) {
       this.omKeyInfos = infoList;

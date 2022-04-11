@@ -82,7 +82,7 @@ public class NSSummaryCodec implements Codec<NSSummary> {
     res.setNumOfFiles(in.readInt());
     res.setSizeOfFiles(in.readLong());
     short len = in.readShort();
-    assert(len == (short) ReconConstants.NUM_OF_BINS);
+    assert (len == (short) ReconConstants.NUM_OF_BINS);
     int[] fileSizeBucket = new int[len];
     for (int i = 0; i < len; ++i) {
       fileSizeBucket[i] = in.readInt();
