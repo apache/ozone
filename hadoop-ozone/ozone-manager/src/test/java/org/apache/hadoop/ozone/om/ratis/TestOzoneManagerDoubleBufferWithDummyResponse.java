@@ -81,7 +81,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
-        .setMaxUnFlushedTransctionSize(10000)
+        .setmaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
         .setIndexToTerm((val) -> term)
         .build();

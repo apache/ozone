@@ -122,7 +122,7 @@ public final class OzoneManagerDoubleBuffer {
     private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
     private Function<Long, Long> indexToTerm = null;
-    private int maxUnFlushedTransctionSize = 0;
+    private int maxUnFlushedTransactionCount = 0;
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -150,8 +150,8 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    public Builder setMaxUnFlushedTransctionSize(int size) {
-      this.maxUnFlushedTransctionSize = size;
+    public Builder setmaxUnFlushedTransactionCount(int size) {
+      this.maxUnFlushedTransactionCount = size;
       return this;
     }
 
@@ -161,12 +161,12 @@ public final class OzoneManagerDoubleBuffer {
                 "OzoneManagerRatisSnapshot should not be null");
         Preconditions.checkNotNull(indexToTerm, "When ratis is enabled " +
             "indexToTerm should not be null");
-        Preconditions.checkState(maxUnFlushedTransctionSize > 0L,
+        Preconditions.checkState(maxUnFlushedTransactionCount > 0L,
             "when ratis is enable, maxUnFlushedTransctions " +
                 "should be bigger than 0");
       }
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, maxUnFlushedTransctionSize);
+          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount);
     }
   }
 

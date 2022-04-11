@@ -402,12 +402,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
     int maxUnflushedTransactionSize = ozoneManager.getConfiguration()
-        .getInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_SIZE,
-            OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_SIZE_DEFAULT);
+        .getInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT,
+            OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT);
     return new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
-        .setMaxUnFlushedTransctionSize(maxUnflushedTransactionSize)
+        .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
         .setIndexToTerm(this::getTermForIndex)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)

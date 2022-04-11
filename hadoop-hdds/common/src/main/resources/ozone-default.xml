@@ -1622,7 +1622,7 @@
   </property>
 
   <property>
-    <name>ozone.om.unflushed.transactions.max.size</name>
+    <name>ozone.om.unflushed.transaction.max.count</name>
     <value>10000</value>
     <tag>OZONE, OM</tag>
     <description>the unflushed transactions here are those requests that have been
