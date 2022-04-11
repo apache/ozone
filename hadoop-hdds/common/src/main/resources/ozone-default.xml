@@ -977,6 +977,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.recon.heartbeat.interval</name>
+    <value>60s</value>
+    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <description>
+      The heartbeat interval from a Datanode to Recon.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.heartbeat.log.warn.interval.count</name>
     <value>10</value>
     <tag>OZONE, MANAGEMENT</tag>
