@@ -119,7 +119,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .setCertificateClient(certificateClientTest)
         .build();
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        60 * 60, certificateClientTest.getCertificate().
+        60 *60, certificateClientTest.getCertificate().
         getSerialNumber().toString());
     secretManager.start(certificateClientTest);
     cluster.getOzoneManager().startSecretManager();
@@ -160,7 +160,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.RATIS,
+          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE, new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
       }
@@ -168,13 +168,13 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
       byte[] fileContent;
-      try (OzoneInputStream is = bucket.readKey(keyName)) {
+      try(OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
         is.read(fileContent);
       }
 
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, ReplicationType.RATIS,
+          keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -203,7 +203,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.RATIS,
+          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE, new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",
@@ -342,7 +342,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    */
   @AfterClass
   public static void shutdown() throws IOException {
-    if (ozClient != null) {
+    if(ozClient != null) {
       ozClient.close();
     }
 

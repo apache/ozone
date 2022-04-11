@@ -41,23 +41,24 @@ import java.util.concurrent.Callable;
  * To start:
  *      ozone admin containerbalancer start
  *      [ -t/--threshold {@literal <threshold>}]
- *      [ -i/--iterations {@literal <iterations>}]
- *      [ -d/--maxDatanodesPercentageToInvolvePerIteration
- *      {@literal <maxDatanodesPercentageToInvolvePerIteration>}]
+ *      [ -i/--idleiterations {@literal <idleiterations>}]
+ *      [ -d/--maxDatanodesRatioToInvolvePerIteration
+ *      {@literal <maxDatanodesRatioToInvolvePerIteration>}]
  *      [ -s/--maxSizeToMovePerIterationInGB
  *      {@literal <maxSizeToMovePerIterationInGB>}]
  *      Examples:
  *      ozone admin containerbalancer start
  *        start balancer with default values in the configuration
- *      ozone admin containerbalancer start -t 5
+ *      ozone admin containerbalancer start -t 0.05
  *        start balancer with a threshold of 5%
  *      ozone admin containerbalancer start -i 20
- *        start balancer with maximum 20 consecutive iterations
- *      ozone admin containerbalancer start -i -1
+ *        start balancer with maximum 20 consecutive idle iterations
+ *      ozone admin containerbalancer start -i 0
  *        run balancer infinitely with default values in the configuration
- *      ozone admin containerbalancer start -d 40
- *        start balancer with maximum 40% of healthy, in-service datanodes
- *        involved in balancing
+ *      ozone admin containerbalancer start -d 0.4
+ *        start balancer with the ratio of maximum datanodes to involve in
+ *        balancing in one iteration to the total number of healthy datanodes as
+ *        0.4
  *      ozone admin containerbalancer start -s 10
  *        start balancer with maximum size of 10GB to move in one iteration
  * To stop:

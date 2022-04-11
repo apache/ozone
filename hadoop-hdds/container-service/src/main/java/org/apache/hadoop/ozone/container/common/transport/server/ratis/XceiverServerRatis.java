@@ -273,7 +273,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // Set the ratis storage directory
     Collection<String> storageDirPaths =
             HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
-    List<File> storageDirs = new ArrayList<>(storageDirPaths.size());
+    List<File> storageDirs= new ArrayList<>(storageDirPaths.size());
     storageDirPaths.stream().forEach(d -> storageDirs.add(new File(d)));
 
     RaftServerConfigKeys.setStorageDir(properties, storageDirs);
@@ -693,7 +693,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     long bytesWritten = 0;
     Iterator<org.apache.hadoop.ozone.container.common.interfaces.Container<?>>
         containerIt = containerController.getContainers();
-    while (containerIt.hasNext()) {
+    while(containerIt.hasNext()) {
       ContainerData containerData = containerIt.next().getContainerData();
       if (containerData.getOriginPipelineId()
           .compareTo(pipelineID.getId()) == 0) {

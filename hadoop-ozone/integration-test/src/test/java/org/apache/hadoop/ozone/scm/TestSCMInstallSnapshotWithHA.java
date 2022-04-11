@@ -20,7 +20,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 
@@ -121,7 +120,7 @@ public class TestSCMInstallSnapshotWithHA {
     StorageContainerManager leaderSCM = getLeader(cluster);
     Assert.assertNotNull(leaderSCM);
     // Find the inactive SCM
-    String followerId = getInactiveSCM(cluster).getSCMNodeId();
+    String followerId = getInactiveSCM(cluster).getScmId();
 
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
     // Do some transactions so that the log index increases
@@ -160,7 +159,7 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    String followerId = getInactiveSCM(cluster).getSCMNodeId();
+    String followerId = getInactiveSCM(cluster).getScmId();
     // Find the inactive SCM
 
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
@@ -214,7 +213,7 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallCorruptedCheckpointFailure() throws Exception {
     StorageContainerManager leaderSCM = getLeader(cluster);
     // Find the inactive SCM
-    String followerId = getInactiveSCM(cluster).getSCMNodeId();
+    String followerId = getInactiveSCM(cluster).getScmId();
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
     // Do some transactions so that the log index increases
     writeToIncreaseLogIndex(leaderSCM, 100);
@@ -317,10 +316,13 @@ public class TestSCMInstallSnapshotWithHA {
     return null;
   }
 
-  private static StorageContainerManager getInactiveSCM(
-      MiniOzoneHAClusterImpl cluster) {
-    Iterator<StorageContainerManager> inactiveScms = cluster.getInactiveSCM();
-    return inactiveScms.hasNext() ? inactiveScms.next() : null;
+  static StorageContainerManager getInactiveSCM(MiniOzoneHAClusterImpl impl) {
+    for (StorageContainerManager scm : impl.getStorageContainerManagers()) {
+      if (!impl.isSCMActive(scm.getScmId())) {
+        return scm;
+      }
+    }
+    return null;
   }
 }
 

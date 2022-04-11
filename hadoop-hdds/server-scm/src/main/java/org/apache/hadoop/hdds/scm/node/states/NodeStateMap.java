@@ -330,7 +330,7 @@ public class NodeStateMap {
   }
 
   public void setContainers(UUID uuid, Set<ContainerID> containers)
-      throws NodeNotFoundException {
+      throws NodeNotFoundException{
     lock.writeLock().lock();
     try {
       checkIfNodeExist(uuid);

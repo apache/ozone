@@ -16,20 +16,17 @@
 *** Settings ***
 Documentation       Write Compatibility
 Resource            ../ozone-lib/shell.robot
-Resource            setup.robot
 Test Timeout        5 minutes
-Suite Setup         Create Local Test File
 
 *** Variables ***
 ${SUFFIX}    ${EMPTY}
 
-
 *** Test Cases ***
 Key Can Be Written
-    Create Key    /vol1/bucket1/key-${SUFFIX}    ${TESTFILE}
+    Create Key    /vol1/bucket1/key-${SUFFIX}    /etc/passwd
 
 Dir Can Be Created
     Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${SUFFIX}
 
 File Can Be Put
-    Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX}
+    Execute    ozone fs -put /etc/passwd o3fs://bucket1.vol1/dir-${SUFFIX}/

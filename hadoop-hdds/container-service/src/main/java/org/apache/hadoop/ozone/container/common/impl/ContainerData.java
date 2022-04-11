@@ -129,20 +129,19 @@ public abstract class ContainerData {
    * Creates a ContainerData Object, which holds metadata of the container.
    * @param type - ContainerType
    * @param containerId - ContainerId
-   * @param layoutVersion - Container layoutVersion
+   * @param layOutVersion - Container layOutVersion
    * @param size - Container maximum size in bytes
    * @param originPipelineId - Pipeline Id where this container is/was created
    * @param originNodeId - Node Id where this container is/was created
    */
   protected ContainerData(ContainerType type, long containerId,
-                          ContainerLayoutVersion layoutVersion, long size,
-                          String originPipelineId,
-                          String originNodeId) {
+      ChunkLayOutVersion layOutVersion, long size, String originPipelineId,
+      String originNodeId) {
     Preconditions.checkNotNull(type);
 
     this.containerType = type;
     this.containerID = containerId;
-    this.layOutVersion = layoutVersion.getVersion();
+    this.layOutVersion = layOutVersion.getVersion();
     this.metadata = new TreeMap<>();
     this.state = ContainerDataProto.State.OPEN;
     this.readCount = new AtomicLong(0L);
@@ -159,7 +158,7 @@ public abstract class ContainerData {
 
   protected ContainerData(ContainerData source) {
     this(source.getContainerType(), source.getContainerID(),
-        source.getLayoutVersion(), source.getMaxSize(),
+        source.getLayOutVersion(), source.getMaxSize(),
         source.getOriginPipelineId(), source.getOriginNodeId());
   }
 
@@ -226,11 +225,11 @@ public abstract class ContainerData {
   }
 
   /**
-   * Returns the layoutVersion of the actual container data format.
-   * @return layoutVersion
+   * Returns the layOutVersion of the actual container data format.
+   * @return layOutVersion
    */
-  public ContainerLayoutVersion getLayoutVersion() {
-    return ContainerLayoutVersion.getContainerLayoutVersion(layOutVersion);
+  public ChunkLayOutVersion getLayOutVersion() {
+    return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion);
   }
 
   /**

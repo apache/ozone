@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.Test;
 
@@ -32,8 +32,8 @@ import static org.junit.Assert.assertNotNull;
 public class TestChunkManagerDummyImpl extends AbstractTestChunkManager {
 
   @Override
-  protected ContainerLayoutTestInfo getStrategy() {
-    return ContainerLayoutTestInfo.DUMMY;
+  protected ChunkLayoutTestInfo getStrategy() {
+    return ChunkLayoutTestInfo.DUMMY;
   }
 
   @Test

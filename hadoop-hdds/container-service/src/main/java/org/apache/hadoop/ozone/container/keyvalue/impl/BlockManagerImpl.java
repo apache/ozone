@@ -119,7 +119,7 @@ public class BlockManagerImpl implements BlockManager {
         "cannot be negative");
     // We are not locking the key manager since LevelDb serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
-    try (ReferenceCountedDB db = BlockUtils.
+    try(ReferenceCountedDB db = BlockUtils.
         getDB(container.getContainerData(), config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
@@ -216,7 +216,7 @@ public class BlockManagerImpl implements BlockManager {
               + containerBCSId + ".", UNKNOWN_BCSID);
     }
 
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -244,7 +244,7 @@ public class BlockManagerImpl implements BlockManager {
       throws IOException {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -276,7 +276,7 @@ public class BlockManagerImpl implements BlockManager {
 
     KeyValueContainerData cData = (KeyValueContainerData) container
         .getContainerData();
-    try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
+    try(ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.fs;
 import org.apache.hadoop.ozone.om.IOzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 
 import java.io.IOException;
@@ -51,6 +52,11 @@ public interface OzoneManagerFS extends IOzoneAcl {
    */
   OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
           throws IOException;
+
+  void createDirectory(OmKeyArgs args) throws IOException;
+
+  OpenKeySession createFile(OmKeyArgs args, boolean isOverWrite,
+      boolean isRecursive) throws IOException;
 
   /**
    * Look up a file. Return the info of the file to client side.

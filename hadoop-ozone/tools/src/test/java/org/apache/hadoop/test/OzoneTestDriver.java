@@ -37,7 +37,7 @@ public class OzoneTestDriver {
     try {
       pgd.addClass("freon", Freon.class,
           "Populates ozone with data.");
-    } catch (Throwable e) {
+    } catch(Throwable e) {
       e.printStackTrace();
     }
   }
@@ -46,7 +46,7 @@ public class OzoneTestDriver {
     int exitCode = -1;
     try {
       exitCode = pgd.run(args);
-    } catch (Throwable e) {
+    } catch(Throwable e) {
       e.printStackTrace();
     }
 
@@ -55,7 +55,7 @@ public class OzoneTestDriver {
     }
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args){
     new OzoneTestDriver().run(args);
   }
 }

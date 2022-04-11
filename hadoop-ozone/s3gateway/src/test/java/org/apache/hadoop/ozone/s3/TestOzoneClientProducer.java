@@ -17,37 +17,19 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriInfo;
 import java.io.IOException;
-import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 
-import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
-import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
-
-import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD5;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TYPE;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
-import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
-import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
 import static org.junit.Assert.fail;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.mockito.Mockito;
 
 /**
  * Test class for @{@link OzoneClientProducer}.
@@ -56,37 +38,16 @@ import org.mockito.Mockito;
 public class TestOzoneClientProducer {
 
   private OzoneClientProducer producer;
-  private MultivaluedMap<String, String> headerMap;
-  private MultivaluedMap<String, String> queryMap;
-  private String authHeader;
-  private String contentMd5;
-  private String host;
-  private String amzContentSha256;
-  private String date;
-  private String contentType;
-  private ContainerRequestContext context;
-  private UriInfo uriInfo;
 
   public TestOzoneClientProducer(
       String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType
   )
       throws Exception {
-    this.authHeader = authHeader;
-    this.contentMd5 = contentMd5;
-    this.host = host;
-    this.amzContentSha256 = amzContentSha256;
-    this.date = date;
-    this.contentType = contentType;
     producer = new OzoneClientProducer();
-    headerMap = new MultivaluedHashMap<>();
-    queryMap = new MultivaluedHashMap<>();
-    uriInfo = Mockito.mock(UriInfo.class);
-    context = Mockito.mock(ContainerRequestContext.class);
     OzoneConfiguration config = new OzoneConfiguration();
     config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
     config.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
-    setupContext();
     producer.setOzoneConfiguration(config);
   }
 
@@ -122,10 +83,7 @@ public class TestOzoneClientProducer {
         },
         {
             null, null, null, null, null, null
-        },
-        {
-            "", null, null, null, null, null
-        },
+        }
     });
   }
 
@@ -137,93 +95,6 @@ public class TestOzoneClientProducer {
     } catch (Exception ex) {
       Assert.assertTrue(ex instanceof IOException);
     }
-  }
-
-  @Test
-  public void testGetSignature() {
-    try {
-      System.err.println("Testing: " + authHeader);
-      OzoneConfiguration configuration = new OzoneConfiguration();
-      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1");
-      configuration.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "ozone1addr:9399");
-      producer.setOzoneConfiguration(configuration);
-      producer.getSignature();
-      if ("".equals(authHeader)) {
-        fail("Empty AuthHeader must fail");
-      }
-    } catch (WebApplicationException ex) {
-      if (authHeader == null || authHeader.equals("")) {
-        // Empty auth header should be 403
-        Assert.assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
-        // TODO: Should return XML in body like this (bot not for now):
-        // <Error>
-        //   <Code>AccessDenied</Code><Message>Access Denied</Message>
-        //   <RequestId>...</RequestId><HostId>...</HostId>
-        // </Error>
-      } else {
-        // Other requests have stale timestamp and thus should fail
-        Assert.assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
-      }
-    } catch (Exception ex) {
-      fail("Unexpected exception: " + ex);
-    }
-  }
-
-  @Test
-  public void testGetClientFailureWithMultipleServiceIds() {
-    try {
-      OzoneConfiguration configuration = new OzoneConfiguration();
-      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
-      producer.setOzoneConfiguration(configuration);
-      producer.createClient();
-      fail("testGetClientFailureWithMultipleServiceIds");
-    } catch (Exception ex) {
-      Assert.assertTrue(ex instanceof IOException);
-      Assert.assertTrue(ex.getMessage().contains(
-          "More than 1 OzoneManager ServiceID"));
-    }
-  }
-
-  @Test
-  public void testGetClientFailureWithMultipleServiceIdsAndInternalServiceId() {
-    try {
-      OzoneConfiguration configuration = new OzoneConfiguration();
-      configuration.set(OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID, "ozone1");
-      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
-      producer.setOzoneConfiguration(configuration);
-      producer.createClient();
-      fail("testGetClientFailureWithMultipleServiceIdsAndInternalServiceId");
-    } catch (Exception ex) {
-      Assert.assertTrue(ex instanceof IOException);
-      // Still test will fail, as config is not complete. But it should pass
-      // the service id check.
-      Assert.assertFalse(ex.getMessage().contains(
-          "More than 1 OzoneManager ServiceID"));
-    }
-  }
-
-  private void setupContext() throws Exception {
-    headerMap.putSingle(AUTHORIZATION_HEADER, authHeader);
-    headerMap.putSingle(CONTENT_MD5, contentMd5);
-    headerMap.putSingle(HOST_HEADER, host);
-    headerMap.putSingle(X_AMZ_CONTENT_SHA256, amzContentSha256);
-    headerMap.putSingle(X_AMAZ_DATE, date);
-    headerMap.putSingle(CONTENT_TYPE, contentType);
-
-    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryMap);
-    Mockito.when(uriInfo.getRequestUri()).thenReturn(new URI(""));
-
-    Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
-    Mockito.when(context.getHeaders()).thenReturn(headerMap);
-    Mockito.when(context.getHeaderString(AUTHORIZATION_HEADER))
-        .thenReturn(authHeader);
-    Mockito.when(context.getUriInfo().getQueryParameters())
-        .thenReturn(queryMap);
-
-    AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
-    awsSignatureProcessor.setContext(context);
-
-    producer.setSignatureParser(awsSignatureProcessor);
   }
 
 }

@@ -123,7 +123,7 @@ public class TableCountTask implements ReconOmTask {
         continue;
       }
       String rowKey = getRowKeyFromTable(omdbUpdateEvent.getTable());
-      try {
+      try{
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
           objectCountMap.computeIfPresent(rowKey, (k, count) -> count + 1L);

@@ -117,7 +117,7 @@ public final class CertificateSignRequest {
     PemObject pemObject =
         new PemObject("CERTIFICATE REQUEST", request.getEncoded());
     StringWriter str = new StringWriter();
-    try (JcaPEMWriter pemWriter = new JcaPEMWriter(str)) {
+    try(JcaPEMWriter pemWriter = new JcaPEMWriter(str)) {
       pemWriter.writeObject(pemObject);
     }
     return str.toString();
@@ -135,7 +135,7 @@ public final class CertificateSignRequest {
       throws IOException {
     try (PemReader reader = new PemReader(new StringReader(csr))) {
       PemObject pemObject = reader.readPemObject();
-      if (pemObject.getContent() == null) {
+      if(pemObject.getContent() == null) {
         throw new SCMSecurityException("Invalid Certificate signing request",
             INVALID_CSR);
       }
@@ -268,10 +268,10 @@ public final class CertificateSignRequest {
 
     private Extension getKeyUsageExtension() throws IOException {
       int keyUsageFlag = KeyUsage.keyAgreement;
-      if (digitalEncryption) {
+      if(digitalEncryption){
         keyUsageFlag |= KeyUsage.keyEncipherment | KeyUsage.dataEncipherment;
       }
-      if (digitalSignature) {
+      if(digitalSignature) {
         keyUsageFlag |= KeyUsage.digitalSignature;
       }
 
@@ -303,7 +303,7 @@ public final class CertificateSignRequest {
       List<Extension> extensions = new ArrayList<>();
 
       // Add basic extension
-      if (ca) {
+      if(ca) {
         extensions.add(getBasicExtension());
       }
 

@@ -80,7 +80,7 @@ public interface ChecksumByteBuffer extends Checksum {
     }
 
     private static int update(int crc, ByteBuffer b, int[] table) {
-      for (; b.remaining() > 7;) {
+      for(; b.remaining() > 7;) {
         final int c0 = (b.get() ^ crc) & 0xff;
         final int c1 = (b.get() ^ (crc >>>= 8)) & 0xff;
         final int c2 = (b.get() ^ (crc >>>= 8)) & 0xff;

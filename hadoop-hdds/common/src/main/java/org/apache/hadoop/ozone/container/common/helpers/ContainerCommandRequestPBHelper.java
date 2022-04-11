@@ -45,7 +45,7 @@ public final class ContainerCommandRequestPBHelper {
     Map<String, String> auditParams = new TreeMap<>();
     Type cmdType = msg.getCmdType();
     String containerID = String.valueOf(msg.getContainerID());
-    switch (cmdType) {
+    switch(cmdType) {
     case CreateContainer:
       auditParams.put("containerID", containerID);
       auditParams.put("containerType",
@@ -75,11 +75,11 @@ public final class ContainerCommandRequestPBHelper {
       return auditParams;
 
     case PutBlock:
-      try {
+      try{
         auditParams.put("blockData",
             BlockData.getFromProtoBuf(msg.getPutBlock().getBlockData())
                 .toString());
-      } catch (IOException ex) {
+      } catch (IOException ex){
         if (LOG.isTraceEnabled()) {
           LOG.trace("Encountered error parsing BlockData from protobuf: "
               + ex.getMessage());
@@ -132,11 +132,11 @@ public final class ContainerCommandRequestPBHelper {
     case CompactChunk: return null; //CompactChunk operation
 
     case PutSmallFile:
-      try {
+      try{
         auditParams.put("blockData",
             BlockData.getFromProtoBuf(msg.getPutSmallFile()
                 .getBlock().getBlockData()).toString());
-      } catch (IOException ex) {
+      } catch (IOException ex){
         if (LOG.isTraceEnabled()) {
           LOG.trace("Encountered error parsing BlockData from protobuf: "
               + ex.getMessage());

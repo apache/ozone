@@ -59,7 +59,7 @@ public class TestOMDBDefinition {
     missingOmDBTables.remove("default");
     int countOmDBTables = missingOmDBTables.size();
     // Remove the file if it is found in both the datastructures
-    for (DBColumnFamilyDefinition definition : columnFamilyDefinitions) {
+    for(DBColumnFamilyDefinition definition : columnFamilyDefinitions) {
       if (!missingOmDBTables.remove(definition.getName())) {
         missingDBDefTables.add(definition.getName());
       }

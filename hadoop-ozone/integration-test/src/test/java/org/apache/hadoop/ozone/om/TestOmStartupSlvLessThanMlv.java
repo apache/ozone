@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
+import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
 
 
 import org.apache.ozone.test.GenericTestUtils;
@@ -60,7 +60,7 @@ public class TestOmStartupSlvLessThanMlv {
     int mlv = largestSlv + 1;
 
     // Create version file with MLV > SLV, which should fail the cluster build.
-    UpgradeTestUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, mlv);
+    TestUpgradeUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, mlv);
 
     MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
@@ -70,7 +70,7 @@ public class TestOmStartupSlvLessThanMlv {
     try {
       clusterBuilder.build();
       Assert.fail("Expected OMException due to incorrect MLV on OM creation.");
-    } catch (OMException e) {
+    } catch(OMException e) {
       String expectedMessage = String.format("Cannot initialize " +
               "VersionManager. Metadata layout version (%s) > software layout" +
               " version (%s)", mlv, largestSlv);

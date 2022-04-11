@@ -37,7 +37,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -67,7 +67,7 @@ public class TestOMUpgradeFinalization {
    */
   @Rule
   public Timeout timeout = new Timeout(300000);
-  private MiniOzoneHAClusterImpl cluster;
+  private MiniOzoneOMHAClusterImpl cluster;
   private OzoneManager ozoneManager;
   private ClientProtocol clientProtocol;
   private int fromLayoutVersion;
@@ -100,7 +100,7 @@ public class TestOMUpgradeFinalization {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = UUID.randomUUID().toString();
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(omServiceId)

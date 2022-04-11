@@ -21,7 +21,7 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.junit.Assert;
 import org.junit.Test;
 
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIMEOUT;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario with failover.

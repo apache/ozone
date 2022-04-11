@@ -105,7 +105,7 @@ public class TestDatanodeAdminMonitor {
    */
   @Test
   public void testClosePipelinesEventFiredWhenAdminStarted()
-      throws NodeNotFoundException {
+      throws NodeNotFoundException{
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -425,7 +425,7 @@ public class TestDatanodeAdminMonitor {
    */
   private Set<ContainerID> generateContainers(int count) {
     Set<ContainerID> containers = new HashSet<>();
-    for (int i = 0; i < count; i++) {
+    for (int i=0; i<count; i++) {
       containers.add(ContainerID.valueOf(i));
     }
     return containers;

@@ -27,7 +27,7 @@ public class DummyEntity implements Auditable {
   private String key1;
   private String key2;
 
-  public DummyEntity() {
+  public DummyEntity(){
     this.key1 = "value1";
     this.key2 = "value2";
   }

@@ -186,7 +186,7 @@ public class TestAuditParser {
   @Test
   public void testLoadCommand() {
     String[] args1 = new String[]{dbName, "load", LOGS1};
-    try {
+    try{
       execute(args1, "");
       fail("No exception thrown.");
     } catch (Exception e) {

@@ -267,15 +267,15 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
-    for (OmBucketInfo bucketInfo : bucketList) {
+    for(OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
+      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
           !omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
         totalBucketQuota += nextQuotaInBytes;
       }
     }
 
-    if (volumeQuotaInBytes < totalBucketQuota &&
+    if(volumeQuotaInBytes < totalBucketQuota &&
         volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
       throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +

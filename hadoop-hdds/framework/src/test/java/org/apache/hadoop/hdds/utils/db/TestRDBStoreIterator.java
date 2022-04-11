@@ -92,7 +92,7 @@ public class TestRDBStoreIterator {
   }
 
   @Test
-  public void testHasNextDependsOnIsvalid() {
+  public void testHasNextDependsOnIsvalid(){
     when(rocksDBIteratorMock.isValid()).thenReturn(true, true, false);
 
     RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
@@ -169,7 +169,7 @@ public class TestRDBStoreIterator {
 
     RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
     byte[] key = null;
-    if (iter.hasNext()) {
+    if(iter.hasNext()) {
       ByteArrayKeyValue entry = iter.next();
       key = entry.getKey();
     }
@@ -191,7 +191,7 @@ public class TestRDBStoreIterator {
     ByteArrayKeyValue entry;
     byte[] key = null;
     byte[] value = null;
-    if (iter.hasNext()) {
+    if(iter.hasNext()) {
       entry = iter.next();
       key = entry.getKey();
       value = entry.getValue();

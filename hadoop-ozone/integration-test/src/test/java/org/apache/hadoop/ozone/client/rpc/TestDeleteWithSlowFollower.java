@@ -72,7 +72,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTRO
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -213,8 +212,7 @@ public class TestDeleteWithSlowFollower {
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assume.assumeTrue("Expected exactly a single location, but got: " +
-        locationInfoList.size(), 1 == locationInfoList.size());
+    Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     long containerID = omKeyLocationInfo.getContainerID();
     // A container is created on the datanode. Now figure out a follower node to
@@ -226,7 +224,7 @@ public class TestDeleteWithSlowFollower {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(new RatisReplicationConfig(
                 HddsProtos.ReplicationFactor.THREE));
-    Assume.assumeTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
+    Assert.assertTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       if (RatisTestHelper.isRatisFollower(dn, pipeline)) {
@@ -235,9 +233,10 @@ public class TestDeleteWithSlowFollower {
         leader = dn;
       }
     }
-    Assume.assumeNotNull(follower, leader);
+    Assert.assertNotNull(follower);
+    Assert.assertNotNull(leader);
     //ensure that the chosen follower is still a follower
-    Assume.assumeTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
+    Assert.assertTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
     // shutdown the  follower node
     cluster.shutdownHddsDatanode(follower.getDatanodeDetails());
     key.write(testData);

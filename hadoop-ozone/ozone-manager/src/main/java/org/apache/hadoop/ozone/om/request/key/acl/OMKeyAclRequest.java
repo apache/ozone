@@ -112,8 +112,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       if (getOmRequest().getAddAclRequest().hasObj() && operationResult) {
         modificationTime = getOmRequest().getAddAclRequest()
             .getModificationTime();
-      } else if (getOmRequest().getSetAclRequest().hasObj()
-          && operationResult) {
+      } else if (getOmRequest().getSetAclRequest().hasObj() && operationResult){
         modificationTime = getOmRequest().getSetAclRequest()
             .getModificationTime();
       } else if (getOmRequest().getRemoveAclRequest().hasObj()

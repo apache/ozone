@@ -34,7 +34,7 @@ import com.google.common.primitives.Longs;
 /**
  * Codec to encode ContainerKeyPrefix as byte array.
  */
-public class ContainerKeyPrefixCodec implements Codec<ContainerKeyPrefix> {
+public class ContainerKeyPrefixCodec implements Codec<ContainerKeyPrefix>{
 
   private static final String KEY_DELIMITER = "_";
 

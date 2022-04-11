@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
@@ -149,8 +149,9 @@ public class TestSCMNodeMetrics {
     long nrProcessed = getCounter("NumNodeReportProcessed");
 
     StorageReportProto storageReport =
-        HddsTestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp",
-            100, 10, 90, null);
+        TestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp", 100,
+            10, 90,
+            null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
@@ -169,7 +170,7 @@ public class TestSCMNodeMetrics {
     DatanodeDetails randomDatanode =
         MockDatanodeDetails.randomDatanodeDetails();
 
-    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+    StorageReportProto storageReport = TestUtils.createStorageReport(
         randomDatanode.getUuid(), "/tmp", 100, 10, 90, null);
 
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
@@ -187,7 +188,7 @@ public class TestSCMNodeMetrics {
   @Test
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
-    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+    StorageReportProto storageReport = TestUtils.createStorageReport(
         registeredDatanode.getUuid(), "/tmp", 100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();

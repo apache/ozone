@@ -98,8 +98,8 @@ public class TestNodeStateMap {
       throws NodeAlreadyExistsException {
     // Add one node for all possible states
     int nodeCount = 0;
-    for (NodeOperationalState op : NodeOperationalState.values()) {
-      for (NodeState health : NodeState.values()) {
+    for(NodeOperationalState op : NodeOperationalState.values()) {
+      for(NodeState health : NodeState.values()) {
         addRandomNodeWithState(op, health);
         nodeCount++;
       }

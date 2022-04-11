@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -70,13 +69,6 @@ public class ReplicationSupervisor {
     this.containersInFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
-  }
-
-  public ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ReplicationConfig replicationConfig) {
-    this(containerSet, context, replicator,
-        replicationConfig.getReplicationMaxStreams());
   }
 
   public ReplicationSupervisor(

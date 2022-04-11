@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.junit.Assert;
 import org.junit.Test;
@@ -31,6 +30,7 @@ import org.junit.Test;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
 /**
@@ -43,7 +43,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String newOwner = "user1";
     OMRequest originalRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
+        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
 
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
@@ -59,13 +59,13 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String ownerName = "user1";
 
-    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     String newOwner = "user2";
 
     OMRequest originalRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
+        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
         new OMVolumeSetOwnerRequest(originalRequest);
@@ -98,12 +98,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
         .get(volumeKey).getCreationTime();
     long modificationTime = omMetadataManager.getVolumeTable()
         .get(volumeKey).getModificationTime();
-
-    // creationTime and modificationTime can be the same to the precision of a
-    // millisecond - since there is no time-consuming operation between
-    // OMRequestTestUtils.addVolumeToDB (sets creationTime) and
-    // preExecute (sets modificationTime).
-    Assert.assertTrue(modificationTime >= creationTime);
+    Assert.assertTrue(modificationTime > creationTime);
 
     OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList =
         omMetadataManager.getUserTable().get(newOwnerKey);
@@ -129,7 +124,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     String ownerName = "user1";
 
     OMRequest originalRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
+        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
             ownerName);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
@@ -155,7 +150,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
     // create request with quota set.
     OMRequest originalRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
+        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
             100L, 100L);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
@@ -179,13 +174,13 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
   public void testOwnSameVolumeTwice() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String owner = "user1";
-    OMRequestTestUtils.addVolumeToDB(volumeName, owner, omMetadataManager);
-    OMRequestTestUtils.addUserToDB(volumeName, owner, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, owner, omMetadataManager);
+    TestOMRequestUtils.addUserToDB(volumeName, owner, omMetadataManager);
     String newOwner = "user2";
 
     // Create request to set new owner
     OMRequest omRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
+        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
 
     OMVolumeSetOwnerRequest setOwnerRequest =
         new OMVolumeSetOwnerRequest(omRequest);

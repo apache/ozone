@@ -47,7 +47,7 @@ public final class CodecFactory {
     codecs.put(X509Certificate.class, new X509CertificateCodec());
   }
 
-  private CodecFactory() { }
+  private CodecFactory() {}
 
   public static Codec getCodec(Class<?> type)
       throws InvalidProtocolBufferException {

@@ -64,7 +64,7 @@ public class TestAllocateContainer {
 
   @AfterClass
   public static void shutdown() throws InterruptedException {
-    if (cluster != null) {
+    if(cluster != null) {
       cluster.shutdown();
     }
     IOUtils.cleanupWithLogger(null, storageContainerLocationClient);

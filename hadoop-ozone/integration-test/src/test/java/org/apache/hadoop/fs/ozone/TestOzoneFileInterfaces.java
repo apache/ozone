@@ -523,7 +523,7 @@ public class TestOzoneFileInterfaces {
 
     assertEquals(0, blockLocations[0].getOffset());
     assertEquals(blockSize, blockLocations[1].getOffset());
-    assertEquals(2 * blockSize, blockLocations[2].getOffset());
+    assertEquals(2*blockSize, blockLocations[2].getOffset());
     assertEquals(blockSize, blockLocations[0].getLength());
     assertEquals(blockSize, blockLocations[1].getLength());
     assertEquals(837, blockLocations[2].getLength());

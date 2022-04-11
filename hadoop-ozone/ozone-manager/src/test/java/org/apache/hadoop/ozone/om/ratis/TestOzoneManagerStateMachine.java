@@ -303,7 +303,7 @@ public class TestOzoneManagerStateMachine {
           mockTransactionContext(createKeyRequest));
       Assert.fail("Expected StateMachineException to be thrown when " +
           "submitting write request while prepared.");
-    } catch (StateMachineException smEx) {
+    } catch(StateMachineException smEx) {
       Assert.assertFalse(smEx.leaderShouldStepDown());
 
       Throwable cause = smEx.getCause();

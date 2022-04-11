@@ -373,7 +373,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     byte[] data = ContainerTestHelper.getFixedLengthString(
         keyString, 100).getBytes(UTF_8);
     OzoneOutputStream keyStream = TestHelper.createKey(
-        keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
+        keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
         100, store, volumeName, bucketName);
     keyStream.write(data);
     keyStream.close();

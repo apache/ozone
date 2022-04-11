@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -77,7 +77,7 @@ public class ChunkKeyHandler extends KeyHandler implements
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-          throws IOException, OzoneClientException {
+          throws IOException, OzoneClientException{
     containerOperationClient = new
             ContainerOperationClient(createOzoneConfiguration());
     xceiverClientManager = containerOperationClient
@@ -105,11 +105,11 @@ public class ChunkKeyHandler extends KeyHandler implements
     List<OmKeyLocationInfo> locationInfos = keyInfo
             .getLatestVersionLocations().getBlocksLatestVersionOnly();
     // for zero-sized key
-    if (locationInfos.isEmpty()) {
+    if(locationInfos.isEmpty()){
       System.out.println("No Key Locations Found");
       return;
     }
-    ContainerLayoutVersion containerLayoutVersion = ContainerLayoutVersion
+    ChunkLayOutVersion chunkLayOutVersion = ChunkLayOutVersion
             .getConfiguredVersion(getConf());
     JsonArray responseArrayList = new JsonArray();
     for (OmKeyLocationInfo keyLocation:locationInfos) {
@@ -142,7 +142,7 @@ public class ChunkKeyHandler extends KeyHandler implements
       for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
               entry: responses.entrySet()) {
         JsonObject jsonObj = new JsonObject();
-        if (entry.getValue() == null) {
+        if(entry.getValue() == null){
           LOG.error("Cant execute getBlock on this node");
           continue;
         }
@@ -152,7 +152,7 @@ public class ChunkKeyHandler extends KeyHandler implements
                         keyLocation.getContainerID(),
                         keyLocation.getPipeline());
         for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
-          String fileName = containerLayoutVersion.getChunkFile(new File(
+          String fileName = chunkLayOutVersion.getChunkFile(new File(
               getChunkLocationPath(containerData.getContainerPath())),
                   keyLocation.getBlockID(),
                   ChunkInfo.getFromProtoBuf(chunkInfo)).toString();

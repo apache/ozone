@@ -177,7 +177,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     keys.add("/dir1/dir2");
     keys.add("/dir1/dir2/dir3");
     keys.add("/dir1/dir2/dir3/dir4/");
-    for (int i = 1; i <= 3; i++) {
+    for (int i=1; i <= 3; i++) {
       int length = 10;
       String fileName = parentDir.concat("/file" + i + "/");
       keys.add(fileName);
@@ -190,7 +190,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     }
 
     // check
-    for (int i = 1; i <= 3; i++) {
+    for (int i=1; i <= 3; i++) {
       String fileName = parentDir.concat("/file" + i + "/");
       Path p = new Path(fileName);
       Assert.assertTrue(o3fs.getFileStatus(p).isFile());
@@ -209,12 +209,12 @@ public class TestOzoneFSWithObjectStoreCreate {
     Assert.assertTrue(result);
 
     // No Key should exist.
-    for (String key : keys) {
+    for(String key : keys) {
       checkPath(new Path(key));
     }
 
 
-    for (int i = 1; i <= 3; i++) {
+    for (int i=1; i <= 3; i++) {
       int length = 10;
       String fileName = parentDir.concat("/file" + i + "/");
       OzoneOutputStream ozoneOutputStream =
@@ -229,12 +229,12 @@ public class TestOzoneFSWithObjectStoreCreate {
     o3fs.rename(new Path("/dir1"), new Path("/dest"));
 
     // No source Key should exist.
-    for (String key : keys) {
+    for(String key : keys) {
       checkPath(new Path(key));
     }
 
     // check dest path.
-    for (int i = 1; i <= 3; i++) {
+    for (int i=1; i <= 3; i++) {
       String fileName = "/dest/".concat(parentDir.concat("/file" + i + "/"));
       Path p = new Path(fileName);
       Assert.assertTrue(o3fs.getFileStatus(p).isFile());
@@ -467,7 +467,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private void checkAncestors(Path p) throws Exception {
     p = p.getParent();
-    while (p.getParent() != null) {
+    while(p.getParent() != null) {
       FileStatus fileStatus = o3fs.getFileStatus(p);
       Assert.assertTrue(fileStatus.isDirectory());
       p = p.getParent();

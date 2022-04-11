@@ -168,7 +168,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       int keyFactor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       Iterator iter =
           multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
-      while (iter.hasNext()) {
+      while(iter.hasNext()) {
         Map.Entry entry = (Map.Entry)iter.next();
         PartKeyInfo iterPartKeyInfo = (PartKeyInfo)entry.getValue();
         quotaReleased +=

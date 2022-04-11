@@ -217,7 +217,7 @@ public class TestCleanupTableInfo {
     for (String tableName : om.getMetadataManager().listTableNames()) {
       if (!cleanup.contains(tableName)) {
         assertEquals(
-            "Cache item count of table " + tableName,
+            "Cache item count of table " +tableName,
             cacheItemCount.get(tableName).intValue(),
             Iterators.size(
                 om.getMetadataManager().getTable(tableName).cacheIterator()
@@ -289,7 +289,7 @@ public class TestCleanupTableInfo {
     return new OMFileCreateRequest(protoRequest);
   }
 
-  private OMKeyCreateRequest anOMKeyCreateRequest() {
+  private OMKeyCreateRequest anOMKeyCreateRequest(){
     OMRequest protoRequest = mock(OMRequest.class);
     when(protoRequest.getCreateKeyRequest()).thenReturn(aKeyCreateRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateKey);

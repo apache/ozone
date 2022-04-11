@@ -268,7 +268,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
-      NodeOperationalState newState) throws NodeNotFoundException {
+      NodeOperationalState newState) throws NodeNotFoundException{
     setNodeOperationalState(datanodeDetails, newState, 0);
   }
 
@@ -283,7 +283,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       NodeOperationalState newState, long opStateExpiryEpocSec)
-      throws NodeNotFoundException {
+      throws NodeNotFoundException{
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
   }
@@ -612,7 +612,7 @@ public class SCMNodeManager implements NodeManager {
         // send Finalize command multiple times.
         scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
             new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
-      } catch (NotLeaderException ex) {
+      } catch(NotLeaderException ex) {
         LOG.warn("Skip sending finalize upgrade command since current SCM is" +
             "not leader.", ex);
       }
@@ -764,7 +764,7 @@ public class SCMNodeManager implements NodeManager {
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
       NodeStatus status = dni.getNodeStatus();
       nodes.get(status.getOperationalState().name())
-          .compute(status.getHealth().name(), (k, v) -> v + 1);
+          .compute(status.getHealth().name(), (k, v) -> v+1);
     }
     return nodes;
   }

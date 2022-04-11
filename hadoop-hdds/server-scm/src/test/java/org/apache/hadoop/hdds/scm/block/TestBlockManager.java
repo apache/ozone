@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -103,7 +103,7 @@ public class TestBlockManager {
   public ExpectedException thrown = ExpectedException.none();
 
   @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  public TemporaryFolder folder= new TemporaryFolder();
   private SCMMetadataStore scmMetadataStore;
   private ReplicationConfig replicationConfig;
 
@@ -172,7 +172,7 @@ public class TestBlockManager {
     configurator.setMetadataStore(scmMetadataStore);
     configurator.setSCMHAManager(scmHAManager);
     configurator.setScmContext(scmContext);
-    scm = HddsTestUtils.getScm(conf, configurator);
+    scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
     mapping = scm.getContainerManager();
@@ -198,7 +198,7 @@ public class TestBlockManager {
   @Test
   public void testAllocateBlock() throws Exception {
     pipelineManager.createPipeline(replicationConfig);
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         replicationConfig, OzoneConsts.OZONE, new ExcludeList());
     Assert.assertNotNull(block);
@@ -212,7 +212,7 @@ public class TestBlockManager {
       }
     } catch (IOException e) {
     }
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
     ExcludeList excludeList = new ExcludeList();
     excludeList
         .addPipeline(pipelineManager.getPipelines(replicationConfig)
@@ -280,7 +280,7 @@ public class TestBlockManager {
       executors.add(Executors.newSingleThreadExecutor());
     }
     pipelineManager.createPipeline(replicationConfig);
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
             new ConcurrentHashMap<>();
     List<CompletableFuture<AllocatedBlock>> futureList =
@@ -342,7 +342,7 @@ public class TestBlockManager {
       executors.add(Executors.newSingleThreadExecutor());
     }
     pipelineManager.createPipeline(replicationConfig);
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
             new ConcurrentHashMap<>();
     List<CompletableFuture<AllocatedBlock>> futureList =
@@ -410,7 +410,7 @@ public class TestBlockManager {
       executors.add(Executors.newSingleThreadExecutor());
     }
     pipelineManager.createPipeline(replicationConfig);
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
         new ConcurrentHashMap<>();
     List<CompletableFuture<AllocatedBlock>> futureList =
@@ -452,7 +452,7 @@ public class TestBlockManager {
       // the pipeline per raft log disk config is set to 1 by default
       int numContainers = (int)Math.ceil((double)
               (numContainerPerOwnerInPipeline *
-                  numContainerPerOwnerInPipeline) / numMetaDataVolumes);
+                  numContainerPerOwnerInPipeline)/numMetaDataVolumes);
       Assert.assertTrue(numContainers == pipelineManager.
           getNumberOfContainers(pipeline.getId()));
       Assert.assertTrue(
@@ -497,7 +497,7 @@ public class TestBlockManager {
 
     pipelineManager.createPipeline(replicationConfig);
     pipelineManager.createPipeline(replicationConfig);
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
 
     AllocatedBlock allocatedBlock = blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
@@ -544,7 +544,7 @@ public class TestBlockManager {
              / replicationConfig.getRequiredNodes(); i++) {
       pipelineManager.createPipeline(replicationConfig);
     }
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
 
     // wait till each pipeline has the configured number of containers.
     // After this each pipeline has numContainerPerOwnerInPipeline containers

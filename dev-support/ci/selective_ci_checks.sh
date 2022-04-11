@@ -219,10 +219,7 @@ function get_count_compose_files() {
     start_end::group_start "Count compose files"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/acceptance.sh"
-        "^hadoop-ozone/dist"
-    )
-    local ignore_array=(
-        "^hadoop-ozone/dist/src/main/k8s"
+        "^hadoop-ozone/dist/src/main/compose"
     )
     filter_changed_files true
     COUNT_COMPOSE_CHANGED_FILES=${match_count}
@@ -261,10 +258,7 @@ function get_count_kubernetes_files() {
     start_end::group_start "Count kubernetes files"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
-        "^hadoop-ozone/dist"
-    )
-    local ignore_array=(
-        "^hadoop-ozone/dist/src/main/compose"
+        "^hadoop-ozone/dist/src/main/k8s"
     )
     filter_changed_files true
     COUNT_KUBERNETES_CHANGED_FILES=${match_count}
@@ -338,9 +332,6 @@ function check_needs_checkstyle() {
         "pom.xml"
         "src/..../java"
     )
-    local ignore_array=(
-        "^hadoop-ozone/dist"
-    )
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
@@ -382,9 +373,6 @@ function check_needs_findbugs() {
         "pom.xml"
         "src/..../java"
     )
-    local ignore_array=(
-        "^hadoop-ozone/dist"
-    )
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
@@ -402,11 +390,6 @@ function check_needs_unit_test() {
         "pom.xml"
         "src/..../java"
         "src/..../resources"
-    )
-    local ignore_array=(
-        "^hadoop-ozone/dist"
-        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
-        "^hadoop-ozone/integration-test"
     )
     filter_changed_files
 

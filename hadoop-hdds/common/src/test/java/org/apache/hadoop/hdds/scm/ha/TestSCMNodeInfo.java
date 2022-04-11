@@ -93,7 +93,7 @@ public class TestSCMNodeInfo {
     int count = 1;
     for (SCMNodeInfo scmNodeInfo : scmNodeInfos) {
       Assert.assertEquals(scmServiceId, scmNodeInfo.getServiceId());
-      Assert.assertEquals("scm" + count++, scmNodeInfo.getNodeId());
+      Assert.assertEquals("scm"+count++, scmNodeInfo.getNodeId());
       Assert.assertEquals("localhost:" + ++port,
           scmNodeInfo.getBlockClientAddress());
       Assert.assertEquals("localhost:" + ++port,
@@ -117,7 +117,7 @@ public class TestSCMNodeInfo {
     int count = 1;
     for (SCMNodeInfo scmNodeInfo : scmNodeInfos) {
       Assert.assertEquals(scmServiceId, scmNodeInfo.getServiceId());
-      Assert.assertEquals("scm" + count++, scmNodeInfo.getNodeId());
+      Assert.assertEquals("scm"+count++, scmNodeInfo.getNodeId());
       Assert.assertEquals("localhost:" + OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT,
           scmNodeInfo.getBlockClientAddress());
       Assert.assertEquals("localhost:" +

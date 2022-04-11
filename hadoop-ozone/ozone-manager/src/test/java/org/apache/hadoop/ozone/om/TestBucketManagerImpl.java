@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.*;
 
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -223,7 +223,7 @@ public class TestBucketManagerImpl {
             .setAdminName("bilbo")
             .setOwnerName("bilbo")
             .build();
-    OMRequestTestUtils.addVolumeToOM(metaMgr, args);
+    TestOMRequestUtils.addVolumeToOM(metaMgr, args);
     // Create bucket
     createBucket(metaMgr, bucketInfo);
     // Check exception thrown when bucket does not exist
@@ -245,7 +245,7 @@ public class TestBucketManagerImpl {
 
   private void createBucket(OMMetadataManager metadataManager,
       OmBucketInfo bucketInfo) throws IOException {
-    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
+    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
   }
 
   @Test

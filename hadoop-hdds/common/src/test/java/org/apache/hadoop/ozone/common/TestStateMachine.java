@@ -45,12 +45,12 @@ public class TestStateMachine {
   /**
    * STATES used by the test state machine.
    */
-  public enum STATES { INIT, CREATING, OPERATIONAL, CLOSED, CLEANUP, FINAL };
+  public enum STATES {INIT, CREATING, OPERATIONAL, CLOSED, CLEANUP, FINAL};
 
   /**
    * EVENTS used by the test state machine.
    */
-  public enum EVENTS { ALLOCATE, CREATE, UPDATE, CLOSE, DELETE, TIMEOUT };
+  public enum EVENTS {ALLOCATE, CREATE, UPDATE, CLOSE, DELETE, TIMEOUT};
 
   @Rule
   public ExpectedException exception = ExpectedException.none();

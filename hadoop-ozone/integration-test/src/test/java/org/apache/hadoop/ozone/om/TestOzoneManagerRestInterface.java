@@ -88,7 +88,7 @@ public class TestOzoneManagerRestInterface {
 
     ObjectMapper objectMapper = new ObjectMapper();
     TypeReference<List<ServiceInfo>> serviceInfoReference =
-        new TypeReference<List<ServiceInfo>>() { };
+        new TypeReference<List<ServiceInfo>>() {};
     List<ServiceInfo> serviceInfos = objectMapper.readValue(
         serviceListJson, serviceInfoReference);
     Map<HddsProtos.NodeType, ServiceInfo> serviceMap = new HashMap<>();

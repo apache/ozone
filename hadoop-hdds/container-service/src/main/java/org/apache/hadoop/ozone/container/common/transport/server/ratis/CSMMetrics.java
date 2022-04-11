@@ -33,7 +33,7 @@ import org.apache.ratis.protocol.RaftGroupId;
  * This class is for maintaining Container State Machine statistics.
  */
 @InterfaceAudience.Private
-@Metrics(about = "Container State Machine Metrics", context = "dfs")
+@Metrics(about="Container State Machine Metrics", context="dfs")
 public class CSMMetrics {
   public static final String SOURCE_NAME =
       CSMMetrics.class.getSimpleName();

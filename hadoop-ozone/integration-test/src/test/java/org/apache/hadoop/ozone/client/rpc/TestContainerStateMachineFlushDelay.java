@@ -47,7 +47,8 @@ import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.*;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Tests the containerStateMachine failure handling by set flush delay.
@@ -91,7 +92,6 @@ public class TestContainerStateMachineFlushDelay {
     baseDir.mkdirs();
 
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     //  conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);

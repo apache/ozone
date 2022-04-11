@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -350,8 +350,8 @@ public class TestReconWithOzoneManager {
    * For test purpose each container will have only one key.
    */
   private void addKeys(int start, int end) throws Exception {
-    for (int i = start; i < end; i++) {
-      Pipeline pipeline = HddsTestUtils.getRandomPipeline();
+    for(int i = start; i < end; i++) {
+      Pipeline pipeline = TestUtils.getRandomPipeline();
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
       BlockID blockID = new BlockID(i, 1);
       OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID,
@@ -359,7 +359,7 @@ public class TestReconWithOzoneManager {
       omKeyLocationInfoList.add(omKeyLocationInfo1);
       OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
           OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
-      writeDataToOm("key" + i, "bucket" + i, "vol" + i,
+      writeDataToOm("key"+i, "bucket"+i, "vol"+i,
           Collections.singletonList(omKeyLocationInfoGroup));
     }
   }
@@ -367,7 +367,7 @@ public class TestReconWithOzoneManager {
   private long getTableKeyCount(TableIterator<String, ? extends
       Table.KeyValue<String, OmKeyInfo>> iterator) {
     long keyCount = 0;
-    while (iterator.hasNext()) {
+    while(iterator.hasNext()) {
       keyCount++;
       iterator.next();
     }

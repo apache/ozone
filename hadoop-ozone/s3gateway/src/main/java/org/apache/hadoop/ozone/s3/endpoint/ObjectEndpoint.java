@@ -208,20 +208,23 @@ public class ObjectEndpoint extends EndpointBase {
 
       return Response.ok().status(HttpStatus.SC_OK)
           .build();
-    } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.NOT_A_FILE) {
-        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST,
-            keyPath);
-        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
-            "when calling the PutObject/MPU PartUpload operation: " +
-            OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
-            " considered as Unix Paths. Path has Violated FS Semantics " +
-            "which caused put operation to fail.");
-        throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
-      }
+    } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
+      if (ex instanceof  OMException) {
+        if (((OMException) ex).getResult() == ResultCodes.NOT_A_FILE) {
+          OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST,
+              keyPath);
+          os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+              "when calling the PutObject/MPU PartUpload operation: " +
+              OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+              " considered as Unix Paths. Path has Violated FS Semantics " +
+              "which caused put operation to fail.");
+          throw os3Exception;
+        } else if ((((OMException) ex).getResult() ==
+            ResultCodes.PERMISSION_DENIED)) {
+          throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
+        }
+      }
       throw ex;
     } finally {
       if (output != null) {
@@ -494,11 +497,11 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
+      LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
+          "key: {}", bucket, key, ex);
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, key);
       }
-      LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
-          "key: {}", bucket, key, ex);
       throw ex;
     }
   }
@@ -541,6 +544,8 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
+      LOG.error("Error in Complete Multipart Upload Request for bucket: {}, " +
+          ", key: {}", bucket, key, ex);
       if (ex.getResult() == ResultCodes.INVALID_PART) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_PART, key);
       } else if (ex.getResult() == ResultCodes.INVALID_PART_ORDER) {
@@ -549,13 +554,13 @@ public class ObjectEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD, uploadID);
       } else if (ex.getResult() == ResultCodes.ENTITY_TOO_SMALL) {
         throw S3ErrorTable.newError(ENTITY_TOO_SMALL, key);
-      } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
+      } else if(ex.getResult() == ResultCodes.INVALID_REQUEST) {
         OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: You must " +
             "specify at least one part");
         throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.NOT_A_FILE) {
+      } else if(ex.getResult() == ResultCodes.NOT_A_FILE) {
         OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: " +
@@ -564,8 +569,6 @@ public class ObjectEndpoint extends EndpointBase {
             "given KeyName caused failure for MPU");
         throw os3Exception;
       }
-      LOG.error("Error in Complete Multipart Upload Request for bucket: {}, " +
-          ", key: {}", bucket, key, ex);
       throw ex;
     }
   }
@@ -880,7 +883,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     long currentDate = System.currentTimeMillis();
-    if  (ozoneDateInMs <= currentDate) {
+    if  (ozoneDateInMs <= currentDate){
       return OptionalLong.of(ozoneDateInMs);
     } else {
       // dates in the future are invalid, so return empty()

@@ -59,7 +59,7 @@ public class TestLeaderChoosePolicy {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
-            .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
+            .setTotalPipelineNumLimit(numDatanodes + numDatanodes/3)
             .setHbInterval(2000)
             .setHbProcessorInterval(1000)
             .build();

@@ -122,7 +122,7 @@ public class TestHddsUtils {
     assertThat(addresses.size(), is(3));
     it = addresses.iterator();
     HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
-    while (it.hasNext()) {
+    while(it.hasNext()) {
       InetSocketAddress current = it.next();
       assertTrue(expected1.remove(current.getHostName(),
           current.getPort()));
@@ -136,7 +136,7 @@ public class TestHddsUtils {
     assertThat(addresses.size(), is(3));
     it = addresses.iterator();
     HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
-    while (it.hasNext()) {
+    while(it.hasNext()) {
       InetSocketAddress current = it.next();
       assertTrue(expected2.remove(current.getHostName(),
           current.getPort()));

@@ -22,11 +22,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import org.junit.Assert;
@@ -190,32 +188,6 @@ public class TestOzoneConfiguration {
         subject.getInt("test.scm.client.port", 123));
     Assert.assertEquals(TimeUnit.MINUTES.toSeconds(30),
         subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
-  }
-
-  @Test
-  public void testInstantiationWithInputConfiguration() throws IOException {
-    String key = "hdds.scm.init.default.layout.version";
-    String val = "Test1";
-    Configuration configuration = new Configuration(true);
-
-    File ozoneSite = tempConfigs.newFile("ozone-site.xml");
-    FileOutputStream ozoneSiteStream = new FileOutputStream(ozoneSite);
-    try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
-        ozoneSiteStream, StandardCharsets.UTF_8))) {
-      startConfig(out);
-      appendProperty(out, key, val);
-      endConfig(out);
-    }
-    configuration
-        .addResource(new URL("file:///" + ozoneSite.getAbsolutePath()));
-
-    OzoneConfiguration ozoneConfiguration =
-        new OzoneConfiguration(configuration);
-    // ozoneConfig value matches input config value for the corresponding key
-    Assert.assertEquals(val, ozoneConfiguration.get(key));
-    Assert.assertEquals(val, configuration.get(key));
-
-    Assert.assertNotEquals(val, new OzoneConfiguration().get(key));
   }
 
   @Test

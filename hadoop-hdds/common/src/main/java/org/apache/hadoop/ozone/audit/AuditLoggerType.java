@@ -31,7 +31,7 @@ public enum AuditLoggerType {
     return type;
   }
 
-  AuditLoggerType(String type) {
+  AuditLoggerType(String type){
     this.type = type;
   }
 }

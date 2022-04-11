@@ -28,7 +28,7 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20211202-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20210329-1</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20210419-1</docker.ozone-testkr5b.image>
   </properties>
 

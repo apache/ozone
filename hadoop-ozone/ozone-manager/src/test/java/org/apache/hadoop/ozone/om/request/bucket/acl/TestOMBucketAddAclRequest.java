@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.TestBucketRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -42,7 +42,7 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:testUser:rw");
 
-    OMRequest originalRequest = OMRequestTestUtils
+    OMRequest originalRequest = TestOMRequestUtils
         .createBucketAddAclRequest(volumeName, bucketName, acl);
     long originModTime = originalRequest.getAddAclRequest()
         .getModificationTime();
@@ -66,13 +66,13 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     String ownerName = "testUser";
 
-    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:newUser:rw");
 
-    OMRequest originalRequest = OMRequestTestUtils.
+    OMRequest originalRequest = TestOMRequestUtils.
         createBucketAddAclRequest(volumeName, bucketName, acl);
     OMBucketAddAclRequest omBucketAddAclRequest =
         new OMBucketAddAclRequest(originalRequest);
@@ -101,7 +101,7 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:newUser:rw");
 
-    OMRequest originalRequest = OMRequestTestUtils
+    OMRequest originalRequest = TestOMRequestUtils
         .createBucketAddAclRequest(volumeName, bucketName, acl);
     OMBucketAddAclRequest omBucketAddAclRequest =
         new OMBucketAddAclRequest(originalRequest);

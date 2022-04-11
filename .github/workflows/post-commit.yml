@@ -125,12 +125,6 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-        if: matrix.check != 'bats'
-      - name: Checkout project with history
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-        if: matrix.check == 'bats'
       - name: Cache for maven dependencies
         uses: actions/cache@v2
         with:

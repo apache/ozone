@@ -59,7 +59,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -194,7 +194,7 @@ public class KeyValueHandler extends Handler {
       DispatcherContext dispatcherContext) {
     Type cmdType = request.getCmdType();
 
-    switch (cmdType) {
+    switch(cmdType) {
     case CreateContainer:
       return handler.handleCreateContainer(request, kvContainer);
     case ReadContainer:
@@ -266,8 +266,8 @@ public class KeyValueHandler extends Handler {
 
     long containerID = request.getContainerID();
 
-    ContainerLayoutVersion layoutVersion =
-        ContainerLayoutVersion.getConfiguredVersion(conf);
+    ChunkLayOutVersion layoutVersion =
+        ChunkLayOutVersion.getConfiguredVersion(conf);
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
@@ -744,7 +744,7 @@ public class KeyValueHandler extends Handler {
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
       // We should increment stats after writeChunk
-      if (stage == WriteChunkStage.WRITE_DATA ||
+      if (stage == WriteChunkStage.WRITE_DATA||
           stage == WriteChunkStage.COMBINED) {
         metrics.incContainerBytesStats(Type.WriteChunk, writeChunk
             .getChunkData().getLen());
@@ -959,7 +959,7 @@ public class KeyValueHandler extends Handler {
   public void exportContainer(final Container container,
       final OutputStream outputStream,
       final TarContainerPacker packer)
-      throws IOException {
+      throws IOException{
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
   }

@@ -357,7 +357,7 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void reinitialize() throws IOException {
+  public void reinitialize() {
     Preconditions.checkNotNull(installingDBCheckpoint);
     DBCheckpoint checkpoint = installingDBCheckpoint;
 
@@ -369,8 +369,8 @@ public class SCMStateMachine extends BaseStateMachine {
       termIndex =
           scm.getScmHAManager().installCheckpoint(checkpoint);
     } catch (Exception e) {
-      LOG.error("Failed to reinitialize SCMStateMachine.", e);
-      throw new IOException(e);
+      LOG.error("Failed to reinitialize SCMStateMachine.");
+      return;
     }
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.

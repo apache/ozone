@@ -90,7 +90,7 @@ public class Lease<T> {
    */
   public void registerCallBack(Callable<Void> callback)
       throws LeaseExpiredException {
-    if (hasExpired()) {
+    if(hasExpired()) {
       throw new LeaseExpiredException(messageForResource(resource));
     }
     callbacks.add(callback);
@@ -104,7 +104,7 @@ public class Lease<T> {
    *         If the lease has already timed out
    */
   public long getElapsedTime() throws LeaseExpiredException {
-    if (hasExpired()) {
+    if(hasExpired()) {
       throw new LeaseExpiredException(messageForResource(resource));
     }
     return Time.monotonicNow() - creationTime;
@@ -129,7 +129,7 @@ public class Lease<T> {
    *         If the lease has already timed out
    */
   public long getLeaseLifeTime() throws LeaseExpiredException {
-    if (hasExpired()) {
+    if(hasExpired()) {
       throw new LeaseExpiredException(messageForResource(resource));
     }
     return leaseTimeout.get();
@@ -144,7 +144,7 @@ public class Lease<T> {
    *         If the lease has already timed out
    */
   public void renew(long timeout) throws LeaseExpiredException {
-    if (hasExpired()) {
+    if(hasExpired()) {
       throw new LeaseExpiredException(messageForResource(resource));
     }
     leaseTimeout.addAndGet(timeout);

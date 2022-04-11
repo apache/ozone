@@ -80,7 +80,7 @@ public final class OzoneKMSUtil {
    */
   public static Text getKeyProviderMapKey(URI namespaceUri) {
     return new Text(O3_KMS_PREFIX + namespaceUri.getScheme()
-        + "://" + namespaceUri.getAuthority());
+        +"://" + namespaceUri.getAuthority());
   }
 
   public static String bytes2String(byte[] bytes) {
@@ -131,7 +131,7 @@ public final class OzoneKMSUtil {
   }
 
   public static KeyProvider getKeyProvider(final ConfigurationSource conf,
-      final URI serverProviderUri) throws IOException {
+      final URI serverProviderUri) throws IOException{
     if (serverProviderUri == null) {
       throw new IOException("KMS serverProviderUri is not configured.");
     }

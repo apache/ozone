@@ -187,14 +187,4 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
       throws SequenceNumberNotFoundException;
-
-  /**
-   * Get limited data written to DB since a specific sequence number.
-   * @param sequenceNumber
-   * @param limitCount
-   * @return
-   * @throws SequenceNumberNotFoundException
-   */
-  DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws SequenceNumberNotFoundException;
 }

@@ -41,8 +41,6 @@ public final class ReconConstants {
   public static final String CONTAINER_KEY_COUNT_TABLE =
       "containerKeyCountTable";
 
-  public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
-
   // By default, limit the number of results returned
   public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String DEFAULT_BATCH_NUMBER = "1";

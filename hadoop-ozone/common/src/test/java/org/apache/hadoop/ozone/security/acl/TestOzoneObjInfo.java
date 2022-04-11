@@ -67,10 +67,10 @@ public class TestOzoneObjInfo {
     objInfo = getBuilder(volume, bucket, key).build();
     assertEquals(objInfo.getBucketName(), bucket);
 
-    objInfo = getBuilder(volume, null, null).build();
+    objInfo =getBuilder(volume, null, null).build();
     assertEquals(objInfo.getBucketName(), null);
 
-    objInfo = getBuilder(null, bucket, null).build();
+    objInfo =getBuilder(null, bucket, null).build();
     assertEquals(objInfo.getBucketName(), bucket);
   }
 

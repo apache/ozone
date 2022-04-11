@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -241,7 +241,7 @@ public class TestOzoneShellHA {
    * @return the leader OM's Node ID in the MiniOzoneHACluster.
    */
   private String getLeaderOMNodeId() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
+    MiniOzoneOMHAClusterImpl haCluster = (MiniOzoneOMHAClusterImpl) cluster;
     OzoneManager omLeader = haCluster.getOMLeader();
     Assert.assertNotNull("There should be a leader OM at this point.",
         omLeader);
@@ -264,7 +264,7 @@ public class TestOzoneShellHA {
    * @return String array.
    */
   private String[] getHASetConfStrings(int numOfArgs) {
-    assert (numOfArgs >= 0);
+    assert(numOfArgs >= 0);
     String[] res = new String[1 + 1 + numOfOMs + numOfArgs];
     final int indexOmServiceIds = 0;
     final int indexOmNodes = 1;
@@ -280,7 +280,7 @@ public class TestOzoneShellHA {
 
     String[] omNodesArr = omNodesVal.split(",");
     // Sanity check
-    assert (omNodesArr.length == numOfOMs);
+    assert(omNodesArr.length == numOfOMs);
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
           getSetConfStringFromConf(ConfUtils.addKeySuffixes(
@@ -624,7 +624,7 @@ public class TestOzoneShellHA {
 
     // create volume: vol1 with bucket: bucket1
     final String testVolBucket = "/vol1/bucket1";
-    final String testKey = testVolBucket + "/key1";
+    final String testKey = testVolBucket+"/key1";
 
     final String[] volBucketArgs = new String[] {"-mkdir", "-p", testVolBucket};
     final String[] keyArgs = new String[] {"-touch", testKey};
@@ -652,7 +652,7 @@ public class TestOzoneShellHA {
 
     final String[] rmKeyArgs = new String[] {"-rm", "-R", testKey};
     final String[] rmTrashArgs = new String[] {"-rm", "-R",
-                                               testVolBucket + "/.Trash"};
+                                               testVolBucket+"/.Trash"};
     final Path trashPathKey1 = Path.mergePaths(new Path(
             new OFSPath(testKey).getTrashRoot(), new Path("Current")),
             new Path(testKey));
@@ -666,11 +666,11 @@ public class TestOzoneShellHA {
       Assert.assertEquals(0, res);
 
       LOG.info("Executing testDeleteTrashNoSkipTrash: key1 deleted moved to"
-              + " Trash: " + trashPathKey1.toString());
+              +" Trash: "+trashPathKey1.toString());
       fs.getFileStatus(trashPathKey1);
 
       LOG.info("Executing testDeleteTrashNoSkipTrash: deleting trash FsShell "
-              + "with args{}: ", Arrays.asList(rmTrashArgs));
+              +"with args{}: ", Arrays.asList(rmTrashArgs));
       res = ToolRunner.run(shell, rmTrashArgs);
       Assert.assertEquals(0, res);
 

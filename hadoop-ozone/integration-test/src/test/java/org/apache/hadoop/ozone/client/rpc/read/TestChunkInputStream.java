@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,7 +31,7 @@ import org.junit.Test;
  */
 public class TestChunkInputStream extends TestInputStreamBase {
 
-  public TestChunkInputStream(ContainerLayoutVersion layout) {
+  public TestChunkInputStream(ChunkLayOutVersion layout) {
     super(layout);
   }
 

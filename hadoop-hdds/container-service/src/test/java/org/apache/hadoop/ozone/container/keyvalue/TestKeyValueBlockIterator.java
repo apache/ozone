@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -42,8 +42,8 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
@@ -68,9 +68,9 @@ public class TestKeyValueBlockIterator {
   private OzoneConfiguration conf;
   private File testRoot;
   private ReferenceCountedDB db;
-  private final ContainerLayoutVersion layout;
+  private final ChunkLayOutVersion layout;
 
-  public TestKeyValueBlockIterator(ContainerLayoutVersion layout) {
+  public TestKeyValueBlockIterator(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
 
@@ -120,7 +120,7 @@ public class TestKeyValueBlockIterator {
 
     // Default filter used is all unprefixed blocks.
     List<Long> unprefixedBlockIDs = blockIDs.get("");
-    try (BlockIterator<BlockData> keyValueBlockIterator =
+    try(BlockIterator<BlockData> keyValueBlockIterator =
                 db.getStore().getBlockIterator()) {
 
       Iterator<Long> blockIDIter = unprefixedBlockIDs.iterator();
@@ -152,7 +152,7 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithNextBlock() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
-    try (BlockIterator<BlockData> keyValueBlockIterator =
+    try(BlockIterator<BlockData> keyValueBlockIterator =
                 db.getStore().getBlockIterator()) {
       assertEquals((long)blockIDs.get(0),
               keyValueBlockIterator.nextBlock().getLocalID());
@@ -171,7 +171,7 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithHasNext() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
-    try (BlockIterator<BlockData> blockIter =
+    try(BlockIterator<BlockData> blockIter =
                 db.getStore().getBlockIterator()) {
 
       // Even calling multiple times hasNext() should not move entry forward.
@@ -209,7 +209,7 @@ public class TestKeyValueBlockIterator {
     int deletingBlocks = 5;
     Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
             normalBlocks, deletingBlocks);
-    try (BlockIterator<BlockData> keyValueBlockIterator =
+    try(BlockIterator<BlockData> keyValueBlockIterator =
                 db.getStore().getBlockIterator(
                         MetadataKeyFilters.getDeletingKeyFilter())) {
       List<Long> deletingBlockIDs =
@@ -230,7 +230,7 @@ public class TestKeyValueBlockIterator {
   public void testKeyValueBlockIteratorWithOnlyDeletedBlocks() throws
       Exception {
     createContainerWithBlocks(CONTAINER_ID, 0, 5);
-    try (BlockIterator<BlockData> keyValueBlockIterator =
+    try(BlockIterator<BlockData> keyValueBlockIterator =
                 db.getStore().getBlockIterator()) {
       //As all blocks are deleted blocks, blocks does not match with normal key
       // filter.
@@ -288,7 +288,7 @@ public class TestKeyValueBlockIterator {
    */
   private void testWithFilter(MetadataKeyFilters.KeyPrefixFilter filter,
                               List<Long> expectedIDs) throws Exception {
-    try (BlockIterator<BlockData> iterator =
+    try(BlockIterator<BlockData> iterator =
                 db.getStore().getBlockIterator(filter)) {
       // Test seek.
       iterator.seekToFirst();
@@ -364,7 +364,7 @@ public class TestKeyValueBlockIterator {
             Map<String, Integer> prefixCounts) throws Exception {
     // Create required block data.
     Map<String, List<Long>> blockIDs = new HashMap<>();
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
+    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
         conf)) {
 
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();

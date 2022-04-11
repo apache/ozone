@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus
 import org.apache.hadoop.ozone.om.request.OMKeyRequestFactory;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
-import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetOwnerRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
@@ -142,13 +141,7 @@ public final class OzoneManagerRatisUtils {
     case DeleteBucket:
       return new OMBucketDeleteRequest(omRequest);
     case SetBucketProperty:
-      boolean hasBucketOwner = omRequest.getSetBucketPropertyRequest()
-          .getBucketArgs().hasOwnerName();
-      if (hasBucketOwner) {
-        return new OMBucketSetOwnerRequest(omRequest);
-      } else {
-        return new OMBucketSetPropertyRequest(omRequest);
-      }
+      return new OMBucketSetPropertyRequest(omRequest);
     case AddAcl:
     case RemoveAcl:
     case SetAcl:

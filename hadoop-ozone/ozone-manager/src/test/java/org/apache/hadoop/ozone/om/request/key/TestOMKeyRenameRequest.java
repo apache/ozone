@@ -19,12 +19,11 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.UUID;
-
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -50,9 +49,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     OMRequest modifiedOmRequest =
         doPreExecute(createRenameKeyRequest(toKeyName));
 
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
@@ -98,7 +97,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     // In actual implementation we don't check for bucket/volume exists
     // during delete key.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
@@ -136,7 +135,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         doPreExecute(createRenameKeyRequest(toKeyName));
 
     // Add only volume entry to DB.
-    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
         new OMKeyRenameRequest(modifiedOmRequest);
@@ -159,7 +158,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     // In actual implementation we don't check for bucket/volume exists
     // during delete key.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
@@ -184,7 +183,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     // In actual implementation we don't check for bucket/volume exists
     // during delete key.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =

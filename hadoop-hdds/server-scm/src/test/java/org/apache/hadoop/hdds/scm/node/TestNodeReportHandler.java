@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -84,9 +84,9 @@ public class TestNodeReportHandler implements EventPublisher {
   @Test
   public void testNodeReport() throws IOException {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-    StorageReportProto storageOne = HddsTestUtils
+    StorageReportProto storageOne = TestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
-    MetadataStorageReportProto metaStorageOne = HddsTestUtils
+    MetadataStorageReportProto metaStorageOne = TestUtils
         .createMetadataStorageReport(metaStoragePath, 100, 10, 90, null);
 
     SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
@@ -100,7 +100,7 @@ public class TestNodeReportHandler implements EventPublisher {
     Assert.assertTrue(nodeMetric.get().getRemaining().get() == 90);
     Assert.assertTrue(nodeMetric.get().getScmUsed().get() == 10);
 
-    StorageReportProto storageTwo = HddsTestUtils
+    StorageReportProto storageTwo = TestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
     nodeReportHandler.onMessage(
         getNodeReport(dn, Arrays.asList(storageOne, storageTwo),
@@ -117,7 +117,7 @@ public class TestNodeReportHandler implements EventPublisher {
       List<StorageReportProto> reports,
       List<MetadataStorageReportProto> metaReports) {
     NodeReportProto nodeReportProto =
-        HddsTestUtils.createNodeReport(reports, metaReports);
+        TestUtils.createNodeReport(reports, metaReports);
     return new NodeReportFromDatanode(dn, nodeReportProto);
   }
 

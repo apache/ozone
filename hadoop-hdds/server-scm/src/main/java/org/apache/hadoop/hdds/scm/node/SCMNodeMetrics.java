@@ -129,12 +129,12 @@ public final class SCMNodeMetrics implements MetricsSource {
      *     ...
      */
     MetricsRecordBuilder metrics = collector.addRecord(registry.info());
-    for (Map.Entry<String, Map<String, Integer>> e : nodeCount.entrySet()) {
-      for (Map.Entry<String, Integer> h : e.getValue().entrySet()) {
+    for(Map.Entry<String, Map<String, Integer>> e : nodeCount.entrySet()) {
+      for(Map.Entry<String, Integer> h : e.getValue().entrySet()) {
         metrics.addGauge(
             Interns.info(
-                StringUtils.camelize(e.getKey() + "_" + h.getKey() + "_nodes"),
-                "Number of " + e.getKey() + " " + h.getKey() + " datanodes"),
+                StringUtils.camelize(e.getKey()+"_"+h.getKey()+"_nodes"),
+                "Number of "+e.getKey()+" "+h.getKey()+" datanodes"),
             h.getValue());
       }
     }

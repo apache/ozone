@@ -46,7 +46,7 @@ public class DataNodeUpgradeFinalizer extends
   @Override
   public void preFinalizeUpgrade(DatanodeStateMachine dsm)
       throws IOException {
-    if (!canFinalizeDataNode(dsm)) {
+    if(!canFinalizeDataNode(dsm)) {
       // DataNode is not yet ready to finalize.
       // Reset the Finalization state.
       getVersionManager().setUpgradeState(FINALIZATION_REQUIRED);

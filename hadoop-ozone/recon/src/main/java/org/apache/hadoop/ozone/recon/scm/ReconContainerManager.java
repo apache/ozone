@@ -150,7 +150,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       existContainers = containers.get(true);
     }
     List<Long> noExistContainers = null;
-    if (containers.containsKey(false)) {
+    if (containers.containsKey(false)){
       noExistContainers = containers.get(false).parallelStream().
           map(ContainerReplicaProto::getContainerID)
           .collect(Collectors.toList());
@@ -178,7 +178,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
         ContainerReplicaProto.State crpState = crp.getState();
         try {
           checkContainerStateAndUpdate(cID, crpState);
-        } catch (Exception ioe) {
+        } catch (Exception ioe){
           LOG.error("Exception while " +
               "checkContainerStateAndUpdate container", ioe);
         }

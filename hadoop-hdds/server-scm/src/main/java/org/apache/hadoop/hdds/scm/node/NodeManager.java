@@ -324,7 +324,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     return null;
   }
 
-  default HDDSLayoutVersionManager getLayoutVersionManager() {
+  default HDDSLayoutVersionManager getLayoutVersionManager(){
     return null;
   }
 

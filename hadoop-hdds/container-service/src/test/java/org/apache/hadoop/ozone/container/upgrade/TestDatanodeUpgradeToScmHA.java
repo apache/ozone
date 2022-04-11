@@ -144,7 +144,7 @@ public class TestDatanodeUpgradeToScmHA {
     ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<Void> readFuture = executor.submit(() -> {
       // Layout version check should be thread safe.
-      while (!dsm.getLayoutVersionManager()
+      while(!dsm.getLayoutVersionManager()
           .isAllowed(HDDSLayoutFeature.SCM_HA)) {
         readChunk(writeChunk, pipeline);
       }
@@ -203,7 +203,7 @@ public class TestDatanodeUpgradeToScmHA {
     ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<Void> importFuture = executor.submit(() -> {
       // Layout version check should be thread safe.
-      while (!dsm.getLayoutVersionManager()
+      while(!dsm.getLayoutVersionManager()
           .isAllowed(HDDSLayoutFeature.SCM_HA)) {
         importContainer(exportContainerID, exportedContainerFile);
         readChunk(exportWriteChunk, pipeline);
@@ -541,7 +541,7 @@ public class TestDatanodeUpgradeToScmHA {
    * Get the cluster ID and SCM ID from SCM to the datanode.
    */
   public void callVersionEndpointTask() throws Exception {
-    try (EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
+    try(EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
         address, 1000)) {
       VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
           dsm.getContainer());

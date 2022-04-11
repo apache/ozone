@@ -442,7 +442,7 @@ public class DeletedBlockLogImpl
       commitTransactions(ackProto.getResultsList(),
           UUID.fromString(ackProto.getDnId()));
       metrics.incrBlockDeletionCommandSuccess();
-    } else if (status == CommandStatus.Status.FAILED) {
+    } else if (status == CommandStatus.Status.FAILED){
       metrics.incrBlockDeletionCommandFailure();
     } else {
       LOG.error("Delete Block Command is not executed yet.");

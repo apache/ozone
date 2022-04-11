@@ -52,18 +52,18 @@ public class TestResourceSemaphore {
     try {
       g.release(1, 0);
       Assert.fail("Should have failed.");
-    } catch (IllegalStateException e) {
+    } catch (IllegalStateException e){
     }
     try {
       g.release(0, 1);
       Assert.fail("Should have failed.");
-    } catch (IllegalStateException e) {
+    } catch (IllegalStateException e){
     }
   }
 
   static void assertUsed(ResourceSemaphore.Group g, int... expected) {
     Assert.assertEquals(expected.length, g.resourceSize());
-    for (int i = 0; i < expected.length; i++) {
+    for(int i = 0; i < expected.length; i++) {
       Assert.assertEquals(expected[i], g.get(i).used());
     }
   }

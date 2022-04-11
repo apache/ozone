@@ -431,16 +431,6 @@ public class TestContainerReplicaCount {
     assertTrue(rcnt.isHealthy());
   }
 
-  @Test
-  public void testContainerWithNoReplicasIsMissing() {
-    Set<ContainerReplica> replica = new HashSet<>();
-    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
-    ContainerReplicaCount rcnt =
-        new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    assertTrue(rcnt.isMissing());
-    assertFalse(rcnt.isSufficientlyReplicated());
-  }
-
   private void validate(ContainerReplicaCount rcnt,
       boolean sufficientlyReplicated, int replicaDelta,
       boolean overReplicated) {

@@ -66,7 +66,7 @@ public class TestVirtualHostStyleFilter {
       virtualHostStyleUri = new URI("http://" + s3HttpAddr);
     } else if (path != null && queryParams == null) {
       virtualHostStyleUri = new URI("http://" + s3HttpAddr + path);
-    } else if (path != null && queryParams != null)  {
+    } else if (path !=null && queryParams != null)  {
       virtualHostStyleUri = new URI("http://" + s3HttpAddr + path +
           queryParams);
     } else {

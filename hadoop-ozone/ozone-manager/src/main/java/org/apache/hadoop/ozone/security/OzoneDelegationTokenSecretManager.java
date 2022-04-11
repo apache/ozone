@@ -404,7 +404,7 @@ public class OzoneDelegationTokenSecretManager
   @Override
   public byte[] retrievePassword(OzoneTokenIdentifier identifier)
       throws InvalidToken {
-    if (identifier.getTokenType().equals(S3AUTHINFO)) {
+    if(identifier.getTokenType().equals(S3AUTHINFO)) {
       return validateS3AuthInfo(identifier);
     }
     return validateToken(identifier).getPassword();

@@ -521,7 +521,7 @@ public class TestOmMetrics {
     }
 
     try {
-      long id = (keySession != null) ? keySession.getId() : 0;
+      long id = (keySession != null)?keySession.getId():0;
       writeClient.commitKey(keyArgs, id);
     } catch (IOException ignored) {
     }

@@ -93,7 +93,7 @@ public class MetricsProxyEndpoint {
         ) {
         final ByteBuffer buffer = ByteBuffer.allocateDirect(16 * 1024);
 
-        while (inputChannel.read(buffer) != -1) {
+        while(inputChannel.read(buffer) != -1) {
           buffer.flip();
           outputChannel.write(buffer);
           buffer.compact();
@@ -101,7 +101,7 @@ public class MetricsProxyEndpoint {
 
         buffer.flip();
 
-        while (buffer.hasRemaining()) {
+        while(buffer.hasRemaining()) {
           outputChannel.write(buffer);
         }
       } finally {

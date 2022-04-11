@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateDirectoryRequest;
@@ -108,7 +108,7 @@ public class TestOMDirectoryCreateRequest {
     String bucketName = "bucket1";
     String keyName = "a/b/c";
 
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -132,7 +132,7 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -201,7 +201,7 @@ public class TestOMDirectoryCreateRequest {
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
     omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
-    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -224,10 +224,10 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
         keyName.substring(0, 12), 1L, HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -266,10 +266,10 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
         OzoneFSUtils.addTrailingSlashIfNeeded(keyName), 1L,
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
         omMetadataManager);
@@ -310,10 +310,10 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     // Add a key with first two levels.
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
         keyName.substring(0, 11), 1L, HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -348,7 +348,7 @@ public class TestOMDirectoryCreateRequest {
     String keyName = genRandomKeyName();
 
     // Add volume and bucket entries to DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -396,7 +396,7 @@ public class TestOMDirectoryCreateRequest {
   private String genRandomKeyName() {
     StringBuilder keyNameBuilder = new StringBuilder();
     keyNameBuilder.append(RandomStringUtils.randomAlphabetic(5));
-    for (int i = 0; i < 3; i++) {
+    for (int i =0; i< 3; i++) {
       keyNameBuilder.append("/").append(RandomStringUtils.randomAlphabetic(5));
     }
     return keyNameBuilder.toString();

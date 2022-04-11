@@ -17,12 +17,19 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -49,6 +56,44 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   void stop() throws IOException;
 
   /**
+   * After calling commit, the key will be made visible. There can be multiple
+   * open key writes in parallel (identified by client id). The most recently
+   * committed one will be the one visible.
+   *
+   * @param args the key to commit.
+   * @param clientID the client that is committing.
+   * @throws IOException
+   */
+  void commitKey(OmKeyArgs args, long clientID) throws IOException;
+
+  /**
+   * A client calls this on an open key, to request to allocate a new block,
+   * and appended to the tail of current block list of the open client.
+   *
+   * @param args the key to append
+   * @param clientID the client requesting block.
+   * @param excludeList List of datanodes/containers to exclude during block
+   *                    allocation.
+   * @return the reference to the new block.
+   * @throws IOException
+   */
+  OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientID,
+      ExcludeList excludeList) throws IOException;
+
+  /**
+   * Given the args of a key to put, write an open key entry to meta data.
+   *
+   * In case that the container creation or key write failed on
+   * DistributedStorageHandler, this key's metadata will still stay in OM.
+   * TODO garbage collect the open keys that never get closed
+   *
+   * @param args the args of the key provided by client.
+   * @return a OpenKeySession instance client uses to talk to container.
+   * @throws IOException
+   */
+  OpenKeySession openKey(OmKeyArgs args) throws IOException;
+
+  /**
    * Look up an existing key. Return the info of the key to client side, which
    * DistributedStorageHandler will use to access the data on datanode.
    *
@@ -60,6 +105,26 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress) throws IOException;
 
+  /**
+   * Renames an existing key within a bucket.
+   *
+   * @param args the args of the key provided by client.
+   * @param toKeyName New name to be used for the key
+   * @throws IOException if specified key doesn't exist or
+   * some other I/O errors while renaming the key.
+   */
+  void renameKey(OmKeyArgs args, String toKeyName) throws IOException;
+
+  /**
+   * Deletes an object by an object key. The key will be immediately removed
+   * from OM namespace and become invisible to clients. The object data
+   * will be removed in async manner that might retain for some time.
+   *
+   * @param args the args of the key provided by client.
+   * @throws IOException if specified key doesn't exist or
+   * some other I/O errors while deleting an object.
+   */
+  void deleteKey(OmKeyArgs args) throws IOException;
 
   /**
    * Returns a list of keys represented by {@link OmKeyInfo}
@@ -128,6 +193,16 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<String> getExpiredOpenKeys(int count) throws IOException;
 
   /**
+   * Deletes a expired open key by its name. Called when a hanging key has been
+   * lingering for too long. Once called, the open key entries gets removed
+   * from OM mdata data.
+   *
+   * @param objectKeyName object key name with #open# prefix.
+   * @throws IOException if specified key doesn't exist or other I/O errors.
+   */
+  void deleteExpiredOpenKey(String objectKeyName) throws IOException;
+
+  /**
    * Returns the metadataManager.
    * @return OMMetadataManager.
    */
@@ -139,6 +214,42 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   BackgroundService getDeletingService();
 
+
+  /**
+   * Initiate multipart upload for the specified key.
+   * @param keyArgs
+   * @return MultipartInfo
+   * @throws IOException
+   */
+  OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws IOException;
+
+  /**
+   * Commit Multipart upload part file.
+   * @param omKeyArgs
+   * @param clientID
+   * @return OmMultipartCommitUploadPartInfo
+   * @throws IOException
+   */
+
+  OmMultipartCommitUploadPartInfo commitMultipartUploadPart(
+      OmKeyArgs omKeyArgs, long clientID) throws IOException;
+
+  /**
+   * Complete Multipart upload Request.
+   * @param omKeyArgs
+   * @param multipartUploadList
+   * @return OmMultipartUploadCompleteInfo
+   * @throws IOException
+   */
+  OmMultipartUploadCompleteInfo completeMultipartUpload(OmKeyArgs omKeyArgs,
+      OmMultipartUploadCompleteList multipartUploadList) throws IOException;
+
+  /**
+   * Abort multipart upload request.
+   * @param omKeyArgs
+   * @throws IOException
+   */
+  void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException;
 
   OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws OMException;

@@ -85,7 +85,7 @@ public class TestContainerKeyMapperTask {
   }
 
   @Test
-  public void testReprocessOMDB() throws Exception {
+  public void testReprocessOMDB() throws Exception{
 
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);

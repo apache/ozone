@@ -108,3 +108,130 @@ Total bytes written: 10240000
 Total Execution time: 00:00:16,898
 ***********************
 ```
+
+## Genesis
+
+Genesis 是一个微型的基准测试工具，它也包含在发行包中（`ozone genesis`），但是它不需要一个真实的集群，而是采用一种隔离的方法测试不同部分的代码（比如，将数据存储到本地基于 RocksDB 的键值存储中）。
+
+运行示例：
+
+```
+ ozone genesis -benchmark=BenchMarkRocksDbStore
+# JMH version: 1.19
+# VM version: JDK 11.0.1, VM 11.0.1+13-LTS
+# VM invoker: /usr/lib/jvm/java-11-openjdk-11.0.1.13-3.el7_6.x86_64/bin/java
+# VM options: -Dproc_genesis -Djava.net.preferIPv4Stack=true -Dhadoop.log.dir=/var/log/hadoop -Dhadoop.log.file=hadoop.log -Dhadoop.home.dir=/opt/hadoop -Dhadoop.id.str=hadoop -Dhadoop.root.logger=INFO,console -Dhadoop.policy.file=hadoop-policy.xml -Dhadoop.security.logger=INFO,NullAppender
+# Warmup: 2 iterations, 1 s each
+# Measurement: 20 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 4 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: org.apache.hadoop.ozone.genesis.BenchMarkRocksDbStore.test
+# Parameters: (backgroundThreads = 4, blockSize = 8, maxBackgroundFlushes = 4, maxBytesForLevelBase = 512, maxOpenFiles = 5000, maxWriteBufferNumber = 16, writeBufferSize = 64)
+
+# Run progress: 0.00% complete, ETA 00:00:22
+# Fork: 1 of 1
+# Warmup Iteration   1: 213775.360 ops/s
+# Warmup Iteration   2: 32041.633 ops/s
+Iteration   1: 196342.348 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   2: 41926.816 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   3: 210433.231 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   4: 46941.951 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   5: 212825.884 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   6: 145914.351 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   7: 141838.469 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   8: 205334.438 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration   9: 163709.519 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  10: 162494.608 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  11: 199155.793 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  12: 209679.298 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  13: 193787.574 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  14: 127004.147 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  15: 145511.080 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  16: 223433.864 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  17: 169752.665 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  18: 165217.191 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  19: 191038.476 ops/s
+                 ?stack: <delayed till summary>
+
+Iteration  20: 196335.579 ops/s
+                 ?stack: <delayed till summary>
+
+
+
+Result "org.apache.hadoop.ozone.genesis.BenchMarkRocksDbStore.test":
+  167433.864 ?(99.9%) 43530.883 ops/s [Average]
+  (min, avg, max) = (41926.816, 167433.864, 223433.864), stdev = 50130.230
+  CI (99.9%): [123902.981, 210964.748] (assumes normal distribution)
+
+Secondary result "org.apache.hadoop.ozone.genesis.BenchMarkRocksDbStore.test:?stack":
+Stack profiler:
+
+....[Thread state distributions]....................................................................
+ 78.9%         RUNNABLE
+ 20.0%         TIMED_WAITING
+  1.1%         WAITING
+
+....[Thread state: RUNNABLE]........................................................................
+ 59.8%  75.8% org.rocksdb.RocksDB.put
+ 16.5%  20.9% org.rocksdb.RocksDB.get
+  0.7%   0.9% java.io.UnixFileSystem.delete0
+  0.7%   0.9% org.rocksdb.RocksDB.disposeInternal
+  0.3%   0.4% java.lang.Long.formatUnsignedLong0
+  0.1%   0.2% org.apache.hadoop.ozone.genesis.BenchMarkRocksDbStore.test
+  0.1%   0.1% java.lang.Long.toUnsignedString0
+  0.1%   0.1% org.apache.hadoop.ozone.genesis.generated.BenchMarkRocksDbStore_test_jmhTest.test_thrpt_jmhStub
+  0.0%   0.1% java.lang.Object.clone
+  0.0%   0.0% java.lang.Thread.currentThread
+  0.4%   0.5% <other>
+
+....[Thread state: TIMED_WAITING]...................................................................
+ 20.0% 100.0% java.lang.Object.wait
+
+....[Thread state: WAITING].........................................................................
+  1.1% 100.0% jdk.internal.misc.Unsafe.park
+
+
+
+# Run complete. Total time: 00:00:38
+
+Benchmark                          (backgroundThreads)  (blockSize)  (maxBackgroundFlushes)  (maxBytesForLevelBase)  (maxOpenFiles)  (maxWriteBufferNumber)  (writeBufferSize)   Mode  Cnt       Score       Error  Units
+BenchMarkRocksDbStore.test                           4            8                       4                     512            5000                      16                 64  thrpt   20  167433.864 ? 43530.883  ops/s
+BenchMarkRocksDbStore.test:?stack                    4            8                       4                     512            5000                      16                 64  thrpt              NaN                ---
+```

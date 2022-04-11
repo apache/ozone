@@ -55,7 +55,7 @@ public final class SCMContainerPlacementRackAware
   private final NetworkTopology networkTopology;
   private boolean fallback;
   private static final int RACK_LEVEL = 1;
-  private static final int MAX_RETRY = 3;
+  private static final int MAX_RETRY= 3;
   private final SCMContainerPlacementMetrics metrics;
   // Used to check the placement policy is validated in the parent class
   private static final int REQUIRED_RACKS = 2;
@@ -118,7 +118,7 @@ public final class SCMContainerPlacementRackAware
       mutableFavoredNodes.addAll(favoredNodes);
       mutableFavoredNodes.removeAll(excludedNodes);
     }
-    int favoredNodeNum = mutableFavoredNodes == null ? 0 :
+    int favoredNodeNum = mutableFavoredNodes == null? 0 :
         mutableFavoredNodes.size();
 
     List<DatanodeDetails> chosenNodes = new ArrayList<>();
@@ -195,7 +195,7 @@ public final class SCMContainerPlacementRackAware
       // in the same rack, then choose nodes on different racks, otherwise,
       // choose one on the same rack as one of excluded nodes, remaining chosen
       // are on different racks.
-      for (int i = 0; i < excludedNodesCount; i++) {
+      for(int i = 0; i < excludedNodesCount; i++) {
         for (int j = i + 1; j < excludedNodesCount; j++) {
           if (networkTopology.isSameParent(
               excludedNodes.get(i), excludedNodes.get(j))) {
@@ -257,7 +257,7 @@ public final class SCMContainerPlacementRackAware
     int maxRetry = MAX_RETRY;
     List<String> excludedNodesForCapacity = null;
     boolean isFallbacked = false;
-    while (true) {
+    while(true) {
       metrics.incrDatanodeChooseAttemptCount();
       DatanodeDetails node = null;
       if (affinityNodes != null) {
@@ -348,8 +348,8 @@ public final class SCMContainerPlacementRackAware
     Preconditions.checkArgument(chosenNodes != null);
     List<DatanodeDetails> excludedNodeList = excludedNodes != null ?
         excludedNodes : chosenNodes;
-    int favoredNodeNum = favoredNodes == null ? 0 : favoredNodes.size();
-    while (true) {
+    int favoredNodeNum = favoredNodes == null? 0 : favoredNodes.size();
+    while(true) {
       DatanodeDetails favoredNode = favoredNodeNum > favorIndex ?
           favoredNodes.get(favorIndex) : null;
       DatanodeDetails chosenNode;

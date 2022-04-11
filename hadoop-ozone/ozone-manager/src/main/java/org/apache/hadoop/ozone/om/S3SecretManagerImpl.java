@@ -65,7 +65,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
     try {
       S3SecretValue s3Secret =
           omMetadataManager.getS3SecretTable().get(kerberosID);
-      if (s3Secret == null) {
+      if(s3Secret == null) {
         byte[] secret = OmUtils.getSHADigest();
         result = new S3SecretValue(kerberosID, DigestUtils.sha256Hex(secret));
         omMetadataManager.getS3SecretTable().put(kerberosID, result);

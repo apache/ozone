@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
@@ -58,19 +58,19 @@ public class TestOMAllocateBlockRequestWithFSO
     keyName = parentDir + OzoneConsts.OM_KEY_PREFIX + fileName;
 
     // add parentDir to dirTable
-    long parentID = OMRequestTestUtils.addParentsToDirTable(volumeName,
+    long parentID = TestOMRequestUtils.addParentsToDirTable(volumeName,
             bucketName, parentDir, omMetadataManager);
     long txnId = 50;
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
                     Time.now());
 
     // add key to openFileTable
-    OMRequestTestUtils.addFileToKeyTable(true, false,
+    TestOMRequestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
 
     return omMetadataManager.getOzonePathKey(parentID, fileName);
@@ -92,7 +92,7 @@ public class TestOMAllocateBlockRequestWithFSO
   @Override
   protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
       boolean doAssert) throws Exception {
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
+    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
             omMetadataManager);
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;

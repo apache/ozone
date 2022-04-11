@@ -124,8 +124,8 @@ public final class DBConfigFromFile {
     Env env = Env.getDefault();
     DBOptions options = null;
     File configLocation = getConfigLocation();
-    if (configLocation != null &&
-        StringUtil.isNotBlank(configLocation.toString())) {
+    if(configLocation != null &&
+        StringUtil.isNotBlank(configLocation.toString())){
       Path optionsFile = Paths.get(configLocation.toString(),
           getOptionsFileNameFromDB(dbFileName));
 

@@ -81,7 +81,6 @@ public class ContainerHealthTask extends ReconScmTask {
   public synchronized void run() {
     try {
       while (canRun()) {
-        wait(interval);
         long start = Time.monotonicNow();
         long currentTime = System.currentTimeMillis();
         long existingCount = processExistingDBRecords(currentTime);
@@ -98,6 +97,7 @@ public class ContainerHealthTask extends ReconScmTask {
                 " processing {} containers.", Time.monotonicNow() - start,
             containers.size());
         processedContainers.clear();
+        wait(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
@@ -144,7 +144,7 @@ public class ContainerHealthTask extends ReconScmTask {
              containerHealthSchemaManager.getAllUnhealthyRecordsCursor()) {
       ContainerHealthStatus currentContainer = null;
       Set<String> existingRecords = new HashSet<>();
-      while (cursor.hasNext()) {
+      while(cursor.hasNext()) {
         recordCount++;
         UnhealthyContainersRecord rec = cursor.fetchNext();
         try {
@@ -259,7 +259,7 @@ public class ContainerHealthTask extends ReconScmTask {
     public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       boolean returnValue = false;
-      switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
+      switch(UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
         returnValue = container.isMissing();
         break;

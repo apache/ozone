@@ -193,7 +193,7 @@ public class TestSCMCertStore {
 
     // Generate 3 more certificates and revoke 2 of them
     List<BigInteger> newSerialIDs = new ArrayList<>();
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i<3; i++) {
       X509Certificate cert = generateX509Cert();
       scmCertStore.storeValidCertificate(cert.getSerialNumber(), cert, SCM);
       newSerialIDs.add(cert.getSerialNumber());
@@ -250,7 +250,7 @@ public class TestSCMCertStore {
     scmCertStore.storeValidCertificate(serialID, x509Certificate, SCM);
     Date now = new Date();
     // Set revocation time in the future
-    Date revocationTime = new Date(now.getTime() + 500);
+    Date revocationTime = new Date(now.getTime()+500);
 
     X509CertificateHolder caCertificateHolder =
         new X509CertificateHolder(generateX509Cert().getEncoded());
@@ -282,7 +282,7 @@ public class TestSCMCertStore {
   private long getTableSize(Iterator iterator) {
     long size = 0;
 
-    while (iterator.hasNext()) {
+    while(iterator.hasNext()) {
       size++;
       iterator.next();
     }
