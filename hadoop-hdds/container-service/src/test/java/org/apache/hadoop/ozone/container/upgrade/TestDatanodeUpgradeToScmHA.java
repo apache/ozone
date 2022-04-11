@@ -192,7 +192,7 @@ public class TestDatanodeUpgradeToScmHA {
     // restarted with SCM HA config and gets a different SCM ID.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     changeScmID();
-    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), false);
     // Make sure the existing container can be read.
     readChunk(exportWriteChunk2, pipeline);
 
@@ -289,7 +289,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     /// FINALIZED: Restart datanode to upgrade the failed volume ///
 
-    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion());
+    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion(), true);
 
     Assert.assertEquals(1,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
@@ -344,7 +344,7 @@ public class TestDatanodeUpgradeToScmHA {
     changeScmID();
     // A new volume is added that must be formatted.
     File preFinVolume2 = addVolume();
-    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), false);
 
     Assert.assertEquals(2,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
@@ -378,7 +378,7 @@ public class TestDatanodeUpgradeToScmHA {
     File finVolume = addVolume();
     // Yet another SCM ID is received this time, but it should not matter.
     changeScmID();
-    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion());
+    restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion(), true);
     Assert.assertEquals(3,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
     Assert.assertEquals(0,
@@ -521,7 +521,7 @@ public class TestDatanodeUpgradeToScmHA {
     callVersionEndpointTask();
   }
 
-  public void restartDatanode(int expectedMlv)
+  public void restartDatanode(int expectedMlv, boolean afterFinalize)
       throws Exception {
     // Stop existing datanode.
     DatanodeDetails dd = dsm.getDatanodeDetails();
@@ -531,10 +531,29 @@ public class TestDatanodeUpgradeToScmHA {
     dsm = new DatanodeStateMachine(dd,
         conf, null, null,
         null);
-    int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
-    Assert.assertEquals(expectedMlv, mlv);
+
+    if (afterFinalize) {
+      // After FINALIZE, the mlv should be >= SCM_HA.
+      // NOTE: Before we have a newer LayoutFeature that SCM_HA,
+      // we could check the mlv exactly == SCM_HA,
+      // but after, we could only check mlv >= SCM_HA.
+      checkMlvAtLeast(expectedMlv);
+    } else {
+      // Before FINALIZE, mlv should stay at a version like INITIAL_VERSION.
+      checkMlvExact(expectedMlv);
+    }
 
     callVersionEndpointTask();
+  }
+
+  private void checkMlvExact(int expectedMlv) {
+    int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
+    Assert.assertEquals(expectedMlv, mlv);
+  }
+
+  private void checkMlvAtLeast(int expectedMlv) {
+    int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
+    Assert.assertTrue(expectedMlv <= mlv);
   }
 
   /**
