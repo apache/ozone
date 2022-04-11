@@ -50,6 +50,7 @@ public final class S3Utils {
     Map<String, String> auditParams = new TreeMap<>();
     for (int i = 0; i < strs.length; i++) {
       if (StringUtils.isEmpty(strs[i]) || StringUtils.isEmpty(strs[i + 1])) {
+        ++i;
         continue;
       }
       auditParams.put(strs[i], strs[++i]);
