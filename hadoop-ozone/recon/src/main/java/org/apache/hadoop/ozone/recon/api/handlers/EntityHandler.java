@@ -47,13 +47,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public abstract class EntityHandler {
 
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
-  private ReconOMMetadataManager omMetadataManager;
+  private final ReconOMMetadataManager omMetadataManager;
 
-  private BucketHandler bucketHandler;
+  private final BucketHandler bucketHandler;
 
-  private OzoneStorageContainerManager reconSCM;
+  private final OzoneStorageContainerManager reconSCM;
 
   private static String normalizedPath;
   private static String[] names;
@@ -196,7 +196,7 @@ public abstract class EntityHandler {
    * This method can be optimized by using username as a filter.
    * @return a list of volume names under the system
    */
-  protected List<OmVolumeArgs> listVolumes() throws IOException {
+  List<OmVolumeArgs> listVolumes() throws IOException {
     List<OmVolumeArgs> result = new ArrayList<>();
     Table volumeTable = omMetadataManager.getVolumeTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
@@ -220,7 +220,7 @@ public abstract class EntityHandler {
    * @return a list of buckets
    * @throws IOException IOE
    */
-  protected List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
+  List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
       throws IOException {
     List<OmBucketInfo> result = new ArrayList<>();
     // if volume name is null, seek prefix is an empty string
@@ -316,7 +316,7 @@ public abstract class EntityHandler {
     return totalSize;
   }
 
-  protected long calculateDUForVolume(String volumeName)
+  long calculateDUForVolume(String volumeName)
       throws IOException {
     long result = 0L;
 

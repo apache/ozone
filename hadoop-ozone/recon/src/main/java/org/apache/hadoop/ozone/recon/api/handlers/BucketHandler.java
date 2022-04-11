@@ -48,11 +48,11 @@ public abstract class BucketHandler {
   private static final Logger LOG = LoggerFactory.getLogger(
       BucketHandler.class);
 
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
-  private ReconOMMetadataManager omMetadataManager;
+  private final ReconOMMetadataManager omMetadataManager;
 
-  private ContainerManager containerManager;
+  private final ContainerManager containerManager;
 
   public BucketHandler(
           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
@@ -141,7 +141,7 @@ public abstract class BucketHandler {
     return String.join(OM_KEY_PREFIX, keyArr);
   }
 
-  protected boolean bucketExists(String volName, String bucketName)
+  boolean bucketExists(String volName, String bucketName)
       throws IOException {
     String bucketDBKey = omMetadataManager.getBucketKey(volName, bucketName);
     // Check if bucket exists
