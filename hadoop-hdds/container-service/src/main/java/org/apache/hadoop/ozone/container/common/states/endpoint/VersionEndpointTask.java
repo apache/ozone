@@ -101,7 +101,8 @@ public class VersionEndpointTask implements
                 : volumeMap.entrySet()) {
               StorageVolume volume = entry.getValue();
               boolean result = HddsVolumeUtil.checkVolume((HddsVolume) volume,
-                  scmId, clusterId, configuration, LOG);
+                  scmId, clusterId, configuration, LOG,
+                  ozoneContainer.getDbVolumeSet());
               if (!result) {
                 volumeSet.failVolume(volume.getStorageDir().getPath());
               }

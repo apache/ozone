@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGr
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -142,6 +143,8 @@ public class OzoneContainer {
       dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
           new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
               context, VolumeType.DB_VOLUME, volumeChecker);
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet,
+          conf, LOG);
     } else {
       dbVolumeSet = null;
     }
