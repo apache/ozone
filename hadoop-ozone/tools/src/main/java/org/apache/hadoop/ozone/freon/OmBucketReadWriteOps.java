@@ -32,10 +32,15 @@ import picocli.CommandLine.Option;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutorCompletionService;
 
 /**
  * Synthetic read/write operations workload generator tool.
@@ -160,19 +165,17 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   }
 
   private void mainMethod(long counter) throws Exception {
-    Future<Integer> readFuture = readOperations();
-    Future<Integer> writeFuture = writeOperations();
 
-    int rCount = readFuture.get();
-    print("Total Files Read = " + rCount);
+    int readResult = readOperations();
+    int writeResult = writeOperations();
 
-    int wCount = writeFuture.get();
-    print("Total Files Written = " + wCount);
+    print("Total Files Read: " + readResult);
+    print("Total Files Written: " + writeResult * fileCountForWrite);
 
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
 
-  private Future<Integer> readOperations() throws Exception {
+  private int readOperations() throws Exception {
 
     // Create fileCountForRead (defaultValue = 1000) files under
     // rootPath/readPath directory
@@ -185,23 +188,41 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
     // performing numOfReadOperations (defaultValue = 50) iterations
     // of read operations (fileSystem.listStatus(rootPath/readPath))
     ExecutorService readService = Executors.newFixedThreadPool(readThreadCount);
-    Future<Integer> readFuture = readService.submit(() -> {
-      int count = 0;
-      try {
-        for (int i = 0; i < numOfReadOperations; i++) {
-          FileStatus[] status =
-              fileSystem.listStatus(new Path(readPath));
-          count = +status.length;
+    CompletionService<Integer> readExecutorCompletionService =
+        new ExecutorCompletionService<>(readService);
+    List<Future<Integer>> readFutures = new ArrayList<>();
+    for (int i = 0; i < readThreadCount; i++) {
+      readFutures.add(readExecutorCompletionService.submit(() -> {
+        int readCount = 0;
+        try {
+          for (int j = 0; j < numOfReadOperations; j++) {
+            FileStatus[] status =
+                fileSystem.listStatus(new Path(readPath));
+            readCount += status.length;
+          }
+        } catch (IOException e) {
+          LOG.warn("Exception while listing status ", e);
         }
-      } catch (IOException e) {
-        LOG.warn("Exception while listing status ", e);
+        return readCount;
+      }));
+    }
+
+    int readResult = 0;
+    for (int i = 0; i < readFutures.size(); i++) {
+      try {
+        readResult += readExecutorCompletionService.take().get();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      } catch (ExecutionException e) {
+        e.printStackTrace();
       }
-      return count;
-    });
-    return readFuture;
+    }
+    readService.shutdown();
+
+    return readResult;
   }
 
-  private Future<Integer> writeOperations() throws Exception {
+  private int writeOperations() throws Exception {
 
     // Start writeThreadCount (defaultValue = 10) concurrent write threads
     // performing numOfWriteOperations (defaultValue = 10) iterations
@@ -212,19 +233,37 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
     ExecutorService writeService =
         Executors.newFixedThreadPool(writeThreadCount);
-    Future<Integer> writeFuture = writeService.submit(() -> {
-      int count = 0;
-      try {
-        for (int i = 0; i < numOfWriteOperations; i++) {
-          createFiles(writePath, fileCountForWrite);
-          count++;
+    CompletionService<Integer> writeExecutorCompletionService =
+        new ExecutorCompletionService<>(writeService);
+    List<Future<Integer>> writeFutures = new ArrayList<>();
+    for (int i = 0; i < writeThreadCount; i++) {
+      writeFutures.add(writeExecutorCompletionService.submit(() -> {
+        int writeCount = 0;
+        try {
+          for (int j = 0; j < numOfWriteOperations; j++) {
+            createFiles(writePath, fileCountForWrite);
+            writeCount++;
+          }
+        } catch (IOException e) {
+          LOG.warn("Exception while creating file ", e);
         }
-      } catch (IOException e) {
-        LOG.warn("Exception while creating file ", e);
+        return writeCount;
+      }));
+    }
+
+    int writeResult = 0;
+    for (int i = 0; i < writeFutures.size(); i++) {
+      try {
+        writeResult += writeExecutorCompletionService.take().get();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      } catch (ExecutionException e) {
+        e.printStackTrace();
       }
-      return count;
-    });
-    return writeFuture;
+    }
+    writeService.shutdown();
+
+    return writeResult;
   }
 
   private void createFile(String dir, long counter) throws Exception {

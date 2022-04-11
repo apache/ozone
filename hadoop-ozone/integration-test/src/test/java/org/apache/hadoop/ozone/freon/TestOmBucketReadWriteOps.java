@@ -164,9 +164,13 @@ public class TestOmBucketReadWriteOps {
     verifyFileCreation(parameterBuilder.fileCountForRead, readFileStatuses,
         false);
 
+    int readThreadCount = (parameterBuilder.readThreadPercentage *
+        parameterBuilder.totalThreadCount) / 100;
+    int writeThreadCount = parameterBuilder.totalThreadCount - readThreadCount;
+
     Path writeDir = new Path(rootPath.concat("/writePath"));
     FileStatus[] writeFileStatuses = fileSystem.listStatus(writeDir);
-    verifyFileCreation(parameterBuilder.fileCountForWrite *
+    verifyFileCreation(writeThreadCount * parameterBuilder.fileCountForWrite *
         parameterBuilder.numOfWriteOperations, writeFileStatuses, false);
 
     verifyOMLockMetrics(cluster.getOzoneManager().getMetadataManager().getLock()
