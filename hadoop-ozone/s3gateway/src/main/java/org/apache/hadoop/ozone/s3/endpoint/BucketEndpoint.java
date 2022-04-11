@@ -130,14 +130,6 @@ public class BucketEndpoint extends EndpointBase {
         return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
       }
 
-      if (browser != null) {
-        InputStream browserPage = getClass()
-            .getResourceAsStream("/browser.html");
-        return Response.ok(browserPage,
-              MediaType.TEXT_HTML_TYPE)
-              .build();
-      }
-
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
         return listMultipartUploads(bucketName, prefix);
