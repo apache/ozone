@@ -94,7 +94,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   }
 
   public void setQuotaInNamespace(long quotaInNamespace) {
-    this.quotaInNamespace= quotaInNamespace;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   public void setCreationTime(long time) {

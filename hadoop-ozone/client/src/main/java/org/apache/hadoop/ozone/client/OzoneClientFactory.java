@@ -51,7 +51,7 @@ public final class OzoneClientFactory {
   /**
    * Private constructor, class is not meant to be initialized.
    */
-  private OzoneClientFactory(){}
+  private OzoneClientFactory() { }
 
 
   /**

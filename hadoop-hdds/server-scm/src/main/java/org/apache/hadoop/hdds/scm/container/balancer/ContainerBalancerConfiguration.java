@@ -43,27 +43,25 @@ public final class ContainerBalancerConfiguration {
       LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
 
   @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
-      "0.1", tags = {ConfigTag.BALANCER},
-      description = "Threshold is a fraction in the range of 0 to 1. A " +
+      "10", tags = {ConfigTag.BALANCER},
+      description = "Threshold is a percentage in the range of 0 to 100. A " +
           "cluster is considered balanced if for each datanode, the " +
           "utilization of the datanode (used space to capacity ratio) differs" +
           " from the utilization of the cluster (used space to capacity ratio" +
-          " of the entire cluster) no more than the threshold value.")
-  private String threshold = "0.1";
+          " of the entire cluster) no more than the threshold.")
+  private String threshold = "10";
 
-  @Config(key = "datanodes.involved.max.ratio.per.iteration", type =
-      ConfigType.AUTO,
-      defaultValue = "0.2", tags = {ConfigTag.BALANCER}, description = "The " +
-      "ratio of maximum number of datanodes that should be involved in " +
-      "balancing in one iteration to the total number of healthy, in service " +
-      "nodes known to container balancer.")
-  private String maxDatanodesRatioToInvolvePerIteration = "0.2";
+  @Config(key = "datanodes.involved.max.percentage.per.iteration", type =
+      ConfigType.INT, defaultValue = "20", tags = {ConfigTag.BALANCER},
+      description = "Maximum percentage of healthy, in service datanodes " +
+          "that can be involved in balancing in one iteration.")
+  private int maxDatanodesPercentageToInvolvePerIteration = 20;
 
   @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
-      defaultValue = "30GB", tags = {ConfigTag.BALANCER},
+      defaultValue = "500GB", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in bytes that will be moved " +
           "by Container Balancer in one iteration.")
-  private long maxSizeToMovePerIteration = 30 * OzoneConsts.GB;
+  private long maxSizeToMovePerIteration = 500 * OzoneConsts.GB;
 
   @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
       defaultValue = "26GB", tags = {ConfigTag.BALANCER}, description = "The " +
@@ -81,10 +79,11 @@ public final class ContainerBalancerConfiguration {
       " (or default) ozone.scm.container.size.")
   private long maxSizeLeavingSource;
 
-  @Config(key = "idle.iterations", type = ConfigType.INT,
+  @Config(key = "iterations", type = ConfigType.INT,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
-      description = "The idle iteration count of Container Balancer.")
-  private int idleIterations = 10;
+      description = "The number of iterations that Container Balancer will " +
+          "run for.")
+  private int iterations = 10;
 
   @Config(key = "exclude.containers", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
@@ -93,7 +92,7 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
       tags = {ConfigTag.BALANCER}, description =
-      "The amount of time in minutes to allow a single container to move " +
+      "The amount of time to allow a single container to move " +
           "from source to target.")
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
@@ -101,7 +100,7 @@ public final class ContainerBalancerConfiguration {
       defaultValue = "70m", tags = {
       ConfigTag.BALANCER}, description = "The interval period between each " +
       "iteration of Container Balancer.")
-  private long balancingInterval;
+  private long balancingInterval = Duration.ofMinutes(70).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
@@ -127,46 +126,61 @@ public final class ContainerBalancerConfiguration {
   /**
    * Gets the threshold value for Container Balancer.
    *
-   * @return a fraction in the range 0 to 1
+   * @return percentage value in the range 0 to 100
    */
   public double getThreshold() {
     return Double.parseDouble(threshold);
   }
 
+  public double getThresholdAsRatio() {
+    return Double.parseDouble(threshold) / 100;
+  }
+
   /**
    * Sets the threshold value for Container Balancer.
    *
-   * @param threshold a fraction in the range 0 to 1
+   * @param threshold a percentage value in the range 0 to 100
    */
   public void setThreshold(double threshold) {
-    if (threshold < 0 || threshold > 1) {
+    if (threshold < 0d || threshold >= 100d) {
       throw new IllegalArgumentException(
-          "Threshold must be a fraction in the range 0 to 1.");
+          "Threshold must be a percentage(double) in the range 0 to 100.");
     }
     this.threshold = String.valueOf(threshold);
   }
 
   /**
-   * Gets the idle iteration value for Container Balancer.
+   * Gets the iteration count for Container Balancer. A value of -1 means
+   * infinite number of iterations.
    *
-   * @return a idle iteration count larger than 0
+   * @return a value greater than 0, or -1
    */
-  public int getIdleIteration() {
-    return idleIterations;
+  public int getIterations() {
+    return iterations;
   }
 
   /**
-   * Sets the idle iteration value for Container Balancer.
+   * Sets the number of iterations for Container Balancer.
    *
-   * @param count a idle iteration count larger than 0
+   * @param count a value greater than 0, or -1 for running balancer infinitely
    */
-  public void setIdleIteration(int count) {
+  public void setIterations(int count) {
     if (count < -1 || 0 == count) {
       throw new IllegalArgumentException(
-          "Idle iteration count must be larger than 0 or " +
-              "-1(for infinitely running).");
+          "Iteration count must be greater than 0, or " +
+              "-1(for running balancer infinitely).");
     }
-    this.idleIterations = count;
+    this.iterations = count;
+  }
+
+  /**
+   * Gets the maximum percentage of healthy, in-service datanodes that will be
+   * involved in balancing in one iteration.
+   *
+   * @return percentage as an integer from 0 up to and including 100
+   */
+  public int getMaxDatanodesPercentageToInvolvePerIteration() {
+    return maxDatanodesPercentageToInvolvePerIteration;
   }
 
   /**
@@ -188,37 +202,36 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the ratio of maximum number of datanodes that will be involved in
-   * balancing by Container Balancer in one iteration to the total number of
-   * healthy, in-service nodes known to balancer.
+   * Gets the ratio of maximum datanodes involved in balancing to the total
+   * number of healthy, in-service datanodes known to SCM.
    *
-   * @return maximum datanodes to involve divided by total healthy,
-   * in-service nodes
+   * @return ratio as a double from 0 up to and including 1
    */
   public double getMaxDatanodesRatioToInvolvePerIteration() {
-    return Double.parseDouble(maxDatanodesRatioToInvolvePerIteration);
+    return maxDatanodesPercentageToInvolvePerIteration / 100d;
   }
 
   /**
-   * Sets the ratio of maximum number of datanodes that will be involved in
-   * balancing by Container Balancer in one iteration to the total number of
-   * healthy, in-service nodes known to balancer.
+   * Sets the maximum percentage of healthy, in-service datanodes that will be
+   * involved in balancing in one iteration.
    *
-   * @param maxDatanodesRatioToInvolvePerIteration number of datanodes to
-   *                                               involve divided by total
-   *                                               number of healthy, in
-   *                                               service nodes
+   * @param maxDatanodesPercentageToInvolvePerIteration number of datanodes
+   *                                                    to involve divided by
+   *                                                    total number of
+   *                                                    healthy, in-service
+   *                                                    datanodes multiplied
+   *                                                    by 100
    */
-  public void setMaxDatanodesRatioToInvolvePerIteration(
-      double maxDatanodesRatioToInvolvePerIteration) {
-    if (maxDatanodesRatioToInvolvePerIteration < 0 ||
-        maxDatanodesRatioToInvolvePerIteration > 1) {
-      throw new IllegalArgumentException("Max datanodes to involve ratio must" +
-          " be a double greater than equal to zero and lesser than equal to " +
-          "one.");
+  public void setMaxDatanodesPercentageToInvolvePerIteration(
+      int maxDatanodesPercentageToInvolvePerIteration) {
+    if (maxDatanodesPercentageToInvolvePerIteration < 0 ||
+        maxDatanodesPercentageToInvolvePerIteration > 100) {
+      throw new IllegalArgumentException(String.format("Argument %d is " +
+              "illegal. Percentage must be from 0 up to and including 100.",
+          maxDatanodesPercentageToInvolvePerIteration));
     }
-    this.maxDatanodesRatioToInvolvePerIteration =
-        String.valueOf(maxDatanodesRatioToInvolvePerIteration);
+    this.maxDatanodesPercentageToInvolvePerIteration =
+        maxDatanodesPercentageToInvolvePerIteration;
   }
 
   /**
@@ -347,12 +360,12 @@ public final class ContainerBalancerConfiguration {
     return String.format("Container Balancer Configuration values:%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
-            "%-50s %s%n" +
-            "%-50s %dGB%n"+
-            "%-50s %dGB%n"+
+            "%-50s %d%n" +
+            "%-50s %dGB%n" +
+            "%-50s %dGB%n" +
             "%-50s %dGB%n", "Key", "Value", "Threshold",
-        threshold, "Max Datanodes to Involve per Iteration(ratio)",
-        maxDatanodesRatioToInvolvePerIteration,
+        threshold, "Max Datanodes to Involve per Iteration(percent)",
+        maxDatanodesPercentageToInvolvePerIteration,
         "Max Size to Move per Iteration",
         maxSizeToMovePerIteration / OzoneConsts.GB,
         "Max Size Entering Target per Iteration",

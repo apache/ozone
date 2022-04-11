@@ -109,7 +109,7 @@ public class TestOMFailovers {
     public OMResponse submitRequest(RpcController controller,
         OzoneManagerProtocolProtos.OMRequest request) throws ServiceException {
       throw new ServiceException("ServiceException of type " +
-          exception.getClass() + " for "+ omNodeId, exception);
+          exception.getClass() + " for " + omNodeId, exception);
     }
   }
 

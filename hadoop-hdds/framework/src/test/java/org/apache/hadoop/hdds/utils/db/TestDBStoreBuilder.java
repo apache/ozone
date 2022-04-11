@@ -69,7 +69,7 @@ public class TestDBStoreBuilder {
   public void builderWithOneParamV2() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.newFolder();
-    if(!newFolder.exists()) {
+    if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     thrown.expect(IOException.class);
@@ -82,7 +82,7 @@ public class TestDBStoreBuilder {
   public void builderWithOpenClose() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.newFolder();
-    if(!newFolder.exists()) {
+    if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     DBStore dbStore = DBStoreBuilder.newBuilder(conf)
@@ -97,7 +97,7 @@ public class TestDBStoreBuilder {
   public void builderWithDoubleTableName() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.newFolder();
-    if(!newFolder.exists()) {
+    if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     // Registering a new table with the same name should replace the previous
@@ -127,7 +127,7 @@ public class TestDBStoreBuilder {
   public void builderWithDataWrites() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.newFolder();
-    if(!newFolder.exists()) {
+    if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf)
@@ -156,7 +156,7 @@ public class TestDBStoreBuilder {
   public void builderWithDiskProfileWrites() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.newFolder();
-    if(!newFolder.exists()) {
+    if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf)
