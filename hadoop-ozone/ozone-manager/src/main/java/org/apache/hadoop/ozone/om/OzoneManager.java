@@ -1107,8 +1107,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           throws IOException {
     return new GrpcOzoneManagerServer(conf,
             this.omServerProtocol,
-            this.delegationTokenMgr,
-            this.certClient);
+            this.delegationTokenMgr);
   }
 
   private static boolean isOzoneSecurityEnabled() {
