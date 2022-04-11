@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.junit.Assert.assertTrue;
@@ -61,6 +62,7 @@ import org.slf4j.event.Level;
  * Tests the Ratis snapshot feature in SCM.
  */
 @Timeout(500)
+@Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -291,7 +293,7 @@ public class TestSCMInstallSnapshotWithHA {
     while (logIndex <= targetLogIndex) {
       containers.add(scm.getContainerManager()
           .allocateContainer(
-              new RatisReplicationConfig(ReplicationFactor.THREE),
+              RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
               TestSCMInstallSnapshotWithHA.class.getName()));
       Thread.sleep(100);
       logIndex = stateMachine.getLastAppliedTermIndex().getIndex();

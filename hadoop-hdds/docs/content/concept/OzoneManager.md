@@ -24,7 +24,7 @@ summary: Ozone Manager is the principal name space service of Ozone. OM manages 
   limitations under the License.
 -->
 
-{{< image src="OzoneManager.png">}}
+![Ozone Manager](OzoneManager.png)
 
 Ozone Manager (OM) is the namespace manager for Ozone.
 
@@ -60,7 +60,7 @@ understood if we trace what happens during a key write and key read.
 
 ### Key Write
 
-{{< image src="OzoneManager-WritePath.png">}}
+![Ozone Manager Write Path](OzoneManager-WritePath.png)
 
 * To write a key to Ozone, a client tells Ozone manager that it would like to
 write a key into a bucket that lives inside a specific volume. Once Ozone
@@ -84,7 +84,7 @@ information on Ozone manager.
 
 ### Key Reads
 
-{{< image src="OzoneManager-ReadPath.png">}}
+![Ozone Manager Read Path](OzoneManager-ReadPath.png)
 
 * Key reads are simpler, the client requests the block list from the Ozone
 Manager

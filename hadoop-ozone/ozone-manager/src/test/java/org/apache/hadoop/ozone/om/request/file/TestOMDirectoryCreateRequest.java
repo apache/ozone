@@ -114,7 +114,7 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
@@ -138,12 +138,13 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
-    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -166,12 +167,13 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
-    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -195,12 +197,13 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
-    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse =
@@ -233,12 +236,13 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
-    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -276,12 +280,13 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
-    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -319,12 +324,13 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
-    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -354,12 +360,13 @@ public class TestOMDirectoryCreateRequest {
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
     OMDirectoryCreateRequest omDirectoryCreateRequest =
-        new OMDirectoryCreateRequest(omRequest);
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omDirectoryCreateRequest.preExecute(ozoneManager);
 
-    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
 
     Assert.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =

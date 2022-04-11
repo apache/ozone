@@ -15,21 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds;
+package org.apache.ozone.test.tag;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import org.junit.jupiter.api.Tag;
 
 /**
- * Versioning for datanode.
+ * Annotation to mark test classes or methods that take too much time.
+ * These are excluded from CI runs for each commit and run periodically.
  */
-public final class DatanodeVersions {
-
-  public static final int DEFAULT_VERSION = 0;
-
-  public static final int SEPARATE_RATIS_PORTS_AVAILABLE = 1;
-
-  // this should always point to the latest version
-  public static final int CURRENT_VERSION = SEPARATE_RATIS_PORTS_AVAILABLE;
-
-  private DatanodeVersions() {
-    // no instances
-  }
+@Target({ ElementType.TYPE, ElementType.METHOD })
+@Retention(RetentionPolicy.RUNTIME)
+@Tag("slow")
+public @interface Slow {
+  /**
+   * Description or Jira issue.
+   */
+  String value() default "";
 }

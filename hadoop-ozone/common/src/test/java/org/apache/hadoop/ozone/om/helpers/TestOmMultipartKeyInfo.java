@@ -38,8 +38,8 @@ public class TestOmMultipartKeyInfo {
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
         .setCreationTime(Time.now())
-        .setReplicationConfig(
-                new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE))
         .build();
 
     OmMultipartKeyInfo cloneMultipartKeyInfo = omMultipartKeyInfo.copyObject();

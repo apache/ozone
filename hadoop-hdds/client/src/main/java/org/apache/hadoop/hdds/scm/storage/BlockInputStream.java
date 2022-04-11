@@ -221,7 +221,7 @@ public class BlockInputStream extends InputStream
     // protocol.
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               ReplicationConfig
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();

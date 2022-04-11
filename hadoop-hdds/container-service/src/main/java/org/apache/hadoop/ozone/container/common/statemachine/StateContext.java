@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -101,7 +102,7 @@ public class StateContext {
   private final Queue<SCMCommand> commandQueue;
   private final Map<Long, CommandStatus> cmdStatusMap;
   private final Lock lock;
-  private final DatanodeStateMachine parent;
+  private final DatanodeStateMachine parentDatanodeStateMachine;
   private final AtomicLong stateExecutionCount;
   private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
@@ -123,7 +124,7 @@ public class StateContext {
   // Endpoint -> ReportType -> Boolean of whether the full report should be
   //  queued in getFullReports call.
   private final Map<InetSocketAddress,
-      Map<String, AtomicBoolean>> fullReportSendIndicator;
+      Map<String, AtomicBoolean>> isFullReportReadyToBeSent;
   // List of supported full report types.
   private final List<String> fullReportTypeList;
   // ReportType -> Report.
@@ -160,14 +161,14 @@ public class StateContext {
           state, DatanodeStateMachine parent) {
     this.conf = conf;
     this.state = state;
-    this.parent = parent;
+    this.parentDatanodeStateMachine = parent;
     commandQueue = new LinkedList<>();
     cmdStatusMap = new ConcurrentHashMap<>();
     incrementalReportsQueue = new HashMap<>();
     containerReports = new AtomicReference<>();
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
-    crlStatusReport = new AtomicReference<>();
+    crlStatusReport = new AtomicReference<>(); // Certificate Revocation List
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
@@ -175,7 +176,7 @@ public class StateContext {
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
     lastHeartbeatSent = new AtomicLong(0);
-    fullReportSendIndicator = new HashMap<>();
+    isFullReportReadyToBeSent = new HashMap<>();
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
     initReportTypeCollection();
@@ -196,12 +197,12 @@ public class StateContext {
   }
 
   /**
-   * Returns the ContainerStateMachine class that holds this state.
+   * Returns the DatanodeStateMachine class that holds this state.
    *
-   * @return ContainerStateMachine.
+   * @return DatanodeStateMachine.
    */
   public DatanodeStateMachine getParent() {
-    return parent;
+    return parentDatanodeStateMachine;
   }
 
   /**
@@ -316,8 +317,8 @@ public class StateContext {
           "not full report message type: " + reportType);
     }
     type2Reports.get(reportType).set(report);
-    if (fullReportSendIndicator != null) {
-      for (Map<String, AtomicBoolean> mp : fullReportSendIndicator.values()) {
+    if (isFullReportReadyToBeSent != null) {
+      for (Map<String, AtomicBoolean> mp : isFullReportReadyToBeSent.values()) {
         mp.get(reportType).set(true);
       }
     }
@@ -357,8 +358,57 @@ public class StateContext {
    * @return List of reports
    */
   public List<GeneratedMessage> getAllAvailableReports(
-      InetSocketAddress endpoint) {
-    return getReports(endpoint, Integer.MAX_VALUE);
+      InetSocketAddress endpoint
+  ) {
+    int maxLimit = Integer.MAX_VALUE;
+    // TODO: It is highly unlikely that we will reach maxLimit for the number
+    //       for the number of reports, specially as it does not apply to the
+    //       number of entries in a report. But if maxLimit is hit, should a
+    //       heartbeat be scheduled ASAP? Should full reports not included be
+    //       dropped? Currently this code will keep the full reports not sent
+    //       and include it in the next heartbeat.
+    return getAllAvailableReportsUpToLimit(endpoint, maxLimit);
+  }
+
+  /**
+   * Gets a point in time snapshot of all containers, any pending incremental
+   * container reports (ICR) for containers will be included in this report
+   * and this call will drop any pending ICRs.
+   * @return Full Container Report
+   */
+  public ContainerReportsProto getFullContainerReportDiscardPendingICR()
+      throws IOException {
+
+    // Block ICRs from being generated
+    synchronized (parentDatanodeStateMachine
+        .getContainer()) {
+      synchronized (incrementalReportsQueue) {
+        for (Map.Entry<InetSocketAddress, List<GeneratedMessage>>
+            entry : incrementalReportsQueue.entrySet()) {
+          if (entry.getValue() != null) {
+            entry.getValue().removeIf(
+                generatedMessage ->
+                    generatedMessage instanceof
+                        IncrementalContainerReportProto);
+          }
+        }
+      }
+      return parentDatanodeStateMachine
+          .getContainer()
+          .getContainerSet()
+          .getContainerReport();
+    }
+  }
+
+  @VisibleForTesting
+  List<GeneratedMessage> getAllAvailableReportsUpToLimit(
+      InetSocketAddress endpoint,
+      int limit) {
+    List<GeneratedMessage> reports = getFullReports(endpoint, limit);
+    List<GeneratedMessage> incrementalReports = getIncrementalReports(endpoint,
+        limit - reports.size()); // get all (MAX_VALUE)
+    reports.addAll(incrementalReports);
+    return reports;
   }
 
   List<GeneratedMessage> getIncrementalReports(
@@ -378,11 +428,15 @@ public class StateContext {
   }
 
   List<GeneratedMessage> getFullReports(
-      InetSocketAddress endpoint) {
-    Map<String, AtomicBoolean> mp = fullReportSendIndicator.get(endpoint);
-    List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
+      InetSocketAddress endpoint, int maxLimit) {
+    int count = 0;
+    Map<String, AtomicBoolean> mp = isFullReportReadyToBeSent.get(endpoint);
+    List<GeneratedMessage> fullReports = new LinkedList<>();
     if (null != mp) {
       for (Map.Entry<String, AtomicBoolean> kv : mp.entrySet()) {
+        if (count == maxLimit) {
+          break;
+        }
         if (kv.getValue().get()) {
           String reportType = kv.getKey();
           final AtomicReference<GeneratedMessage> ref =
@@ -393,36 +447,16 @@ public class StateContext {
           }
           final GeneratedMessage msg = ref.get();
           if (msg != null) {
-            nonIncrementalReports.add(msg);
+            fullReports.add(msg);
+            // Mark the report as not ready to be sent, until another refresh.
             mp.get(reportType).set(false);
+            count++;
           }
         }
       }
     }
-    return nonIncrementalReports;
+    return fullReports;
   }
-
-  /**
-   * Returns available reports from the report queue with a max limit on
-   * list size, or empty list if the queue is empty.
-   *
-   * @return List of reports
-   */
-  public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
-                                           int maxLimit) {
-    if (maxLimit < 0) {
-      throw new IllegalArgumentException("Illegal maxLimit value: " + maxLimit);
-    }
-    List<GeneratedMessage> reports = getFullReports(endpoint);
-    if (maxLimit <= reports.size()) {
-      return reports.subList(0, maxLimit);
-    } else {
-      reports.addAll(getIncrementalReports(endpoint,
-          maxLimit - reports.size()));
-      return reports;
-    }
-  }
-
 
   /**
    * Adds the ContainerAction to ContainerAction queue.
@@ -450,17 +484,6 @@ public class StateContext {
         }
       }
     }
-  }
-
-  /**
-   * Returns all the pending ContainerActions from the ContainerAction queue,
-   * or empty list if the queue is empty.
-   *
-   * @return {@literal List<ContainerAction>}
-   */
-  public List<ContainerAction> getAllPendingContainerActions(
-      InetSocketAddress endpoint) {
-    return getPendingContainerAction(endpoint, Integer.MAX_VALUE);
   }
 
   /**
@@ -569,10 +592,12 @@ public class StateContext {
   public DatanodeState<DatanodeStateMachine.DatanodeStates> getTask() {
     switch (this.state) {
     case INIT:
-      return new InitDatanodeState(this.conf, parent.getConnectionManager(),
+      return new InitDatanodeState(this.conf,
+          parentDatanodeStateMachine.getConnectionManager(),
           this);
     case RUNNING:
-      return new RunningDatanodeState(this.conf, parent.getConnectionManager(),
+      return new RunningDatanodeState(this.conf,
+          parentDatanodeStateMachine.getConnectionManager(),
           this);
     case SHUTDOWN:
       return null;
@@ -759,6 +784,19 @@ public class StateContext {
     this.addCmdStatus(command);
   }
 
+  public Map<SCMCommandProto.Type, Integer> getCommandQueueSummary() {
+    Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
+    lock.lock();
+    try {
+      for (SCMCommand cmd : commandQueue) {
+        summary.put(cmd.getType(), summary.getOrDefault(cmd.getType(), 0) + 1);
+      }
+    } finally {
+      lock.unlock();
+    }
+    return summary;
+  }
+
   /**
    * Returns the count of the Execution.
    * @return long
@@ -845,7 +883,7 @@ public class StateContext {
       fullReportTypeList.forEach(e -> {
         mp.putIfAbsent(e, new AtomicBoolean(true));
       });
-      this.fullReportSendIndicator.putIfAbsent(endpoint, mp);
+      this.isFullReportReadyToBeSent.putIfAbsent(endpoint, mp);
     }
   }
 

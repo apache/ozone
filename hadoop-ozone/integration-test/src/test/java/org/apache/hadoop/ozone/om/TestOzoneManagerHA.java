@@ -37,14 +37,11 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.BeforeClass;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Rule;
 import org.junit.Assert;
-
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -58,7 +55,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONN
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
@@ -67,6 +63,7 @@ import static org.junit.Assert.fail;
 /**
  * Base class for Ozone Manager HA tests.
  */
+@Timeout(300)
 public abstract class TestOzoneManagerHA {
 
   private static MiniOzoneHAClusterImpl cluster = null;
@@ -85,11 +82,6 @@ public abstract class TestOzoneManagerHA {
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
 
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
@@ -138,7 +130,7 @@ public abstract class TestOzoneManagerHA {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -148,7 +140,6 @@ public abstract class TestOzoneManagerHA {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS);
     conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
@@ -190,7 +181,7 @@ public abstract class TestOzoneManagerHA {
   /**
    * Reset cluster between tests.
    */
-  @After
+  @AfterEach
   public void resetCluster()
       throws IOException {
     if (cluster != null) {
@@ -201,7 +192,7 @@ public abstract class TestOzoneManagerHA {
   /**
    * Shutdown MiniDFSCluster after all tests of a class have run.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();

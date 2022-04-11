@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.failure.Failures;
-import org.apache.hadoop.ozone.loadgenerators.*;
+import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;

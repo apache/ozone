@@ -43,7 +43,7 @@ for scheme in ofs o3fs; do
   done
 done
 
-for bucket in link generated; do
+for bucket in encrypted link generated; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} s3
 done
 

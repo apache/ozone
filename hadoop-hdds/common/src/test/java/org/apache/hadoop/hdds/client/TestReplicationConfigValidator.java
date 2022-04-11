@@ -36,10 +36,10 @@ public class TestReplicationConfigValidator {
     final ReplicationConfigValidator validator =
         config.getObject(ReplicationConfigValidator.class);
 
-    validator.validate(new RatisReplicationConfig(THREE));
-    validator.validate(new RatisReplicationConfig(ONE));
-    validator.validate(new StandaloneReplicationConfig(THREE));
-    validator.validate(new StandaloneReplicationConfig(ONE));
+    validator.validate(RatisReplicationConfig.getInstance(THREE));
+    validator.validate(RatisReplicationConfig.getInstance(ONE));
+    validator.validate(StandaloneReplicationConfig.getInstance(THREE));
+    validator.validate(StandaloneReplicationConfig.getInstance(ONE));
 
   }
 
@@ -51,8 +51,8 @@ public class TestReplicationConfigValidator {
     final ReplicationConfigValidator validator =
         config.getObject(ReplicationConfigValidator.class);
 
-    validator.validate(new RatisReplicationConfig(THREE));
-    validator.validate(new StandaloneReplicationConfig(ONE));
+    validator.validate(RatisReplicationConfig.getInstance(THREE));
+    validator.validate(StandaloneReplicationConfig.getInstance(ONE));
 
   }
 
@@ -64,9 +64,9 @@ public class TestReplicationConfigValidator {
     final ReplicationConfigValidator validator =
         config.getObject(ReplicationConfigValidator.class);
 
-    validator.validate(new RatisReplicationConfig(THREE));
+    validator.validate(RatisReplicationConfig.getInstance(THREE));
 
-    validator.validate(new RatisReplicationConfig(ONE));
+    validator.validate(RatisReplicationConfig.getInstance(ONE));
     //exception is expected
 
   }
