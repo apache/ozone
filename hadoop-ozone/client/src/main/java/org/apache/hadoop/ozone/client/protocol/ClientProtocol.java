@@ -349,6 +349,7 @@ public interface ClientProtocol {
    * @param keyMap The key is original key name nad value is new key name.
    * @throws IOException
    */
+  @Deprecated
   void renameKeys(String volumeName, String bucketName,
                   Map<String, String> keyMap) throws IOException;
 

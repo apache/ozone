@@ -20,14 +20,12 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -254,17 +252,5 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;
-  }
-
-  public static OMAllocateBlockRequest getInstance(KeyArgs keyArgs,
-      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new OMAllocateBlockRequestWithFSO(omRequest, bucketLayout);
-    }
-    return new OMAllocateBlockRequest(omRequest, bucketLayout);
   }
 }

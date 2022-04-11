@@ -218,7 +218,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         doPreExecute(createDeleteOpenKeyRequest(openKeys));
 
     OMOpenKeysDeleteRequest openKeyDeleteRequest =
-        new OMOpenKeysDeleteRequest(omRequest);
+        new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
@@ -386,7 +386,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
     OMOpenKeysDeleteRequest omOpenKeysDeleteRequest =
-        new OMOpenKeysDeleteRequest(originalOmRequest);
+        new OMOpenKeysDeleteRequest(originalOmRequest, getBucketLayout());
 
     OMRequest modifiedOmRequest =
         omOpenKeysDeleteRequest.preExecute(ozoneManager);

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.client;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -334,7 +335,8 @@ public interface ScmClient extends Closeable {
   /**
    * Start ContainerBalancer.
    */
-  boolean startContainerBalancer(Optional<Double> threshold,
+  StartContainerBalancerResponseProto startContainerBalancer(
+      Optional<Double> threshold,
       Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,

@@ -424,7 +424,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setCmdType(request.getCmdType())
           .setStatus(Status.OK)
           .setGetContainerReplicasResponse(getContainerReplicas(
-              request.getGetContainerReplicasRequest()))
+              request.getGetContainerReplicasRequest(),
+              request.getVersion()))
           .build();
       default:
         throw new IllegalArgumentException(
@@ -438,9 +439,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public GetContainerReplicasResponseProto getContainerReplicas(
-      GetContainerReplicasRequestProto request) throws IOException {
+      GetContainerReplicasRequestProto request, int clientVersion)
+      throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> replicas
-        = impl.getContainerReplicas(request.getContainerID());
+        = impl.getContainerReplicas(request.getContainerID(), clientVersion);
     return GetContainerReplicasResponseProto.newBuilder()
         .addAllContainerReplica(replicas).build();
   }
@@ -820,11 +822,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           Optional.of(request.getMaxSizeLeavingSourceInGB());
     }
 
-    return StartContainerBalancerResponseProto.newBuilder().
-        setStart(impl.startContainerBalancer(threshold,
-            iterations, maxDatanodesPercentageToInvolvePerIteration,
-            maxSizeToMovePerIterationInGB,
-            maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB)).build();
+    return impl.startContainerBalancer(threshold, iterations,
+        maxDatanodesPercentageToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(

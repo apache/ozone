@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -37,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -256,18 +254,5 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     String multipartKey = omMetadataManager.getMultipartKey(
         volumeName, bucketName, keyName, multipartUploadID);
     return multipartKey;
-  }
-
-  public static S3MultipartUploadAbortRequest getInstance(KeyArgs keyArgs,
-      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new S3MultipartUploadAbortRequestWithFSO(omRequest,
-          bucketLayout);
-    }
-    return new S3MultipartUploadAbortRequest(omRequest, bucketLayout);
   }
 }
