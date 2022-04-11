@@ -110,7 +110,7 @@ public class TestS3GatewayAuditLog {
 
     rootEndpoint.get().getEntity();
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=LIST_S3_BUCKETS null | ret=SUCCESS";
+        "op=LIST_S3_BUCKETS {} | ret=SUCCESS";
     verifyLog(expected);
   }
 
