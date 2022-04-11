@@ -111,7 +111,6 @@ public class BucketEndpoint extends EndpointBase {
         "marker", marker,
         "max-keys", String.valueOf(maxKeys),
         "prefix", prefix,
-        "browser", browser,
         "continuation-token", continueToken,
         "start-after", startAfter
     );
