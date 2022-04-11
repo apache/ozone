@@ -143,6 +143,12 @@
                   </includes>
                 </relocation>
                 <relocation>
+                  <pattern>kotlin</pattern>
+                  <shadedPattern>
+                    ${shaded.prefix}.kotlin
+                  </shadedPattern>
+                </relocation>
+                <relocation>
                   <pattern>picocli</pattern>
                   <shadedPattern>
                     ${shaded.prefix}.picocli

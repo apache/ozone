@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -62,7 +64,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DE
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
  */
-public class ContainerBalancer {
+public class ContainerBalancer implements SCMService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
@@ -106,6 +108,7 @@ public class ContainerBalancer {
   private Map<ContainerMoveSelection,
       CompletableFuture<ReplicationManager.MoveResult>>
       moveSelectionToFutureMap;
+  private IterationResult iterationResult;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
@@ -133,39 +136,6 @@ public class ContainerBalancer {
 
     this.lock = new ReentrantLock();
     findSourceStrategy = new FindSourceGreedy(nodeManager);
-  }
-
-  /**
-   * Starts ContainerBalancer. Current implementation is incomplete.
-   *
-   * @param balancerConfiguration Configuration values.
-   */
-  public boolean start(ContainerBalancerConfiguration balancerConfiguration) {
-    lock.lock();
-    try {
-      if (balancerRunning || currentBalancingThread != null) {
-        LOG.error("Container Balancer is already running.");
-        return false;
-      }
-
-      this.config = balancerConfiguration;
-      if (!validateConfiguration(config)) {
-        return false;
-      }
-      ozoneConfiguration.setFromObject(balancerConfiguration);
-      balancerRunning = true;
-      LOG.info("Starting Container Balancer...{}", this);
-
-      //we should start a new balancer thread async
-      //and response to cli as soon as possible
-      currentBalancingThread = new Thread(this::balance);
-      currentBalancingThread.setName("ContainerBalancer");
-      currentBalancingThread.setDaemon(true);
-      currentBalancingThread.start();
-    } finally {
-      lock.unlock();
-    }
-    return true;
   }
 
   /**
@@ -210,7 +180,7 @@ public class ContainerBalancer {
 
       // stop balancing if iteration is not initialized
       if (!initializeIteration()) {
-        stop();
+        stopBalancer();
         return;
       }
 
@@ -220,7 +190,7 @@ public class ContainerBalancer {
       metrics.incrementNumIterations(1);
       LOG.info("Result of this iteration of Container Balancer: {}", iR);
       if (iR == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
-        stop();
+        stopBalancer();
         return;
       }
 
@@ -244,7 +214,7 @@ public class ContainerBalancer {
         }
       }
     }
-    stop();
+    stopBalancer();
   }
 
   /**
@@ -408,57 +378,84 @@ public class ContainerBalancer {
         new HashSet<>(potentialTargets.size());
     moveSelectionToFutureMap = new HashMap<>(unBalancedNodes.size());
     boolean isMoveGenerated = false;
-    try {
-      // match each overUtilized node with a target
-      while (true) {
-        if (!isBalancerRunning()) {
-          return IterationResult.ITERATION_INTERRUPTED;
-        }
+    iterationResult = IterationResult.ITERATION_COMPLETED;
 
-        IterationResult result = checkConditionsForBalancing();
-        if (result != null) {
-          return result;
-        }
-
-        DatanodeDetails source =
-            findSourceStrategy.getNextCandidateSourceDataNode();
-        if (source == null) {
-          break;
-        }
-
-        ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
-        if (moveSelection != null) {
-          isMoveGenerated = true;
-          LOG.info("ContainerBalancer is trying to move container {} from " +
-                  "source datanode {} to target datanode {}",
-              moveSelection.getContainerID().toString(),
-              source.getUuidString(),
-              moveSelection.getTargetNode().getUuidString());
-
-          if (moveContainer(source, moveSelection)) {
-            // consider move successful for now, and update selection criteria
-            updateTargetsAndSelectionCriteria(
-                selectedTargets, moveSelection, source);
-          }
-        } else {
-          // can not find any target for this source
-          findSourceStrategy.removeCandidateSourceDataNode(source);
-        }
+    // match each source node with a target
+    while (true) {
+      if (!isBalancerRunning()) {
+        iterationResult = IterationResult.ITERATION_INTERRUPTED;
+        break;
       }
 
-      if (!isMoveGenerated) {
-        //no move option is generated, so the cluster can not be
-        //balanced any more, just stop iteration and exit
-        return IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+      if (checkIterationLimits()) {
+        /* scheduled enough moves to hit either maxSizeToMovePerIteration or
+        maxDatanodesPercentageToInvolvePerIteration limit
+        */
+        break;
       }
-      return IterationResult.ITERATION_COMPLETED;
-    } finally {
+
+      DatanodeDetails source =
+          findSourceStrategy.getNextCandidateSourceDataNode();
+      if (source == null) {
+        // no more source DNs are present
+        break;
+      }
+
+      ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
+      if (moveSelection != null) {
+        isMoveGenerated = true;
+        processMoveSelection(source, moveSelection, selectedTargets);
+      } else {
+        // can not find any target for this source
+        findSourceStrategy.removeCandidateSourceDataNode(source);
+      }
+    }
+
+    checkIterationResults(isMoveGenerated, selectedTargets);
+    return iterationResult;
+  }
+
+  private void processMoveSelection(DatanodeDetails source,
+                                    ContainerMoveSelection moveSelection,
+                                    Set<DatanodeDetails> selectedTargets) {
+    LOG.info("ContainerBalancer is trying to move container {} from " +
+            "source datanode {} to target datanode {}",
+        moveSelection.getContainerID().toString(),
+        source.getUuidString(),
+        moveSelection.getTargetNode().getUuidString());
+
+    if (moveContainer(source, moveSelection)) {
+      // consider move successful for now, and update selection criteria
+      updateTargetsAndSelectionCriteria(
+          selectedTargets, moveSelection, source);
+    }
+  }
+
+  /**
+   * Check the iteration results. Result can be:
+   * <p>ITERATION_INTERRUPTED if balancing was stopped</p>
+   * <p>CAN_NOT_BALANCE_ANY_MORE if no move was generated during this iteration
+   * </p>
+   * <p>ITERATION_COMPLETED</p>
+   * @param isMoveGenerated whether a move was generated during the iteration
+   * @param selectedTargets selected target datanodes
+   */
+  private void checkIterationResults(boolean isMoveGenerated,
+                                     Set<DatanodeDetails> selectedTargets) {
+    if (!isMoveGenerated) {
+      /*
+       If no move was generated during this iteration then we don't need to
+       check the move results
+       */
+      iterationResult = IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+    } else {
       checkIterationMoveResults(selectedTargets);
     }
   }
 
   /**
    * Checks the results of all move operations when exiting an iteration.
+   *
    * @param selectedTargets Set of target datanodes that were selected in
    *                        current iteration
    */
@@ -479,14 +476,20 @@ public class ContainerBalancer {
             ContainerInfo container =
                 containerManager.getContainer(moveSelection.getContainerID());
             this.sizeMovedPerIteration += container.getUsedBytes();
-            metrics.incrementNumMovedContainersInLatestIteration(1);
-            LOG.info("Move completed for container {} to target {}",
+            metrics.incrementNumContainerMovesInLatestIteration(1);
+            LOG.info("Container move completed for container {} to target {}",
                 container.containerID(),
                 moveSelection.getTargetNode().getUuidString());
           } catch (ContainerNotFoundException e) {
             LOG.warn("Could not find Container {} while " +
                     "checking move results in ContainerBalancer",
                 moveSelection.getContainerID(), e);
+          }
+        } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Container move for container {} to target {} failed: {}",
+                moveSelection.getContainerID(),
+                moveSelection.getTargetNode().getUuidString(), result);
           }
         }
       } catch (InterruptedException e) {
@@ -506,10 +509,13 @@ public class ContainerBalancer {
         sourceToTargetMap.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
-    metrics.incrementDataSizeMovedGBInLatestIteration(
-        sizeMovedPerIteration / OzoneConsts.GB);
+    sizeMovedPerIteration /= OzoneConsts.GB;
+    metrics.incrementDataSizeMovedGBInLatestIteration(sizeMovedPerIteration);
+    metrics.incrementNumContainerMoves(
+        metrics.getNumContainerMovesInLatestIteration());
+    metrics.incrementDataSizeMovedGB(sizeMovedPerIteration);
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
-            "in this iteration: {}B.",
+            "in this iteration: {}GB.",
         countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
   }
 
@@ -555,23 +561,20 @@ public class ContainerBalancer {
 
   /**
    * Checks if limits maxDatanodesPercentageToInvolvePerIteration and
-   * maxSizeToMovePerIteration have not been hit.
+   * maxSizeToMovePerIteration have been hit.
    *
-   * @return {@link IterationResult#MAX_DATANODES_TO_INVOLVE_REACHED} if reached
-   * max datanodes to involve limit,
-   * {@link IterationResult#MAX_SIZE_TO_MOVE_REACHED} if reached max size to
-   * move limit, or null if balancing can continue
+   * @return true if a limit was hit, else false
    */
-  private IterationResult checkConditionsForBalancing() {
+  private boolean checkIterationLimits() {
     int maxDatanodesToInvolve =
         (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
     if (countDatanodesInvolvedPerIteration + 2 > maxDatanodesToInvolve) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Hit max datanodes to involve limit. {} datanodes have" +
-                " already been involved and the limit is {}.",
+                " already been scheduled for balancing and the limit is {}.",
             countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
       }
-      return IterationResult.MAX_DATANODES_TO_INVOLVE_REACHED;
+      return true;
     }
     if (sizeMovedPerIteration + (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -579,12 +582,13 @@ public class ContainerBalancer {
         StorageUnit.BYTES) > maxSizeToMovePerIteration) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Hit max size to move limit. {} bytes have already been " +
-                "moved and the limit is {} bytes.", sizeMovedPerIteration,
+                "scheduled for balancing and the limit is {} bytes.",
+            sizeMovedPerIteration,
             maxSizeToMovePerIteration);
       }
-      return IterationResult.MAX_SIZE_TO_MOVE_REACHED;
+      return true;
     }
-    return null;
+    return false;
   }
 
   /**
@@ -593,10 +597,9 @@ public class ContainerBalancer {
    *
    * @param source the source datanode
    * @param moveSelection the selected container to move and target datanode
-   * @return false if an exception occurred, the move completed
-   * exceptionally, or the move completed with a result other than
-   * ReplicationManager.MoveResult.COMPLETED. Returns true if the move
-   * completed with MoveResult.COMPLETED or move is not yet done
+   * @return false if an exception occurred or the move completed with a
+   * result other than ReplicationManager.MoveResult.COMPLETED. Returns true
+   * if the move completed with MoveResult.COMPLETED or move is not yet done
    */
   private boolean moveContainer(DatanodeDetails source,
                                 ContainerMoveSelection moveSelection) {
@@ -615,7 +618,7 @@ public class ContainerBalancer {
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
         LOG.info("Container move for container {} from source {} to target {}" +
-                "completed exceptionally",
+                "failed with exceptions",
             container.toString(),
             source.getUuidString(),
             moveSelection.getTargetNode().getUuidString());
@@ -694,9 +697,6 @@ public class ContainerBalancer {
 
     return (clusterCapacity - clusterRemaining) / (double) clusterCapacity;
   }
-
-
-
 
   /**
    * Get potential targets for container move. Potential targets are under
@@ -785,42 +785,168 @@ public class ContainerBalancer {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
-    metrics.resetNumMovedContainersInLatestIteration();
+    metrics.resetNumContainerMovesInLatestIteration();
     metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();
   }
 
   /**
-   * Stops ContainerBalancer.
+   * Receives a notification for raft or safe mode related status changes.
+   * Stops ContainerBalancer if it's running and the current SCM becomes a
+   * follower or enters safe mode.
    */
-  public void stop() {
+  @Override
+  public void notifyStatusChanged() {
+    if (!scmContext.isLeader() || scmContext.isInSafeMode()) {
+      if (isBalancerRunning()) {
+        stopBalancingThread();
+      }
+    }
+  }
+
+  /**
+   * Checks if ContainerBalancer should run.
+   * @return false
+   */
+  @Override
+  public boolean shouldRun() {
+    return false;
+  }
+
+  /**
+   * @return Name of this service.
+   */
+  @Override
+  public String getServiceName() {
+    return ContainerBalancer.class.getSimpleName();
+  }
+
+  /**
+   * Starts ContainerBalancer as an SCMService.
+   */
+  @Override
+  public void start() {
+    if (shouldRun()) {
+      startBalancingThread();
+    }
+  }
+
+  /**
+   * Starts Container Balancer after checking its state and validating
+   * configuration.
+   *
+   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
+   * not in a start-appropriate state
+   * @throws InvalidContainerBalancerConfigurationException if
+   * {@link ContainerBalancerConfiguration} config file is incorrectly
+   * configured
+   */
+  public void startBalancer() throws IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException {
     lock.lock();
     try {
-      // we should stop the balancer thread gracefully
-      if (!balancerRunning) {
-        LOG.info("Container Balancer is not running.");
-        return;
-      }
-      balancerRunning = false;
+      validateState();
+      validateConfiguration(this.config);
+      startBalancingThread();
     } finally {
       lock.unlock();
     }
+  }
 
-    // wait for currentBalancingThread to die
-    if (Thread.currentThread().getId() != currentBalancingThread.getId()) {
-      currentBalancingThread.interrupt();
+  /**
+   * Starts a new balancing thread asynchronously.
+   */
+  private void startBalancingThread() {
+    lock.lock();
+    try {
+      balancerRunning = true;
+      currentBalancingThread = new Thread(this::balance);
+      currentBalancingThread.setName("ContainerBalancer");
+      currentBalancingThread.setDaemon(true);
+      currentBalancingThread.start();
+    } finally {
+      lock.unlock();
+    }
+    LOG.info("Starting Container Balancer... {}", this);
+  }
+
+  /**
+   * Checks if ContainerBalancer can start.
+   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
+   * already running, SCM is in safe mode, or SCM is not leader ready
+   */
+  private void validateState() throws IllegalContainerBalancerStateException {
+    if (!scmContext.isLeaderReady()) {
+      LOG.warn("SCM is not leader ready");
+      throw new IllegalContainerBalancerStateException("SCM is not leader " +
+          "ready");
+    }
+    if (scmContext.isInSafeMode()) {
+      LOG.warn("SCM is in safe mode");
+      throw new IllegalContainerBalancerStateException("SCM is in safe mode");
+    }
+    lock.lock();
+    try {
+      if (isBalancerRunning() || currentBalancingThread != null) {
+        LOG.warn("Cannot start ContainerBalancer because it's already running");
+        throw new IllegalContainerBalancerStateException(
+            "Cannot start ContainerBalancer because it's already running");
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Stops the SCM service.
+   */
+  @Override
+  public void stop() {
+    stopBalancer();
+  }
+
+  /**
+   * Stops ContainerBalancer gracefully.
+   */
+  public void stopBalancer() {
+    lock.lock();
+    try {
+      if (!isBalancerRunning()) {
+        LOG.info("Container Balancer is not running.");
+        return;
+      }
+      stopBalancingThread();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void stopBalancingThread() {
+    Thread balancingThread;
+    lock.lock();
+    try {
+      balancerRunning = false;
+      balancingThread = currentBalancingThread;
+      currentBalancingThread = null;
+    } finally {
+      lock.unlock();
+    }
+    // wait for balancingThread to die
+    if (balancingThread != null &&
+        balancingThread.getId() != Thread.currentThread().getId()) {
+      balancingThread.interrupt();
       try {
-        currentBalancingThread.join();
+        balancingThread.join();
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
       }
     }
-    currentBalancingThread = null;
     LOG.info("Container Balancer stopped successfully.");
   }
 
-  private boolean validateConfiguration(ContainerBalancerConfiguration conf) {
+  private void validateConfiguration(ContainerBalancerConfiguration conf)
+      throws InvalidContainerBalancerConfigurationException {
     // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
@@ -828,25 +954,30 @@ public class ContainerBalancer {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     if (conf.getMaxSizeEnteringTarget() <= size) {
-      LOG.info("MaxSizeEnteringTarget should be larger than " +
-          "ozone.scm.container.size");
-      return false;
+      LOG.warn("hdds.container.balancer.size.entering.target.max {} should " +
+          "be greater than ozone.scm.container.size {}",
+          conf.getMaxSizeEnteringTarget(), size);
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.entering.target.max should be greater" +
+              " than ozone.scm.container.size");
     }
     if (conf.getMaxSizeLeavingSource() <= size) {
-      LOG.info("MaxSizeLeavingSource should be larger than " +
-          "ozone.scm.container.size");
-      return false;
+      LOG.warn("hdds.container.balancer.size.leaving.source.max {} should " +
+              "be greater than ozone.scm.container.size {}",
+          conf.getMaxSizeLeavingSource(), size);
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.size.leaving.source.max should be greater" +
+              " than ozone.scm.container.size");
     }
 
     // balancing interval should be greater than DUFactory refresh period
     DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
-    long balancingInterval = duConf.getRefreshPeriod().toMillis();
-    if (conf.getBalancingInterval().toMillis() <= balancingInterval) {
-      LOG.info("balancing.iteration.interval should be larger than " +
-          "hdds.datanode.du.refresh.period.");
-      return false;
+    long refreshPeriod = duConf.getRefreshPeriod().toMillis();
+    if (conf.getBalancingInterval().toMillis() <= refreshPeriod) {
+      LOG.warn("hdds.container.balancer.balancing.iteration.interval {} " +
+              "should be greater than hdds.datanode.du.refresh.period {}",
+          conf.getBalancingInterval(), refreshPeriod);
     }
-    return true;
   }
 
   public void setNodeManager(NodeManager nodeManager) {
@@ -869,11 +1000,21 @@ public class ContainerBalancer {
   }
 
   /**
+   * Sets the configuration that ContainerBalancer will use. This should be
+   * set before starting balancer.
+   * @param config ContainerBalancerConfiguration
+   */
+  public void setConfig(ContainerBalancerConfiguration config) {
+    this.config = config;
+  }
+
+  /**
    * Gets the list of unBalanced nodes, that is, the over and under utilized
    * nodes in the cluster.
    *
    * @return List of DatanodeUsageInfo containing unBalanced nodes.
    */
+  @VisibleForTesting
   List<DatanodeUsageInfo> getUnBalancedNodes() {
     return unBalancedNodes;
   }
@@ -907,6 +1048,7 @@ public class ContainerBalancer {
    *
    * @return Map of {@link DatanodeDetails} to {@link ContainerMoveSelection}
    */
+  @VisibleForTesting
   public Map<DatanodeDetails, ContainerMoveSelection> getSourceToTargetMap() {
     return sourceToTargetMap;
   }
@@ -920,16 +1062,23 @@ public class ContainerBalancer {
     return balancerRunning;
   }
 
+  @VisibleForTesting
   int getCountDatanodesInvolvedPerIteration() {
     return countDatanodesInvolvedPerIteration;
   }
 
+  @VisibleForTesting
   public long getSizeMovedPerIteration() {
     return sizeMovedPerIteration;
   }
 
   public ContainerBalancerMetrics getMetrics() {
     return metrics;
+  }
+
+  @VisibleForTesting
+  IterationResult getIterationResult() {
+    return iterationResult;
   }
 
   public static int ratioToPercent(double ratio) {
@@ -949,8 +1098,6 @@ public class ContainerBalancer {
    */
   enum IterationResult {
     ITERATION_COMPLETED,
-    MAX_DATANODES_TO_INVOLVE_REACHED,
-    MAX_SIZE_TO_MOVE_REACHED,
     ITERATION_INTERRUPTED,
     CAN_NOT_BALANCE_ANY_MORE
   }

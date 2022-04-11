@@ -727,6 +727,7 @@ public class OzoneBucket extends WithMetadata {
    * @param keyMap The key is original key name nad value is new key name.
    * @throws IOException
    */
+  @Deprecated
   public void renameKeys(Map<String, String> keyMap)
       throws IOException {
     proxy.renameKeys(volumeName, name, keyMap);

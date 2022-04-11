@@ -95,7 +95,6 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("marker") String marker,
       @DefaultValue("1000") @QueryParam("max-keys") int maxKeys,
       @QueryParam("prefix") String prefix,
-      @QueryParam("browser") String browser,
       @QueryParam("continuation-token") String continueToken,
       @QueryParam("start-after") String startAfter,
       @QueryParam("uploads") String uploads,
@@ -106,15 +105,6 @@ public class BucketEndpoint extends EndpointBase {
       S3BucketAcl result = getAcl(bucketName);
       getMetrics().incGetAclSuccess();
       return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
-    }
-
-    if (browser != null) {
-      InputStream browserPage = getClass()
-          .getResourceAsStream("/browser.html");
-      return Response.ok(browserPage,
-            MediaType.TEXT_HTML_TYPE)
-            .build();
-
     }
 
     if (uploads != null) {

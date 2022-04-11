@@ -96,4 +96,12 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
   }
+
+  public List<OmKeyInfo> getOmKeyInfoList() {
+    return omKeyInfoList;
+  }
+
+  public OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
+  }
 }
