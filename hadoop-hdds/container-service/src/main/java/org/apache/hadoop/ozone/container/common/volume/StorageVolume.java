@@ -35,6 +35,7 @@ import java.util.Objects;
  * StorageVolume represents a generic Volume in datanode, could be
  * 1. HddsVolume for container storage.
  * 2. MetadataVolume for metadata(ratis) storage.
+ * 3. DbVolume for db instance storage.
  */
 public abstract class StorageVolume
     implements Checkable<Boolean, VolumeCheckResult> {
@@ -44,7 +45,8 @@ public abstract class StorageVolume
    */
   public enum VolumeType {
     DATA_VOLUME,
-    META_VOLUME
+    META_VOLUME,
+    DB_VOLUME,
   }
 
   private final File storageDir;

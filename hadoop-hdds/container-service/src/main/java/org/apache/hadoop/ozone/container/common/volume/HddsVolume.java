@@ -76,6 +76,14 @@ public class HddsVolume extends StorageVolume {
   private int layoutVersion;      // layout version of the storage data
   private final AtomicLong committedBytes; // till Open containers become full
 
+  // The dedicated DbVolume that the db instance of this HddsVolume resides.
+  // This is optional, if null then the db instance resides on this HddsVolume.
+  private DbVolume dbVolume;
+  // The subdirectory with storageID as its name, used to build the
+  // container db path. This is initialized only once together with dbVolume,
+  // and stored as a member to prevent spawning lots of File objects.
+  private File dbParentDir;
+
   /**
    * Builder for HddsVolume.
    */
@@ -370,5 +378,21 @@ public class HddsVolume extends StorageVolume {
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  public void setDbVolume(DbVolume dbVolume) {
+    this.dbVolume = dbVolume;
+  }
+
+  public DbVolume getDbVolume() {
+    return this.dbVolume;
+  }
+
+  public void setDbParentDir(File dbParentDir) {
+    this.dbParentDir = dbParentDir;
+  }
+
+  public File getDbParentDir() {
+    return this.dbParentDir;
   }
 }

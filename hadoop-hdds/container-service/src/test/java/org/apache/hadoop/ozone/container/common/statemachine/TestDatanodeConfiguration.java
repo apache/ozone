@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_MIN_GAP_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.DISK_CHECK_TIMEOUT_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY;
@@ -57,6 +58,8 @@ public class TestDatanodeConfiguration {
         validFailedVolumesTolerated);
     conf.setInt(FAILED_METADATA_VOLUMES_TOLERATED_KEY,
         validFailedVolumesTolerated);
+    conf.setInt(FAILED_DB_VOLUMES_TOLERATED_KEY,
+        validFailedVolumesTolerated);
     conf.setTimeDuration(DISK_CHECK_MIN_GAP_KEY,
         validDiskCheckMinGap, TimeUnit.MINUTES);
     conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
@@ -73,6 +76,8 @@ public class TestDatanodeConfiguration {
         subject.getFailedDataVolumesTolerated());
     assertEquals(validFailedVolumesTolerated,
         subject.getFailedMetadataVolumesTolerated());
+    assertEquals(validFailedVolumesTolerated,
+        subject.getFailedDbVolumesTolerated());
     assertEquals(validDiskCheckMinGap,
         subject.getDiskCheckMinGap().toMinutes());
     assertEquals(validDiskCheckTimeout,
@@ -95,6 +100,8 @@ public class TestDatanodeConfiguration {
         invalidFailedVolumesTolerated);
     conf.setInt(FAILED_METADATA_VOLUMES_TOLERATED_KEY,
         invalidFailedVolumesTolerated);
+    conf.setInt(FAILED_DB_VOLUMES_TOLERATED_KEY,
+        invalidFailedVolumesTolerated);
     conf.setTimeDuration(DISK_CHECK_MIN_GAP_KEY,
         invalidDiskCheckMinGap, TimeUnit.MINUTES);
     conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
@@ -112,6 +119,8 @@ public class TestDatanodeConfiguration {
         subject.getFailedDataVolumesTolerated());
     assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
         subject.getFailedMetadataVolumesTolerated());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedDbVolumesTolerated());
     assertEquals(DISK_CHECK_MIN_GAP_DEFAULT,
         subject.getDiskCheckMinGap().toMillis());
     assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,
@@ -135,6 +144,8 @@ public class TestDatanodeConfiguration {
         subject.getFailedDataVolumesTolerated());
     assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
         subject.getFailedMetadataVolumesTolerated());
+    assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
+        subject.getFailedDbVolumesTolerated());
     assertEquals(DISK_CHECK_MIN_GAP_DEFAULT,
         subject.getDiskCheckMinGap().toMillis());
     assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,

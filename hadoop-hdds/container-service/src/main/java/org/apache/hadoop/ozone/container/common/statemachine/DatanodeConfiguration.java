@@ -45,6 +45,8 @@ public class DatanodeConfiguration {
       "hdds.datanode.failed.data.volumes.tolerated";
   public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.metadata.volumes.tolerated";
+  public static final String FAILED_DB_VOLUMES_TOLERATED_KEY =
+      "hdds.datanode.failed.db.volumes.tolerated";
   public static final String DISK_CHECK_MIN_GAP_KEY =
       "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY =
@@ -195,6 +197,17 @@ public class DatanodeConfiguration {
   )
   private int failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
+  @Config(key = "failed.db.volumes.tolerated",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of db volumes that are allowed to fail "
+          + "before a datanode stops offering service. "
+          + "Config this to -1 means unlimited, but we should have "
+          + "at least one good volume left."
+  )
+  private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+
   @Config(key = "disk.check.min.gap",
       defaultValue = "15m",
       type = ConfigType.TIME,
@@ -277,6 +290,13 @@ public class DatanodeConfiguration {
       failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
+    if (failedDbVolumesTolerated < -1) {
+      LOG.warn(FAILED_DB_VOLUMES_TOLERATED_KEY +
+              "must be greater than -1 and was set to {}. Defaulting to {}",
+          failedDbVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
+      failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+    }
+
     if (diskCheckMinGap < 0) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -323,6 +343,14 @@ public class DatanodeConfiguration {
 
   public void setFailedMetadataVolumesTolerated(int failedVolumesTolerated) {
     this.failedMetadataVolumesTolerated = failedVolumesTolerated;
+  }
+
+  public int getFailedDbVolumesTolerated() {
+    return failedDbVolumesTolerated;
+  }
+
+  public void setFailedDbVolumesTolerated(int failedVolumesTolerated) {
+    this.failedDbVolumesTolerated = failedVolumesTolerated;
   }
 
   public Duration getDiskCheckMinGap() {

@@ -316,8 +316,8 @@ public class DatanodeStateMachine implements Closeable {
   public void handleFatalVolumeFailures() {
     LOG.error("DatanodeStateMachine Shutdown due to too many bad volumes, "
         + "check " + DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY
-        + " and "
-        + DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY);
+        + " and " + DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY
+        + " and " + DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY);
     hddsDatanodeStopService.stopService();
   }
 

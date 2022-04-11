@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -62,6 +64,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -91,6 +94,7 @@ public class OzoneContainer {
   private final ConfigurationSource config;
   private final MutableVolumeSet volumeSet;
   private final MutableVolumeSet metaVolumeSet;
+  private final MutableVolumeSet dbVolumeSet;
   private final StorageVolumeChecker volumeChecker;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
@@ -133,6 +137,14 @@ public class OzoneContainer {
     volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
     metaVolumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.META_VOLUME, volumeChecker);
+    if (VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
+        .equals(OzoneConsts.SCHEMA_V3)) {
+      dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+          new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+              context, VolumeType.DB_VOLUME, volumeChecker);
+    } else {
+      dbVolumeSet = null;
+    }
 
     containerSet = new ContainerSet();
     metadataScanner = null;
@@ -437,9 +449,12 @@ public class OzoneContainer {
     return metaVolumeSet;
   }
 
+  public MutableVolumeSet getDbVolumeSet() {
+    return dbVolumeSet;
+  }
+
   @VisibleForTesting
   StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
     return new StorageVolumeChecker(conf, new Timer());
   }
-
 }

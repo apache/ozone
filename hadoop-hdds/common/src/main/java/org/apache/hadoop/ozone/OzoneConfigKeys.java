@@ -328,6 +328,11 @@ public final class OzoneConfigKeys {
   public static final String
       HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "1GB";
 
+  // Specifying the dedicated volumes for per-disk db instances.
+  // For container schema v3 only.
+  public static final String HDDS_DATANODE_CONTAINER_DB_DIR =
+      "hdds.datanode.container.db.dir";
+
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
   public static final boolean OZONE_SECURITY_ENABLED_DEFAULT = false;

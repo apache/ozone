@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -47,5 +48,11 @@ public final class StorageVolumeUtil {
       List<StorageVolume> volumes) {
     return volumes.stream().
         map(v -> (HddsVolume) v).collect(Collectors.toList());
+  }
+
+  public static List<DbVolume> getDbVolumesList(
+      List<StorageVolume> volumes) {
+    return volumes.stream().
+        map(v -> (DbVolume) v).collect(Collectors.toList());
   }
 }

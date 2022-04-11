@@ -127,6 +127,10 @@ public class TestVolumeSetDiskChecks {
         UUID.randomUUID().toString(), conf, null,
         StorageVolume.VolumeType.META_VOLUME,
         dummyChecker);
+    final MutableVolumeSet dbVolumeSet = new MutableVolumeSet(
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DB_VOLUME,
+        dummyChecker);
 
     Assert.assertEquals(volumeSet.getFailedVolumesList().size(),
         numBadVolumes);
@@ -136,8 +140,14 @@ public class TestVolumeSetDiskChecks {
         numBadVolumes);
     Assert.assertEquals(metaVolumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
+    Assert.assertEquals(dbVolumeSet.getFailedVolumesList().size(),
+        numBadVolumes);
+    Assert.assertEquals(dbVolumeSet.getVolumesList().size(),
+        numVolumes - numBadVolumes);
+
     volumeSet.shutdown();
     metaVolumeSet.shutdown();
+    dbVolumeSet.shutdown();
   }
 
   /**
@@ -159,13 +169,21 @@ public class TestVolumeSetDiskChecks {
         UUID.randomUUID().toString(), conf, null,
         StorageVolume.VolumeType.META_VOLUME,
         dummyChecker);
+    final MutableVolumeSet dbVolumeSet = new MutableVolumeSet(
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DB_VOLUME,
+        dummyChecker);
 
     assertEquals(volumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(volumeSet.getVolumesList().size(), 0);
     assertEquals(metaVolumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(metaVolumeSet.getVolumesList().size(), 0);
+    assertEquals(dbVolumeSet.getFailedVolumesList().size(), numVolumes);
+    assertEquals(dbVolumeSet.getVolumesList().size(), 0);
+
     volumeSet.shutdown();
     metaVolumeSet.shutdown();
+    dbVolumeSet.shutdown();
   }
 
   /**
@@ -188,10 +206,19 @@ public class TestVolumeSetDiskChecks {
     }
     ozoneConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         String.join(",", metaDirs));
+
+    final List<String> dbDirs = new ArrayList<>();
+    for (int i = 0; i < numDirs; ++i) {
+      dbDirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+    }
+    ozoneConf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
+        String.join(",", dbDirs));
+
     DatanodeConfiguration dnConf =
         ozoneConf.getObject(DatanodeConfiguration.class);
     dnConf.setFailedDataVolumesTolerated(numDirs * 2);
     dnConf.setFailedMetadataVolumesTolerated(numDirs * 2);
+    dnConf.setFailedDbVolumesTolerated(numDirs * 2);
     ozoneConf.setFromObject(dnConf);
     return ozoneConf;
   }

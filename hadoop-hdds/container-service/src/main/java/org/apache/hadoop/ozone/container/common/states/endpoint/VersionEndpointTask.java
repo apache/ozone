@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
@@ -25,10 +26,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -78,16 +82,18 @@ public class VersionEndpointTask implements
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
 
+          Preconditions.checkNotNull(scmId,
+              "Reply from SCM: scmId cannot be null");
+          Preconditions.checkNotNull(clusterId,
+              "Reply from SCM: clusterId cannot be null");
+
+          formatDbVolumesIfNeeded(scmId, clusterId);
+
           // Check volumes
           MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
           volumeSet.writeLock();
           try {
             Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
-
-            Preconditions.checkNotNull(scmId,
-                "Reply from SCM: scmId cannot be null");
-            Preconditions.checkNotNull(clusterId,
-                "Reply from SCM: clusterId cannot be null");
 
             // If version file does not exist
             // create version file and also set scm ID or cluster ID.
@@ -128,5 +134,32 @@ public class VersionEndpointTask implements
       rpcEndPoint.unlock();
     }
     return rpcEndPoint.getState();
+  }
+
+  private void formatDbVolumesIfNeeded(String scmId, String clusterId) {
+    if (!VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
+        .equals(OzoneConsts.SCHEMA_V3)) {
+      return;
+    }
+
+    MutableVolumeSet dbVolumeSet = ozoneContainer.getDbVolumeSet();
+
+    if (dbVolumeSet != null) {
+      dbVolumeSet.writeLock();
+      try {
+        List<DbVolume> dbVolumeList = StorageVolumeUtil
+            .getDbVolumesList(dbVolumeSet.getVolumesList());
+
+        dbVolumeList.parallelStream().forEach(dbVolume -> {
+          String id = VersionedDatanodeFeatures.ScmHA
+              .chooseContainerPathID(configuration, scmId, clusterId);
+          if (!dbVolume.format(id)) {
+            dbVolumeSet.failVolume(dbVolume.getStorageDir().getPath());
+          }
+        });
+      } finally {
+        dbVolumeSet.writeUnlock();
+      }
+    }
   }
 }
