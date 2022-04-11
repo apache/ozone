@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -34,7 +34,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatch() throws Exception {
 
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
@@ -55,7 +55,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String ozoneToKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         toKeyName);
 
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
     Assert.assertTrue(
@@ -77,7 +77,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
 
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
@@ -98,7 +98,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String ozoneToKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         toKeyName);
 
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
     Assert.assertTrue(
@@ -122,7 +122,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithSameKeyName() throws Exception {
 
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
@@ -140,7 +140,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String ozoneFromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
 
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
     Assert.assertTrue(

@@ -76,7 +76,7 @@ public class ClientCRLStore implements CRLStore {
 
   public List<Long> getRevokedCertIds(X509CRL crl) {
     return Collections.unmodifiableList(crl.getRevokedCertificates().stream()
-        .map(cert -> cert.getSerialNumber().longValue())
+        .map(cert->cert.getSerialNumber().longValue())
         .collect(Collectors.toList()));
   }
 
@@ -91,7 +91,7 @@ public class ClientCRLStore implements CRLStore {
 
   public List<Long> getPendingCrlIds() {
     return new ArrayList<>(pendingCrls)
-        .stream().map(crl -> crl.getCrlSequenceID())
+        .stream().map(crl->crl.getCrlSequenceID())
         .collect(Collectors.toList());
   }
 

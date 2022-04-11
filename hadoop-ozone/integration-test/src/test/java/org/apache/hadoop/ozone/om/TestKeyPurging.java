@@ -112,7 +112,7 @@ public class TestKeyPurging {
       String keyName = keyBase + "-" + i;
       keys.add(keyName);
       OzoneOutputStream keyStream = TestHelper.createKey(
-          keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
+          keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
           KEY_SIZE, store, volumeName, bucketName);
       keyStream.write(data);
       keyStream.close();

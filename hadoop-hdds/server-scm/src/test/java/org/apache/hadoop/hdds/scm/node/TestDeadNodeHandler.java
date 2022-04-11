@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -101,7 +101,7 @@ public class TestDeadNodeHandler {
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     eventQueue = new EventQueue();
-    scm = HddsTestUtils.getScm(conf);
+    scm = TestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     scmContext = new SCMContext.Builder().setIsInSafeMode(true)
         .setLeader(true).setIsPreCheckComplete(true)
@@ -143,11 +143,11 @@ public class TestDeadNodeHandler {
     String metaStoragePath = GenericTestUtils.getRandomizedTempPath()
         .concat("/metadata-" + datanode1.getUuidString());
 
-    StorageReportProto storageOne = HddsTestUtils.createStorageReport(
+    StorageReportProto storageOne = TestUtils.createStorageReport(
         datanode1.getUuid(), storagePath, 100 * OzoneConsts.TB,
         10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
     MetadataStorageReportProto metaStorageOne =
-        HddsTestUtils.createMetadataStorageReport(metaStoragePath,
+        TestUtils.createMetadataStorageReport(metaStoragePath,
             100 * OzoneConsts.GB, 10 * OzoneConsts.GB,
             90 * OzoneConsts.GB, null);
 
@@ -160,48 +160,48 @@ public class TestDeadNodeHandler {
     // test case happy.
 
     nodeManager.register(datanode1,
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
     nodeManager.register(datanode2,
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
     nodeManager.register(datanode3,
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
 
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
 
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Arrays.asList(metaStorageOne)), null);
 
     LambdaTestUtils.await(120000, 1000,
         () -> pipelineManager.getPipelines(new RatisReplicationConfig(THREE))
             .size() > 3);
-    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+    TestUtils.openAllRatisPipelines(pipelineManager);
 
     ContainerInfo container1 =
-        HddsTestUtils.allocateContainer(containerManager);
+        TestUtils.allocateContainer(containerManager);
     ContainerInfo container2 =
-        HddsTestUtils.allocateContainer(containerManager);
+        TestUtils.allocateContainer(containerManager);
     ContainerInfo container3 =
-        HddsTestUtils.allocateContainer(containerManager);
+        TestUtils.allocateContainer(containerManager);
     ContainerInfo container4 =
-        HddsTestUtils.allocateContainer(containerManager);
+        TestUtils.allocateContainer(containerManager);
 
     registerContainers(datanode1, container1, container2, container4);
     registerContainers(datanode2, container1, container2);
@@ -212,10 +212,9 @@ public class TestDeadNodeHandler {
     registerReplicas(containerManager, container3, datanode3);
     registerReplicas(containerManager, container4, datanode1);
 
-    HddsTestUtils.closeContainer(containerManager, container1.containerID());
-    HddsTestUtils.closeContainer(containerManager, container2.containerID());
-    HddsTestUtils.quasiCloseContainer(containerManager,
-        container3.containerID());
+    TestUtils.closeContainer(containerManager, container1.containerID());
+    TestUtils.closeContainer(containerManager, container2.containerID());
+    TestUtils.quasiCloseContainer(containerManager, container3.containerID());
 
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event

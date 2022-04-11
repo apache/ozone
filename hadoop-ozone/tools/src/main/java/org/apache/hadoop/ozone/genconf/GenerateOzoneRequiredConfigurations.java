@@ -163,7 +163,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
     generatedConfig.setProperties(requiredProperties);
 
     File output = new File(path, "ozone-site.xml");
-    if (output.createNewFile()) {
+    if(output.createNewFile()){
       JAXBContext context =
           JAXBContext.newInstance(OzoneConfiguration.XMLConfiguration.class);
       Marshaller m = context.createMarshaller();

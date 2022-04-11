@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -63,7 +63,7 @@ public class TestSCMBlockProtocolServer {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
-    scm = HddsTestUtils.getScm(config, configurator);
+    scm = TestUtils.getScm(config, configurator);
     scm.start();
     scm.exitSafeMode();
     // add nodes to scm node manager

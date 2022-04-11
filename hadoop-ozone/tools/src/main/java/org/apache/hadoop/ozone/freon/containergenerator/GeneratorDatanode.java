@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -316,8 +316,8 @@ public class GeneratorDatanode extends BaseGenerator {
 
   private KeyValueContainer createContainer(long containerId)
       throws IOException {
-    ContainerLayoutVersion layoutVersion =
-        ContainerLayoutVersion.getConfiguredVersion(config);
+    ChunkLayOutVersion layoutVersion =
+        ChunkLayOutVersion.getConfiguredVersion(config);
     KeyValueContainerData keyValueContainerData =
         new KeyValueContainerData(containerId, layoutVersion,
             getContainerSize(config),

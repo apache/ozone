@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
  * registered with SCM.
  */
 public class DataNodeSafeModeRule extends
-    SafeModeExitRule<NodeRegistrationContainerReport> {
+    SafeModeExitRule<NodeRegistrationContainerReport>{
 
   // Min DataNodes required to exit safe mode.
   private int requiredDns;

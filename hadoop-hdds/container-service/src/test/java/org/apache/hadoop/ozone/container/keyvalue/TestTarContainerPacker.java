@@ -36,7 +36,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -87,15 +87,15 @@ public class TestTarContainerPacker {
 
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
 
-  private final ContainerLayoutVersion layout;
+  private final ChunkLayOutVersion layout;
 
-  public TestTarContainerPacker(ContainerLayoutVersion layout) {
+  public TestTarContainerPacker(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
   }
 
   @BeforeClass

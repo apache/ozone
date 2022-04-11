@@ -161,7 +161,7 @@ public abstract class StorageVolume
   }
 
   public StorageType getStorageType() {
-    if (this.volumeInfo != null) {
+    if(this.volumeInfo != null) {
       return this.volumeInfo.getStorageType();
     }
     return StorageType.DEFAULT;

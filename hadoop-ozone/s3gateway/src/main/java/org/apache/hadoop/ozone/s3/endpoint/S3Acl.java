@@ -83,7 +83,7 @@ public final class S3Acl {
 
 
     public static ACLType getType(String typeStr) {
-      for (ACLType type: ACLType.values()) {
+      for(ACLType type: ACLType.values()) {
         if (type.getValue().equals(typeStr)) {
           return type;
         }
@@ -139,7 +139,7 @@ public final class S3Acl {
     }
 
     public static ACLIdentityType getTypeFromGranteeType(String typeStr) {
-      for (ACLIdentityType type: ACLIdentityType.values()) {
+      for(ACLIdentityType type: ACLIdentityType.values()) {
         if (type.getGranteeType().equals(typeStr)) {
           return type;
         }
@@ -148,7 +148,7 @@ public final class S3Acl {
     }
 
     public static ACLIdentityType getTypeFromHeaderType(String typeStr) {
-      for (ACLIdentityType type: ACLIdentityType.values()) {
+      for(ACLIdentityType type: ACLIdentityType.values()) {
         if (type.getHeaderType().equals(typeStr)) {
           return type;
         }

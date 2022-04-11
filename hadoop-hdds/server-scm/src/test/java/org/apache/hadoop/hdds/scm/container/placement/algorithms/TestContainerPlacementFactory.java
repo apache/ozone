@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -97,11 +97,11 @@ public class TestContainerPlacementFactory {
           datanodeDetails, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
-      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+      StorageReportProto storage1 = TestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
-          HddsTestUtils.createMetadataStorageReport(
+          TestUtils.createMetadataStorageReport(
           "/metadata1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       datanodeInfo.updateStorageReports(
@@ -114,19 +114,19 @@ public class TestContainerPlacementFactory {
       dnInfos.add(datanodeInfo);
     }
 
-    StorageReportProto storage2 = HddsTestUtils.createStorageReport(
+    StorageReportProto storage2 = TestUtils.createStorageReport(
         dnInfos.get(2).getUuid(),
         "/data1-" + dnInfos.get(2).getUuidString(),
         STORAGE_CAPACITY, 90L, 10L, null);
     dnInfos.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
-    StorageReportProto storage3 = HddsTestUtils.createStorageReport(
+    StorageReportProto storage3 = TestUtils.createStorageReport(
         dnInfos.get(3).getUuid(),
         "/data1-" + dnInfos.get(3).getUuidString(),
         STORAGE_CAPACITY, 80L, 20L, null);
     dnInfos.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
-    StorageReportProto storage4 = HddsTestUtils.createStorageReport(
+    StorageReportProto storage4 = TestUtils.createStorageReport(
         dnInfos.get(4).getUuid(),
         "/data1-" + dnInfos.get(4).getUuidString(),
         STORAGE_CAPACITY, 70L, 30L, null);

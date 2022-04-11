@@ -54,7 +54,7 @@ public class AuditParser extends GenericCli {
     new AuditParser().run(argv);
   }
 
-  public String getDatabase() {
+  public String getDatabase(){
     return database;
   }
 }

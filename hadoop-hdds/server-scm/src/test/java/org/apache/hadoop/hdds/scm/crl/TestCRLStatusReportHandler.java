@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.server.SCMCertStore;
@@ -125,7 +125,7 @@ public class TestCRLStatusReportHandler implements EventPublisher {
       List<Long> pendingCRLIds,
       long receivedCRLId) {
     CRLStatusReport crlStatusReportProto =
-        HddsTestUtils.createCRLStatusReport(pendingCRLIds, receivedCRLId);
+        TestUtils.createCRLStatusReport(pendingCRLIds, receivedCRLId);
     return new CRLStatusReportFromDatanode(dn, crlStatusReportProto);
   }
 

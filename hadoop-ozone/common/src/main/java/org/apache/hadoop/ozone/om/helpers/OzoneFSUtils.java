@@ -31,7 +31,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  */
 public final class OzoneFSUtils {
 
-  private OzoneFSUtils() { }
+  private OzoneFSUtils() {}
 
   /**
    * Returns string representation of path after removing the leading slash.

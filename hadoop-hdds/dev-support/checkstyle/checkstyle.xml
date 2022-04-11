@@ -152,7 +152,6 @@
         <module name="WhitespaceAfter">
           <property name="tokens" value="COMMA, SEMI"/>
         </module>
-        <module name="WhitespaceAround"/>
 
 
         <!-- Modifier Checks                                    -->

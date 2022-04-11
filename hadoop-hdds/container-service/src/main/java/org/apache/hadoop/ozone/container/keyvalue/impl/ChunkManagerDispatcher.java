@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
@@ -43,8 +43,8 @@ import java.util.EnumMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 /**
  * Selects ChunkManager implementation to use for each chunk operation.
@@ -54,8 +54,8 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkManagerDispatcher.class);
 
-  private final Map<ContainerLayoutVersion, ChunkManager> handlers
-      = new EnumMap<>(ContainerLayoutVersion.class);
+  private final Map<ChunkLayOutVersion, ChunkManager> handlers
+      = new EnumMap<>(ChunkLayOutVersion.class);
 
   ChunkManagerDispatcher(boolean sync, BlockManager manager,
                          VolumeSet volSet) {
@@ -128,13 +128,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private @Nonnull ChunkManager selectHandler(Container container)
       throws StorageContainerException {
 
-    ContainerLayoutVersion layout =
-        container.getContainerData().getLayoutVersion();
+    ChunkLayOutVersion layout = container.getContainerData().getLayOutVersion();
     return selectVersionHandler(layout);
   }
 
-  private @Nonnull ChunkManager selectVersionHandler(
-      ContainerLayoutVersion version)
+  private @Nonnull ChunkManager selectVersionHandler(ChunkLayOutVersion version)
       throws StorageContainerException {
     ChunkManager versionHandler = handlers.get(version);
     if (versionHandler == null) {
@@ -144,7 +142,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   private static ChunkManager throwUnknownLayoutVersion(
-      ContainerLayoutVersion version) throws StorageContainerException {
+      ChunkLayOutVersion version) throws StorageContainerException {
 
     String message = "Unsupported storage container layout: " + version;
     LOG.warn(message);

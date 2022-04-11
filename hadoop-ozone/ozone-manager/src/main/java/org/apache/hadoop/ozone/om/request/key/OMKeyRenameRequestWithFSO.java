@@ -149,7 +149,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                       volumeName, bucketName, toKeyName, 0);
 
       // Check if toKey exists.
-      if (toKeyFileStatus != null) {
+      if(toKeyFileStatus != null) {
         // Destination exists and following are different cases:
         OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
 

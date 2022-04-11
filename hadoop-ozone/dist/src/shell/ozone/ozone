@@ -43,6 +43,7 @@ function ozone_usage
   ozone_add_subcommand "freon" client "runs an ozone data generator"
   ozone_add_subcommand "fs" client "run a filesystem command on Ozone file system. Equivalent to 'hadoop fs'"
   ozone_add_subcommand "genconf" client "generate minimally required ozone configs and output to ozone-site.xml in specified path"
+  ozone_add_subcommand "genesis" client "runs a collection of ozone benchmarks to help with tuning."
   ozone_add_subcommand "getconf" client "get ozone config values from configuration"
   ozone_add_subcommand "jmxget" admin "get JMX exported values from NameNode or DataNode."
   ozone_add_subcommand "om" daemon "Ozone Manager"
@@ -130,6 +131,22 @@ function ozonecmd_case
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS}"
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    genesis)
+      ARTIFACT_LIB_DIR="${OZONE_HOME}/share/ozone/lib/ozone-tools"
+      mkdir -p "$ARTIFACT_LIB_DIR"
+      if [[ ! -f "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar" ]]; then
+        echo "jmh-core jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: GPL + classpath exception)"
+        curl -o "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar"  https://repo1.maven.org/maven2/org/openjdk/jmh/jmh-core/1.23/jmh-core-1.23.jar
+      fi
+
+      if [[ ! -f "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" ]]; then
+        echo "jopt jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: MIT License)"
+        curl -o "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" https://repo1.maven.org/maven2/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar
+      fi
+
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.genesis.Genesis
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     getconf)

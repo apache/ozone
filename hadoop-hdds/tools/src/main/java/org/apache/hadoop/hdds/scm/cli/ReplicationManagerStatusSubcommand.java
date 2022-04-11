@@ -43,7 +43,7 @@ public class ReplicationManagerStatusSubcommand extends ScmSubcommand {
     boolean execReturn = scmClient.getReplicationManagerStatus();
 
     // Output data list
-    if (execReturn) {
+    if(execReturn){
       LOG.info("ReplicationManager is Running.");
     } else {
       LOG.info("ReplicationManager is Not Running.");

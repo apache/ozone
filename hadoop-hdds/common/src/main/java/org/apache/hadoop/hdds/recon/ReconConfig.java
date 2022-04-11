@@ -40,7 +40,7 @@ public class ReconConfig {
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },
-      description = "The keytab file used by Recon daemon to login as " +
+      description = "The keytab file used by Recon daemon to login as "+
           "its service principal."
   )
   private String keytab;

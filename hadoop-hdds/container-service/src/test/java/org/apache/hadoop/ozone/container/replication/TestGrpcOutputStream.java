@@ -126,18 +126,18 @@ public class TestGrpcOutputStream {
   public void bufferFlushedWhenFull() throws IOException {
     byte[] bytes = getRandomBytes(bufferSize);
 
-    subject.write(bytes, 0, bufferSize - 1);
-    subject.write(bytes[bufferSize - 1]);
+    subject.write(bytes, 0, bufferSize-1);
+    subject.write(bytes[bufferSize-1]);
     verify(observer).onNext(any());
 
     subject.write(bytes[0]);
-    subject.write(bytes, 1, bufferSize - 1);
+    subject.write(bytes, 1, bufferSize-1);
     verify(observer, times(2)).onNext(any());
   }
 
   @Test
   public void singleArraySpansMultipleResponses() throws IOException {
-    byte[] bytes = writeBytes(subject, 2 * bufferSize + bufferSize / 2);
+    byte[] bytes = writeBytes(subject, 2 * bufferSize + bufferSize/2);
     subject.close();
 
     verifyResponses(bytes);

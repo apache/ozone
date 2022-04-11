@@ -107,7 +107,7 @@ public class OzoneKey {
    *
    * @return bucketName
    */
-  public String getBucketName() {
+  public String getBucketName(){
     return bucketName;
   }
 

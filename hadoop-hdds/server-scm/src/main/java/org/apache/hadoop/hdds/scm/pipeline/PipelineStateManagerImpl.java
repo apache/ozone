@@ -258,8 +258,10 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
       throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
+    Pipeline.PipelineState oldState = null;
     lock.writeLock().lock();
     try {
+      oldState = getPipeline(pipelineID).getPipelineState();
       // null check is here to prevent the case where SCM store
       // is closed but the staleNode handlers/pipeline creations
       // still try to access it.
@@ -273,8 +275,9 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
           + " may have been deleted already.", pipelineID);
     } catch (IOException ex) {
-      LOG.error("Pipeline {} state update failed", pipelineID);
-      throw ex;
+      LOG.warn("Pipeline {} state update failed", pipelineID);
+      // revert back to old state in memory
+      pipelineStateMap.updatePipelineState(pipelineID, oldState);
     } finally {
       lock.writeLock().unlock();
     }

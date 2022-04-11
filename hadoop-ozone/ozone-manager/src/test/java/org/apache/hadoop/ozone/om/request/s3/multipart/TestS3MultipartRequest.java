@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -112,7 +112,7 @@ public class TestS3MultipartRequest {
   protected OMRequest doPreExecuteInitiateMPU(
       String volumeName, String bucketName, String keyName) throws Exception {
     OMRequest omRequest =
-        OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
+        TestOMRequestUtils.createInitiateMPURequest(volumeName, bucketName,
             keyName);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
@@ -150,7 +150,7 @@ public class TestS3MultipartRequest {
     // Just set dummy size
     long dataSize = 100L;
     OMRequest omRequest =
-        OMRequestTestUtils.createCommitPartMPURequest(volumeName, bucketName,
+        TestOMRequestUtils.createCommitPartMPURequest(volumeName, bucketName,
             keyName, clientID, dataSize, multipartUploadID, partNumber);
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
             getS3MultipartUploadCommitReq(omRequest);
@@ -179,7 +179,7 @@ public class TestS3MultipartRequest {
       String multipartUploadID) throws IOException {
 
     OMRequest omRequest =
-        OMRequestTestUtils.createAbortMPURequest(volumeName, bucketName,
+        TestOMRequestUtils.createAbortMPURequest(volumeName, bucketName,
             keyName, multipartUploadID);
 
 
@@ -201,7 +201,7 @@ public class TestS3MultipartRequest {
       List<Part> partList) throws IOException {
 
     OMRequest omRequest =
-        OMRequestTestUtils.createCompleteMPURequest(volumeName, bucketName,
+        TestOMRequestUtils.createCompleteMPURequest(volumeName, bucketName,
             keyName, multipartUploadID, partList);
 
     S3MultipartUploadCompleteRequest s3MultipartUploadCompleteRequest =
@@ -229,7 +229,7 @@ public class TestS3MultipartRequest {
   protected OMRequest doPreExecuteInitiateMPUWithFSO(
       String volumeName, String bucketName, String keyName) throws Exception {
     OMRequest omRequest =
-            OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
+            TestOMRequestUtils.createInitiateMPURequest(volumeName, bucketName,
                     keyName);
 
     S3InitiateMultipartUploadRequestWithFSO

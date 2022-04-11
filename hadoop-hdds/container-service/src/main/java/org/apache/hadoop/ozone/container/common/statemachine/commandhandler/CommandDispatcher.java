@@ -68,7 +68,7 @@ public final class CommandDispatcher {
     this.connectionManager = connectionManager;
     handlerMap = new HashMap<>();
     for (CommandHandler h : handlers) {
-      if (handlerMap.containsKey(h.getCommandType())) {
+      if(handlerMap.containsKey(h.getCommandType())){
         LOG.error("Duplicate handler for the same command. Exiting. Handle " +
             "key : {}", h.getCommandType().getDescriptorForType().getName());
         throw new IllegalArgumentException("Duplicate handler for the same " +

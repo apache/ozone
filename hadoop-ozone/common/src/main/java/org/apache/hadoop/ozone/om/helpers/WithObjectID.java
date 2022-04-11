@@ -61,7 +61,7 @@ public class WithObjectID extends WithMetadata {
    * @param obId - long
    */
   public void setObjectID(long obId) {
-    if (this.objectID != 0) {
+    if(this.objectID != 0) {
       throw new UnsupportedOperationException("Attempt to modify object ID " +
           "which is not zero. Current Object ID is " + this.objectID);
     }

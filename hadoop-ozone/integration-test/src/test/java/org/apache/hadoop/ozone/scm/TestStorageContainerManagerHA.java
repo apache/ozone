@@ -58,7 +58,7 @@ import java.io.IOException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
 /**
  * Base class for Ozone Manager HA tests.
@@ -155,7 +155,7 @@ public class TestStorageContainerManagerHA {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket
-        .createKey(keyName, value.getBytes(UTF_8).length, RATIS, ONE,
+        .createKey(keyName, value.getBytes(UTF_8).length, STAND_ALONE, ONE,
             new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();

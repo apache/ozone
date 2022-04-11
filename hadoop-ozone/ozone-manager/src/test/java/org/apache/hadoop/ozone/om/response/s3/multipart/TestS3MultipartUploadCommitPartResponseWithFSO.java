@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
@@ -50,7 +50,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
 
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
 
     createParentPath(volumeName, bucketName);
@@ -88,7 +88,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     createParentPath(volumeName, bucketName);
 
@@ -160,7 +160,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     createParentPath(volumeName, bucketName);
 
@@ -224,7 +224,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
   private void createParentPath(String volumeName, String bucketName)
       throws Exception {
     // Create parent dirs for the path
-    parentID = OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName,
+    parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
             dirName, omMetadataManager);
   }
 

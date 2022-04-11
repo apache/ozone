@@ -120,7 +120,7 @@ public final class VersionedDatanodeFeatures {
       boolean scmHAEnabled =
           conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
           ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
-      if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled) {
+      if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled){
         return clusterID;
       } else {
         return scmID;

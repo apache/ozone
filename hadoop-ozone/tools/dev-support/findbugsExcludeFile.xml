@@ -13,6 +13,10 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <FindBugsFilter>
+    <Match>
+      <Package name="org.apache.hadoop.ozone.genesis.generated" />
+    </Match>
+
     <!-- Test -->
     <Match>
       <Class name="org.apache.hadoop.ozone.recon.TestReconUtils"/>

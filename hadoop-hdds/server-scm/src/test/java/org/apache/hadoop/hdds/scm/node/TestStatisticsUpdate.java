@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -72,7 +72,7 @@ public class TestStatisticsUpdate {
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, "2s");
     final EventQueue eventQueue = new EventQueue();
-    final StorageContainerManager scm = HddsTestUtils.getScm(conf);
+    final StorageContainerManager scm = TestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
     final DeadNodeHandler deadNodeHandler = new DeadNodeHandler(
         nodeManager, Mockito.mock(PipelineManager.class),
@@ -92,21 +92,21 @@ public class TestStatisticsUpdate {
     String storagePath2 = GenericTestUtils.getRandomizedTempPath()
         .concat("/" + datanode2.getUuidString());
 
-    StorageReportProto storageOne = HddsTestUtils.createStorageReport(
+    StorageReportProto storageOne = TestUtils.createStorageReport(
         datanode1.getUuid(), storagePath1, 100, 10, 90, null);
-    StorageReportProto storageTwo = HddsTestUtils.createStorageReport(
+    StorageReportProto storageTwo = TestUtils.createStorageReport(
         datanode2.getUuid(), storagePath2, 200, 20, 180, null);
 
     nodeManager.register(datanode1,
-        HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
+        TestUtils.createNodeReport(Arrays.asList(storageOne),
             Collections.emptyList()), null);
     nodeManager.register(datanode2,
-        HddsTestUtils.createNodeReport(Arrays.asList(storageTwo),
+        TestUtils.createNodeReport(Arrays.asList(storageTwo),
             Collections.emptyList()), null);
 
-    NodeReportProto nodeReportProto1 = HddsTestUtils.createNodeReport(
+    NodeReportProto nodeReportProto1 = TestUtils.createNodeReport(
         Arrays.asList(storageOne), Collections.emptyList());
-    NodeReportProto nodeReportProto2 = HddsTestUtils.createNodeReport(
+    NodeReportProto nodeReportProto2 = TestUtils.createNodeReport(
         Arrays.asList(storageTwo), Collections.emptyList());
 
     nodeReportHandler.onMessage(

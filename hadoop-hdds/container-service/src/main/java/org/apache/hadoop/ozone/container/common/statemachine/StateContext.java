@@ -184,7 +184,7 @@ public class StateContext {
   /**
    * init related ReportType Collections.
    */
-  private void initReportTypeCollection() {
+  private void initReportTypeCollection(){
     fullReportTypeList.add(CONTAINER_REPORTS_PROTO_NAME);
     type2Reports.put(CONTAINER_REPORTS_PROTO_NAME, containerReports);
     fullReportTypeList.add(NODE_REPORT_PROTO_NAME);
@@ -221,7 +221,7 @@ public class StateContext {
    */
   boolean isExiting(DatanodeStateMachine.DatanodeStates newState) {
     boolean isExiting = state != newState && stateExecutionCount.get() > 0;
-    if (isExiting) {
+    if(isExiting) {
       stateExecutionCount.set(0);
     }
     return isExiting;
@@ -344,7 +344,7 @@ public class StateContext {
       Preconditions.checkState(reportType != null);
     }
     synchronized (incrementalReportsQueue) {
-      if (incrementalReportsQueue.containsKey(endpoint)) {
+      if (incrementalReportsQueue.containsKey(endpoint)){
         incrementalReportsQueue.get(endpoint).addAll(0, reportsToPutBack);
       }
     }
@@ -381,7 +381,7 @@ public class StateContext {
       InetSocketAddress endpoint) {
     Map<String, AtomicBoolean> mp = fullReportSendIndicator.get(endpoint);
     List<GeneratedMessage> nonIncrementalReports = new LinkedList<>();
-    if (null != mp) {
+    if (null != mp){
       for (Map.Entry<String, AtomicBoolean> kv : mp.entrySet()) {
         if (kv.getValue().get()) {
           String reportType = kv.getKey();
@@ -817,14 +817,14 @@ public class StateContext {
    */
   public boolean updateCommandStatus(Long cmdId,
       Consumer<CommandStatus> cmdStatusUpdater) {
-    if (cmdStatusMap.containsKey(cmdId)) {
+    if(cmdStatusMap.containsKey(cmdId)) {
       cmdStatusUpdater.accept(cmdStatusMap.get(cmdId));
       return true;
     }
     return false;
   }
 
-  public void configureHeartbeatFrequency() {
+  public void configureHeartbeatFrequency(){
     heartbeatFrequency.set(getScmHeartbeatInterval(conf));
   }
 

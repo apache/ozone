@@ -27,7 +27,7 @@ import static org.apache.hadoop.hdds.protocol.proto
  * Informs a datanode to register itself with SCM again.
  */
 public class ReregisterCommand extends
-    SCMCommand<ReregisterCommandProto> {
+    SCMCommand<ReregisterCommandProto>{
 
   /**
    * Returns the type of this command.

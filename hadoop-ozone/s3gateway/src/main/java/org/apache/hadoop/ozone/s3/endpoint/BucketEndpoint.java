@@ -212,7 +212,7 @@ public class BucketEndpoint extends EndpointBase {
 
     if (count < maxKeys) {
       response.setTruncated(false);
-    } else if (ozoneKeyIterator.hasNext()) {
+    } else if(ozoneKeyIterator.hasNext()) {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
@@ -241,12 +241,12 @@ public class BucketEndpoint extends EndpointBase {
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
     } catch (OMException exception) {
+      LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
+          exception);
       if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_BUCKET_NAME,
             bucketName);
       }
-      LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
-          exception);
       throw exception;
     }
   }
@@ -291,7 +291,12 @@ public class BucketEndpoint extends EndpointBase {
   @HEAD
   public Response head(@PathParam("bucket") String bucketName)
       throws OS3Exception, IOException {
-    getBucket(bucketName);
+    try {
+      getBucket(bucketName);
+    } catch (OS3Exception ex) {
+      LOG.error("Exception occurred in headBucket", ex);
+      throw ex;
+    }
     return Response.ok().build();
   }
 
@@ -498,10 +503,12 @@ public class BucketEndpoint extends EndpointBase {
         }
       }
       // Add new permission on Volume
-      for (OzoneAcl acl : ozoneAclListOnVolume) {
+      for(OzoneAcl acl : ozoneAclListOnVolume) {
         volume.addAcl(acl);
       }
     } catch (OMException exception) {
+      LOG.error("Error in set ACL Request for bucket: {}", bucketName,
+          exception);
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET,
             bucketName);
@@ -509,8 +516,6 @@ public class BucketEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(S3ErrorTable
             .ACCESS_DENIED, bucketName);
       }
-      LOG.error("Error in set ACL Request for bucket: {}", bucketName,
-          exception);
       throw exception;
     }
     return Response.status(HttpStatus.SC_OK).build();

@@ -43,7 +43,7 @@ public class TestHddsServerUtil {
   public Timeout timeout = Timeout.seconds(300);
 
   @Rule
-  public ExpectedException thrown = ExpectedException.none();
+  public ExpectedException thrown= ExpectedException.none();
 
   /**
    * Verify that the datanode endpoint is parsed correctly.

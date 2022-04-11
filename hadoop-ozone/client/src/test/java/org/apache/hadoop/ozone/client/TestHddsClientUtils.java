@@ -65,7 +65,7 @@ public class TestHddsClientUtils {
   public Timeout timeout = Timeout.seconds(300);
 
   @Rule
-  public ExpectedException thrown = ExpectedException.none();
+  public ExpectedException thrown= ExpectedException.none();
 
   /**
    * Verify client endpoint lookup failure if it is not configured.
@@ -104,7 +104,7 @@ public class TestHddsClientUtils {
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
 
     String[] nodes = new String[] {"scm1", "scm2", "scm3"};
-    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId,
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY+"."+scmServiceId,
         "scm1,scm2,scm3");
     conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
 

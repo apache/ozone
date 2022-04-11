@@ -29,10 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.After;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -43,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.UUID;
 
 /**
  * Test Key Trash Service.
@@ -59,13 +57,12 @@ public class TestTrashService {
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
   private KeyManager keyManager;
-  private OzoneManagerProtocol writeClient;
-  private OzoneManager om;
+  private OmMetadataManagerImpl omMetadataManager;
   private String volumeName;
   private String bucketName;
 
   @Before
-  public void setup() throws IOException, AuthenticationException {
+  public void setup() throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
 
     File folder = tempFolder.newFolder();
@@ -75,18 +72,15 @@ public class TestTrashService {
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(configuration, folder.toString());
 
-    OmTestManagers omTestManagers
-        = new OmTestManagers(configuration);
-    keyManager = omTestManagers.getKeyManager();
-    writeClient = omTestManagers.getWriteClient();
-    om = omTestManagers.getOzoneManager();
+    omMetadataManager = new OmMetadataManagerImpl(configuration);
+
+    keyManager = new KeyManagerImpl(
+        new ScmBlockLocationTestingClient(null, null, 0),
+        omMetadataManager, configuration, UUID.randomUUID().toString(), null);
+    keyManager.start(configuration);
+
     volumeName = "volume";
     bucketName = "bucket";
-  }
-
-  @After
-  public void cleanup() throws Exception {
-    om.stop();
   }
 
   @Test
@@ -95,21 +89,21 @@ public class TestTrashService {
     String destinationBucket = "destBucket";
     createAndDeleteKey(keyName);
 
-    boolean recoverOperation = keyManager.getMetadataManager()
+    boolean recoverOperation = omMetadataManager
         .recoverTrash(volumeName, bucketName, keyName, destinationBucket);
     Assert.assertTrue(recoverOperation);
   }
 
   private void createAndDeleteKey(String keyName) throws IOException {
 
-    OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+    TestOMRequestUtils.addVolumeToOM(keyManager.getMetadataManager(),
         OmVolumeArgs.newBuilder()
             .setOwnerName("owner")
             .setAdminName("admin")
             .setVolume(volumeName)
             .build());
 
-    OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
+    TestOMRequestUtils.addBucketToOM(keyManager.getMetadataManager(),
         OmBucketInfo.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
@@ -126,9 +120,9 @@ public class TestTrashService {
         .build();
 
     /* Create and delete key in the Key Manager. */
-    OpenKeySession session = writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, session.getId());
-    writeClient.deleteKey(keyArgs);
+    OpenKeySession session = keyManager.openKey(keyArgs);
+    keyManager.commitKey(keyArgs, session.getId());
+    keyManager.deleteKey(keyArgs);
   }
 
 }

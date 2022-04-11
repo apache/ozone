@@ -74,7 +74,7 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -178,7 +178,7 @@ public class TestOzoneAtRestEncryption {
    */
   @AfterClass
   public static void shutdown() throws IOException {
-    if (ozClient != null) {
+    if(ozClient != null) {
       ozClient.close();
     }
 
@@ -235,7 +235,7 @@ public class TestOzoneAtRestEncryption {
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
+        ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE, new HashMap<>())) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -251,7 +251,7 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
+    try(OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
@@ -259,7 +259,7 @@ public class TestOzoneAtRestEncryption {
 
     Assert.assertEquals(len, value.length());
     Assert.assertTrue(verifyRatisReplication(bucket.getVolumeName(),
-        bucket.getName(), keyName, ReplicationType.RATIS,
+        bucket.getName(), keyName, ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -267,7 +267,7 @@ public class TestOzoneAtRestEncryption {
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
-      String bucketName) throws Exception {
+      String bucketName) throws Exception{
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
@@ -323,7 +323,7 @@ public class TestOzoneAtRestEncryption {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
+        ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE, keyMetadata)) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -333,14 +333,14 @@ public class TestOzoneAtRestEncryption {
     byte[] fileContent;
     int len = 0;
 
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
+    try(OzoneInputStream is = bucket.readKey(keyName)) {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
 
     Assert.assertEquals(len, value.length());
     Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-        keyName, ReplicationType.RATIS,
+        keyName, ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -463,7 +463,7 @@ public class TestOzoneAtRestEncryption {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
+    String uploadID = initiateMultipartUpload(bucket, keyName, STAND_ALONE,
         ONE);
 
     // Upload Parts
@@ -498,7 +498,7 @@ public class TestOzoneAtRestEncryption {
     // Read different data lengths and starting from different offsets and
     // verify the data matches.
     Random random = new Random();
-    int randomSize = random.nextInt(keySize / 2);
+    int randomSize = random.nextInt(keySize/2);
     int randomOffset = random.nextInt(keySize - randomSize);
 
     int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,

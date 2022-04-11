@@ -21,23 +21,25 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.BucketManager;
-import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.BucketManagerImpl;
+import org.apache.hadoop.ozone.om.IOzoneAcl;
+import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmTestManagers;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManager;
-import org.apache.hadoop.ozone.om.VolumeManager;
+import org.apache.hadoop.ozone.om.PrefixManagerImpl;
+import org.apache.hadoop.ozone.om.VolumeManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -76,6 +78,8 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test class for {@link OzoneNativeAuthorizer}.
@@ -92,10 +96,9 @@ public class TestOzoneNativeAuthorizer {
   private ACLType parentDirGroupAcl;
   private boolean expectedAclResult;
 
-  private static OzoneManagerProtocol writeClient;
-  private static KeyManager keyManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
+  private static KeyManagerImpl keyManager;
+  private static VolumeManagerImpl volumeManager;
+  private static BucketManagerImpl bucketManager;
   private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static OzoneNativeAuthorizer nativeAuthorizer;
@@ -147,14 +150,14 @@ public class TestOzoneNativeAuthorizer {
     ozConfig.set(OZONE_METADATA_DIRS, dir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
-    OmTestManagers omTestManagers =
-        new OmTestManagers(ozConfig);
-    metadataManager = omTestManagers.getMetadataManager();
-    volumeManager = omTestManagers.getVolumeManager();
-    bucketManager = omTestManagers.getBucketManager();
-    prefixManager = omTestManagers.getPrefixManager();
-    keyManager = omTestManagers.getKeyManager();
-    writeClient = omTestManagers.getWriteClient();
+    metadataManager = new OmMetadataManagerImpl(ozConfig);
+    volumeManager = new VolumeManagerImpl(metadataManager, ozConfig);
+    bucketManager = new BucketManagerImpl(metadataManager);
+    prefixManager = new PrefixManagerImpl(metadataManager, false);
+
+    keyManager = new KeyManagerImpl(mock(ScmBlockLocationProtocol.class),
+        metadataManager, ozConfig, "om1", null);
+
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
         Collections.singletonList("om"));
@@ -178,14 +181,14 @@ public class TestOzoneNativeAuthorizer {
         .build();
 
     if (keyName.split(OZONE_URI_DELIMITER).length > 1) {
-      writeClient.createDirectory(keyArgs);
+      keyManager.createDirectory(keyArgs);
       key = key + OZONE_URI_DELIMITER;
     } else {
-      OpenKeySession keySession = writeClient.createFile(keyArgs, true, false);
+      OpenKeySession keySession = keyManager.createFile(keyArgs, true, false);
       keyArgs.setLocationInfoList(
           keySession.getKeyInfo().getLatestVersionLocations()
               .getLocationList());
-      writeClient.commitKey(keyArgs, keySession.getId());
+      keyManager.commitKey(keyArgs, keySession.getId());
     }
 
     keyObj = new OzoneObjInfo.Builder()
@@ -203,7 +206,7 @@ public class TestOzoneNativeAuthorizer {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .build();
-    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
+    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
     buckObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setBucketName(buck)
@@ -218,7 +221,7 @@ public class TestOzoneNativeAuthorizer {
         .setAdminName(adminUgi.getUserName())
         .setOwnerName(testUgi.getUserName())
         .build();
-    OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
+    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
     volObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setResType(VOLUME)
@@ -229,10 +232,10 @@ public class TestOzoneNativeAuthorizer {
   @Test
   public void testCheckAccessForVolume() throws Exception {
     expectedAclResult = true;
-    resetAclsAndValidateAccess(volObj, USER, writeClient);
-    resetAclsAndValidateAccess(volObj, GROUP, writeClient);
-    resetAclsAndValidateAccess(volObj, WORLD, writeClient);
-    resetAclsAndValidateAccess(volObj, ANONYMOUS, writeClient);
+    resetAclsAndValidateAccess(volObj, USER, volumeManager);
+    resetAclsAndValidateAccess(volObj, GROUP, volumeManager);
+    resetAclsAndValidateAccess(volObj, WORLD, volumeManager);
+    resetAclsAndValidateAccess(volObj, ANONYMOUS, volumeManager);
   }
 
   @Test
@@ -248,10 +251,10 @@ public class TestOzoneNativeAuthorizer {
     setVolumeAcl(Arrays.asList(userAcl, groupAcl));
 
 
-    resetAclsAndValidateAccess(buckObj, USER, writeClient);
-    resetAclsAndValidateAccess(buckObj, GROUP, writeClient);
-    resetAclsAndValidateAccess(buckObj, WORLD, writeClient);
-    resetAclsAndValidateAccess(buckObj, ANONYMOUS, writeClient);
+    resetAclsAndValidateAccess(buckObj, USER, bucketManager);
+    resetAclsAndValidateAccess(buckObj, GROUP, bucketManager);
+    resetAclsAndValidateAccess(buckObj, WORLD, bucketManager);
+    resetAclsAndValidateAccess(buckObj, ANONYMOUS, bucketManager);
   }
 
   @Test
@@ -266,10 +269,10 @@ public class TestOzoneNativeAuthorizer {
     setVolumeAcl(Arrays.asList(userAcl, groupAcl));
     setBucketAcl(Arrays.asList(userAcl, groupAcl));
 
-    resetAclsAndValidateAccess(keyObj, USER, writeClient);
-    resetAclsAndValidateAccess(keyObj, GROUP, writeClient);
-    resetAclsAndValidateAccess(keyObj, WORLD, writeClient);
-    resetAclsAndValidateAccess(keyObj, ANONYMOUS, writeClient);
+    resetAclsAndValidateAccess(keyObj, USER, keyManager);
+    resetAclsAndValidateAccess(keyObj, GROUP, keyManager);
+    resetAclsAndValidateAccess(keyObj, WORLD, keyManager);
+    resetAclsAndValidateAccess(keyObj, ANONYMOUS, keyManager);
   }
 
   @Test
@@ -294,10 +297,10 @@ public class TestOzoneNativeAuthorizer {
     setBucketAcl(Arrays.asList(userAcl, groupAcl));
 
 
-    resetAclsAndValidateAccess(prefixObj, USER, writeClient);
-    resetAclsAndValidateAccess(prefixObj, GROUP, writeClient);
-    resetAclsAndValidateAccess(prefixObj, WORLD, writeClient);
-    resetAclsAndValidateAccess(prefixObj, ANONYMOUS, writeClient);
+    resetAclsAndValidateAccess(prefixObj, USER, prefixManager);
+    resetAclsAndValidateAccess(prefixObj, GROUP, prefixManager);
+    resetAclsAndValidateAccess(prefixObj, WORLD, prefixManager);
+    resetAclsAndValidateAccess(prefixObj, ANONYMOUS, prefixManager);
   }
 
 
@@ -344,12 +347,12 @@ public class TestOzoneNativeAuthorizer {
   }
 
   private void resetAclsAndValidateAccess(OzoneObj obj,
-      ACLIdentityType accessType, OzoneManagerProtocol aclImplementor)
+      ACLIdentityType accessType, IOzoneAcl aclImplementor)
       throws IOException {
     List<OzoneAcl> acls;
     String user = testUgi.getUserName();
     String group = (testUgi.getGroups().size() > 0) ?
-        testUgi.getGroups().get(0) : "";
+        testUgi.getGroups().get(0): "";
 
     RequestContext.Builder builder = new RequestContext.Builder()
         .setClientUgi(testUgi)
@@ -372,7 +375,7 @@ public class TestOzoneNativeAuthorizer {
       // Reset acls to only one right.
       if (obj.getResourceType() == VOLUME) {
         setVolumeAcl(Collections.singletonList(newAcl));
-      } else if (obj.getResourceType() == BUCKET) {
+      } else if (obj.getResourceType() == BUCKET){
         setBucketAcl(Collections.singletonList(newAcl));
       } else {
         aclImplementor.setAcl(obj, Collections.singletonList(newAcl));
@@ -450,7 +453,7 @@ public class TestOzoneNativeAuthorizer {
           // only DB not cache.
           if (obj.getResourceType() == VOLUME) {
             addVolumeAcl(addAcl);
-          } else if (obj.getResourceType() == BUCKET) {
+          } else if (obj.getResourceType() == BUCKET){
             addBucketAcl(addAcl);
           } else {
             aclImplementor.addAcl(obj, addAcl);

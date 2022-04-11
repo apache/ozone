@@ -27,7 +27,7 @@ import java.util.List;
  */
 public final class ITestOzoneContractUtils {
 
-  private ITestOzoneContractUtils() { }
+  private ITestOzoneContractUtils(){}
 
   private static List<Object> fsoCombinations = Arrays.asList(new Object[] {
       // FSO configuration is a cluster level server side configuration.
@@ -47,7 +47,7 @@ public final class ITestOzoneContractUtils {
       // and old buckets will be operated on
   });
 
-  static List<Object> getFsoCombinations() {
+  static List<Object> getFsoCombinations(){
     return fsoCombinations;
   }
 

@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -75,7 +75,7 @@ public class TestOMDirectoryCreateResponse {
     String keyName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(keyName),
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
 

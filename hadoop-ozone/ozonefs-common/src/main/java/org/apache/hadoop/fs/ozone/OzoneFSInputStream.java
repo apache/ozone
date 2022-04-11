@@ -101,7 +101,7 @@ public class OzoneFSInputStream extends FSInputStream
    */
   @Override
   public int read(ByteBuffer buf) throws IOException {
-    if (buf.isReadOnly()) {
+    if (buf.isReadOnly()){
       throw new ReadOnlyBufferException();
     }
 

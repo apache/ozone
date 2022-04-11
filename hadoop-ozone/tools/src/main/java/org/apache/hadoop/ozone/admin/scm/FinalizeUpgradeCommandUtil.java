@@ -80,13 +80,13 @@ public final class FinalizeUpgradeCommandUtil {
   }
 
   public static void emitFinishedMsg(String component) {
-    System.out.println("Finalization of " + component + "'s metadata upgrade "
+    System.out.println("Finalization of " + component +"'s metadata upgrade "
         + "finished.");
   }
 
   public static void emitCancellationMsg(String component) {
     System.err.println("Finalization command was cancelled. Note that, this"
-        + "will not cancel finalization in " + component + ". Progress can be"
+        + "will not cancel finalization in " + component +". Progress can be"
         + "monitored in the Ozone Manager's log.");
   }
 }

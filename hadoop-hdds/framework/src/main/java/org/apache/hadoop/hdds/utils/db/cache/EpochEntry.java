@@ -63,7 +63,7 @@ public class EpochEntry<CACHEKEY> implements Comparable<CACHEKEY> {
 
   @Override
   public int compareTo(Object o) {
-    if (this.epoch == ((EpochEntry<?>)o).epoch) {
+    if(this.epoch == ((EpochEntry<?>)o).epoch) {
       return 0;
     } else if (this.epoch < ((EpochEntry<?>)o).epoch) {
       return -1;

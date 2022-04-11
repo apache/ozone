@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
@@ -61,15 +61,15 @@ public class TestContainerSet {
 
   private static final int FIRST_ID = 2;
 
-  private final ContainerLayoutVersion layout;
+  private final ChunkLayOutVersion layout;
 
-  public TestContainerSet(ContainerLayoutVersion layout) {
+  public TestContainerSet(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
   }
 
   @Test
@@ -122,11 +122,11 @@ public class TestContainerSet {
     Iterator<Container<?>> iterator = containerSet.getContainerIterator();
 
     int count = 0;
-    while (iterator.hasNext()) {
+    while(iterator.hasNext()) {
       Container kv = iterator.next();
       ContainerData containerData = kv.getContainerData();
       long containerId = containerData.getContainerID();
-      if (containerId % 2 == 0) {
+      if (containerId%2 == 0) {
         assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
             containerData.getState());
       } else {
@@ -146,7 +146,7 @@ public class TestContainerSet {
       Container kv = containerMapIterator.next().getValue();
       ContainerData containerData = kv.getContainerData();
       long containerId = containerData.getContainerID();
-      if (containerId % 2 == 0) {
+      if (containerId%2 == 0) {
         assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
             containerData.getState());
       } else {
@@ -167,12 +167,12 @@ public class TestContainerSet {
     Mockito.when(vol2.getStorageID()).thenReturn("uuid-2");
 
     ContainerSet containerSet = new ContainerSet();
-    for (int i = 0; i < 10; i++) {
+    for (int i=0; i<10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
           layout,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
-      if (i % 2 == 0) {
+      if (i%2 == 0) {
         kvData.setVolume(vol1);
       } else {
         kvData.setVolume(vol2);
@@ -307,7 +307,7 @@ public class TestContainerSet {
           layout,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
-      if (i % 2 == 0) {
+      if (i%2 == 0) {
         kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
       } else {
         kvData.setState(ContainerProtos.ContainerDataProto.State.OPEN);

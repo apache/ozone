@@ -487,7 +487,7 @@ public class TestOzoneContainer {
       final List<CompletableFuture> computeResults = new LinkedList<>();
       int requestCount = 1000;
       // Create a bunch of Async calls from this test.
-      for (int x = 0; x < requestCount; x++) {
+      for(int x = 0; x <requestCount; x++) {
         BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
         final ContainerProtos.ContainerCommandRequestProto smallFileRequest
             = ContainerTestHelper.getWriteSmallFileRequest(

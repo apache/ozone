@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
@@ -58,7 +58,7 @@ public class TestOzoneManagerRatisRequest {
 
     String volumeName = "vol1";
     String bucketName = "invalidBuck";
-    OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
+    OzoneManagerProtocolProtos.OMRequest omRequest = TestOMRequestUtils
         .createCompleteMPURequest(volumeName, bucketName, "mpuKey", "mpuKeyID",
             new ArrayList<>());
 

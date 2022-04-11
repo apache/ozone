@@ -57,7 +57,7 @@ public class TestRootList {
     assertEquals(0, response.getBucketsNum());
 
     String bucketBaseName = "bucket-" + getClass().getName();
-    for (int i = 0; i < 10; i++) {
+    for(int i = 0; i < 10; i++) {
       clientStub.getObjectStore().createS3Bucket(bucketBaseName + i);
     }
     response = (ListBucketResponse) rootEndpoint.get().getEntity();

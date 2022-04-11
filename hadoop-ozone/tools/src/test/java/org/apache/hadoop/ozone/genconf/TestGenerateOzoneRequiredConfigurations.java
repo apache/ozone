@@ -144,10 +144,10 @@ public class TestGenerateOzoneRequiredConfigurations {
             throw ex;
           }
         };
-    try {
+    try{
       cmd.parseWithHandlers(new CommandLine.RunLast(),
           exceptionHandler, args);
-    }  catch (Exception ex) {
+    }catch(Exception ex){
       Assert.assertTrue("Expected " + msg + ", but got: " + ex.getMessage(),
           ex.getMessage().contains(msg));
     }

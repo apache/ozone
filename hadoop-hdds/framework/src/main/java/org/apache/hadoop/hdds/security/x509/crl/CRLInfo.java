@@ -44,7 +44,7 @@ public class CRLInfo implements Comparator<CRLInfo>,
   private Instant revocationTime;
 
   private CRLInfo(X509CRL x509CRL, long creationTimestamp, long crlSequenceID) {
-    assert ((x509CRL != null) &&
+    assert((x509CRL != null) &&
         !x509CRL.getRevokedCertificates().isEmpty());
     this.x509CRL = x509CRL;
     this.creationTimestamp = creationTimestamp;

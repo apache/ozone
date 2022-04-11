@@ -81,7 +81,7 @@ public class InitDatanodeState implements DatanodeState,
     try {
       addresses = getSCMAddressForDatanodes(conf);
     } catch (IllegalArgumentException e) {
-      if (!Strings.isNullOrEmpty(e.getMessage())) {
+      if(!Strings.isNullOrEmpty(e.getMessage())) {
         LOG.error("Failed to get SCM addresses: {}", e.getMessage());
       }
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;

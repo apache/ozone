@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -90,7 +90,7 @@ public class TestPipelineManagerImpl {
         TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         GenericTestUtils.getRandomizedTempPath());
-    scm = HddsTestUtils.getScm(conf);
+    scm = TestUtils.getScm(conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 20);
@@ -307,7 +307,7 @@ public class TestPipelineManagerImpl {
     // Open the pipeline
     pipelineManager.openPipeline(pipeline.getId());
     ContainerManager containerManager = scm.getContainerManager();
-    ContainerInfo containerInfo = HddsTestUtils.
+    ContainerInfo containerInfo = TestUtils.
             getContainer(HddsProtos.LifeCycleState.CLOSED, pipeline.getId());
     ContainerID containerID = containerInfo.containerID();
     //Add Container to ContainerMap
@@ -681,7 +681,7 @@ public class TestPipelineManagerImpl {
             new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
     PipelineID pipelineID = pipeline.getId();
     ContainerManager containerManager = scm.getContainerManager();
-    ContainerInfo containerInfo = HddsTestUtils.
+    ContainerInfo containerInfo = TestUtils.
         getContainer(HddsProtos.LifeCycleState.CLOSED, pipelineID);
     ContainerID containerID = containerInfo.containerID();
     //Add Container to ContainerMap
@@ -708,8 +708,7 @@ public class TestPipelineManagerImpl {
       PipelineReportHandler pipelineReportHandler,
       boolean isLeader) {
     SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode report =
-        HddsTestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(),
-            isLeader);
+        TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(), isLeader);
     pipelineReportHandler.onMessage(report, new EventQueue());
   }
 }

@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
+import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -61,7 +61,7 @@ public class TestDataNodeStartupSlvLessThanMlv {
 
     // Create version file with MLV > SLV, which should fail the
     // DataNodeStateMachine construction.
-    UpgradeTestUtils.createVersionFile(datanodeSubdir,
+    TestUpgradeUtils.createVersionFile(datanodeSubdir,
         HddsProtos.NodeType.DATANODE, mlv);
 
     try {

@@ -728,7 +728,7 @@ public class NodeStateManager implements Runnable, Closeable {
         (lastHbTime) -> lastHbTime < staleNodeDeadline;
 
     try {
-      for (DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
+      for(DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
         NodeStatus status = nodeStateMap.getNodeStatus(node.getUuid());
         switch (status.getHealth()) {
         case HEALTHY:

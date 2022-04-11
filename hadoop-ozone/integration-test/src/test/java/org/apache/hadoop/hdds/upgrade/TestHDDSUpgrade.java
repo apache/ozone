@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
@@ -147,7 +146,6 @@ public class TestHDDSUpgrade {
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
     conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(NUM_DATA_NODES)
@@ -189,7 +187,7 @@ public class TestHDDSUpgrade {
    * Some tests repeatedly modify the cluster. Helper function to reload the
    * latest SCM state.
    */
-  private void loadSCMState() {
+  private void loadSCMState(){
     scm = cluster.getStorageContainerManager();
     scmContainerManager = scm.getContainerManager();
     scmPipelineManager = scm.getPipelineManager();
@@ -503,7 +501,7 @@ public class TestHDDSUpgrade {
       IOException {
     // For some tests this could get called in a different thread context.
     // We need to guard concurrent updates to the cluster.
-    synchronized (cluster) {
+    synchronized(cluster) {
       cluster.restartStorageContainerManager(true);
       loadSCMState();
     }
@@ -1090,7 +1088,7 @@ public class TestHDDSUpgrade {
     // Verify that new pipeline can be created with upgraded datanodes.
     try {
       testPostUpgradePipelineCreation();
-    } catch (SCMException e) {
+    } catch(SCMException e) {
       // If pipeline creation fails, make sure that there is a valid reason
       // for this i.e. all datanodes are already part of some pipeline.
       for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {

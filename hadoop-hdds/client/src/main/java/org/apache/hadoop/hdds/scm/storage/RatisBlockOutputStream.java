@@ -97,7 +97,7 @@ public class RatisBlockOutputStream extends BlockOutputStream {
 
   @Override
   XceiverClientReply sendWatchForCommit(boolean bufferFull) throws IOException {
-    return bufferFull ? commitWatcher.watchOnFirstIndex()
+    return bufferFull? commitWatcher.watchOnFirstIndex()
         : commitWatcher.watchOnLastIndex();
   }
 

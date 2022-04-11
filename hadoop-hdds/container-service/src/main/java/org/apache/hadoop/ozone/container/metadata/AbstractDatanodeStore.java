@@ -276,7 +276,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         nextBlock = null;
         return currentBlock;
       }
-      if (hasNext()) {
+      if(hasNext()) {
         return nextBlock();
       }
       throw new NoSuchElementException("Block Iterator reached end for " +

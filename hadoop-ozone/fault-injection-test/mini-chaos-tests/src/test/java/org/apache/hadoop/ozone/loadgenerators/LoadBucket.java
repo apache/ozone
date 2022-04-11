@@ -195,7 +195,7 @@ public class LoadBucket {
     @Override
     public String toString() {
       return super.toString() + " "
-          + (readDir ? "readDirectory" : "writeDirectory");
+          + (readDir ? "readDirectory": "writeDirectory");
     }
   }
 

@@ -51,7 +51,7 @@ public class TestLeaseManager {
 
     @Override
     public boolean equals(Object obj) {
-      if (obj instanceof DummyResource) {
+      if(obj instanceof DummyResource) {
         return name.equals(((DummyResource) obj).name);
       }
       return false;

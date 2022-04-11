@@ -161,8 +161,8 @@ public class BlockData {
    * @return list of chunkinfo.
    */
   public List<ContainerProtos.ChunkInfo> getChunks() {
-    return chunkList == null ? Collections.emptyList()
-        : chunkList instanceof ContainerProtos.ChunkInfo ?
+    return chunkList == null? Collections.emptyList()
+        : chunkList instanceof ContainerProtos.ChunkInfo?
             Collections.singletonList((ContainerProtos.ChunkInfo)chunkList)
         : Collections.unmodifiableList(castChunkList());
   }

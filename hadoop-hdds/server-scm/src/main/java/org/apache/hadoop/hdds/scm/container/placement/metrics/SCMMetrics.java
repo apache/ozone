@@ -28,7 +28,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 /**
  * This class is for maintaining StorageContainerManager statistics.
  */
-@Metrics(about = "Storage Container Manager Metrics", context = "dfs")
+@Metrics(about="Storage Container Manager Metrics", context="dfs")
 public class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();

@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
@@ -83,17 +83,17 @@ import static org.mockito.Mockito.verify;
 public class TestHddsDispatcher {
 
   public static final Consumer<ContainerReplicaProto> NO_OP_ICR_SENDER =
-      c -> { };
+      c -> {};
 
-  private final ContainerLayoutVersion layout;
+  private final ChunkLayOutVersion layout;
 
-  public TestHddsDispatcher(ContainerLayoutVersion layout) {
+  public TestHddsDispatcher(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
   }
 
   @Test

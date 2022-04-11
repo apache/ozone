@@ -77,8 +77,6 @@ public class TestCloseContainerHandler {
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).build();
-    cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(ONE, 30000);
   }
 
   @After
@@ -98,7 +96,7 @@ public class TestCloseContainerHandler {
     objectStore.createVolume("test");
     objectStore.getVolume("test").createBucket("test");
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey("test", 1024, ReplicationType.RATIS,
+        .createKey("test", 1024, ReplicationType.STAND_ALONE,
             ReplicationFactor.ONE, new HashMap<>());
     key.write("test".getBytes(UTF_8));
     key.close();

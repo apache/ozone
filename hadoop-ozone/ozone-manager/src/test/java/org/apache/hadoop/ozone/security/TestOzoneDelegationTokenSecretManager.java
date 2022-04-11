@@ -91,7 +91,7 @@ public class TestOzoneDelegationTokenSecretManager {
     s3SecretManager = new S3SecretManagerImpl(conf, metadataManager) {
       @Override
       public S3SecretValue getS3Secret(String kerberosID) {
-        if (s3Secrets.containsKey(kerberosID)) {
+        if(s3Secrets.containsKey(kerberosID)) {
           return new S3SecretValue(kerberosID, s3Secrets.get(kerberosID));
         }
         return null;
@@ -99,7 +99,7 @@ public class TestOzoneDelegationTokenSecretManager {
 
       @Override
       public String getS3UserSecretString(String awsAccessKey) {
-        if (s3Secrets.containsKey(awsAccessKey)) {
+        if(s3Secrets.containsKey(awsAccessKey)) {
           return s3Secrets.get(awsAccessKey);
         }
         return null;
@@ -322,7 +322,7 @@ public class TestOzoneDelegationTokenSecretManager {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     // set invalid om cert serial id
     id.setOmCertSerialId("1927393");
-    id.setMaxDate(Time.now() + 60 * 60 * 24);
+    id.setMaxDate(Time.now() + 60*60*24);
     id.setOwner(new Text("test"));
     Assert.assertFalse(secretManager.verifySignature(id, id.getBytes()));
   }

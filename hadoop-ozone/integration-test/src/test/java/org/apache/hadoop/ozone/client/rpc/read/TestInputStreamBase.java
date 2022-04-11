@@ -37,8 +37,8 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -67,7 +67,7 @@ public abstract class TestInputStreamBase {
   private String bucketName;
   private String keyString;
 
-  private ContainerLayoutVersion containerLayout;
+  private ChunkLayOutVersion chunkLayout;
   private static final Random RAND = new Random();
 
   protected static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
@@ -81,11 +81,11 @@ public abstract class TestInputStreamBase {
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
   }
 
-  public TestInputStreamBase(ContainerLayoutVersion layout) {
-    this.containerLayout = layout;
+  public TestInputStreamBase(ChunkLayOutVersion layout) {
+    this.chunkLayout = layout;
   }
 
   /**
@@ -105,8 +105,7 @@ public abstract class TestInputStreamBase {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 64,
         StorageUnit.MB);
-    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
-        containerLayout.toString());
+    conf.set(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY, chunkLayout.toString());
 
     ReplicationManagerConfiguration repConf =
         conf.getObject(ReplicationManagerConfiguration.class);
@@ -198,7 +197,7 @@ public abstract class TestInputStreamBase {
     byte[] expectedData = new byte[readDataLen];
     System.arraycopy(inputData, (int) offset, expectedData, 0, readDataLen);
 
-    for (int i = 0; i < readDataLen; i++) {
+    for (int i=0; i < readDataLen; i++) {
       Assert.assertEquals("Read data at does not match the input data at " +
               "position " + (offset + i), expectedData[i], readData[i]);
     }

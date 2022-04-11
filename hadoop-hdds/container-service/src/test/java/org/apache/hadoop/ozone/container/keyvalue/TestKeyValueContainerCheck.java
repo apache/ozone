@@ -74,7 +74,7 @@ import static org.junit.Assert.assertFalse;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerCheck.class);
 
-  private final ContainerLayoutTestInfo chunkManagerTestInfo;
+  private final ChunkLayoutTestInfo chunkManagerTestInfo;
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
   private MutableVolumeSet volumeSet;
@@ -82,15 +82,14 @@ import static org.junit.Assert.assertFalse;
   private File testRoot;
   private ChunkManager chunkManager;
 
-  public TestKeyValueContainerCheck(
-      ContainerLayoutTestInfo chunkManagerTestInfo) {
+  public TestKeyValueContainerCheck(ChunkLayoutTestInfo chunkManagerTestInfo) {
     this.chunkManagerTestInfo = chunkManagerTestInfo;
   }
 
   @Parameterized.Parameters public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {ContainerLayoutTestInfo.FILE_PER_CHUNK},
-        {ContainerLayoutTestInfo.FILE_PER_BLOCK}
+        {ChunkLayoutTestInfo.FILE_PER_CHUNK},
+        {ChunkLayoutTestInfo.FILE_PER_BLOCK}
     });
   }
 
@@ -186,7 +185,7 @@ import static org.junit.Assert.assertFalse;
       try (RandomAccessFile file = new RandomAccessFile(chunkFile, "rws")) {
         file.setLength(length / 2);
       }
-      assertEquals(length / 2, chunkFile.length());
+      assertEquals(length/2, chunkFile.length());
     }
 
     // metadata check should pass.

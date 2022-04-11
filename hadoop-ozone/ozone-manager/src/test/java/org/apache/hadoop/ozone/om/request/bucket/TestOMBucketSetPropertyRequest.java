@@ -22,11 +22,11 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.util.UUID;
 
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
@@ -80,7 +80,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         bucketName, true, Long.MAX_VALUE);
 
     // Create with default BucketInfo values
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
@@ -142,9 +142,9 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    OMRequestTestUtils.addVolumeToDB(
+    TestOMRequestUtils.addVolumeToDB(
         volumeName, omMetadataManager, 10 * GB);
-    OMRequestTestUtils.addBucketToDB(
+    TestOMRequestUtils.addBucketToDB(
         volumeName, bucketName, omMetadataManager, 8 * GB);
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true, 20 * GB);

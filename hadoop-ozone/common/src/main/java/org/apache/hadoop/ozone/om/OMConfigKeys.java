@@ -201,15 +201,15 @@ public final class OMConfigKeys {
   public static final String  DELEGATION_REMOVER_SCAN_INTERVAL_KEY =
       "ozone.manager.delegation.remover.scan.interval";
   public static final long    DELEGATION_REMOVER_SCAN_INTERVAL_DEFAULT =
-      60 * 60 * 1000;
+      60*60*1000;
   public static final String  DELEGATION_TOKEN_RENEW_INTERVAL_KEY =
       "ozone.manager.delegation.token.renew-interval";
   public static final long    DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT =
-      24 * 60 * 60 * 1000;  // 1 day = 86400000 ms
+      24*60*60*1000;  // 1 day = 86400000 ms
   public static final String  DELEGATION_TOKEN_MAX_LIFETIME_KEY =
       "ozone.manager.delegation.token.max-lifetime";
   public static final long    DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT =
-      7 * 24 * 60 * 60 * 1000; // 7 days
+      7*24*60*60*1000; // 7 days
 
   public static final String OZONE_DB_CHECKPOINT_TRANSFER_RATE_KEY =
       "ozone.manager.db.checkpoint.transfer.bandwidthPerSec";
@@ -301,10 +301,5 @@ public final class OMConfigKeys {
       "ozone.om.admin.protocol.wait.between.retries";
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
-  public static final String OZONE_OM_TRANSPORT_CLASS =
-      "ozone.om.transport.class";
-  public static final String OZONE_OM_TRANSPORT_CLASS_DEFAULT =
-      "org.apache.hadoop.ozone.om.protocolPB"
-          + ".Hadoop3OmTransportFactory";
 
 }

@@ -722,11 +722,11 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.container.layout</name>
+    <name>ozone.scm.chunk.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
-      Container layout defines how chunks, blocks and containers are stored on disk.
+      Chunk layout defines how chunks, blocks and containers are stored on disk.
       Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
       block are stored in the same file with FILE_PER_BLOCK.  The default is
       FILE_PER_BLOCK.
@@ -2014,7 +2014,7 @@
   </property>
   <property>
     <name>ozone.scm.ratis.enable</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>Property to enable or disable Ratis server on SCM.
       Please note - this is a temporary property to disable SCM Ratis server.
@@ -2519,24 +2519,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.scm.connection.request.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection request timeout in milliseconds for HTTP call made by Recon to
-      request SCM DB snapshot.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.scm.connection.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection timeout for HTTP call in milliseconds made by Recon to request
-      SCM snapshot.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
@@ -2567,41 +2549,6 @@
     <tag>OZONE, RECON, OM</tag>
     <description>
       Request to flush the OM DB before taking checkpoint snapshot.
-    </description>
-  </property>
-  <property>
-    <name>recon.om.delta.update.limit</name>
-    <value>2000</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Recon each time get a limited delta updates from OM.
-      The actual fetched data might be larger than this limit.
-    </description>
-  </property>
-  <property>
-    <name>recon.om.delta.update.loop.limit</name>
-    <value>10</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      The sync between Recon and OM consists of several small
-      fetch loops.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.scm.container.threshold</name>
-    <value>100</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Threshold value for the difference in number of containers
-      in SCM and RECON.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.scm.snapshot.enabled</name>
-    <value>false</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      If enabled, SCM DB Snapshot is taken by Recon.
     </description>
   </property>
   <property>

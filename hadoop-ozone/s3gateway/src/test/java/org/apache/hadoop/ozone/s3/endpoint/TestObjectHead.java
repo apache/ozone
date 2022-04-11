@@ -69,7 +69,7 @@ public class TestObjectHead {
     //GIVEN
     String value = RandomStringUtils.randomAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
-        value.getBytes(UTF_8).length, ReplicationType.RATIS,
+        value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE, new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();

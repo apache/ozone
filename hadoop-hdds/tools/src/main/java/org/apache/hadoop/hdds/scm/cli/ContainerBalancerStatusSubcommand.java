@@ -36,7 +36,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean execReturn = scmClient.getContainerBalancerStatus();
-    if (execReturn) {
+    if(execReturn){
       System.out.println("ContainerBalancer is Running.");
     } else {
       System.out.println("ContainerBalancer is Not Running.");

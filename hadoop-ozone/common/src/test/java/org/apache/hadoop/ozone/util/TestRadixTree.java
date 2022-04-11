@@ -80,13 +80,13 @@ public class TestRadixTree {
   public void testGetLongestPrefixPath() {
     List<RadixNode<Integer>> lpp =
         ROOT.getLongestPrefixPath("/a/b/c/d/g/p");
-    RadixNode<Integer> lpn = lpp.get(lpp.size() - 1);
+    RadixNode<Integer> lpn = lpp.get(lpp.size()-1);
     assertEquals("g", lpn.getName());
     lpn.setValue(100);
 
     List<RadixNode<Integer>> lpq =
         ROOT.getLongestPrefixPath("/a/b/c/d/g/q");
-    RadixNode<Integer> lqn = lpp.get(lpq.size() - 1);
+    RadixNode<Integer> lqn = lpp.get(lpq.size()-1);
     System.out.print(RadixTree.radixPathToString(lpq));
     assertEquals(lpn, lqn);
     assertEquals("g", lqn.getName());

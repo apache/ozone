@@ -214,7 +214,7 @@ public abstract class CommonChunkManagerTestCases
 
     BlockData blockData = new BlockData(blockID);
     // WHEN
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i< count; i++) {
       ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
           i * len, len);
       chunkManager.writeChunk(container, blockID, info, data, context);
@@ -228,7 +228,7 @@ public abstract class CommonChunkManagerTestCases
     assertTrue(getHddsVolume().getVolumeIOStats().getWriteTime() > 0);
 
     // WHEN
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i< count; i++) {
       ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
           i * len, len);
       chunkManager.readChunk(container, blockID, info, context);

@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 

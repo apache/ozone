@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
@@ -88,7 +88,7 @@ public class TestOMKeyResponse {
 
   @NotNull
   protected OmKeyInfo getOmKeyInfo() {
-    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+    return TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
             replicationType, replicationFactor);
   }
 

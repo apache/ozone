@@ -36,15 +36,15 @@ public class DatanodeVersionFile {
   private final String clusterId;
   private final String datanodeUuid;
   private final long cTime;
-  private final int layoutVersion;
+  private final int layOutVersion;
 
   public DatanodeVersionFile(String storageId, String clusterId,
-      String datanodeUuid, long cTime, int layoutVersion) {
+      String datanodeUuid, long cTime, int layOutVersion) {
     this.storageId = storageId;
     this.clusterId = clusterId;
     this.datanodeUuid = datanodeUuid;
     this.cTime = cTime;
-    this.layoutVersion = layoutVersion;
+    this.layOutVersion = layOutVersion;
   }
 
   private Properties createProperties() {
@@ -54,7 +54,7 @@ public class DatanodeVersionFile {
     properties.setProperty(OzoneConsts.DATANODE_UUID, datanodeUuid);
     properties.setProperty(OzoneConsts.CTIME, String.valueOf(cTime));
     properties.setProperty(OzoneConsts.LAYOUTVERSION, String.valueOf(
-        layoutVersion));
+        layOutVersion));
     return properties;
   }
 

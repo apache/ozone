@@ -82,7 +82,7 @@ public final class MetadataKeyFilters {
     private int keysScanned = 0;
     private int keysHinted = 0;
 
-    public KeyPrefixFilter() { }
+    public KeyPrefixFilter() {}
 
     /**
      * KeyPrefixFilter constructor. It is made of positive and negative prefix

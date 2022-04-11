@@ -200,7 +200,7 @@ public abstract class EndpointBase {
 
   private Iterator<? extends OzoneBucket> iterateBuckets(
       Function<OzoneVolume, Iterator<? extends OzoneBucket>> query)
-      throws IOException, OS3Exception {
+      throws IOException, OS3Exception{
     try {
       return query.apply(getVolume());
     } catch (OMException e) {

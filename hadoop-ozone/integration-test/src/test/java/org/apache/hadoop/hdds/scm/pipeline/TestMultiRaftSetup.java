@@ -63,7 +63,6 @@ public class  TestMultiRaftSetup {
     pipelineDestroyTimeoutInMillis = 1000;
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
         pipelineDestroyTimeoutInMillis, TimeUnit.MILLISECONDS);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
     nodeManager = scm.getScmNodeManager();
@@ -154,7 +153,7 @@ public class  TestMultiRaftSetup {
     shutdown();
   }
   private void assertNotSamePeers() {
-    nodeManager.getAllNodes().forEach((dn) -> {
+    nodeManager.getAllNodes().forEach((dn) ->{
       Collection<DatanodeDetails> peers = nodeManager.getPeerList(dn);
       Assert.assertFalse(peers.contains(dn));
       List<DatanodeDetails> trimList = nodeManager.getAllNodes();

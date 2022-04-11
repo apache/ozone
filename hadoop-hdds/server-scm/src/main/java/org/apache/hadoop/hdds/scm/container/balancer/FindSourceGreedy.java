@@ -33,7 +33,7 @@ import java.util.UUID;
  * The selection criteria for selecting source datanodes , the containers of
  * which will be moved out.
  */
-public class FindSourceGreedy implements FindSourceStrategy {
+public class FindSourceGreedy implements FindSourceStrategy{
   private static final Logger LOG =
       LoggerFactory.getLogger(FindSourceGreedy.class);
   private Map<DatanodeDetails, Long> sizeLeavingNode;
@@ -84,7 +84,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
   @Override
   public void increaseSizeLeaving(DatanodeDetails dui, long size) {
     Long currentSize = sizeLeavingNode.get(dui);
-    if (currentSize != null) {
+    if(currentSize != null) {
       sizeLeavingNode.put(dui, currentSize + size);
       //reorder according to the latest sizeLeavingNode
       potentialSources.add(nodeManager.getUsageInfo(dui));
@@ -114,7 +114,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
    * data nodes.
    */
   @Override
-  public void removeCandidateSourceDataNode(DatanodeDetails dui) {
+  public void removeCandidateSourceDataNode(DatanodeDetails dui){
     potentialSources.removeIf(a -> a.getDatanodeDetails().equals(dui));
   }
 

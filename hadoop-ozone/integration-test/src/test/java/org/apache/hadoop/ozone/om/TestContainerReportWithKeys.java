@@ -107,7 +107,7 @@ public class TestContainerReportWithKeys {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey(keyName, keySize, ReplicationType.RATIS,
+            .createKey(keyName, keySize, ReplicationType.STAND_ALONE,
                 ReplicationFactor.ONE, new HashMap<>());
     String dataString = RandomStringUtils.randomAlphabetic(keySize);
     key.write(dataString.getBytes(UTF_8));

@@ -26,7 +26,7 @@ public enum AuditEventStatus {
 
   private String status;
 
-  AuditEventStatus(String status) {
+  AuditEventStatus(String status){
     this.status = status;
   }
 

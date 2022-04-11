@@ -90,7 +90,7 @@ public class TestListInfoSubcommand {
     assertTrue(m.find());
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
       p = Pattern.compile(
-          "^Health State:\\s+" + state + "$", Pattern.MULTILINE);
+          "^Health State:\\s+"+state+"$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
@@ -106,11 +106,11 @@ public class TestListInfoSubcommand {
   private List<HddsProtos.Node> getNodeDetails() {
     List<HddsProtos.Node> nodes = new ArrayList<>();
 
-    for (int i = 0; i < 4; i++) {
+    for (int i=0; i<4; i++) {
       HddsProtos.DatanodeDetailsProto.Builder dnd =
           HddsProtos.DatanodeDetailsProto.newBuilder();
       dnd.setHostName("host" + i);
-      dnd.setIpAddress("1.2.3." + i + 1);
+      dnd.setIpAddress("1.2.3." + i+1);
       dnd.setNetworkLocation("/default");
       dnd.setNetworkName("host" + i);
       dnd.addPorts(HddsProtos.Port.newBuilder()

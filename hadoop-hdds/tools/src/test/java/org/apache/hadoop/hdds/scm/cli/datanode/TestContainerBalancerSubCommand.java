@@ -119,8 +119,8 @@ public class TestContainerBalancerSubCommand {
         .thenAnswer(invocation -> true);
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
-        "\\ssuccessfully.");
+    Pattern p = Pattern.compile("^Starting\\sContainerBalancer" +
+        "\\sSuccessfully.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
@@ -134,8 +134,8 @@ public class TestContainerBalancerSubCommand {
         .thenAnswer(invocation -> false);
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Container\\sBalancer\\sis\\salready" +
-        "\\srunning.\\sPlease\\sstop\\sit\\sfirst.");
+    Pattern p = Pattern.compile("^ContainerBalancer\\sis\\salready\\srunning," +
+        "\\sPlease\\sstop\\sit\\sfirst.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }

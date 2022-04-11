@@ -33,8 +33,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -47,7 +45,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -484,25 +481,6 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   /**
-   * Gets the list of ReplicaInfo known by SCM for a given container.
-   * @param containerId - The Container ID
-   * @return List of ContainerReplicaInfo for the container or an empty list
-   *         if none.
-   * @throws IOException
-   */
-  @Override
-  public List<ContainerReplicaInfo>
-      getContainerReplicas(long containerId) throws IOException {
-    List<HddsProtos.SCMContainerReplicaProto> protos
-        = storageContainerLocationClient.getContainerReplicas(containerId);
-    List<ContainerReplicaInfo> replicas = new ArrayList<>();
-    for (HddsProtos.SCMContainerReplicaProto p : protos) {
-      replicas.add(ContainerReplicaInfo.fromProto(p));
-    }
-    return replicas;
-  }
-
-  /**
    * Close a container.
    *
    * @throws IOException
@@ -573,21 +551,15 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public ReplicationManagerReport getReplicationManagerReport()
-      throws IOException {
-    return storageContainerLocationClient.getReplicationManagerReport();
-  }
-
-  @Override
   public boolean startContainerBalancer(
-      Optional<Double> threshold, Optional<Integer> iterations,
-      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
+      Optional<Double> threshold, Optional<Integer> idleiterations,
+      Optional<Double> maxDatanodesRatioToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB)
       throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
-        iterations, maxDatanodesPercentageToInvolvePerIteration,
+        idleiterations, maxDatanodesRatioToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB);
   }

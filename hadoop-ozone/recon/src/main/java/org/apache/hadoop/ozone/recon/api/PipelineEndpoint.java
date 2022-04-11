@@ -116,7 +116,7 @@ public class PipelineEndpoint {
         // ex. group id of 48981bf7-8bea-4fbd-9857-79df51ee872d
         // is group-79DF51EE872D
         String[] splits = pipelineId.toString().split("-");
-        String groupId = "group-" + splits[splits.length - 1].toUpperCase();
+        String groupId = "group-" + splits[splits.length-1].toUpperCase();
         Optional<Long> leaderElectionCount = getMetricValue(
             "ratis_leader_election_electionCount", groupId);
         leaderElectionCount.ifPresent(pipelineBuilder::setLeaderElections);

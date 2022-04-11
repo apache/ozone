@@ -165,7 +165,7 @@ public class TestRootCertificate {
       OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
           ip -> {
             builder.addIpAddress(ip.getHostAddress());
-            if (validator.isValid(ip.getCanonicalHostName())) {
+            if(validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
             }
           });

@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -164,11 +164,11 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       String key = UUID.randomUUID().toString();
       long clientID = random.nextLong();
 
-      OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
+      OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volume,
           bucket, key, replicationType, replicationFactor);
 
       if (keyLength > 0) {
-        OMRequestTestUtils.addKeyLocationInfo(omKeyInfo, 0, keyLength);
+        TestOMRequestUtils.addKeyLocationInfo(omKeyInfo, 0, keyLength);
       }
 
       String openKey = omMetadataManager.getOpenKey(volume, bucket,
@@ -177,7 +177,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       // Add to the open key table DB, not cache.
       // In a real execution, the open key would have been removed from the
       // cache by the request, and it would only remain in the DB.
-      OMRequestTestUtils.addKeyToTable(true, false, omKeyInfo,
+      TestOMRequestUtils.addKeyToTable(true, false, omKeyInfo,
           clientID, 0L, omMetadataManager);
       Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
           .isExist(openKey));

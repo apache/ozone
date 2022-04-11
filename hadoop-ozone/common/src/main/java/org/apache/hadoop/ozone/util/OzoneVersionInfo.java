@@ -44,7 +44,7 @@ public final class OzoneVersionInfo {
   public static final RatisVersionInfo RATIS_VERSION_INFO =
       new RatisVersionInfo();
 
-  private OzoneVersionInfo() { }
+  private OzoneVersionInfo() {}
 
   public static void main(String[] args) {
     System.out.println(

@@ -179,7 +179,7 @@ public class StorageContainerManagerStarter extends GenericCli {
 
     @Override
     public boolean init(OzoneConfiguration conf, String clusterId)
-        throws IOException {
+        throws IOException{
       return StorageContainerManager.scmInit(conf, clusterId);
     }
 

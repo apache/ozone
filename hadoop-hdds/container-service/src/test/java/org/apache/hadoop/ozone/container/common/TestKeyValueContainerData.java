@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.Test;
@@ -41,15 +41,15 @@ public class TestKeyValueContainerData {
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
 
-  private final ContainerLayoutVersion layout;
+  private final ChunkLayOutVersion layout;
 
-  public TestKeyValueContainerData(ContainerLayoutVersion layout) {
+  public TestKeyValueContainerData(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
   }
 
   @Test

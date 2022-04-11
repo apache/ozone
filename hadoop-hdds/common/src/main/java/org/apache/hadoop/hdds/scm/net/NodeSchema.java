@@ -28,7 +28,7 @@ public final class NodeSchema {
   /**
    * Network topology layer type enum definition.
    */
-  public enum LayerType {
+  public enum LayerType{
     ROOT("Root", NetConstants.INNER_NODE_COST_DEFAULT),
     INNER_NODE("InnerNode", NetConstants.INNER_NODE_COST_DEFAULT),
     LEAF_NODE("Leaf", NetConstants.NODE_COST_DEFAULT);
@@ -47,7 +47,7 @@ public final class NodeSchema {
       return description;
     }
 
-    public int getCost() {
+    public int getCost(){
       return cost;
     }
     public static LayerType getType(String typeStr) {

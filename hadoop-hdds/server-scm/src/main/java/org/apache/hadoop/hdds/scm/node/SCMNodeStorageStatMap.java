@@ -136,7 +136,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
 
   //TODO: Unregister call should happen as a part of SCMNodeManager shutdown.
   private void unregisterMXBean() {
-    if (this.scmNodeStorageInfoBean != null) {
+    if(this.scmNodeStorageInfoBean != null) {
       MBeans.unregister(this.scmNodeStorageInfoBean);
       this.scmNodeStorageInfoBean = null;
     }

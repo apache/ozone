@@ -46,7 +46,7 @@ public class TestChunkBuffer {
   public void testImplWithByteBuffer() {
     runTestImplWithByteBuffer(1);
     runTestImplWithByteBuffer(1 << 10);
-    for (int i = 0; i < 10; i++) {
+    for(int i = 0; i < 10; i++) {
       runTestImplWithByteBuffer(nextInt(100) + 1);
     }
   }
@@ -62,7 +62,7 @@ public class TestChunkBuffer {
     runTestIncrementalChunkBuffer(1, 1);
     runTestIncrementalChunkBuffer(4, 8);
     runTestIncrementalChunkBuffer(16, 1 << 10);
-    for (int i = 0; i < 10; i++) {
+    for(int i = 0; i < 10; i++) {
       final int a = ThreadLocalRandom.current().nextInt(100) + 1;
       final int b = ThreadLocalRandom.current().nextInt(100) + 1;
       runTestIncrementalChunkBuffer(Math.min(a, b), Math.max(a, b));
@@ -80,7 +80,7 @@ public class TestChunkBuffer {
   public void testImplWithList() {
     runTestImplWithList(4, 8);
     runTestImplWithList(16, 1 << 10);
-    for (int i = 0; i < 10; i++) {
+    for(int i = 0; i < 10; i++) {
       final int a = ThreadLocalRandom.current().nextInt(10) + 1;
       final int b = ThreadLocalRandom.current().nextInt(100) + 1;
       runTestImplWithList(Math.min(a, b), Math.max(a, b));
@@ -131,7 +131,7 @@ public class TestChunkBuffer {
       assertIterate(expected, impl, bpc);
     } else if (bpc == 0) {
       for (int d = 1; d < 5; d++) {
-        final int bytesPerChecksum = n / d;
+        final int bytesPerChecksum = n/d;
         if (bytesPerChecksum > 0) {
           assertIterate(expected, impl, bytesPerChecksum);
         }
@@ -148,7 +148,7 @@ public class TestChunkBuffer {
   private static void assertDuplicate(byte[] expected, ChunkBuffer impl) {
     final int n = expected.length;
     assertToByteString(expected, 0, n, impl);
-    for (int i = 0; i < 10; i++) {
+    for(int i = 0; i < 10; i++) {
       final int offset = nextInt(n);
       final int length = nextInt(n - offset + 1);
       assertToByteString(expected, offset, length, impl);
@@ -165,14 +165,14 @@ public class TestChunkBuffer {
     final int numChecksums = (n + bpc - 1) / bpc;
     final Iterator<ByteBuffer> i = duplicated.iterate(bpc).iterator();
     int count = 0;
-    for (int j = 0; j < numChecksums; j++) {
+    for(int j = 0; j < numChecksums; j++) {
       final ByteBuffer b = i.next();
-      final int expectedRemaining = j < numChecksums - 1 ?
-          bpc : n - bpc * (numChecksums - 1);
+      final int expectedRemaining = j < numChecksums - 1?
+          bpc : n - bpc *(numChecksums - 1);
       Assert.assertEquals(expectedRemaining, b.remaining());
 
-      final int offset = j * bpc;
-      for (int k = 0; k < expectedRemaining; k++) {
+      final int offset = j* bpc;
+      for(int k = 0; k < expectedRemaining; k++) {
         Assert.assertEquals(expected[offset + k], b.get());
         count++;
       }

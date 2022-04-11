@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -63,11 +63,11 @@ public class TestSCMContainerPlacementRandom {
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
-      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+      StorageReportProto storage1 = TestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
-          HddsTestUtils.createMetadataStorageReport(
+          TestUtils.createMetadataStorageReport(
               "/metadata1-" + datanodeInfo.getUuidString(),
               100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
@@ -78,7 +78,7 @@ public class TestSCMContainerPlacementRandom {
       datanodes.add(datanodeInfo);
     }
 
-    StorageReportProto storage2 = HddsTestUtils.createStorageReport(
+    StorageReportProto storage2 = TestUtils.createStorageReport(
         datanodes.get(2).getUuid(),
         "/data1-" + datanodes.get(2).getUuidString(),
         100L, 90L, 10L, null);
@@ -172,11 +172,11 @@ public class TestSCMContainerPlacementRandom {
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
-      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+      StorageReportProto storage1 = TestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
-          HddsTestUtils.createMetadataStorageReport(
+          TestUtils.createMetadataStorageReport(
               "/metadata1-" + datanodeInfo.getUuidString(),
               100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
@@ -187,7 +187,7 @@ public class TestSCMContainerPlacementRandom {
       datanodes.add(datanodeInfo);
     }
 
-    StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+    StorageReportProto storage1 = TestUtils.createStorageReport(
         datanodes.get(1).getUuid(),
         "/data1-" + datanodes.get(1).getUuidString(),
         100L, 90L, 10L, null);
@@ -195,7 +195,7 @@ public class TestSCMContainerPlacementRandom {
         new ArrayList<>(Arrays.asList(storage1)));
 
     MetadataStorageReportProto metaStorage2 =
-        HddsTestUtils.createMetadataStorageReport(
+        TestUtils.createMetadataStorageReport(
             "/metadata1-" + datanodes.get(2).getUuidString(),
             100L, 90, 10L, null);
     datanodes.get(2).updateMetaDataStorageReports(

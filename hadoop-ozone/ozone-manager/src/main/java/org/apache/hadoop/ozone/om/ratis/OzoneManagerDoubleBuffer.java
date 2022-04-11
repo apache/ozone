@@ -243,7 +243,7 @@ public final class OzoneManagerDoubleBuffer {
 
           setReadyBuffer();
           List<Long> flushedEpochs = null;
-          try (BatchOperation batchOperation = omMetadataManager.getStore()
+          try(BatchOperation batchOperation = omMetadataManager.getStore()
               .initBatchOperation()) {
 
             AtomicReference<String> lastTraceId = new AtomicReference<>();
@@ -376,7 +376,7 @@ public final class OzoneManagerDoubleBuffer {
         responseClass.getAnnotation(CleanupTableInfo.class);
     if (cleanupTableInfo != null) {
       String[] cleanupTables;
-      if (cleanupTableInfo.cleanupAll()) {
+      if (cleanupTableInfo.cleanupAll()){
         cleanupTables = Arrays
             .stream(new OMDBDefinition().getColumnFamilies())
             .map(DBColumnFamilyDefinition::getTableName)

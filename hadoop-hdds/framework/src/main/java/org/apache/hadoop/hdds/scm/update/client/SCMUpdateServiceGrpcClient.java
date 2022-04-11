@@ -92,7 +92,7 @@ public class SCMUpdateServiceGrpcClient {
       createChannel();
     }
     clientId = subScribeClient();
-    assert (clientId != null);
+    assert(clientId != null);
 
     // start background thread processing pending crl ids.
     handler = new CRLClientUpdateHandler(clientId, updateClient,

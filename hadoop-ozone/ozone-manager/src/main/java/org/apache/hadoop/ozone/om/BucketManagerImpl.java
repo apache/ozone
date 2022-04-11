@@ -621,7 +621,7 @@ public class BucketManagerImpl implements BucketManager {
       }
       return hasAccess;
     } catch (IOException ex) {
-      if (ex instanceof OMException) {
+      if(ex instanceof OMException) {
         throw (OMException) ex;
       }
       LOG.error("CheckAccess operation failed for bucket:{}/{}.",

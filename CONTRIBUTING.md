@@ -20,8 +20,7 @@ We welcome contributions of:
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)
       * Blockade tests (python + blockade) 
-      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`),
-        which can be used to test cluster and report problems.
+      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`, `ozone genesis`), which can be used to test cluster and report problems.
  * **Bug reports** pointing out broken functionality, docs, or suggestions for improvements are always welcome!
  
 ## Who To Contact

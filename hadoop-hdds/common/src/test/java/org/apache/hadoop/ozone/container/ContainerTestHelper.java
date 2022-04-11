@@ -352,7 +352,7 @@ public final class ContainerTestHelper {
     LOG.trace("addContainer: {}", containerID);
 
     Builder request = getContainerCommandRequestBuilder(containerID, pipeline);
-    if (token != null) {
+    if(token != null){
       request.setEncodedToken(token.encodeToUrlString());
     }
     return request.build();

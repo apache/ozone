@@ -170,7 +170,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     dumpInfo(Types.BUCKET, effectivePath, objectBucketId, bucketKey);
 
     Iterator<Path> pathIterator =  p.iterator();
-    while (pathIterator.hasNext()) {
+    while(pathIterator.hasNext()) {
       Path elem = pathIterator.next();
       String path =
           metadataManager.getOzonePathKey(lastObjectId, elem.toString());

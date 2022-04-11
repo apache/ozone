@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -68,7 +68,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
@@ -693,7 +693,7 @@ public class TestObjectStoreWithFSO {
   private void createTestKey(OzoneBucket bucket, String keyName,
       String keyValue) throws IOException {
     OzoneOutputStream out = bucket.createKey(keyName,
-            keyValue.getBytes(StandardCharsets.UTF_8).length, RATIS,
+            keyValue.getBytes(StandardCharsets.UTF_8).length, STAND_ALONE,
             ONE, new HashMap<>());
     out.write(keyValue.getBytes(StandardCharsets.UTF_8));
     out.close();
@@ -704,7 +704,7 @@ public class TestObjectStoreWithFSO {
   private OmDirectoryInfo getDirInfo(String parentKey) throws Exception {
     OMMetadataManager omMetadataManager =
             cluster.getOzoneManager().getMetadataManager();
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
+    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
             omMetadataManager);
     String[] pathComponents = StringUtils.split(parentKey, '/');
     long parentId = bucketId;

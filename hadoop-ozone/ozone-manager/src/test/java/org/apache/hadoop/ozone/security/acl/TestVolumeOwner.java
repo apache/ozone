@@ -21,21 +21,21 @@ package org.apache.hadoop.ozone.security.acl;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.BucketManager;
-import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.ozone.om.BucketManagerImpl;
+import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmTestManagers;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManager;
-import org.apache.hadoop.ozone.om.VolumeManager;
+import org.apache.hadoop.ozone.om.PrefixManagerImpl;
+import org.apache.hadoop.ozone.om.VolumeManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -54,6 +54,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
+import static org.mockito.Mockito.mock;
 
 
 /**
@@ -63,30 +64,28 @@ public class TestVolumeOwner {
 
   private static OzoneConfiguration ozoneConfig;
   private static OzoneNativeAuthorizer nativeAuthorizer;
-  private static KeyManager keyManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
+  private static KeyManagerImpl keyManager;
+  private static VolumeManagerImpl volumeManager;
+  private static BucketManagerImpl bucketManager;
   private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static UserGroupInformation testUgi;
-  private static OzoneManagerProtocol writeClient;
 
   @BeforeClass
-  public static void setup() throws IOException, AuthenticationException {
+  public static void setup() throws IOException {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     File dir = GenericTestUtils.getRandomizedTestDir();
     ozoneConfig.set(OZONE_METADATA_DIRS, dir.toString());
 
-    OmTestManagers omTestManagers =
-        new OmTestManagers(ozoneConfig);
-    metadataManager = omTestManagers.getMetadataManager();
-    volumeManager = omTestManagers.getVolumeManager();
-    bucketManager = omTestManagers.getBucketManager();
-    keyManager = omTestManagers.getKeyManager();
-    prefixManager = omTestManagers.getPrefixManager();
-    writeClient = omTestManagers.getWriteClient();
+    metadataManager = new OmMetadataManagerImpl(ozoneConfig);
+    volumeManager = new VolumeManagerImpl(metadataManager, ozoneConfig);
+    bucketManager = new BucketManagerImpl(metadataManager);
+    keyManager = new KeyManagerImpl(mock(ScmBlockLocationProtocol.class),
+        metadataManager, ozoneConfig, "om1", null);
+    prefixManager = new PrefixManagerImpl(metadataManager, false);
+
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
         Collections.singletonList("om"));
@@ -107,7 +106,7 @@ public class TestVolumeOwner {
           .setAdminName("om")
           .setOwnerName(getTestVolOwnerName(i))
           .build();
-      OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
+      TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
     }
   }
 
@@ -119,7 +118,7 @@ public class TestVolumeOwner {
             .setVolumeName(getTestVolumeName(i))
             .setBucketName(getTestBucketName(j))
             .build();
-        OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
+        TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
       }
     }
   }
@@ -145,12 +144,12 @@ public class TestVolumeOwner {
                 testUgi.getUserName(), testUgi.getGroupNames(), NONE, NONE));
           }
           OmKeyArgs keyArgs = keyArgsBuilder.build();
-          OpenKeySession keySession = writeClient.createFile(keyArgs, true,
+          OpenKeySession keySession = keyManager.createFile(keyArgs, true,
               false);
           keyArgs.setLocationInfoList(
               keySession.getKeyInfo().getLatestVersionLocations()
                   .getLocationList());
-          writeClient.commitKey(keyArgs, keySession.getId());
+          keyManager.commitKey(keyArgs, keySession.getId());
         }
       }
     }
@@ -187,7 +186,7 @@ public class TestVolumeOwner {
 
     List<IAccessAuthorizer.ACLType> aclsToTest =
         Arrays.stream(IAccessAuthorizer.ACLType.values()).filter(
-            (type) -> type != NONE && type != CREATE)
+            (type)-> type != NONE && type != CREATE)
             .collect(Collectors.toList());
     for (IAccessAuthorizer.ACLType type: aclsToTest) {
       nonAdminOwnerContext = getUserRequestContext(getTestVolOwnerName(0),
@@ -296,6 +295,6 @@ public class TestVolumeOwner {
 
   List<IAccessAuthorizer.ACLType> getAclsToTest() {
     return Arrays.stream(IAccessAuthorizer.ACLType.values()).filter(
-        (type) -> type != NONE).collect(Collectors.toList());
+        (type)-> type != NONE).collect(Collectors.toList());
   }
 }

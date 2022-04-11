@@ -96,7 +96,7 @@ public class TestDU {
 
     long usedSpace = du.getUsedSpace();
 
-    assertFileSize(4 * KB, usedSpace);
+    assertFileSize(4*KB, usedSpace);
   }
 
   private static void assertFileSize(long expected, long actual) {

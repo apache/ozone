@@ -366,7 +366,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
         .setReason(Reason.valueOf(reason))
         .setRevokeTime(revocationTime).build();
     return submitRequest(Type.RevokeCertificates,
-        builder -> builder.setRevokeCertificatesRequest(req))
+        builder->builder.setRevokeCertificatesRequest(req))
         .getRevokeCertificatesResponseProto().getCrlId();
   }
 

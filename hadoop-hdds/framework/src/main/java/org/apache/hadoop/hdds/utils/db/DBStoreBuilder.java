@@ -168,7 +168,7 @@ public final class DBStoreBuilder {
    * @return DBStore
    */
   public DBStore build() throws IOException {
-    if (StringUtil.isBlank(dbname) || (dbPath == null)) {
+    if(StringUtil.isBlank(dbname) || (dbPath == null)) {
       LOG.error("Required Parameter missing.");
       throw new IOException("Required parameter is missing. Please make sure "
           + "Path and DB name is provided.");
@@ -340,7 +340,7 @@ public final class DBStoreBuilder {
         try {
           option = DBConfigFromFile.readFromFile(dbname,
               columnFamilyDescriptors);
-          if (option != null) {
+          if(option != null) {
             LOG.info("Using RocksDB DBOptions from {}.ini file", dbname);
           }
         } catch (IOException ex) {

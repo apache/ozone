@@ -45,7 +45,7 @@ public class TestContainerCommandRequestMessage {
 
   static ByteString newData(int length) {
     final ByteString.Output out = ByteString.newOutput();
-    for (int i = 0; i < length; i++) {
+    for(int i = 0; i < length; i++) {
       out.write(RANDOM.nextInt());
     }
     return out.toByteString();
@@ -128,10 +128,10 @@ public class TestContainerCommandRequestMessage {
   static void runTest(
       BiFunction<BlockID, ByteString, ContainerCommandRequestProto> method)
       throws Exception {
-    for (int i = 0; i < 2; i++) {
+    for(int i = 0; i < 2; i++) {
       runTest(i, method);
     }
-    for (int i = 2; i < 1 << 10;) {
+    for(int i = 2; i < 1 << 10;) {
       runTest(i + 1 + RANDOM.nextInt(i - 1), method);
       i <<= 1;
       runTest(i, method);

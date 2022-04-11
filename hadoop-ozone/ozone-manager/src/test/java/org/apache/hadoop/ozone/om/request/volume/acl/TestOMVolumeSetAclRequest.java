@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.request.volume.acl;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.request.volume.TestOMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -43,7 +43,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     OMRequest originalRequest =
-        OMRequestTestUtils.createVolumeSetAclRequest(volumeName,
+        TestOMRequestUtils.createVolumeSetAclRequest(volumeName,
             Lists.newArrayList(acl));
     long originModTime = originalRequest.getSetAclRequest()
         .getModificationTime();
@@ -66,8 +66,8 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String ownerName = "user1";
 
-    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     OzoneAcl userAccessAcl = OzoneAcl.parseAcl("user:bilbo:rw[ACCESS]");
     OzoneAcl groupDefaultAcl =
@@ -76,7 +76,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     List<OzoneAcl> acls = Lists.newArrayList(userAccessAcl, groupDefaultAcl);
 
     OMRequest originalRequest =
-        OMRequestTestUtils.createVolumeSetAclRequest(volumeName, acls);
+        TestOMRequestUtils.createVolumeSetAclRequest(volumeName, acls);
 
     OMVolumeSetAclRequest omVolumeSetAclRequest =
         new OMVolumeSetAclRequest(originalRequest);
@@ -117,7 +117,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     OMRequest originalRequest =
-        OMRequestTestUtils.createVolumeSetAclRequest(volumeName,
+        TestOMRequestUtils.createVolumeSetAclRequest(volumeName,
             Lists.newArrayList(acl));
 
     OMVolumeSetAclRequest omVolumeSetAclRequest =

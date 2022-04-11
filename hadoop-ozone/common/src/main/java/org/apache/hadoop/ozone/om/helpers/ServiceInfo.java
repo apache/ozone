@@ -62,7 +62,7 @@ public final class ServiceInfo {
   /**
    * Default constructor for JSON deserialization.
    */
-  public ServiceInfo() { }
+  public ServiceInfo() {}
 
   /**
    * Constructs the ServiceInfo for the {@code nodeType}.

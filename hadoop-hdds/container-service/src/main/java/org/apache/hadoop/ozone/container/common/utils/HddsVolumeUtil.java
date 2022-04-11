@@ -145,7 +145,7 @@ public final class HddsVolumeUtil {
     String lvStr = getProperty(props, OzoneConsts.LAYOUTVERSION, versionFile);
 
     int lv = Integer.parseInt(lvStr);
-    if (HDDSVolumeLayoutVersion.getLatestVersion().getVersion() != lv) {
+    if(HDDSVolumeLayoutVersion.getLatestVersion().getVersion() != lv) {
       throw new InconsistentStorageStateException("Invalid layOutVersion. " +
           "Version file has layOutVersion as " + lv + " and latest Datanode " +
           "layOutVersion is " +

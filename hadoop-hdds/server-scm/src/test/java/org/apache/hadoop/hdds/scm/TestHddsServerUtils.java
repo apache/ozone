@@ -56,7 +56,7 @@ public class TestHddsServerUtils {
   public Timeout timeout = Timeout.seconds(300);;
 
   @Rule
-  public ExpectedException thrown = ExpectedException.none();
+  public ExpectedException thrown= ExpectedException.none();
 
   /**
    * Test getting OZONE_SCM_DATANODE_ADDRESS_KEY with port.

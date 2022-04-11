@@ -28,11 +28,11 @@ public enum AuditMarker {
 
   private Marker marker;
 
-  AuditMarker(Marker marker) {
+  AuditMarker(Marker marker){
     this.marker = marker;
   }
 
-  public Marker getMarker() {
+  public Marker getMarker(){
     return marker;
   }
 }

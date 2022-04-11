@@ -100,7 +100,7 @@ public abstract class BaseApprover implements CertificateApprover {
     Objects.requireNonNull(attribute);
     List<Extensions> extensionsList = new ArrayList<>();
     for (ASN1Encodable value : attribute.getAttributeValues()) {
-      if (value != null) {
+      if(value != null) {
         Extensions extensions = Extensions.getInstance(value);
         extensionsList.add(extensions);
       }

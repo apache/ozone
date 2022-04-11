@@ -57,5 +57,6 @@ Ozone 有一系列管理 Ozone 的命令行工具。
 测试工具：
 
    * **freon** -  运行 Ozone 负载生成器。
+   * **genesis**  - Ozone 的 benchmark 应用，仅供开发者使用。
 
 更多信息请参见下面的子页面：

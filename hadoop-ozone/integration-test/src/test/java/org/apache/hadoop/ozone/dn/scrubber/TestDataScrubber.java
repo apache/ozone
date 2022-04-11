@@ -70,7 +70,7 @@ import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
 /**
  * This class tests the data scrubber functionality.
@@ -101,7 +101,6 @@ public class TestDataScrubber {
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
     ozClient = OzoneClientFactory.getRpcClient(ozoneConfig);
     store = ozClient.getObjectStore();
     ozoneManager = cluster.getOzoneManager();
@@ -138,7 +137,7 @@ public class TestDataScrubber {
       String keyName = UUID.randomUUID().toString();
 
       OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, RATIS,
+          value.getBytes(UTF_8).length, STAND_ALONE,
           ONE, new HashMap<>());
       out.write(value.getBytes(UTF_8));
       out.close();
@@ -148,7 +147,7 @@ public class TestDataScrubber {
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
       is.read(fileContent);
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, RATIS,
+          keyName, STAND_ALONE,
           ONE));
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));

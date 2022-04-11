@@ -225,7 +225,7 @@ public class TestVolumeSet {
   }
 
   @Test
-  public void testFailVolumes() throws  Exception {
+  public void testFailVolumes() throws  Exception{
     MutableVolumeSet volSet = null;
     File readOnlyVolumePath = new File(baseDir);
     //Set to readonly, so that this volume will be failed

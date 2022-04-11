@@ -79,7 +79,7 @@ public class TestHDDSKeyGenerator {
     HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config.getConfiguration());
     KeyPair keyPair = keyGen.generateKey(4096);
     PublicKey publicKey = keyPair.getPublic();
-    if (publicKey instanceof RSAPublicKey) {
+    if(publicKey instanceof RSAPublicKey) {
       Assert.assertEquals(4096,
           ((RSAPublicKey)(publicKey)).getModulus().bitLength());
     }

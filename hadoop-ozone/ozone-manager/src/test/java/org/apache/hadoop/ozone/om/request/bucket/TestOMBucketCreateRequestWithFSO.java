@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StorageTypeProto;
@@ -56,7 +56,7 @@ public class TestOMBucketCreateRequestWithFSO
       String bucketName) throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
     OMRequest originalRequest =
-        OMRequestTestUtils.createBucketReqFSO(bucketName, volumeName,
+        TestOMRequestUtils.createBucketReqFSO(bucketName, volumeName,
                 false, StorageTypeProto.SSD);
 
     OMBucketCreateRequest omBucketCreateRequest =

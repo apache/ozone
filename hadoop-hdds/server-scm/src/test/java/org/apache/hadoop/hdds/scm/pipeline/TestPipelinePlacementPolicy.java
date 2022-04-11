@@ -250,7 +250,7 @@ public class TestPipelinePlacementPolicy {
           new ArrayList<>(datanodes.size()), nodesRequired,
           0, 10 * OzoneConsts.TB);
       Assert.fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
+    } catch(SCMException ex) {
       Assert.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
     }
 
@@ -260,13 +260,13 @@ public class TestPipelinePlacementPolicy {
           new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB,
           0);
       Assert.fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
+    } catch(SCMException ex) {
       Assert.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
     }
   }
 
   @Test
-  public void testPickLowestLoadAnchor() throws IOException {
+  public void testPickLowestLoadAnchor() throws IOException{
     List<DatanodeDetails> healthyNodes = nodeManager
         .getNodes(NodeStatus.inServiceHealthy());
 
@@ -343,7 +343,7 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
-  public void testRackAwarenessNotEnabledWithFallBack() throws SCMException {
+  public void testRackAwarenessNotEnabledWithFallBack() throws SCMException{
     DatanodeDetails anchor = placementPolicy
         .chooseNode(nodesWithOutRackAwareness);
     DatanodeDetails randomNode = placementPolicy
@@ -425,12 +425,12 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
-  public void testHeavyNodeShouldBeExcluded() throws SCMException {
+  public void testHeavyNodeShouldBeExcluded() throws SCMException{
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
     // only minority of healthy NODES are heavily engaged in pipelines.
-    int minorityHeavy = healthyNodes.size() / 2 - 1;
+    int minorityHeavy = healthyNodes.size()/2 - 1;
     List<DatanodeDetails> pickedNodes1 = placementPolicy.chooseDatanodes(
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
@@ -443,7 +443,7 @@ public class TestPipelinePlacementPolicy {
     Assert.assertTrue(checkDuplicateNodesUUID(pickedNodes1));
 
     // majority of healthy NODES are heavily engaged in pipelines.
-    int majorityHeavy = healthyNodes.size() / 2 + 2;
+    int majorityHeavy = healthyNodes.size()/2 + 2;
     insertHeavyNodesIntoNodeManager(healthyNodes, majorityHeavy);
     boolean thrown = false;
     List<DatanodeDetails> pickedNodes2 = null;
@@ -627,7 +627,7 @@ public class TestPipelinePlacementPolicy {
   }
 
   private void insertHeavyNodesIntoNodeManager(
-      List<DatanodeDetails> nodes, int heavyNodeCount) throws SCMException {
+      List<DatanodeDetails> nodes, int heavyNodeCount) throws SCMException{
     if (nodes == null) {
       throw new SCMException("",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
