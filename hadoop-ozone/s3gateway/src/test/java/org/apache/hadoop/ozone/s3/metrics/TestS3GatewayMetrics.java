@@ -258,7 +258,6 @@ public class TestS3GatewayMetrics {
     // Failing the putACL endpoint by applying ACL on a non-Existent Bucket
     long oriMetric = metrics.getPutAclFailure();
 
-    clientStub.getObjectStore().createS3Bucket("b1");
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
 
@@ -266,8 +265,9 @@ public class TestS3GatewayMetrics {
       bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers, inputBody);
       fail();
     } catch (OS3Exception ex) {
+    } finally {
+      inputBody.close();
     }
-    inputBody.close();
     long curMetric = metrics.getPutAclFailure();
     assertEquals(1L, curMetric - oriMetric);
   }

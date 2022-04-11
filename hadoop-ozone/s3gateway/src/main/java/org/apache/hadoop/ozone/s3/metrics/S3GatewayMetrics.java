@@ -363,6 +363,6 @@ public final class S3GatewayMetrics implements MetricsSource {
   }
 
   public long getListMultipartUploadsFailure() {
-    return listMultipartUploadsSuccess.value();
+    return listMultipartUploadsFailure.value();
   }
 }
