@@ -307,4 +307,5 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_TRANSPORT_CLASS_DEFAULT =
       "org.apache.hadoop.ozone.om.protocolPB"
           + ".Hadoop3OmTransportFactory";
+
 }

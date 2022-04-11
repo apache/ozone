@@ -194,9 +194,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <netty.version>4.1.63.Final</netty.version>
     <io.grpc.version>1.38.0</io.grpc.version>
-    <tcnative.version>2.0.38.Final</tcnative.version> <!-- See table for correct version -->
-    <!-- Table for netty, grpc & tcnative version combinations  -->
-    <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
