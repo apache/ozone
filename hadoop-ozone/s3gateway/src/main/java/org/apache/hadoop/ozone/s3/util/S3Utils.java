@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.s3.util;
 
+import org.apache.commons.lang.StringUtils;
+
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -41,17 +43,21 @@ public final class S3Utils {
   }
 
   public static Map<String, String> genAuditParam(String... strs) {
-    if (strs.length / 2 == 0) {
-      throw new IllegalArgumentException();
+    if (strs.length % 2 == 1) {
+      throw new IllegalArgumentException("Unexpected number of parameters: "
+          + strs.length);
     }
     Map<String, String> auditParams = new TreeMap<>();
     for (int i = 0; i < strs.length; i++) {
+      if (StringUtils.isEmpty(strs[i]) || StringUtils.isEmpty(strs[i + 1])) {
+        continue;
+      }
       auditParams.put(strs[i], strs[++i]);
     }
     return auditParams;
   }
 
   private S3Utils() {
-      // no instances
+    // no instances
   }
 }

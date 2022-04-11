@@ -114,9 +114,7 @@ public class BucketEndpoint extends EndpointBase {
         "prefix", prefix,
         "browser", browser,
         "continuation-token", continueToken,
-        "start-after", startAfter,
-        "uploads", uploads,
-        "acl", aclMarker
+        "start-after", startAfter
     );
     Iterator<? extends OzoneKey> ozoneKeyIterator;
     ContinueToken decodedToken =
@@ -127,11 +125,12 @@ public class BucketEndpoint extends EndpointBase {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
         getMetrics().incGetAclSuccess();
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(s3GAction, auditParams));
         return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
       }
 
       if (browser != null) {
-        s3GAction = S3GAction.BROWSE;
         InputStream browserPage = getClass()
             .getResourceAsStream("/browser.html");
         return Response.ok(browserPage,

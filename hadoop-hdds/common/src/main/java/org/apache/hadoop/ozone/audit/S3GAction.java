@@ -22,7 +22,6 @@ package org.apache.hadoop.ozone.audit;
 public enum S3GAction implements AuditAction {
 
   //BucketEndpoint
-  BROWSE,
   GET_BUCKET,
   CREATE_BUCKET,
   HEAD_BUCKET,

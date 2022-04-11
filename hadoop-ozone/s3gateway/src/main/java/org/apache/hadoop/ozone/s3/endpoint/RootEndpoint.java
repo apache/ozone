@@ -21,6 +21,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -73,14 +74,16 @@ public class RootEndpoint extends EndpointBase {
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(S3GAction.LIST_S3_BUCKETS, null, ex)
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(S3GAction.LIST_S3_BUCKETS,
+              Collections.emptyMap(), ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(S3GAction.LIST_S3_BUCKETS, null)
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(S3GAction.LIST_S3_BUCKETS,
+                Collections.emptyMap())
         );
       }
     }

@@ -207,13 +207,11 @@ public abstract class EndpointBase implements Auditor {
     }
   }
 
-  @Override
-  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+  private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
       Map<String, String> auditMap) {
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
-        .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS);
+        .withParams(auditMap);
     if (s3Auth != null &&
         s3Auth.getAccessID() != null &&
         !s3Auth.getAccessID().isEmpty()) {
@@ -222,25 +220,23 @@ public abstract class EndpointBase implements Auditor {
     if (context != null) {
       builder.atIp(getClientIpAddress());
     }
+    return builder;
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+      Map<String, String> auditMap) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.SUCCESS);
     return builder.build();
   }
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
-    AuditMessage.Builder builder = new AuditMessage.Builder()
-        .forOperation(op)
-        .withParams(auditMap)
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable);
-    if (s3Auth != null &&
-        s3Auth.getAccessID() != null &&
-        !s3Auth.getAccessID().isEmpty()) {
-      builder.setUser(s3Auth.getAccessID());
-    }
-    if (context != null) {
-      builder.atIp(getClientIpAddress());
-    }
     return builder.build();
   }
 

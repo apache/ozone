@@ -169,9 +169,11 @@ public class ObjectEndpoint extends EndpointBase {
         "bucket", bucketName,
         "path", keyPath,
         "Content-Length", String.valueOf(length),
-        "partNumber", String.valueOf(partNumber),
-        "uploadId", uploadID
+        "partNumber", String.valueOf(partNumber)
     );
+    if (partNumber != 0) {
+      auditParams.put("uploadId", uploadID);
+    }
 
     OzoneOutputStream output = null;
 

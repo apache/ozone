@@ -49,7 +49,6 @@ public class ClientIpFilter implements ContainerRequestFilter {
   private HttpServletRequest httpServletRequest;
 
   @Override
-
   public void filter(ContainerRequestContext request) throws IOException {
     String clientIp = httpServletRequest.getHeader("x-real-ip");
 
