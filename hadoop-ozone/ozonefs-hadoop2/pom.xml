@@ -53,7 +53,7 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
-      <version>2.7.3</version>
+      <version>3.2.3</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
