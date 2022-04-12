@@ -471,6 +471,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         "already shutdown.");
     if (!ozoneManager.isStopped()) {
       ozoneManager.shutDown("OM state machine is shutdown by Ratis server");
+    } else {
+      stop();
     }
   }
 
@@ -633,7 +635,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.raftGroupId = raftGroupId;
   }
 
-  public void stoxp() {
+  public void stop() {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
