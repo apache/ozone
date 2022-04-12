@@ -170,16 +170,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     tenantInContext = ozoneManager.getMultiTenantManager()
         .createTenantAccessInAuthorizer(tenantId);
 
-    // Get the tenant default policy, pass this along
-    final String tenantDefaultPolicies = tenantInContext
-        .getTenantAccessPolicies()
-        .stream().map(AccessPolicy::getPolicyID)
-        .collect(Collectors.joining(","));
-
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
-                .setTenantDefaultPolicyName(tenantDefaultPolicies)
                 .setTenantId(tenantId)
                 .setVolumeName(volumeName))
         .setCreateVolumeRequest(
@@ -235,8 +228,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
     IOException exception = null;
-
-    final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
 
     try {
       // Check ACL: requires volume CREATE permission.
