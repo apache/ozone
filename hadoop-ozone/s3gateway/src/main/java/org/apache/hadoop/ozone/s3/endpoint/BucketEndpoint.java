@@ -137,13 +137,12 @@ public class BucketEndpoint extends EndpointBase {
         prefix = "";
       }
 
-      OzoneBucket bucket = getBucket(bucketName);
-
       // Assign marker to startAfter. for the compatibility of aws api v1
       if (startAfter == null && marker != null) {
         startAfter = marker;
       }
-
+      
+      OzoneBucket bucket = getBucket(bucketName);
       if (startAfter != null && continueToken != null) {
         // If continuation token and start after both are provided, then we
         // ignore start After
@@ -165,6 +164,7 @@ public class BucketEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
+      getMetrics().incGetBucketFailure();
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, auditParams, ex));
       throw ex;
@@ -247,14 +247,15 @@ public class BucketEndpoint extends EndpointBase {
 
   @PUT
   public Response put(@PathParam("bucket") String bucketName,
-      @QueryParam("acl") String aclMarker,
-      @Context HttpHeaders httpHeaders,
-      InputStream body) throws IOException, OS3Exception {
+                      @QueryParam("acl") String aclMarker,
+                      @Context HttpHeaders httpHeaders,
+                      InputStream body) throws IOException, OS3Exception {                      
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
     Map<String, String> auditParams = S3Utils.genAuditParam(
         "bucket", bucketName,
         "acl", aclMarker
     );
+
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_ACL;
@@ -328,6 +329,7 @@ public class BucketEndpoint extends EndpointBase {
       throw ex;
     }
   }
+
   /**
    * Rest endpoint to check the existence of a bucket.
    * <p>
@@ -405,8 +407,9 @@ public class BucketEndpoint extends EndpointBase {
   @POST
   @Produces(MediaType.APPLICATION_XML)
   public MultiDeleteResponse multiDelete(@PathParam("bucket") String bucketName,
-      @QueryParam("delete") String delete,
-      MultiDeleteRequest request) throws OS3Exception, IOException {
+                                         @QueryParam("delete") String delete,
+                                         MultiDeleteRequest request)
+      throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
     Map<String, String> auditParams = S3Utils.genAuditParam(
         "bucket", bucketName,
@@ -492,6 +495,9 @@ public class BucketEndpoint extends EndpointBase {
         LOG.error("Failed to get acl of Bucket " + bucketName, ex);
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       }
+    } catch (OS3Exception ex) {
+      getMetrics().incGetAclFailure();
+      throw ex;
     }
   }
 
@@ -501,7 +507,7 @@ public class BucketEndpoint extends EndpointBase {
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
   public Response putAcl(String bucketName, HttpHeaders httpHeaders,
-      InputStream body) throws IOException, OS3Exception {
+                         InputStream body) throws IOException, OS3Exception {
     String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
     String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
     String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);
@@ -519,7 +525,7 @@ public class BucketEndpoint extends EndpointBase {
           && grantWriteACP == null && grantFull == null) {
         S3BucketAcl putBucketAclRequest =
             new PutBucketAclRequestUnmarshaller().readFrom(
-            null, null, null, null, null, body);
+                null, null, null, null, null, body);
         // Handle grants in body
         ozoneAclListOnBucket.addAll(
             S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
@@ -559,7 +565,6 @@ public class BucketEndpoint extends EndpointBase {
               S3Acl.ACLType.FULL_CONTROL.getValue()));
         }
       }
-
       // A put request will reset all previous ACLs on bucket
       bucket.setAcl(ozoneAclListOnBucket);
       // A put request will reset input user/group's permission on volume
@@ -592,24 +597,28 @@ public class BucketEndpoint extends EndpointBase {
       LOG.error("Error in set ACL Request for bucket: {}", bucketName,
           exception);
       throw exception;
+    } catch (OS3Exception ex) {
+      getMetrics().incPutAclFailure();
+      throw ex;
     }
     getMetrics().incPutAclSuccess();
     return Response.status(HttpStatus.SC_OK).build();
   }
 
   /**
-   *  Example: x-amz-grant-write: \
-   *  uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
-   *  id="555566667777".
+   * Example: x-amz-grant-write: \
+   * uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
+   * id="555566667777".
    */
   private List<OzoneAcl> getAndConvertAclOnBucket(String value,
-      String permission) throws OS3Exception {
+                                                  String permission)
+      throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;
     }
     String[] subValues = value.split(",");
-    for (String acl: subValues) {
+    for (String acl : subValues) {
       String[] part = acl.split("=");
       if (part.length != 2) {
         throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
@@ -636,13 +645,14 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   private List<OzoneAcl> getAndConvertAclOnVolume(String value,
-      String permission) throws OS3Exception {
+                                                  String permission)
+      throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;
     }
     String[] subValues = value.split(",");
-    for (String acl: subValues) {
+    for (String acl : subValues) {
       String[] part = acl.split("=");
       if (part.length != 2) {
         throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
