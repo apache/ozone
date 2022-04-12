@@ -3072,7 +3072,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException {
 
-    metrics.incNumTenantGetUserInfos();
+    metrics.incNumTenantUserLists();
 
     if (StringUtils.isEmpty(tenantId)) {
       return null;
