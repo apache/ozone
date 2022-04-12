@@ -38,6 +38,7 @@ Ranger admin is responsible for manually adding new policies to grant or deny an
 
 It is recommended to add new policies instead of editing the default tenant policies created by Ozone. **DO NOT** remove the **Policy Label** on those default tenant policies, or else the Ozone Manager might fail to sync with Ranger for those policies.
 
+
 ### Ranger Roles
 
 These new Ranger policies would have the corresponding **Ranger roles** added in their **Allow Conditions**.
@@ -66,3 +67,17 @@ The Ranger Sync thread does the following:
 2. Checks if default tenant roles are out-of-sync (could be caused by OM crash during user assign/revoke operation). Overwrites them if this is the case.
 3. Performs all Ranger update (write) operations queued by Ozone tenant commands from the last sync, if any.
    - This implies there will be a delay before Ranger policies and roles are updated for any tenant write operations (tenant create/delete, tenant user assign/revoke/assignadmin/revokeadmin, etc.). 
+
+
+## Sharing a bucket
+
+By default only the bucket owners have full access to the buckets they created.
+So in order to share a bucket with other users, a cluster admin or tenant admin will needs to manually create a new Ozone policy in Ranger for that bucket.  
+
+Further, if a cluster admin or tenant admin wants the bucket owner (who is a regular tenant user without any superuser privileges) to be able to edit that bucket's policy,
+when manually creating a new Ozone policy in Ranger for that bucket,
+an admin will need to explicitly grant the bucket owner user (note: specify an actual user name, `{OWNER}` tag should not be used here) ALL permission
+on the bucket AND tick the bucket owner user's "Delegated Admin" checkbox for that policy.
+
+With this new Ranger policy, as long as the bucket owners can log in to the Ranger Web UI,
+they could edit the bucket policies on their own, for example, to share the bucket with others without an administrator's manual intervention.
