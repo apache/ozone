@@ -32,6 +32,10 @@ List buckets
     ${result} =         Execute AWSS3APICli     list-buckets | jq -r '.Buckets[].Name'
                         Should contain          ${result}    ${BUCKET}
 
+List bucket using Ozone Shell CLI and check the owner
+    ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '. | select(.name=="${BUCKET}") | .owner'
+                        Should Be Equal     ${result}       dlfknslnfslf    # See "Setup dummy credentials for S3" in commonawslib.robot
+
 List buckets with empty access id
                         Execute                    aws configure set aws_access_key_id ''
     ${result} =         Execute AWSS3APICli and checkrc         list-buckets    255

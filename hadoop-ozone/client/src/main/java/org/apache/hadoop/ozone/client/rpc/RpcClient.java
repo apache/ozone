@@ -533,8 +533,18 @@ public class RpcClient implements ClientProtocol {
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
 
-    String owner = bucketArgs.getOwner() == null ?
-            ugi.getShortUserName() : bucketArgs.getOwner();
+    String owner;
+    // If S3 auth exists, set owner name to the short user name derived from the
+    //  accessId. Similar to RpcClient#getDEK
+    if (getThreadLocalS3Auth() != null) {
+      UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
+          getThreadLocalS3Auth().getAccessID());
+      owner = s3gUGI.getShortUserName();
+    } else {
+      owner = bucketArgs.getOwner() == null ?
+          ugi.getShortUserName() : bucketArgs.getOwner();
+    }
+
     Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
         Boolean.FALSE : bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
