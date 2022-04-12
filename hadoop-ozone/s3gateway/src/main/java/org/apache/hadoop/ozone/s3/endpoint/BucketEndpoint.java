@@ -249,7 +249,7 @@ public class BucketEndpoint extends EndpointBase {
   public Response put(@PathParam("bucket") String bucketName,
                       @QueryParam("acl") String aclMarker,
                       @Context HttpHeaders httpHeaders,
-                      InputStream body) throws IOException, OS3Exception {                      
+                      InputStream body) throws IOException, OS3Exception {
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
     Map<String, String> auditParams = S3Utils.genAuditParam(
         "bucket", bucketName,
