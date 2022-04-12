@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -95,7 +94,7 @@ public final class OzoneClientUtils {
    */
   public static ReplicationConfig resolveClientSideReplicationConfig(
       short replication, ReplicationConfig clientConfiguredReplConfig,
-      ReplicationConfig bucketReplConfig, OzoneConfiguration config) {
+      ReplicationConfig bucketReplConfig, ConfigurationSource config) {
     ReplicationConfig clientDeterminedReplConfig = null;
 
     boolean isECBucket = bucketReplConfig != null && bucketReplConfig
