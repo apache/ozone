@@ -32,9 +32,12 @@ List buckets
     ${result} =         Execute AWSS3APICli     list-buckets | jq -r '.Buckets[].Name'
                         Should contain          ${result}    ${BUCKET}
 
-List bucket using Ozone Shell CLI and check the owner
+Get bucket info with Ozone Shell to check the owner field
     ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '. | select(.name=="${BUCKET}") | .owner'
-                        Should Be Equal     ${result}       dlfknslnfslf    # See "Setup dummy credentials for S3" in commonawslib.robot
+                        Should Be Equal     ${result}       root
+                        # In ozonesecure(-ha) docker-config, hadoop.security.auth_to_local is set
+                        # in the way that getShortUserName() converts the accessId to "root".
+                        # Also see "Setup dummy credentials for S3" in commonawslib.robot
 
 List buckets with empty access id
                         Execute                    aws configure set aws_access_key_id ''
