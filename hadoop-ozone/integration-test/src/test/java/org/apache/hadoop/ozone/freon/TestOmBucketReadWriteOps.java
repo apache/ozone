@@ -106,26 +106,35 @@ public class TestOmBucketReadWriteOps {
       out.getFD().sync();
       out.close();
 
-      verifyFreonCommand(new ParameterBuilder());
+      verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
+          .setNumOfReadOperations(10).setNumOfWriteOperations(5)
+          .setFileCountForRead(10).setFileCountForWrite(5));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3"));
+              .setPrefixFilePath("/dir1/dir2/dir3").setTotalThreadCount(10)
+              .setNumOfReadOperations(10).setNumOfWriteOperations(5)
+              .setFileCountForRead(10).setFileCountForWrite(5));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
-              .setPrefixFilePath("/").setFileCountForRead(1000)
-              .setFileCountForWrite(100).setTotalThreadCount(505));
+              .setPrefixFilePath("/").setTotalThreadCount(15)
+              .setNumOfReadOperations(5).setNumOfWriteOperations(3)
+              .setFileCountForRead(5).setFileCountForWrite(3));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/").setFileSizeInBytes(128)
-              .setBufferSize(32));
+              .setPrefixFilePath("/dir1/").setTotalThreadCount(10)
+              .setNumOfReadOperations(5).setNumOfWriteOperations(3)
+              .setFileCountForRead(5).setFileCountForWrite(3).
+              setFileSizeInBytes(64).setBufferSize(16));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3").setFileCountForRead(250)
-              .setNumOfReadOperations(100).setNumOfWriteOperations(0));
+              .setPrefixFilePath("/dir1/dir2/dir3").setTotalThreadCount(10)
+              .setNumOfReadOperations(5).setNumOfWriteOperations(0)
+              .setFileCountForRead(5));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3").setNumOfReadOperations(0)
-              .setFileCountForWrite(20).setNumOfWriteOperations(100));
+              .setPrefixFilePath("/dir1/dir2/dir3/dir4").setTotalThreadCount(20)
+              .setNumOfReadOperations(0).setNumOfWriteOperations(5)
+              .setFileCountForRead(0).setFileCountForWrite(5));
     } finally {
       shutdown();
     }
