@@ -312,7 +312,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
 
       //if there are too many pending requests, wait for doubleBuffer flushing
-      ozoneManagerDoubleBuffer.acquireUnFlushedTransctions(1);
+      ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);

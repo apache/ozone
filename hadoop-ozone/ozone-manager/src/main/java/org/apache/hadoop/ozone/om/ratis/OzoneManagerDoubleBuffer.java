@@ -104,7 +104,7 @@ public final class OzoneManagerDoubleBuffer {
 
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
-  private final Semaphore unFlushedTransctions;
+  private final Semaphore unFlushedTransactions;
 
   /**
    * function which will get term associated with the transaction index.
@@ -162,7 +162,7 @@ public final class OzoneManagerDoubleBuffer {
         Preconditions.checkNotNull(indexToTerm, "When ratis is enabled " +
             "indexToTerm should not be null");
         Preconditions.checkState(maxUnFlushedTransactionCount > 0L,
-            "when ratis is enable, maxUnFlushedTransctions " +
+            "when ratis is enable, maxUnFlushedTransactions " +
                 "should be bigger than 0");
       }
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
@@ -173,7 +173,7 @@ public final class OzoneManagerDoubleBuffer {
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
-      Function<Long, Long> indexToTerm, int maxUnFlushedTransctions) {
+      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
 
@@ -186,7 +186,7 @@ public final class OzoneManagerDoubleBuffer {
       this.currentFutureQueue = null;
       this.readyFutureQueue = null;
     }
-    this.unFlushedTransctions = new Semaphore(maxUnFlushedTransctions);
+    this.unFlushedTransactions = new Semaphore(maxUnFlushedTransactions);
     this.omMetadataManager = omMetadataManager;
     this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
     this.ozoneManagerDoubleBufferMetrics =
@@ -202,19 +202,19 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   /**
-   * Acquires the given number of permits from unFlushedTransctions,
+   * Acquires the given number of permits from unFlushedTransactions,
    * blocking until all are available, or the thread is interrupted.
    */
-  public void acquireUnFlushedTransctions(int n) throws InterruptedException {
-    unFlushedTransctions.acquire(n);
+  public void acquireUnFlushedTransactions(int n) throws InterruptedException {
+    unFlushedTransactions.acquire(n);
   }
 
   /**
    *Releases the given number of permits,
-   *returning them to the unFlushedTransctions.
+   *returning them to the unFlushedTransactions.
    */
-  public void releaseUnFlushedTransctions(int n) {
-    unFlushedTransctions.release(n);
+  public void releaseUnFlushedTransactions(int n) {
+    unFlushedTransactions.release(n);
   }
 
   // TODO: pass the trace id further down and trace all methods of DBStore.
@@ -364,7 +364,7 @@ public final class OzoneManagerDoubleBuffer {
           readyBuffer.clear();
 
           if (isRatisEnabled) {
-            releaseUnFlushedTransctions(flushedTransactionsSize);
+            releaseUnFlushedTransactions(flushedTransactionsSize);
           }
 
           // update the last updated index in OzoneManagerStateMachine.
