@@ -53,6 +53,7 @@ import java.util.UUID;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -127,7 +128,7 @@ public class TestDeleteContainerHandler {
         .getPipelineManager().getPipeline(container.getPipelineID());
 
     // We need to close the container because delete container only happens
-    // on closed containers with force flag set to false.
+    // on closed containers when force flag is set to false.
 
     HddsDatanodeService hddsDatanodeService =
         cluster.getHddsDatanodes().get(0);
@@ -165,15 +166,32 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
+    // Deleting a non-empty container should fail on DN when the force flag
+    // is false.
+    // Check the log for the error message when deleting non-empty containers
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
+            LoggerFactory.getLogger(DeleteContainerCommandHandler.class));
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains("Non" +
+        "-force deletion of non-empty container is not allowed"), 500,
+        5 * 1000);
+
+    // Set container blockCount to 0 to mock that it is empty
+    getContainerfromDN(hddsDatanodeService, containerId.getId())
+        .getContainerData().setBlockCount(0);
+
+    // Send the delete command again. It should succeed this time.
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
 
     Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-
   }
-
 
   @Test
   public void testDeleteContainerRequestHandlerOnOpenContainer()
@@ -282,9 +300,8 @@ public class TestDeleteContainerHandler {
   private Boolean isContainerClosed(HddsDatanodeService hddsDatanodeService,
       long containerID) {
     ContainerData containerData;
-    containerData = hddsDatanodeService
-        .getDatanodeStateMachine().getContainer().getContainerSet()
-        .getContainer(containerID).getContainerData();
+    containerData = getContainerfromDN(hddsDatanodeService, containerID)
+        .getContainerData();
     return !containerData.isOpen();
   }
 
@@ -298,9 +315,16 @@ public class TestDeleteContainerHandler {
       long containerID) {
     Container container;
     // if container is not in container set, it means container got deleted.
-    container = hddsDatanodeService
-        .getDatanodeStateMachine().getContainer().getContainerSet()
-        .getContainer(containerID);
+    container = getContainerfromDN(hddsDatanodeService, containerID);
     return container == null;
+  }
+
+  /**
+   * Return the container for the given containerID from the given DN.
+   */
+  private Container getContainerfromDN(HddsDatanodeService hddsDatanodeService,
+      long containerID) {
+    return hddsDatanodeService.getDatanodeStateMachine().getContainer()
+        .getContainerSet().getContainer(containerID);
   }
 }

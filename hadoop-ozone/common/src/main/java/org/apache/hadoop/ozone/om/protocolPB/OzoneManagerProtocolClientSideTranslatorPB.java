@@ -818,6 +818,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(Type.DeleteKey)
         .setDeleteKeyRequest(req)
         .build();
+    System.out.println("----- DeleteKey: " + args.getKeyName());
 
     handleError(submitRequest(omRequest));
 

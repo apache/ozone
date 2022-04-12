@@ -1060,7 +1060,6 @@ public class ReplicationManager implements SCMService {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.CLOSED);
     Preconditions.assertTrue(container.getNumberOfKeys() == 0);
-    Preconditions.assertTrue(container.getUsedBytes() == 0);
 
     replicas.stream().forEach(rp -> {
       Preconditions.assertTrue(rp.getState() == State.CLOSED);

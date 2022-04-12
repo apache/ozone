@@ -96,6 +96,9 @@ public final class HddsTestUtils {
   private static ThreadLocalRandom random = ThreadLocalRandom.current();
   private static PipelineID randomPipelineID = PipelineID.randomId();
 
+  public static final long CONTAINER_USED_BYTES_DEFAULT = 100L;
+  public static final long CONTAINER_NUM_KEYS_DEFAULT = 2L;
+
   private HddsTestUtils() {
   }
 
@@ -677,13 +680,26 @@ public final class HddsTestUtils {
       final long sequenceId,
       final UUID originNodeId,
       final DatanodeDetails datanodeDetails) {
+    return getReplicas(containerId, state, CONTAINER_USED_BYTES_DEFAULT,
+        CONTAINER_NUM_KEYS_DEFAULT, sequenceId, originNodeId, datanodeDetails);
+  }
+
+  public static ContainerReplica getReplicas(
+      final ContainerID containerId,
+      final ContainerReplicaProto.State state,
+      final long usedBytes,
+      final long keyCount,
+      final long sequenceId,
+      final UUID originNodeId,
+      final DatanodeDetails datanodeDetails) {
     return ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(state)
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(originNodeId)
         .setSequenceId(sequenceId)
-        .setBytesUsed(100)
+        .setBytesUsed(usedBytes)
+        .setKeyCount(keyCount)
         .build();
   }
 
