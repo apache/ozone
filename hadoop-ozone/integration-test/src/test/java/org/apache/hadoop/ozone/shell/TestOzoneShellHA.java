@@ -108,8 +108,8 @@ public class TestOzoneShellHA {
   private static String testFilePathString;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
-  private static OzoneShell ozoneShell = null;
-  private static OzoneAdmin ozoneAdminShell = null;
+  private OzoneShell ozoneShell = null;
+  private OzoneAdmin ozoneAdminShell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -140,9 +140,6 @@ public class TestOzoneShellHA {
     testFile = new File(testFilePathString);
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
-
-    ozoneShell = new OzoneShell();
-    ozoneAdminShell = new OzoneAdmin();
 
     // Init HA cluster
     omServiceId = "om-service-test1";
@@ -176,6 +173,8 @@ public class TestOzoneShellHA {
 
   @Before
   public void setup() throws UnsupportedEncodingException {
+    ozoneShell = new OzoneShell();
+    ozoneAdminShell = new OzoneAdmin();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
@@ -1004,8 +1003,9 @@ public class TestOzoneShellHA {
       execute(ozoneShell, args);
       Assert.fail("Must throw Exception when missing replication param");
     } catch (Exception e) {
-      Assert.assertEquals(e.getCause().getMessage(),
-          "Replication can't be null. Replication type passed was : EC");
+      Assert.assertEquals(
+          "Replication can't be null. Replication type passed was : EC",
+          e.getCause().getMessage());
     }
   }
 
