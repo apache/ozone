@@ -33,6 +33,7 @@ List buckets
                         Should contain          ${result}    ${BUCKET}
 
 Get bucket info with Ozone Shell to check the owner field
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check for insecure cluster
     ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '. | select(.name=="${BUCKET}") | .owner'
                         Should Be Equal     ${result}       root
                         # In ozonesecure(-ha) docker-config, hadoop.security.auth_to_local is set
