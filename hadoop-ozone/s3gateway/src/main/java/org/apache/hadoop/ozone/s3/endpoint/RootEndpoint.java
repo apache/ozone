@@ -50,7 +50,13 @@ public class RootEndpoint extends EndpointBase {
       throws OS3Exception, IOException {
     ListBucketResponse response = new ListBucketResponse();
 
-    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(null);
+    Iterator<? extends OzoneBucket> bucketIterator;
+    try {
+      bucketIterator = listS3Buckets(null);
+    } catch (Exception e) {
+      getMetrics().incListS3BucketsFailure();
+      throw e;
+    }
 
     while (bucketIterator.hasNext()) {
       OzoneBucket next = bucketIterator.next();
@@ -60,6 +66,7 @@ public class RootEndpoint extends EndpointBase {
       response.addBucket(bucketMetadata);
     }
 
+    getMetrics().incListS3BucketsSuccess();
     return Response.ok(response).build();
   }
 

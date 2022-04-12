@@ -27,6 +27,7 @@
   <version>1.3.0-SNAPSHOT</version>
 
   <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
 
@@ -57,7 +58,11 @@
         </exclusion>
         <exclusion>
           <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-api</artifactId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.google.protobuf</groupId>
@@ -136,6 +141,12 @@
                     <include>com.github.joshelser.**.*</include>
                     <include>com.twitter.**.*</include>
                   </includes>
+                </relocation>
+                <relocation>
+                  <pattern>kotlin</pattern>
+                  <shadedPattern>
+                    ${shaded.prefix}.kotlin
+                  </shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>picocli</pattern>

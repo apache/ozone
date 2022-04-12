@@ -17,9 +17,10 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
@@ -31,6 +32,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.util.CrcComposer;
+import org.apache.hadoop.util.CrcUtil;
+import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,10 +52,12 @@ public abstract class BaseFileChecksumHelper {
   private OzoneBucket bucket;
   private String keyName;
   private final long length;
-  private ClientProtocol rpcClient;
 
-  private XceiverClientFactory xceiverClientFactory;
+  private ClientProtocol rpcClient;
+  private OzoneClientConfig.ChecksumCombineMode combineMode;
+
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
+  private XceiverClientFactory xceiverClientFactory;
   private FileChecksum fileChecksum;
   private List<OmKeyLocationInfo> keyLocationInfos;
   private long remaining = 0L;
@@ -61,12 +67,15 @@ public abstract class BaseFileChecksumHelper {
   // initialization
   BaseFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName,
-      long length, ClientProtocol rpcClient) throws IOException {
+      long length,
+      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ClientProtocol rpcClient) throws IOException {
 
     this.volume = volume;
     this.bucket = bucket;
     this.keyName = keyName;
     this.length = length;
+    this.combineMode = checksumCombineMode;
     this.rpcClient = rpcClient;
     this.xceiverClientFactory =
         ((RpcClient)rpcClient).getXceiverClientManager();
@@ -86,6 +95,10 @@ public abstract class BaseFileChecksumHelper {
 
   protected ClientProtocol getRpcClient() {
     return rpcClient;
+  }
+
+  protected OzoneClientConfig.ChecksumCombineMode getCombineMode() {
+    return combineMode;
   }
 
   protected XceiverClientFactory getXceiverClientFactory() {
@@ -161,12 +174,6 @@ public abstract class BaseFileChecksumHelper {
     }
   }
 
-  @VisibleForTesting
-  List<OmKeyLocationInfo> getKeyLocationInfos() {
-    return keyLocationInfos;
-  }
-
-
   /**
    * Compute block checksums block by block and append the raw bytes of the
    * block checksums into getBlockChecksumBuf().
@@ -180,8 +187,15 @@ public abstract class BaseFileChecksumHelper {
    * checksums collected into getBlockChecksumBuf().
    */
   private FileChecksum makeFinalResult() throws IOException {
-    // TODO: support composite CRC
-    return makeMd5CrcResult();
+    switch (getCombineMode()) {
+    case MD5MD5CRC:
+      return makeMd5CrcResult();
+    case COMPOSITE_CRC:
+      return makeCompositeCrcResult();
+    default:
+      throw new IOException("Unknown ChecksumCombineMode: " +
+          getCombineMode());
+    }
   }
 
   private FileChecksum makeMd5CrcResult() {
@@ -191,6 +205,33 @@ public abstract class BaseFileChecksumHelper {
     // assume CRC32 for now
     return new MD5MD5CRC32GzipFileChecksum(getBytesPerCRC(),
         crcPerBlock, fileMD5);
+  }
+
+  FileChecksum makeCompositeCrcResult() throws IOException {
+    long blockSizeHint = 0;
+    if (keyLocationInfos.size() > 0) {
+      blockSizeHint = keyLocationInfos.get(0).getLength();
+    }
+    CrcComposer crcComposer =
+        CrcComposer.newCrcComposer(DataChecksum.Type.CRC32, blockSizeHint);
+    byte[] blockChecksumBytes = blockChecksumBuf.getData();
+
+    for (int i = 0; i < keyLocationInfos.size(); ++i) {
+      OmKeyLocationInfo block = keyLocationInfos.get(i);
+      // For every LocatedBlock, we expect getBlockSize()
+      // to accurately reflect the number of file bytes digested in the block
+      // checksum.
+      int blockCrc = CrcUtil.readInt(blockChecksumBytes, i * 4);
+
+      crcComposer.update(blockCrc, block.getLength());
+      LOG.debug(
+          "Added blockCrc 0x{} for block index {} of size {}",
+          Integer.toString(blockCrc, 16), i, block.getLength());
+    }
+
+    int compositeCrc = CrcUtil.readInt(crcComposer.digest(), 0);
+    return new CompositeCrcFileChecksum(
+        compositeCrc, DataChecksum.Type.CRC32, bytesPerCRC);
   }
 
   public FileChecksum getFileChecksum() {

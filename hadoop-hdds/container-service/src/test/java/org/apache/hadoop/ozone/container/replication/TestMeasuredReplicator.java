@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
@@ -119,4 +121,17 @@ public class TestMeasuredReplicator {
     Assert.assertEquals(0, measuredReplicator.getSuccessTime().value());
   }
 
+  @Test
+  public void testReplicationQueueTimeMetrics() {
+    final Instant queued = Instant.now().minus(1, ChronoUnit.SECONDS);
+    ReplicationTask task = new ReplicationTask(100L, new ArrayList<>()) {
+      @Override
+      public Instant getQueued() {
+        return queued;
+      }
+    };
+    measuredReplicator.replicate(task);
+    // There might be some deviation, so we use >= 1000 here.
+    Assert.assertTrue(measuredReplicator.getQueueTime().value() >= 1000);
+  }
 }

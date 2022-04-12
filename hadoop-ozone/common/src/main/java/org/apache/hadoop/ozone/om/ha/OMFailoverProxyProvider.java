@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
-import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
@@ -54,7 +53,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
@@ -88,7 +86,9 @@ public class OMFailoverProxyProvider<T> implements
   private Map<String, OMProxyInfo> omProxyInfos;
   private List<String> omNodeIDList;
 
+  private String nextProxyOMNodeId;
   private String currentProxyOMNodeId;
+  private int nextProxyIndex;
   private int currentProxyIndex;
 
   private List<String> retryExceptions = new ArrayList<>();
@@ -103,6 +103,7 @@ public class OMFailoverProxyProvider<T> implements
   private int numAttemptsOnSameOM = 0;
   private final long waitBetweenRetries;
   private Set<String> accessControlExceptionOMs = new HashSet<>();
+  private boolean performFailoverDone;
 
   public OMFailoverProxyProvider(ConfigurationSource configuration,
       UserGroupInformation ugi, String omServiceId, Class<T> protocol)
@@ -112,11 +113,14 @@ public class OMFailoverProxyProvider<T> implements
     this.ugi = ugi;
     this.omServiceId = omServiceId;
     this.protocolClass = protocol;
+    this.performFailoverDone = true;
     loadOMClientConfigs(conf, this.omServiceId);
     this.delegationTokenService = computeDelegationTokenService();
 
+    nextProxyIndex = 0;
+    nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
     currentProxyIndex = 0;
-    currentProxyOMNodeId = omNodeIDList.get(currentProxyIndex);
+    currentProxyOMNodeId = nextProxyOMNodeId;
 
     waitBetweenRetries = conf.getLong(
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
@@ -259,9 +263,9 @@ public class OMFailoverProxyProvider<T> implements
             //  address of the suggested leader along with the nodeID.
             //  Failing over just based on nodeID is not very robust.
 
-            // OMFailoverProxyProvider#performFailover() is a dummy call and
-            // does not perform any failover. Failover manually to the next OM.
-            performFailoverToNextProxy();
+            // Prepare the next OM to be tried. This will help with calculation
+            // of the wait times needed get creating the retryAction.
+            selectNextOmProxy();
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
 
@@ -271,7 +275,7 @@ public class OMFailoverProxyProvider<T> implements
             // Retry on same OM again as leader OM is not ready.
             // Failing over to same OM so that wait time between retries is
             // incremented
-            performFailoverIfRequired(omNodeId);
+            setNextOmProxy(omNodeId);
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
@@ -280,9 +284,9 @@ public class OMFailoverProxyProvider<T> implements
           return RetryAction.FAIL; // do not retry
         }
 
-        // For all other exceptions, fail over manually to the next OM Node
-        // proxy.
-        performFailoverToNextProxy();
+        // Prepare the next OM to be tried. This will help with calculation
+        // of the wait times needed get creating the retryAction.
+        selectNextOmProxy();
         return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
 
@@ -337,39 +341,33 @@ public class OMFailoverProxyProvider<T> implements
 
   /**
    * Called whenever an error warrants failing over. It is determined by the
-   * retry policy.
-   *
-   * This is a dummy call from {@link RetryInvocationHandler}. The actual
-   * failover should be performed using either
-   * {@link OMFailoverProxyProvider#performFailoverIfRequired(String)} or
-   * {@link OMFailoverProxyProvider#performFailoverToNextProxy()}.
-   *
-   * In {@link OzoneManagerProtocolClientSideTranslatorPB}, we first
-   * manually failover and then call the RetryAction FAILOVER_AND_RETRY. This
-   * is done because we do not want to always failover to the next proxy. If we
-   * get a OMNotLeaderException with a suggested leader, then we want to
-   * failover to that OM proxy instead. Hence, we failover manually and the
-   * {@link FailoverProxyProvider#performFailover(Object)} call should not do
-   * failover again.
+   * retry policy. This method is supposed to called only once in a
+   * multithreaded environment. This where the failover occurs.
+   * performFailOver updates the currentProxyOmNodeId
+   * When 2 or more threads run in parallel, the
+   * RetryInvocationHandler will check the expectedFailOverCount
+   * and not execute performFailOver() for one of them. So the other thread(s)
+   * shall not call performFailOver(), instead it will call getProxy().
    */
   @Override
-  public void performFailover(T currentProxy) {
-    if (LOG.isDebugEnabled()) {
-      int currentIndex = getCurrentProxyIndex();
-      LOG.debug("Failing over OM proxy to index: {}, nodeId: {}",
-          currentIndex, omNodeIDList.get(currentIndex));
-    }
+  public synchronized void performFailover(T currentProxy) {
+    LOG.debug("Failing over OM from {}:{} to {}:{}",
+        currentProxyOMNodeId, currentProxyIndex,
+        nextProxyOMNodeId, nextProxyIndex);
+    currentProxyOMNodeId = nextProxyOMNodeId;
+    currentProxyIndex = nextProxyIndex;
+    performFailoverDone = true;
   }
 
   /**
-   * Performs failover if the leaderOMNodeId returned through OMReponse does
+   * Set the next leaderOMNodeId returned through OMResponse if it does
    * not match the current leaderOMNodeId cached by the proxy provider.
    */
-  public void performFailoverIfRequired(String newLeaderOMNodeId) {
+  public void setNextOmProxy(String newLeaderOMNodeId) {
     if (newLeaderOMNodeId == null) {
       LOG.debug("No suggested leader nodeId. Performing failover to next peer" +
           " node");
-      performFailoverToNextProxy();
+      selectNextOmProxy();
     } else {
       if (updateLeaderOMNodeId(newLeaderOMNodeId)) {
         LOG.debug("Failing over OM proxy to nodeId: {}", newLeaderOMNodeId);
@@ -378,14 +376,16 @@ public class OMFailoverProxyProvider<T> implements
   }
 
   /**
-   * Performs failover if the leaderOMNodeId returned through OMResponse does
-   * not match the current leaderOMNodeId cached by the proxy provider.
+   * Selects the next OM Leader to try.
    */
-  public void performFailoverToNextProxy() {
-    int newProxyIndex = incrementProxyIndex();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Incrementing OM proxy index to {}, nodeId: {}",
-          newProxyIndex, omNodeIDList.get(newProxyIndex));
+  public synchronized void selectNextOmProxy() {
+    if (performFailoverDone) {
+      performFailoverDone = false;
+      int newProxyIndex = incrementNextProxyIndex();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Incrementing OM proxy index to {}, nodeId: {}",
+            newProxyIndex, omNodeIDList.get(newProxyIndex));
+      }
     }
   }
 
@@ -393,15 +393,15 @@ public class OMFailoverProxyProvider<T> implements
    * Update the proxy index to the next proxy in the list.
    * @return the new proxy index
    */
-  private synchronized int incrementProxyIndex() {
+  private synchronized int incrementNextProxyIndex() {
     // Before failing over to next proxy, add the proxy OM (which has
     // returned an exception) to the list of attemptedOMs.
-    lastAttemptedOM = currentProxyOMNodeId;
-    attemptedOMs.add(currentProxyOMNodeId);
+    lastAttemptedOM = nextProxyOMNodeId;
+    attemptedOMs.add(nextProxyOMNodeId);
 
-    currentProxyIndex = (currentProxyIndex + 1) % omProxies.size();
-    currentProxyOMNodeId = omNodeIDList.get(currentProxyIndex);
-    return currentProxyIndex;
+    nextProxyIndex = (nextProxyIndex + 1) % omProxies.size();
+    nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
+    return nextProxyIndex;
   }
 
   /**
@@ -409,27 +409,31 @@ public class OMFailoverProxyProvider<T> implements
    * @param newLeaderOMNodeId OMNodeId to failover to.
    * @return true if failover is successful, false otherwise.
    */
-  synchronized boolean updateLeaderOMNodeId(String newLeaderOMNodeId) {
-    if (!currentProxyOMNodeId.equals(newLeaderOMNodeId)) {
+  private synchronized boolean updateLeaderOMNodeId(String newLeaderOMNodeId) {
+    if (!nextProxyOMNodeId.equals(newLeaderOMNodeId)) {
       if (omProxies.containsKey(newLeaderOMNodeId)) {
-        lastAttemptedOM = currentProxyOMNodeId;
-        currentProxyOMNodeId = newLeaderOMNodeId;
-        currentProxyIndex = omNodeIDList.indexOf(currentProxyOMNodeId);
+        lastAttemptedOM = nextProxyOMNodeId;
+        nextProxyOMNodeId = newLeaderOMNodeId;
+        nextProxyIndex = omNodeIDList.indexOf(nextProxyOMNodeId);
         return true;
       }
     } else {
-      lastAttemptedOM = currentProxyOMNodeId;
+      lastAttemptedOM = nextProxyOMNodeId;
     }
     return false;
   }
 
-  private synchronized int getCurrentProxyIndex() {
-    return currentProxyIndex;
-  }
-
+  /**
+   * Get the wait time based on
+   * 1. Is the same OM being retried based on response from OM.
+   * 2. Is this a new OM that is being used.
+   * 3. Were all the OMs visited once and retries need to be resumed after a
+   * delay.
+   * @return delay in milliseconds
+   */
   public synchronized long getWaitTime() {
-    if (currentProxyOMNodeId.equals(lastAttemptedOM)) {
-      // Clear attemptedOMs list as round robin has been broken.
+    if (nextProxyOMNodeId.equals(lastAttemptedOM)) {
+      // Clear attemptedOMs list as the same OM has been selected again.
       attemptedOMs.clear();
 
       // The same OM will be contacted again. So wait and then retry.
@@ -439,7 +443,7 @@ public class OMFailoverProxyProvider<T> implements
     // Reset numAttemptsOnSameOM as we failed over to a different OM.
     numAttemptsOnSameOM = 0;
 
-    // OMs are being contacted in round robin way. Check if all the OMs have
+    // OMs are being contacted in Round Robin way. Check if all the OMs have
     // been contacted in this attempt.
     for (String omNodeID : omProxyInfos.keySet()) {
       if (!attemptedOMs.contains(omNodeID)) {
@@ -447,8 +451,8 @@ public class OMFailoverProxyProvider<T> implements
       }
     }
     // This implies all the OMs have been contacted once. Return true and
-    // clear the list as we are going to inject a wait and the next check
-    // should not include these atttempts again.
+    // clear the list. The OMs will be retried in a Round Robin fashion again
+    // after a delay.
     attemptedOMs.clear();
     return waitBetweenRetries;
   }
@@ -459,11 +463,11 @@ public class OMFailoverProxyProvider<T> implements
         unwrappedException instanceof SecretManager.InvalidToken) {
       // Retry all available OMs once before failing with
       // AccessControlException.
-      if (accessControlExceptionOMs.contains(currentProxyOMNodeId)) {
+      if (accessControlExceptionOMs.contains(nextProxyOMNodeId)) {
         accessControlExceptionOMs.clear();
         return false;
       } else {
-        accessControlExceptionOMs.add(currentProxyOMNodeId);
+        accessControlExceptionOMs.add(nextProxyOMNodeId);
         if (accessControlExceptionOMs.containsAll(omNodeIDList)) {
           return false;
         }

@@ -100,7 +100,7 @@ public interface ContainerStateManager {
   /**
    *
    */
-  boolean contains(HddsProtos.ContainerID containerID);
+  boolean contains(ContainerID containerID);
 
   /**
    * Returns the ID of all the managed containers.
@@ -117,23 +117,23 @@ public interface ContainerStateManager {
   /**
    *
    */
-  ContainerInfo getContainer(HddsProtos.ContainerID id);
+  ContainerInfo getContainer(ContainerID id);
 
   /**
    *
    */
-  Set<ContainerReplica> getContainerReplicas(HddsProtos.ContainerID id);
+  Set<ContainerReplica> getContainerReplicas(ContainerID id);
 
   /**
    *
    */
-  void updateContainerReplica(HddsProtos.ContainerID id,
+  void updateContainerReplica(ContainerID id,
                               ContainerReplica replica);
 
   /**
    *
    */
-  void removeContainerReplica(HddsProtos.ContainerID id,
+  void removeContainerReplica(ContainerID id,
                               ContainerReplica replica);
 
   /**

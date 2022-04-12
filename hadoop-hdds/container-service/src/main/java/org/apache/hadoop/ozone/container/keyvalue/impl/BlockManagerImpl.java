@@ -94,24 +94,24 @@ public class BlockManagerImpl implements BlockManager {
    * Puts or overwrites a block.
    *
    * @param container - Container for which block need to be added.
-   * @param data     - BlockData.
-   * @param incrKeyCount - for FilePerBlockStrategy, increase key count only
-   *                     when the whole block file is written.
+   * @param data - BlockData.
+   * @param endOfBlock - The last putBlock call for this block (when
+   *                   all the chunks are written and stream is closed)
    * @return length of the block.
    * @throws IOException
    */
   @Override
   public long putBlock(Container container, BlockData data,
-      boolean incrKeyCount) throws IOException {
+      boolean endOfBlock) throws IOException {
     return persistPutBlock(
         (KeyValueContainer) container,
         data,
         config,
-        incrKeyCount);
+        endOfBlock);
   }
 
   public static long persistPutBlock(KeyValueContainer container,
-      BlockData data, ConfigurationSource config, boolean incrKeyCount)
+      BlockData data, ConfigurationSource config, boolean endOfBlock)
       throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
@@ -143,11 +143,32 @@ public class BlockManagerImpl implements BlockManager {
             containerBCSId, bcsId);
         return data.getSize();
       }
+
+      // Check if the block is present in the pendingPutBlockCache for the
+      // container to determine whether the blockCount is already incremented
+      // for this block in the DB or not.
+      long localID = data.getLocalID();
+      boolean isBlockInCache = container.isBlockInPendingPutBlockCache(localID);
+      boolean incrBlockCount = false;
+
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
+
+        // If the block does not exist in the pendingPutBlockCache of the
+        // container, then check the DB to ascertain if it exists or not.
+        // If block exists in cache, blockCount should not be incremented.
+        if (!isBlockInCache) {
+          if (db.getStore().getBlockDataTable().get(
+              Long.toString(localID)) == null) {
+            // Block does not exist in DB => blockCount needs to be
+            // incremented when the block is added into DB.
+            incrBlockCount = true;
+          }
+        }
+
         db.getStore().getBlockDataTable().putWithBatch(
-            batch, Long.toString(data.getLocalID()), data);
+            batch, Long.toString(localID), data);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
@@ -164,10 +185,10 @@ public class BlockManagerImpl implements BlockManager {
             container.getContainerData().getBytesUsed());
 
         // Set Block Count for a container.
-        if (incrKeyCount) {
+        if (incrBlockCount) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, OzoneConsts.BLOCK_COUNT,
-              container.getContainerData().getKeyCount() + 1);
+              container.getContainerData().getBlockCount() + 1);
         }
 
         db.getStore().getBatchHandler().commitBatchOperation(batch);
@@ -176,10 +197,24 @@ public class BlockManagerImpl implements BlockManager {
       if (bcsId != 0) {
         container.updateBlockCommitSequenceId(bcsId);
       }
-      // Increment block count finally here for in-memory.
-      if (incrKeyCount) {
-        container.getContainerData().incrKeyCount();
+
+      // Increment block count and add block to pendingPutBlockCache
+      // in-memory after the DB update.
+      if (incrBlockCount) {
+        container.getContainerData().incrBlockCount();
       }
+
+      // If the Block is not in PendingPutBlockCache (and it is not endOfBlock),
+      // add it there so that subsequent putBlock calls for this block do not
+      // have to read the DB to check for block existence
+      if (!isBlockInCache && !endOfBlock) {
+        container.addToPendingPutBlockCache(localID);
+      } else if (isBlockInCache && endOfBlock) {
+        // Remove the block from the PendingPutBlockCache as there would not
+        // be any more writes to this block
+        container.removeFromPendingPutBlockCache(localID);
+      }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug(
             "Block " + data.getBlockID() + " successfully committed with bcsId "
@@ -260,51 +295,14 @@ public class BlockManagerImpl implements BlockManager {
 
   /**
    * Deletes an existing block.
-   *
-   * @param container - Container from which block need to be deleted.
-   * @param blockID - ID of the block.
-   * @throws StorageContainerException
    */
   @Override
   public void deleteBlock(Container container, BlockID blockID) throws
       IOException {
-    Preconditions.checkNotNull(blockID, "block ID cannot be null.");
-    Preconditions.checkState(blockID.getContainerID() >= 0,
-        "Container ID cannot be negative.");
-    Preconditions.checkState(blockID.getLocalID() >= 0,
-        "Local ID cannot be negative.");
-
-    KeyValueContainerData cData = (KeyValueContainerData) container
-        .getContainerData();
-    try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
-      // This is a post condition that acts as a hint to the user.
-      // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      // Note : There is a race condition here, since get and delete
-      // are not atomic. Leaving it here since the impact is refusing
-      // to delete a Block which might have just gotten inserted after
-      // the get check.
-
-      // Throw an exception if block data not found in the block data table.
-      getBlockByID(db, blockID);
-
-      // Update DB to delete block and set block count and bytes used.
-      try (BatchOperation batch = db.getStore().getBatchHandler()
-          .initBatchOperation()) {
-        String localID = Long.toString(blockID.getLocalID());
-        db.getStore().getBlockDataTable().deleteWithBatch(batch, localID);
-        // Update DB to delete block and set block count.
-        // No need to set bytes used here, as bytes used is taken care during
-        // delete chunk.
-        long blockCount = container.getContainerData().getKeyCount() - 1;
-        db.getStore().getMetadataTable()
-            .putWithBatch(batch, OzoneConsts.BLOCK_COUNT, blockCount);
-        db.getStore().getBatchHandler().commitBatchOperation(batch);
-      }
-
-      // Decrement block count here
-      container.getContainerData().decrKeyCount();
-    }
+    // Block/ Chunk Deletion is handled by BlockDeletingService.
+    // SCM sends Block Deletion commands directly to Datanodes and not
+    // through a Pipeline.
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -319,8 +317,8 @@ public class BlockManagerImpl implements BlockManager {
   public List<BlockData> listBlock(Container container, long startLocalID, int
       count) throws IOException {
     Preconditions.checkNotNull(container, "container cannot be null");
-    Preconditions.checkState(startLocalID >= 0, "startLocal ID cannot be " +
-        "negative");
+    Preconditions.checkState(startLocalID >= 0 || startLocalID == -1,
+        "startLocal ID cannot be negative");
     Preconditions.checkArgument(count > 0,
         "Count must be a positive number.");
     container.readLock();
@@ -332,11 +330,11 @@ public class BlockManagerImpl implements BlockManager {
         result = new ArrayList<>();
         List<? extends Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
-                .getSequentialRangeKVs(Long.toString(startLocalID), count,
+                .getSequentialRangeKVs(startLocalID == -1 ? null :
+                        Long.toString(startLocalID), count,
                     MetadataKeyFilters.getUnprefixedKeyFilter());
         for (Table.KeyValue<String, BlockData> entry : range) {
-          BlockData data = new BlockData(entry.getValue().getBlockID());
-          result.add(data);
+          result.add(entry.getValue());
         }
         return result;
       }

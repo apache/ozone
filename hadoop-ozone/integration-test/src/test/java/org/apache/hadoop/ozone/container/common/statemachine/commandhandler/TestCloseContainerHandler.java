@@ -106,7 +106,7 @@ public class TestCloseContainerHandler {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName("test")
             .setRefreshPipeline(true)

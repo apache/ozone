@@ -39,8 +39,8 @@ import java.util.List;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS_DEFAULT;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 
 /**
  * Cached ozone client for s3 requests.
@@ -58,8 +58,8 @@ public final class OzoneClientCache {
   private OzoneClientCache(OzoneConfiguration ozoneConfiguration)
       throws IOException {
     // Set the expected OM version if not set via config.
-    ozoneConfiguration.setIfUnset(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY,
-        OZONE_OM_CLIENT_PROTOCOL_VERSION);
+    ozoneConfiguration.setIfUnset(OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
+        OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT);
     String omServiceID = OmUtils.getOzoneManagerServiceId(ozoneConfiguration);
     secConfig = new SecurityConfig(ozoneConfiguration);
     client = null;

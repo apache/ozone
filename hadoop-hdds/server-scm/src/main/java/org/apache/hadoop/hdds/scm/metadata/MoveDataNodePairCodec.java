@@ -21,10 +21,9 @@ package org.apache.hadoop.hdds.scm.metadata;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.MoveDataNodePairProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 
 import java.io.IOException;
-
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * Codec to serialize / deserialize MoveDataNodePair.
@@ -34,7 +33,8 @@ public class MoveDataNodePairCodec implements Codec<MoveDataNodePair> {
   @Override
   public byte[] toPersistedFormat(MoveDataNodePair mdnp)
       throws IOException {
-    return mdnp.getProtobufMessage(CURRENT_VERSION).toByteArray();
+    return mdnp
+        .getProtobufMessage(ClientVersion.CURRENT_VERSION).toByteArray();
   }
 
   @Override

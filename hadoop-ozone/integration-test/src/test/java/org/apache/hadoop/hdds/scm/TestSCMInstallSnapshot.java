@@ -37,10 +37,12 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
+import org.apache.ozone.test.tag.Flaky;
+
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -57,7 +59,7 @@ public class TestSCMInstallSnapshot {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
@@ -72,7 +74,7 @@ public class TestSCMInstallSnapshot {
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -90,11 +92,13 @@ public class TestSCMInstallSnapshot {
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(THREE), "Owner1").getPipelineID());
+            RatisReplicationConfig.getInstance(THREE), "Owner1")
+            .getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     Pipeline ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(ONE), "Owner2").getPipelineID());
+            RatisReplicationConfig.getInstance(ONE), "Owner2")
+            .getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
         .setRpcAddress(new InetSocketAddress("0.0.0.0", 0))
@@ -115,6 +119,7 @@ public class TestSCMInstallSnapshot {
   }
 
   @Test
+  @Flaky("HDDS-6116")
   public void testInstallCheckPoint() throws Exception {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
