@@ -25,7 +25,6 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -34,12 +33,14 @@ import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.ozone.shell.bucket.BucketHandler;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Parameters;
 
 /**
@@ -58,17 +59,8 @@ public class CopyKeyHandler extends BucketHandler {
       description = "The new desired name of the key")
   private String toKey;
 
-  @Option(names = {"-r", "--replication"},
-      description =
-          "Replication configuration of the new key. (this is replication "
-              + "specific. for RATIS/STANDALONE you can use ONE or THREE) "
-              + "Default is specified in the cluster-wide config.")
-  private String replication;
-
-  @Option(names = {"-t", "--type"},
-      description = "Replication type of the new key. (use RATIS or " +
-          "STAND_ALONE) Default is specified in the cluster-wide config.")
-  private ReplicationType replicationType;
+  @Mixin
+  private ShellReplicationOptions replication;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -81,7 +73,7 @@ public class CopyKeyHandler extends BucketHandler {
     OzoneBucket bucket = vol.getBucket(bucketName);
 
     ReplicationConfig replicationConfig =
-        ReplicationConfig.parse(replicationType, replication, getConf());
+        replication.fromParamsOrConfig(getConf());
 
     OzoneKeyDetails keyDetail = bucket.getKey(fromKey);
     Map<String, String> keyMetadata = new HashMap<>(keyDetail.getMetadata());
