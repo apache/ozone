@@ -710,7 +710,8 @@ public class TestOzoneTenantShell {
   }
 
   @Test
-  public void testTenantSetSecret() throws IOException, InterruptedException {
+  public void testTenantSetSecretAndAssignRevokeUsersAsNonDelegatedAdmin()
+      throws IOException, InterruptedException {
 
     final String tenantName = "tenant-test-set-secret";
 
@@ -798,10 +799,11 @@ public class TestOzoneTenantShell {
       return null;
     });
 
-    // Once we make bob an admin of this tenant, set secret should succeed
+    // Once we make bob an admin of this tenant (non-delegated admin permission
+    // is sufficient in this case), set secret should succeed
     executeHA(tenantShell, new String[] {"user", "assign-admin",
         tenantName + "$" + ugiBob.getShortUserName(),
-        "--tenant=" + tenantName, "--delegated=true"});
+        "--tenant=" + tenantName, "--delegated=false"});
     checkOutput(out, "", true);
     checkOutput(err, "Assigned admin", false);
 
@@ -813,6 +815,22 @@ public class TestOzoneTenantShell {
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
+      return null;
+    });
+
+    // Assigning/revoking user accessIds should work for a non-delegated admin
+    ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
+      executeHA(tenantShell, new String[] {
+          "user", "assign", "carol", "--tenant=" + tenantName});
+      checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$carol'\n"
+          + "export AWS_SECRET_ACCESS_KEY='", false);
+      checkOutput(err, "Assigned 'carol' to '" + tenantName + "' with accessId"
+          + " '" + tenantName + "$carol'.\n", true);
+
+      executeHA(tenantShell, new String[] {
+          "user", "revoke", tenantName + "$carol"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Revoked accessId", false);
       return null;
     });
 
