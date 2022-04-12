@@ -57,11 +57,11 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
 
   @Option(names = { "--layout", "-l" },
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
-      defaultValue = "OBJECT_STORE")
+      defaultValue = "LEGACY")
   private AllowedBucketLayouts allowedBucketLayout;
 
   @CommandLine.Mixin

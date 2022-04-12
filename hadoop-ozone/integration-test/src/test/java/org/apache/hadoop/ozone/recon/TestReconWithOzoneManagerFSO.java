@@ -67,7 +67,7 @@ public class TestReconWithOzoneManagerFSO {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     cluster =
             MiniOzoneCluster.newBuilder(conf)
                     .setNumDatanodes(1)
