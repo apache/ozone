@@ -329,7 +329,8 @@ public class TestS3GetSecretRequest {
 
     // This effectively makes alice an admin.
     when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
-    when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, true))
+    // Make alice a non-delegated admin
+    when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, false))
         .thenReturn(true);
 
     // Init LayoutVersionManager to prevent NPE in checkLayoutFeature
