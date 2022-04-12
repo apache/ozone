@@ -242,7 +242,6 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked user '{}' accessId '{}' to tenant '{}'",
           userPrincipal, accessId, tenantId);
-      omMetrics.incNumTenantRevokeUserSuccesses();
     } else {
       LOG.error("Failed to revoke user '{}' accessId '{}' to tenant '{}': {}",
           userPrincipal, accessId, tenantId, exception.getMessage());

@@ -220,7 +220,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked admin of accessId '{}' from tenant '{}'",
           accessId, tenantId);
-      omMetrics.incNumTenantRevokeAdminSuccesses();
     } else {
       LOG.error("Failed to revoke admin of accessId '{}' from tenant '{}': {}",
           accessId, tenantId, exception.getMessage());

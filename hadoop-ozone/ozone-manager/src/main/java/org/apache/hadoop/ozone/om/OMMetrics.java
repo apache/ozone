@@ -126,19 +126,15 @@ public class OMMetrics {
   private @Metric MutableCounterLong numTenantDeleteFails;
   // Metrics for tenant assign user operation
   private @Metric MutableCounterLong numTenantAssignUsers;
-  private @Metric MutableCounterLong numTenantAssignUserSuccesses;
   private @Metric MutableCounterLong numTenantAssignUserFails;
   // Metrics for tenant revoke user operation
   private @Metric MutableCounterLong numTenantRevokeUsers;
-  private @Metric MutableCounterLong numTenantRevokeUserSuccesses;
   private @Metric MutableCounterLong numTenantRevokeUserFails;
   // Metrics for tenant assign admin operation
   private @Metric MutableCounterLong numTenantAssignAdmins;
-  private @Metric MutableCounterLong numTenantAssignAdminSuccesses;
   private @Metric MutableCounterLong numTenantAssignAdminFails;
   // Metrics for tenant revoke admin operation
   private @Metric MutableCounterLong numTenantRevokeAdmins;
-  private @Metric MutableCounterLong numTenantRevokeAdminSuccesses;
   private @Metric MutableCounterLong numTenantRevokeAdminFails;
   // Metric for tenant list operation
   private @Metric MutableCounterLong numTenantLists;
@@ -464,10 +460,6 @@ public class OMMetrics {
     numTenantAssignUsers.incr();
   }
 
-  public void incNumTenantAssignUserSuccesses() {
-    numTenantAssignUserSuccesses.incr();
-  }
-
   public void incNumTenantAssignUserFails() {
     numTenantAssignUserFails.incr();
   }
@@ -475,10 +467,6 @@ public class OMMetrics {
   public void incNumTenantRevokeUsers() {
     numTenantOps.incr();
     numTenantRevokeUsers.incr();
-  }
-
-  public void incNumTenantRevokeUserSuccesses() {
-    numTenantRevokeUserSuccesses.incr();
   }
 
   public void incNumTenantRevokeUserFails() {
@@ -490,10 +478,6 @@ public class OMMetrics {
     numTenantAssignAdmins.incr();
   }
 
-  public void incNumTenantAssignAdminSuccesses() {
-    numTenantAssignAdminSuccesses.incr();
-  }
-
   public void incNumTenantAssignAdminFails() {
     numTenantAssignAdminFails.incr();
   }
@@ -501,10 +485,6 @@ public class OMMetrics {
   public void incNumTenantRevokeAdmins() {
     numTenantOps.incr();
     numTenantRevokeAdmins.incr();
-  }
-
-  public void incNumTenantRevokeAdminSuccesses() {
-    numTenantRevokeAdminSuccesses.incr();
   }
 
   public void incNumTenantRevokeAdminFails() {
@@ -1026,20 +1006,12 @@ public class OMMetrics {
     return numTenantAssignUsers.value();
   }
 
-  public long getNumTenantAssignUserSuccesses() {
-    return numTenantAssignUserSuccesses.value();
-  }
-
   public long getNumTenantAssignUserFails() {
     return numTenantAssignUserFails.value();
   }
 
   public long getNumTenantRevokeUsers() {
     return numTenantRevokeUsers.value();
-  }
-
-  public long getNumTenantRevokeUserSuccesses() {
-    return numTenantRevokeUserSuccesses.value();
   }
 
   public long getNumTenantRevokeUserFails() {
@@ -1050,20 +1022,12 @@ public class OMMetrics {
     return numTenantAssignAdmins.value();
   }
 
-  public long getNumTenantAssignAdminSuccesses() {
-    return numTenantAssignAdminSuccesses.value();
-  }
-
   public long getNumTenantAssignAdminFails() {
     return numTenantAssignAdminFails.value();
   }
 
   public long getNumTenantRevokeAdmins() {
     return numTenantRevokeAdmins.value();
-  }
-
-  public long getNumTenantRevokeAdminSuccesses() {
-    return numTenantRevokeAdminSuccesses.value();
   }
 
   public long getNumTenantRevokeAdminFails() {

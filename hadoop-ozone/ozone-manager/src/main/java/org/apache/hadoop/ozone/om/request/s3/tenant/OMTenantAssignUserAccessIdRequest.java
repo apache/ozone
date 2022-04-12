@@ -369,7 +369,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Assigned user '{}' to tenant '{}' with accessId '{}'",
           userPrincipal, tenantId, accessId);
-      omMetrics.incNumTenantAssignUserSuccesses();
     } else {
       LOG.error("Failed to assign '{}' to tenant '{}' with accessId '{}': {}",
           userPrincipal, tenantId, accessId, exception.getMessage());

@@ -240,7 +240,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Assigned admin to accessId '{}' in tenant '{}', "
               + "delegated: {}", accessId, tenantId, delegated);
-      omMetrics.incNumTenantAssignAdminSuccesses();
     } else {
       LOG.error("Failed to assign admin to accessId '{}' in tenant '{}', "
               + "delegated: {}: {}",
