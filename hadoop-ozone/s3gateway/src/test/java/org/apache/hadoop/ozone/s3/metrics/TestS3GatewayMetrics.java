@@ -72,8 +72,8 @@ public class TestS3GatewayMetrics {
   private OzoneBucket bucket;
   private HttpHeaders headers;
   private static final String ACL_MARKER = "acl";
-  public static final String CONTENT = "0123456789";
-  private final String keyName = "key1";
+  private static final String CONTENT = "0123456789";
+  private static final String keyName = "key1";
   private S3GatewayMetrics metrics;
 
 
