@@ -95,6 +95,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
@@ -168,9 +169,10 @@ public class ObjectEndpoint extends EndpointBase {
           partNumber, uploadID, body);
     }
 
+    String copyHeader = null, storageType = null;
     try {
-      String copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
-      String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+      storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
       S3StorageType s3StorageType;
       boolean storageTypeDefault;
@@ -206,12 +208,17 @@ public class ObjectEndpoint extends EndpointBase {
 
       IOUtils.copy(body, output);
 
+      getMetrics().incCreateKeySuccess();
       return Response.ok().status(HttpStatus.SC_OK)
           .build();
     } catch (OMException ex) {
+      if (copyHeader != null) {
+        getMetrics().incCopyObjectFailure();
+      } else {
+        getMetrics().incCreateKeyFailure();
+      }
       if (ex.getResult() == ResultCodes.NOT_A_FILE) {
-        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST,
-            keyPath);
+        OS3Exception os3Exception = newError(INVALID_REQUEST, keyPath, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the PutObject/MPU PartUpload operation: " +
             OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
@@ -219,7 +226,7 @@ public class ObjectEndpoint extends EndpointBase {
             "which caused put operation to fail.");
         throw os3Exception;
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
+        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       }
       LOG.error("Exception occurred in PutObject", ex);
       throw ex;
@@ -274,8 +281,7 @@ public class ObjectEndpoint extends EndpointBase {
             length);
         LOG.debug("range Header provided: {}", rangeHeader);
         if (rangeHeader.isInValidRange()) {
-          throw S3ErrorTable.newError(
-              S3ErrorTable.INVALID_RANGE, rangeHeaderVal);
+          throw newError(S3ErrorTable.INVALID_RANGE, rangeHeaderVal);
         }
       }
       ResponseBuilder responseBuilder;
@@ -323,13 +329,18 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
+      getMetrics().incGetKeySuccess();
       return responseBuilder.build();
     } catch (OMException ex) {
+      if (uploadId != null) {
+        getMetrics().incListPartsFailure();
+      } else {
+        getMetrics().incGetKeyFailure();
+      }
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .NO_SUCH_KEY, keyPath);
+        throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
+        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else {
         throw ex;
       }
@@ -364,11 +375,12 @@ public class ObjectEndpoint extends EndpointBase {
       key = getBucket(bucketName).headObject(keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
+      getMetrics().incHeadKeyFailure();
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
+        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else {
         throw ex;
       }
@@ -379,6 +391,7 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
+    getMetrics().incHeadKeySuccess();
     return response.build();
   }
 
@@ -398,10 +411,11 @@ public class ObjectEndpoint extends EndpointBase {
       ozoneBucket.abortMultipartUpload(key, uploadId);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
-        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId);
+        throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
       }
       throw ex;
     }
+    getMetrics().incAbortMultiPartUploadSuccess();
     return Response
         .status(Status.NO_CONTENT)
         .build();
@@ -432,9 +446,13 @@ public class ObjectEndpoint extends EndpointBase {
       bucket.getKey(keyPath);
       bucket.deleteKey(keyPath);
     } catch (OMException ex) {
+      if (uploadId != null && !uploadId.equals("")) {
+        getMetrics().incAbortMultiPartUploadFailure();
+      } else {
+        getMetrics().incDeleteKeyFailure();
+      }
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .NO_SUCH_BUCKET, bucketName);
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
@@ -444,12 +462,13 @@ public class ObjectEndpoint extends EndpointBase {
         // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
+        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else {
         throw ex;
       }
 
     }
+    getMetrics().incDeleteKeySuccess();
     return Response
         .status(Status.NO_CONTENT)
         .build();
@@ -491,11 +510,13 @@ public class ObjectEndpoint extends EndpointBase {
       multipartUploadInitiateResponse.setKey(key);
       multipartUploadInitiateResponse.setUploadID(multipartInfo.getUploadID());
 
+      getMetrics().incInitMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
+      getMetrics().incInitMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, key);
+        throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
       }
       LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
           "key: {}", bucket, key, ex);
@@ -538,25 +559,27 @@ public class ObjectEndpoint extends EndpointBase {
           .getHash());
       // Location also setting as bucket name.
       completeMultipartUploadResponse.setLocation(bucket);
+      getMetrics().incCompleteMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
+      getMetrics().incCompleteMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.INVALID_PART) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_PART, key);
+        throw newError(S3ErrorTable.INVALID_PART, key, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_PART_ORDER) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_PART_ORDER, key);
+        throw newError(S3ErrorTable.INVALID_PART_ORDER, key, ex);
       } else if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
-        throw S3ErrorTable.newError(NO_SUCH_UPLOAD, uploadID);
+        throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (ex.getResult() == ResultCodes.ENTITY_TOO_SMALL) {
-        throw S3ErrorTable.newError(ENTITY_TOO_SMALL, key);
+        throw newError(ENTITY_TOO_SMALL, key, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
+        OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: You must " +
             "specify at least one part");
         throw os3Exception;
       } else if (ex.getResult() == ResultCodes.NOT_A_FILE) {
-        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
+        OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: " +
             OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
@@ -602,8 +625,7 @@ public class ObjectEndpoint extends EndpointBase {
               headers.getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
           if (!checkCopySourceModificationTime(sourceKeyModificationTime,
               copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
-            throw S3ErrorTable.newError(PRECOND_FAILED,
-                sourceBucket + "/" + sourceKey);
+            throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
           }
 
           try (OzoneInputStream sourceObject =
@@ -642,6 +664,7 @@ public class ObjectEndpoint extends EndpointBase {
           ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
+      getMetrics().incCreateMultipartKeySuccess();
       if (copyHeader != null) {
         return Response.ok(new CopyPartResult(eTag)).build();
       } else {
@@ -650,12 +673,11 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
     } catch (OMException ex) {
+      getMetrics().incCreateMultipartKeyFailure();
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
-        throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
-            uploadID);
+        throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
-            bucket + "/" + key);
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
       }
       throw ex;
     }
@@ -710,14 +732,14 @@ public class ObjectEndpoint extends EndpointBase {
 
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
-        throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
-            uploadID);
+        throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
-            bucket + "/" + key + "/" + uploadID);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            bucket + "/" + key + "/" + uploadID, ex);
       }
       throw ex;
     }
+    getMetrics().incListPartsSuccess();
     return Response.status(Status.OK).entity(listPartsResponse).build();
   }
 
@@ -750,8 +772,7 @@ public class ObjectEndpoint extends EndpointBase {
         // options like storage type are provided or not when source and
         // dest are given same
         if (storageTypeDefault) {
-          OS3Exception ex = S3ErrorTable.newError(S3ErrorTable
-              .INVALID_REQUEST, copyHeader);
+          OS3Exception ex = newError(S3ErrorTable.INVALID_REQUEST, copyHeader);
           ex.setErrorMessage("This copy request is illegal because it is " +
               "trying to copy an object to it self itself without changing " +
               "the object's metadata, storage class, website redirect " +
@@ -791,18 +812,19 @@ public class ObjectEndpoint extends EndpointBase {
 
       OzoneKeyDetails destKeyDetails = destOzoneBucket.getKey(destkey);
 
+      getMetrics().incCopyObjectSuccess();
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
       return copyObjectResponse;
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, sourceKey);
+        throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket);
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
-            destBucket + "/" + destkey);
+        throw newError(S3ErrorTable.ACCESS_DENIED,
+            destBucket + "/" + destkey, ex);
       }
       throw ex;
     } finally {
@@ -829,7 +851,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
     int pos = header.indexOf('/');
     if (pos == -1) {
-      OS3Exception ex = S3ErrorTable.newError(INVALID_ARGUMENT, header);
+      OS3Exception ex = newError(INVALID_ARGUMENT, header);
       ex.setErrorMessage("Copy Source must mention the source bucket and " +
           "key: sourcebucket/sourcekey");
       throw ex;
@@ -840,7 +862,7 @@ public class ObjectEndpoint extends EndpointBase {
       String key = urlDecode(header.substring(pos + 1));
       return Pair.of(bucket, key);
     } catch (UnsupportedEncodingException e) {
-      OS3Exception ex = S3ErrorTable.newError(INVALID_ARGUMENT, header);
+      OS3Exception ex = newError(INVALID_ARGUMENT, header, e);
       ex.setErrorMessage("Copy Source header could not be url-decoded");
       throw ex;
     }
@@ -851,8 +873,7 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       return S3StorageType.valueOf(storageType);
     } catch (IllegalArgumentException ex) {
-      throw S3ErrorTable.newError(INVALID_ARGUMENT,
-          storageType);
+      throw newError(INVALID_ARGUMENT, storageType, ex);
     }
   }
 

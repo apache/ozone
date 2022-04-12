@@ -75,6 +75,11 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
   }
 
   @Override
+  public int getQueuedCount() {
+    return supervisor.getInFlightReplications();
+  }
+
+  @Override
   public SCMCommandProto.Type getCommandType() {
     return Type.replicateContainerCommand;
   }

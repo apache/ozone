@@ -27,9 +27,6 @@ export SECURITY_ENABLED=true
 
 start_docker_env
 
-execute_command_in_container rm sudo bash -c "sed -i -e 's/^mirrorlist/#&/' -e 's/^#baseurl/baseurl/' -e 's/mirror.centos.org/vault.centos.org/' /etc/yum.repos.d/*.repo"
-execute_command_in_container rm sudo yum install -y krb5-workstation
-
 execute_robot_test om kinit.robot
 
 execute_robot_test om createmrenv.robot

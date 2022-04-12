@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -69,6 +70,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -252,6 +255,18 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Heartbeat Interval - Defines the heartbeat frequency from a datanode to
+   * Recon.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getReconHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
+        HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
    * Get the Stale Node interval, which is used by SCM to flag a datanode as
    * stale, if the heartbeat from that node has been missing for this duration.
    *
@@ -397,8 +412,8 @@ public final class HddsServerUtil {
    */
   public static String getDatanodeIdFilePath(ConfigurationSource conf) {
     String dataNodeIDDirPath =
-        conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-    if (dataNodeIDDirPath == null) {
+        conf.getTrimmed(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
+    if (Strings.isNullOrEmpty(dataNodeIDDirPath)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       if (metaDirPath == null) {
         // this means meta data is not found, in theory should not happen at

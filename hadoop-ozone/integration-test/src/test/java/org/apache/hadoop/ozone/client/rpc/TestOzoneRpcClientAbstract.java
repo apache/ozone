@@ -107,6 +107,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.commons.io.FileUtils;
@@ -130,6 +131,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PART
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
@@ -141,9 +143,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.slf4j.event.Level.DEBUG;
 
-import org.junit.FixMethodOrder;
-import org.junit.Test;
-import org.junit.runners.MethodSorters;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 
 /**
  * This is an abstract class to test all the public facing APIs of Ozone
@@ -152,7 +154,7 @@ import org.junit.runners.MethodSorters;
  * requests directly to OzoneManager. {@link TestOzoneRpcClientWithRatis}
  * tests the Ozone Client by submitting requests to OM's Ratis server.
  */
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@TestMethodOrder(MethodOrderer.MethodName.class)
 public abstract class TestOzoneRpcClientAbstract {
 
   private static MiniOzoneCluster cluster = null;
@@ -966,14 +968,28 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testBucketUsedBytes() throws IOException {
+    bucketUsedBytesTestHelper(BucketLayout.OBJECT_STORE);
+  }
+
+  @Test
+  public void testFSOBucketUsedBytes() throws IOException {
+    bucketUsedBytesTestHelper(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  private void bucketUsedBytesTestHelper(BucketLayout bucketLayout)
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     OzoneVolume volume = null;
     String value = "sample value";
     int valueLength = value.getBytes(UTF_8).length;
     store.createVolume(volumeName);
     volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
     String keyName = UUID.randomUUID().toString();
 
@@ -982,6 +998,12 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(valueLength,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    // pre-allocate more blocks than needed
+    int fakeValueLength = valueLength + blockSize;
+    writeKey(bucket, keyName, ONE, value, fakeValueLength);
     Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
@@ -1552,6 +1574,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
   // Make this executed at last, for it has some side effect to other UTs
   @Test
+  @Flaky("HDDS-6151")
   public void testZReadKeyWithUnhealthyContainerReplica() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

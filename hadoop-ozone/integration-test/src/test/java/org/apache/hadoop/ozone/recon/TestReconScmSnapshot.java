@@ -92,7 +92,7 @@ public class TestReconScmSnapshot {
         .getContainerManager();
 
     for (int i = 0; i < 10; i++) {
-      containerManager.allocateContainer(new RatisReplicationConfig(
+      containerManager.allocateContainer(RatisReplicationConfig.getInstance(
           HddsProtos.ReplicationFactor.ONE), "testOwner");
     }
 

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -101,8 +102,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return List of ReplicaInfo for the container or an empty list if none.
    * @throws IOException
    */
-  List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerId) throws IOException;
+  List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId, int clientVersion) throws IOException;
 
   /**
    * Ask SCM the location of a batch of containers. SCM responds with a group of
@@ -198,8 +199,9 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *  state acts like a wildcard returning all nodes in that state.
    * @param opState The node operational state
    * @param state The node health
-   * @param clientVersion
+   * @param clientVersion Client's version number
    * @return List of Datanodes.
+   * @see org.apache.hadoop.ozone.ClientVersions
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
@@ -328,8 +330,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   /**
    * Start ContainerBalancer.
+   * @return {@link StartContainerBalancerResponseProto} that contains the
+   * start status and an optional message.
    */
-  boolean startContainerBalancer(Optional<Double> threshold,
+  StartContainerBalancerResponseProto startContainerBalancer(
+      Optional<Double> threshold,
       Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
@@ -353,24 +358,28 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *
    * @param ipaddress datanode IP address String
    * @param uuid datanode UUID String
+   * @param clientVersion Client's version number
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
+   * @see org.apache.hadoop.ozone.ClientVersions
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException;
+      String ipaddress, String uuid, int clientVersion) throws IOException;
 
   /**
    * Get usage information of most or least used datanodes.
    *
    * @param mostUsed true if most used, false if least used
    * @param count Integer number of nodes to get info for
+   * @param clientVersion Client's version number
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
+   * @see org.apache.hadoop.ozone.ClientVersions
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count) throws IOException;
+      boolean mostUsed, int count, int clientVersion) throws IOException;
 
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException;

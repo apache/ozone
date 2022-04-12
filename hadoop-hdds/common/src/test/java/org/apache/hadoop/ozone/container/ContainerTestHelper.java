@@ -147,6 +147,34 @@ public final class ContainerTestHelper {
     return builder.build();
   }
 
+  public static ContainerCommandRequestProto getListBlockRequest(
+      ContainerCommandRequestProto writeChunkRequest) {
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(writeChunkRequest.getContainerID())
+        .setCmdType(ContainerProtos.Type.ListBlock)
+        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setListBlock(ContainerProtos.ListBlockRequestProto.newBuilder()
+            .setCount(10).build())
+        .build();
+  }
+
+  public static ContainerCommandRequestProto getPutBlockRequest(
+      ContainerCommandRequestProto writeChunkRequest) {
+    ContainerProtos.BlockData.Builder block =
+        ContainerProtos.BlockData.newBuilder()
+            .setSize(writeChunkRequest.getWriteChunk().getChunkData().getLen())
+            .setBlockID(writeChunkRequest.getWriteChunk().getBlockID())
+            .addChunks(writeChunkRequest.getWriteChunk().getChunkData());
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(writeChunkRequest.getContainerID())
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(block.build())
+            .build())
+        .build();
+  }
+
   public static Builder newWriteChunkRequestBuilder(
       Pipeline pipeline, BlockID blockID, int datalen, int seq)
       throws IOException {
@@ -265,41 +293,6 @@ public final class ContainerTestHelper {
     newRequest.setReadChunk(readRequest);
     newRequest.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
     return newRequest;
-  }
-
-  /**
-   * Returns a delete Request.
-   *
-   * @param pipeline pipeline.
-   * @param writeRequest - write request
-   * @return request
-   */
-  public static ContainerCommandRequestProto getDeleteChunkRequest(
-      Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
-      throws IOException {
-    return newDeleteChunkRequestBuilder(pipeline, writeRequest).build();
-  }
-
-  public static Builder newDeleteChunkRequestBuilder(Pipeline pipeline,
-      ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest)
-      throws IOException {
-    LOG.trace("deleteChunk blockID={} from pipeline={}",
-        writeRequest.getBlockID(), pipeline);
-
-    ContainerProtos.DeleteChunkRequestProto.Builder deleteRequest =
-        ContainerProtos.DeleteChunkRequestProto
-            .newBuilder();
-
-    deleteRequest.setChunkData(writeRequest.getChunkData());
-    deleteRequest.setBlockID(writeRequest.getBlockID());
-
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
-    request.setCmdType(ContainerProtos.Type.DeleteChunk);
-    request.setContainerID(writeRequest.getBlockID().getContainerID());
-    request.setDeleteChunk(deleteRequest);
-    request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request;
   }
 
   /**
@@ -505,34 +498,6 @@ public final class ContainerTestHelper {
         response.getGetBlock().getBlockData().getChunksCount());
   }
 
-  /**
-   * @param pipeline - pipeline.
-   * @param putBlockRequest - putBlockRequest.
-   * @return - Request
-   */
-  public static ContainerCommandRequestProto getDeleteBlockRequest(
-      Pipeline pipeline, ContainerProtos.PutBlockRequestProto putBlockRequest)
-      throws IOException {
-    return newDeleteBlockRequestBuilder(pipeline, putBlockRequest).build();
-  }
-
-  public static Builder newDeleteBlockRequestBuilder(Pipeline pipeline,
-      ContainerProtos.PutBlockRequestProtoOrBuilder putBlockRequest)
-      throws IOException {
-    DatanodeBlockID blockID = putBlockRequest.getBlockData().getBlockID();
-    LOG.trace("deleteBlock: name={}", blockID);
-    ContainerProtos.DeleteBlockRequestProto.Builder delRequest =
-        ContainerProtos.DeleteBlockRequestProto.newBuilder();
-    delRequest.setBlockID(blockID);
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
-    request.setCmdType(ContainerProtos.Type.DeleteBlock);
-    request.setContainerID(blockID.getContainerID());
-    request.setDeleteBlock(delRequest);
-    request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
-    return request;
-  }
-
   public static Builder newGetCommittedBlockLengthBuilder(Pipeline pipeline,
       ContainerProtos.PutBlockRequestProtoOrBuilder putBlock)
       throws IOException {
@@ -679,11 +644,6 @@ public final class ContainerTestHelper {
       builder.setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
           .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo)
           .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1).build());
-      break;
-    case DeleteChunk:
-      builder
-          .setDeleteChunk(ContainerProtos.DeleteChunkRequestProto.newBuilder()
-              .setBlockID(fakeBlockId).setChunkData(fakeChunkInfo).build());
       break;
     case GetSmallFile:
       builder

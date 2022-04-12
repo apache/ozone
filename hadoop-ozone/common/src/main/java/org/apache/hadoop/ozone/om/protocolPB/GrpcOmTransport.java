@@ -256,6 +256,7 @@ public class GrpcOmTransport implements OmTransport {
             }
           }
           // switch om host to current proxy OMNodeId
+          omFailoverProxyProvider.performFailover(null);
           host.set(omFailoverProxyProvider
               .getGrpcProxyAddress(
                   omFailoverProxyProvider.getCurrentProxyOMNodeId()));
