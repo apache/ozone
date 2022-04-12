@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -52,32 +52,35 @@ public class TenantListHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
     try {
-      TenantInfoList tenantInfoList = objStore.listTenant();
+      TenantStateList tenantStateList = objStore.listTenant();
 
       if (printHeader) {
-        // default console width 80 / 5 = 16. +1 for extra room. Change later?
-        out().format(longFormat ? "%-17s" : "%s%n",
+        // Assuming default terminal width 120 / 6 ~= 20. +1 for space
+        out().format(longFormat ? "%-21s" : "%s%n",
             "Tenant");
         if (longFormat) {
-          out().format("%-17s%-17s%-17s%s%n",
+          out().format("%-21s%-21s%-21s%-21s%s%n",
               "BucketNS",
-              "AccountNS",
-              "UserPolicy",
+              "UserRole",
+              "AdminRole",
+              "BucketNSPolicy",
               "BucketPolicy");
         }
       }
 
-      tenantInfoList.getTenantInfoList().forEach(tenantInfo -> {
-        out().format(longFormat ? "%-17s" : "%s%n",
-            tenantInfo.getTenantId());
+      tenantStateList.getTenantStateList().forEach(tenantState -> {
+        out().format(longFormat ? "%-21s" : "%s%n",
+            tenantState.getTenantId());
         if (longFormat) {
-          out().format("%-17s%-17s%-17s%s%n",
-              tenantInfo.getBucketNamespaceName(),
-              tenantInfo.getAccountNamespaceName(),
-              tenantInfo.getUserPolicyGroupName(),
-              tenantInfo.getBucketPolicyGroupName());
+          out().format("%-21s%-21s%-21s%-21s%s%n",
+              tenantState.getBucketNamespaceName(),
+              tenantState.getUserRoleName(),
+              tenantState.getAdminRoleName(),
+              tenantState.getBucketNamespacePolicyName(),
+              tenantState.getBucketPolicyName());
         }
       });
+
     } catch (IOException e) {
       LOG.error("Failed to list tenants: {}", e.getMessage());
     }

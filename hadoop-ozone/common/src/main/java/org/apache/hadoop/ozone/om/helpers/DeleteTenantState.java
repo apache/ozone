@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteT
 /**
  * A class that encapsulates DeleteTenantResponse protobuf message.
  */
-public class DeleteTenantInfo {
+public class DeleteTenantState {
 
   /**
    * Volume name associated to the deleted tenant.
@@ -35,7 +35,7 @@ public class DeleteTenantInfo {
    */
   private final long volRefCount;
 
-  public DeleteTenantInfo(String volumeName, long volRefCount) {
+  public DeleteTenantState(String volumeName, long volRefCount) {
     this.volumeName = volumeName;
     this.volRefCount = volRefCount;
   }
@@ -48,8 +48,8 @@ public class DeleteTenantInfo {
     return volRefCount;
   }
 
-  public static DeleteTenantInfo fromProtobuf(DeleteTenantResponse resp) {
-    return new DeleteTenantInfo(resp.getVolumeName(), resp.getVolRefCount());
+  public static DeleteTenantState fromProtobuf(DeleteTenantResponse resp) {
+    return new DeleteTenantState(resp.getVolumeName(), resp.getVolRefCount());
   }
 
   public DeleteTenantResponse getProtobuf() {
@@ -59,8 +59,8 @@ public class DeleteTenantInfo {
         .build();
   }
 
-  public static DeleteTenantInfo.Builder newBuilder() {
-    return new DeleteTenantInfo.Builder();
+  public static DeleteTenantState.Builder newBuilder() {
+    return new DeleteTenantState.Builder();
   }
 
   /**
@@ -84,8 +84,8 @@ public class DeleteTenantInfo {
       return this;
     }
 
-    public DeleteTenantInfo build() {
-      return new DeleteTenantInfo(volumeName, volRefCount);
+    public DeleteTenantState build() {
+      return new DeleteTenantState(volumeName, volRefCount);
     }
   }
 }

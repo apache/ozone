@@ -28,8 +28,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
@@ -59,16 +59,17 @@ public final class OMTenantRequestHelper {
   }
 
   /**
-   * Passes check if caller is an Ozone cluster admin or tenant delegated admin,
-   * throws OMException otherwise.
+   * Check if caller is an Ozone cluster admin or tenant (delegated) admin.
+   * Throws PERMISSION_DENIED if the check failed.
+   *
    * @throws OMException PERMISSION_DENIED
    */
   static void checkTenantAdmin(OzoneManager ozoneManager, String tenantId)
       throws OMException {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isTenantAdmin(ugi, tenantId, true)) {
+    if (!ozoneManager.getMultiTenantManager().isTenantAdmin(
+        ugi, tenantId, true)) {
       throw new OMException("User '" + ugi.getUserName() +
           "' is neither an Ozone admin nor a delegated admin of tenant '" +
           tenantId + "'.", OMException.ResultCodes.PERMISSION_DENIED);
@@ -93,7 +94,7 @@ public final class OMTenantRequestHelper {
           throw omEx;
         }
       }
-      throw new OMException("Error while retrieving OmDBTenantInfo for tenant "
+      throw new OMException("Error while retrieving OmDBTenantState for tenant "
           + "'" + tenantId + "': " + ex.getMessage(),
           OMException.ResultCodes.METADATA_ERROR);
     }
@@ -107,16 +108,16 @@ public final class OMTenantRequestHelper {
   public static String getTenantVolumeName(OMMetadataManager omMetadataManager,
                                            String tenantId) throws IOException {
 
-    final OmDBTenantInfo tenantInfo =
+    final OmDBTenantState tenantState =
         omMetadataManager.getTenantStateTable().get(tenantId);
 
-    if (tenantInfo == null) {
+    if (tenantState == null) {
       throw new OMException("Potential DB error or race condition. "
-          + "OmDBTenantInfo entry is missing for tenant '" + tenantId + "'.",
+          + "OmDBTenantState entry is missing for tenant '" + tenantId + "'.",
           ResultCodes.TENANT_NOT_FOUND);
     }
 
-    final String volumeName = tenantInfo.getBucketNamespaceName();
+    final String volumeName = tenantState.getBucketNamespaceName();
 
     if (volumeName == null) {
       throw new OMException("Potential DB error. volumeName "
@@ -152,8 +153,9 @@ public final class OMTenantRequestHelper {
           OzoneManager ozoneManager, String accessId,
           UserGroupInformation ugi) throws IOException {
 
-    final OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
-            .getTenantAccessIdTable().get(accessId);
+    final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    final OmDBAccessIdInfo accessIdInfo =
+        metadataManager.getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
       // Doesn't have the accessId entry in TenantAccessIdTable.
@@ -182,8 +184,10 @@ public final class OMTenantRequestHelper {
       return true;
     }
 
-    // Check if ugi is an admin of this tenant
-    if (ozoneManager.isTenantAdmin(ugi, tenantId, true)) {
+    // Check if ugi is a tenant admin (or an Ozone cluster admin)
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
+    if (multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
       return true;
     }
 
@@ -237,7 +241,7 @@ public final class OMTenantRequestHelper {
     //  (apart from it being populated on OM startup) right now.
     //  So unless tenantCache is updated on follower nodes later as well,
     //  we can't use listUsersInTenant to check tenant emptiness in followers.
-    final List<TenantUserAccessId> tenantUserAccessIdsList =
+    final List<UserAccessIdInfo> tenantUserAccessIdsList =
         tenantManager.listUsersInTenant(tenantId, "").getUserAccessIds();
     return tenantUserAccessIdsList.size() == 0;
   }

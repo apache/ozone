@@ -117,8 +117,8 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
@@ -129,7 +129,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
@@ -157,8 +157,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAccessIdInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -650,8 +650,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
-    multiTenantManager = new OMMultiTenantManagerImpl(metadataManager,
-        configuration);
+    multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
     OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
@@ -2953,7 +2952,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * List tenants.
    */
-  public TenantInfoList listTenant() throws IOException {
+  public TenantStateList listTenant() throws IOException {
 
     metrics.incNumTenantLists();
 
@@ -2966,7 +2965,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw omEx;
     }
 
-    final Table<String, OmDBTenantInfo> tenantStateTable =
+    final Table<String, OmDBTenantState> tenantStateTable =
         metadataManager.getTenantStateTable();
 
     // Won't iterate cache here, mainly because we can't acquire a read lock
@@ -2975,30 +2974,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // are flushed to the table. This should be acceptable for a list tenant
     // request.
 
-    final TableIterator<String, ? extends KeyValue<String, OmDBTenantInfo>>
+    final TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
         iterator = tenantStateTable.iterator();
 
-    final List<TenantInfo> tenantInfoList = new ArrayList<>();
+    final List<TenantState> tenantStateList = new ArrayList<>();
 
     // Iterate table
     while (iterator.hasNext()) {
-      final Table.KeyValue<String, OmDBTenantInfo> dbEntry = iterator.next();
+      final Table.KeyValue<String, OmDBTenantState> dbEntry = iterator.next();
       final String tenantId = dbEntry.getKey();
-      final OmDBTenantInfo omDBTenantInfo = dbEntry.getValue();
-      assert (tenantId.equals(omDBTenantInfo.getTenantId()));
-      tenantInfoList.add(TenantInfo.newBuilder()
-          .setTenantId(omDBTenantInfo.getTenantId())
-          .setBucketNamespaceName(omDBTenantInfo.getBucketNamespaceName())
-          .setAccountNamespaceName(omDBTenantInfo.getAccountNamespaceName())
-          .setUserPolicyGroupName(omDBTenantInfo.getUserPolicyGroupName())
-          .setBucketNamespaceName(omDBTenantInfo.getBucketPolicyGroupName())
+      final OmDBTenantState omDBTenantState = dbEntry.getValue();
+      assert (tenantId.equals(omDBTenantState.getTenantId()));
+      tenantStateList.add(TenantState.newBuilder()
+          .setTenantId(omDBTenantState.getTenantId())
+          .setBucketNamespaceName(omDBTenantState.getBucketNamespaceName())
+          .setUserRoleName(omDBTenantState.getUserRoleName())
+          .setAdminRoleName(omDBTenantState.getAdminRoleName())
+          .setBucketNamespacePolicyName(
+              omDBTenantState.getBucketNamespacePolicyName())
+          .setBucketPolicyName(omDBTenantState.getBucketPolicyName())
           .build());
     }
 
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         OMAction.LIST_TENANT, new LinkedHashMap<>()));
 
-    return new TenantInfoList(tenantInfoList);
+    return new TenantStateList(tenantStateList);
   }
 
   /**
@@ -3013,14 +3014,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    final List<TenantAccessIdInfo> accessIdInfoList = new ArrayList<>();
+    final List<ExtendedUserAccessIdInfo> accessIdInfoList = new ArrayList<>();
 
     // Won't iterate cache here for a similar reason as in OM#listTenant
     //  tenantGetUserInfo lists all accessIds assigned to a user across
     //  multiple tenants.
 
     // Retrieve the list of accessIds associated to this user principal
-    final OmDBKerberosPrincipalInfo kerberosPrincipalInfo =
+    final OmDBUserPrincipalInfo kerberosPrincipalInfo =
         metadataManager.getPrincipalToAccessIdsTable().get(userPrincipal);
     if (kerberosPrincipalInfo == null) {
       return null;
@@ -3043,7 +3044,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           return;
         }
         assert (accessIdInfo.getUserPrincipal().equals(userPrincipal));
-        accessIdInfoList.add(TenantAccessIdInfo.newBuilder()
+        accessIdInfoList.add(ExtendedUserAccessIdInfo.newBuilder()
+            .setUserPrincipal(userPrincipal)
             .setAccessId(accessId)
             .setTenantId(accessIdInfo.getTenantId())
             .setIsAdmin(accessIdInfo.getIsAdmin())
@@ -3063,7 +3065,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         OMAction.TENANT_GET_USER_INFO, auditMap));
 
-    return new TenantUserInfoValue(userPrincipal, accessIdInfoList);
+    return new TenantUserInfoValue(accessIdInfoList);
   }
 
   @Override
@@ -3084,7 +3086,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final String volumeName = OMTenantRequestHelper.getTenantVolumeName(
             getMetadataManager(), tenantId);
-    // TODO: Maybe use multiTenantManager.getTenantInfo(tenantId)
+    // TODO: Maybe use multiTenantManager.getTenantState(tenantId)
     //  .getTenantBucketNameSpace() after refactoring
 
     final Map<String, String> auditMap = new LinkedHashMap<>();
@@ -3095,11 +3097,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean lockAcquired =
         metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
     try {
-      String userName = getRemoteUser().getUserName();
-      if (!multiTenantManager.isTenantAdmin(userName, tenantId)
-          && !omAdminUsernames.contains(userName)) {
-        throw new IOException("Only tenant and ozone admins can access this " +
-            "API. '" + userName + "' is not an admin.");
+      final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+      if (!multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
+        throw new OMException("Only tenant and ozone admins can access this " +
+            "API. '" + ugi.getShortUserName() + "' is not an admin.",
+            PERMISSION_DENIED);
       }
       final TenantUserList userList =
           multiTenantManager.listUsersInTenant(tenantId, prefix);
@@ -3134,10 +3136,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (optionalTenantId.isPresent()) {
         final String tenantId = optionalTenantId.get();
 
-        OmDBTenantInfo tenantInfo =
+        OmDBTenantState tenantState =
             metadataManager.getTenantStateTable().get(tenantId);
-        if (tenantInfo != null) {
-          s3Volume = tenantInfo.getBucketNamespaceName();
+        if (tenantState != null) {
+          s3Volume = tenantState.getBucketNamespaceName();
         } else {
           String message = "Unable to find tenant '" + tenantId
               + "' details for access ID " + accessId
@@ -3813,58 +3815,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public boolean isTenantAdmin(UserGroupInformation callerUgi,
-                               String tenantId, Boolean delegated) {
-    if (callerUgi == null) {
-      return false;
-    } else {
-      return isTenantAdmin(callerUgi.getShortUserName(), tenantId, delegated)
-          || isTenantAdmin(callerUgi.getUserName(), tenantId, delegated);
-    }
-  }
-
-  /**
-   * Returns true if user is a tenant's admin, false otherwise.
-   * @param username User name string.
-   * @param tenantId Tenant name string.
-   * @param delegated True if operation requires delegated admin permission.
-   */
-  public boolean isTenantAdmin(String username,
-      String tenantId, Boolean delegated) {
-    if (StringUtils.isEmpty(username) || StringUtils.isEmpty(tenantId)) {
-      return false;
-    }
-
-    try {
-      final OmDBKerberosPrincipalInfo principalInfo =
-          getMetadataManager().getPrincipalToAccessIdsTable().get(username);
-
-      if (principalInfo == null) {
-        // The user is not assigned to any tenant
-        return false;
-      }
-
-      // Find accessId assigned to the specified tenant
-      for (final String accessId : principalInfo.getAccessIds()) {
-        final OmDBAccessIdInfo accessIdInfo =
-            getMetadataManager().getTenantAccessIdTable().get(accessId);
-        if (tenantId.equals(accessIdInfo.getTenantId())) {
-          if (!delegated) {
-            return accessIdInfo.getIsAdmin();
-          } else {
-            return accessIdInfo.getIsAdmin()
-                && accessIdInfo.getIsDelegatedAdmin();
-          }
-        }
-      }
-    } catch (IOException e) {
-      LOG.error("Error while retrieving value for key '" + username
-          + "' in PrincipalToAccessIdsTable");
-    }
-
-    return false;
-  }
-
   /**
    * Returns true if OzoneNativeAuthorizer is enabled and false if otherwise.
    *
@@ -3920,10 +3870,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isAclEnabled) {
       UserGroupInformation ugi = Server.getRemoteUser();
       if (getS3Auth() != null) {
-        ugi = UserGroupInformation
-            .createRemoteUser(
-                OzoneAclUtils.accessIdToUserPrincipal(
-                    getS3Auth().getAccessId()));
+        ugi = UserGroupInformation.createRemoteUser(
+            OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId()));
       }
       InetAddress remoteIp = Server.getRemoteIp();
       resolved = resolveBucketLink(requested, new HashSet<>(),

@@ -1406,32 +1406,53 @@ message SetS3SecretResponse {
     optional string secretKey = 2;
 }
 
-message TenantInfo {
+message TenantState {
     optional string tenantId = 1;
-    optional string bucketNamespaceName = 2;
-    optional string accountNamespaceName = 3;
-    optional string userPolicyGroupName = 4;
-    optional string bucketPolicyGroupName = 5;
+    optional string bucketNamespaceName = 2;        // Volume name
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
+    optional string bucketNamespacePolicyName = 5;  // VolumeAccessPolicy name
+    optional string bucketPolicyName = 6;           // BucketAccessPolicy name
 }
 
-message TenantUserAccessId {
+message TenantUserPrincipalInfo {
+    repeated string accessIds = 1;
+}
+
+// Stores a basic user-accessId pair, used in TenantListUserResponse
+message UserAccessIdInfo {
     optional string userPrincipal = 1;
     optional string accessId = 2;
-    optional bool isAdmin = 3;
-    optional bool isDelegatedAdmin = 4;
 }
 
+// Multi-purpose message for storing or transferring extra access ID information
+//
+// This is an extension to the S3Secret protobuf message, carrying supplementary
+//   information to the existing accessId (kerberosID) field.
+// For now, all fields are related to multi-tenancy. New fields can be added
+//   when necessary in the future. e.g. when implementing new features.
+//
+// Usage 1: Stored as value (OmDBAccessIdInfo) in TenantAccessIdTable.
+//   In this case, accessId field is not set to avoid duplication,
+//   because the key of TenantAccessIdTable is already accessId.
+//
+// Usage 2: Used when transferring the result of `ozone tenant user info`
+//   See TenantUserInfoValue.
+//
+message ExtendedUserAccessIdInfo {
+    optional string userPrincipal = 1;
+    optional string accessId = 2;  // OmDBAccessIdInfo doesn't use this field
+    optional string tenantId = 3;
+    optional bool isAdmin = 4;
+    optional bool isDelegatedAdmin = 5;
+}
 
 message ListTenantRequest {
 
 }
 
 message ListTenantResponse {
-    repeated TenantInfo tenantInfo = 1;
-}
-
-message TenantGetUserInfoRequest {
-    optional string userPrincipal = 1;
+    repeated TenantState tenantState = 1;
 }
 
 message TenantListUserRequest {
@@ -1439,27 +1460,17 @@ message TenantListUserRequest {
     optional string prefix = 2;
 }
 
-message TenantGetUserInfoResponse {
-    optional TenantUserInfo tenantUserInfo = 1;
-}
-
 message TenantListUserResponse {
-    optional string tenantId = 1;
-    repeated TenantUserAccessId userAccessIdInfo = 2;
+    repeated UserAccessIdInfo userAccessIdInfo = 1;
 }
 
-message TenantUserInfo {
+message TenantGetUserInfoRequest {
     optional string userPrincipal = 1;
-    repeated TenantAccessIdInfo accessIdInfo = 2;
 }
 
-message TenantAccessIdInfo {
-    optional string accessId = 1;
-    optional string tenantId = 2;
-    optional bool isAdmin = 3;
-    optional bool isDelegatedAdmin = 4;
+message TenantGetUserInfoResponse {
+    repeated ExtendedUserAccessIdInfo accessIdInfo = 1;
 }
-
 
 message LayoutVersion {
   required uint64 version = 1;
@@ -1528,13 +1539,6 @@ message TenantAssignAdminResponse {
 
 message TenantRevokeAdminResponse {
 
-}
-
-message OmDBAccessInfo {
-  optional string tenantId = 1;
-  optional string userPrincipal = 2;
-  optional bool isAdmin = 3;
-  optional bool isDelegatedAdmin = 4;
 }
 
 message GetS3VolumeContextResponse {

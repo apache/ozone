@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
@@ -386,7 +386,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     TenantUserInfoValue ret = impl.tenantGetUserInfo(userPrincipal);
     // Note impl.tenantGetUserInfo() throws if errs
     if (ret != null) {
-      resp.setTenantUserInfo(ret.getProtobuf());
+      resp.addAllAccessIdInfo(ret.getAccessIdInfoList());
     }
 
     return resp.build();
@@ -401,7 +401,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         impl.listUsersInTenant(request.getTenantId(), request.getPrefix());
     // Note impl.listUsersInTenant() throws if errs
     if (usersInTenant != null) {
-      builder.setTenantId(request.getTenantId());
       builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
     }
     return builder.build();
@@ -413,8 +412,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     final ListTenantResponse.Builder resp = ListTenantResponse.newBuilder();
 
-    TenantInfoList ret = impl.listTenant();
-    resp.addAllTenantInfo(ret.getTenantInfoList());
+    TenantStateList ret = impl.listTenant();
+    resp.addAllTenantState(ret.getTenantStateList());
 
     return resp.build();
   }

@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,29 +28,33 @@ import java.io.IOException;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Codec to encode OmDBTenantInfo as byte array.
+ * Codec to encode OmDBUserPrincipalInfo as byte array.
  */
-public class OmDBTenantInfoCodec implements Codec<OmDBTenantInfo> {
+public class OmDBUserPrincipalInfoCodec
+    implements Codec<OmDBUserPrincipalInfo> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmDBTenantInfoCodec.class);
+      LoggerFactory.getLogger(OmDBUserPrincipalInfoCodec.class);
 
   @Override
-  public byte[] toPersistedFormat(OmDBTenantInfo object) throws IOException {
+  public byte[] toPersistedFormat(OmDBUserPrincipalInfo object)
+      throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.convertToByteArray();
+    return object.getProtobuf().toByteArray();
   }
 
   @Override
-  public OmDBTenantInfo fromPersistedFormat(byte[] rawData)
+  public OmDBUserPrincipalInfo fromPersistedFormat(byte[] rawData)
       throws IOException {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
-    return OmDBTenantInfo.getFromByteArray(rawData);
+    return OmDBUserPrincipalInfo.getFromProtobuf(
+        OzoneManagerProtocolProtos.TenantUserPrincipalInfo.parseFrom(rawData));
   }
 
   @Override
-  public OmDBTenantInfo copyObject(OmDBTenantInfo object) {
-    // TODO: Not really a "copy". from OMTransactionInfoCodec
+  public OmDBUserPrincipalInfo copyObject(
+      OmDBUserPrincipalInfo object) {
+    // Note: Not really a "copy". See OMTransactionInfoCodec
     return object;
   }
 }

@@ -46,12 +46,12 @@ public class OmDBAccessIdInfoCodec implements Codec<OmDBAccessIdInfo> {
     checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
     return OmDBAccessIdInfo.getFromProtobuf(
-        OzoneManagerProtocolProtos.OmDBAccessInfo.parseFrom(rawData));
+        OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo.parseFrom(rawData));
   }
 
   @Override
   public OmDBAccessIdInfo copyObject(OmDBAccessIdInfo object) {
-    // TODO: Not really a "copy". See OMTransactionInfoCodec
+    // Note: Not really a "copy". See OMTransactionInfoCodec
     return object;
   }
 }

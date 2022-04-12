@@ -30,12 +30,12 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -361,15 +361,9 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
 
-  Table<String, OmDBKerberosPrincipalInfo> getPrincipalToAccessIdsTable();
+  Table<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTable();
 
-  Table<String, OmDBTenantInfo> getTenantStateTable();
-
-  Table<String, String> getTenantGroupTable();
-
-  Table<String, String> getTenantRoleTable();
-
-  Table<String, String> getTenantPolicyTable();
+  Table<String, OmDBTenantState> getTenantStateTable();
 
   /**
    * Gets the OM Meta table.
