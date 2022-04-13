@@ -36,7 +36,7 @@ public class TestMultiTenantAccessController {
    */
    @Before
    public void setupUnitTest() {
-     controller = new DummyMultiTenantAccessController();
+     controller = new InMemoryMultiTenantAccessController();
    }
 
   /**

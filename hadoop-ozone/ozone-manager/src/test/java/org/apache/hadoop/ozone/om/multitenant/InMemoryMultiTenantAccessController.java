@@ -6,14 +6,14 @@ import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
-public class DummyMultiTenantAccessController
+public class InMemoryMultiTenantAccessController
     implements MultiTenantAccessController {
 
   private final Map<String, Policy>  policies;
   private final Map<String, Role>  roles;
   private long nextRoleID;
 
-  public DummyMultiTenantAccessController() {
+  public InMemoryMultiTenantAccessController() {
     nextRoleID = 0;
     policies = new HashMap<>();
     roles = new HashMap<>();
