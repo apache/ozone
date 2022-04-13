@@ -655,13 +655,15 @@ public class TestOzoneManagerLock {
 
     // For example, threadCount = 10, iterations = 100. The expected counter
     // value is 10 * 100
-    Assert.assertEquals(threadCount * iterations, counter.getCount());
+    Assert.assertEquals(((long) threadCount) * iterations,
+        counter.getCount());
     Assert.assertEquals(threadCount, listTokens.size());
 
     // Thread-1 -> 1 * 100,
     // Thread-2 -> 2 * 100 and so on.
     for (int i = 1; i <= listTokens.size(); i++) {
-      Assert.assertEquals((new Integer(i * iterations)), listTokens.get(i - 1));
+      Assert.assertEquals(Integer.valueOf(i * iterations),
+          listTokens.get(i - 1));
     }
   }
 
