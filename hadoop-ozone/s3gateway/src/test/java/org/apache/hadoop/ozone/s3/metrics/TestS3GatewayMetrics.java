@@ -65,6 +65,7 @@ import static org.mockito.Mockito.when;
 public class TestS3GatewayMetrics {
 
   private String bucketName = OzoneConsts.BUCKET;
+  private String keyName =  OzoneConsts.KEY;
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
   private RootEndpoint rootEndpoint;
@@ -73,7 +74,6 @@ public class TestS3GatewayMetrics {
   private HttpHeaders headers;
   private static final String ACL_MARKER = "acl";
   private static final String CONTENT = "0123456789";
-  private static final String keyName = "key1";
   private S3GatewayMetrics metrics;
 
 
