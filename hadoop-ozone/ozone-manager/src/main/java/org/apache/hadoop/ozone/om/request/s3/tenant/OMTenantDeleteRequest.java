@@ -69,7 +69,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     // Check Ozone cluster admin privilege
-    OMTenantRequestHelper.checkAdmin(ozoneManager);
+    ozoneManager.getMultiTenantManager().checkAdmin();
 
     // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
 
@@ -121,7 +121,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
           VOLUME_LOCK, volumeName);
 
       // Check if there are any accessIds in the tenant
-      if (!OMTenantRequestHelper.isTenantEmpty(omMetadataManager, tenantId)) {
+      if (!ozoneManager.getMultiTenantManager().isTenantEmpty(tenantId)) {
         LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
             tenantId);
         throw new OMException("Tenant '" + tenantId + "' is not empty. " +
