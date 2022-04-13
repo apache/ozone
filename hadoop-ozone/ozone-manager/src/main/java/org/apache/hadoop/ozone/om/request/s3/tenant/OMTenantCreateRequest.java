@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -57,7 +56,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
@@ -117,7 +115,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     // Check Ozone cluster admin privilege
-    OMTenantRequestHelper.checkAdmin(ozoneManager);
+    ozoneManager.getMultiTenantManager().checkAdmin();
 
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantId = request.getTenantId();
@@ -170,16 +168,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     tenantInContext = ozoneManager.getMultiTenantManager()
         .createTenantAccessInAuthorizer(tenantId);
 
-    // Get the tenant default policy, pass this along
-    final String tenantDefaultPolicies = tenantInContext
-        .getTenantAccessPolicies()
-        .stream().map(AccessPolicy::getPolicyID)
-        .collect(Collectors.joining(","));
-
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
-                .setTenantDefaultPolicyName(tenantDefaultPolicies)
                 .setTenantId(tenantId)
                 .setVolumeName(volumeName))
         .setCreateVolumeRequest(
@@ -235,8 +226,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
     IOException exception = null;
-
-    final String tenantDefaultPolicies = request.getTenantDefaultPolicyName();
 
     try {
       // Check ACL: requires volume CREATE permission.

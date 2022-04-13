@@ -42,4 +42,8 @@ public class CachedTenantState {
   public String getTenantId() {
     return tenantId;
   }
+
+  public boolean isTenantEmpty() {
+    return tenantUserAccessIds.size() == 0;
+  }
 }
