@@ -95,7 +95,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
 
     multiTenantManager.checkTenantExistence(tenantId);
 
-    // Caller should be an Ozone admin or this tenant's delegated admin
+    // Caller should be an Ozone admin, or a tenant delegated admin
     multiTenantManager.checkTenantAdmin(tenantId, true);
 
     OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
