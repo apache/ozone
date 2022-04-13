@@ -533,7 +533,7 @@ public class RpcClient implements ClientProtocol {
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
 
-    String owner;
+    final String owner;
     // If S3 auth exists, set owner name to the short user name derived from the
     //  accessId. Similar to RpcClient#getDEK
     if (getThreadLocalS3Auth() != null) {
