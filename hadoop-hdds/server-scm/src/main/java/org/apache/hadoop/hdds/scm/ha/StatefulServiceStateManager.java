@@ -12,10 +12,26 @@ import java.io.IOException;
  * {@link StatefulService}.
  */
 public interface StatefulServiceStateManager {
+
+  /**
+   * Persists the specified configurationMessage to RocksDB and replicates it
+   * through RATIS.
+   * @param serviceName name of the {@link StatefulService}, obtained
+   *                    through {@link SCMService#getServiceName()}
+   * @param configurationMessage configuration to persist
+   * @throws IOException on failure to persist configuration
+   */
   @Replicate
   void saveConfiguration(String serviceName, Message configurationMessage)
       throws IOException;
 
+  /**
+   * Reads the persisted configuration mapped to the specified serviceName.
+   * @param serviceName name of the {@link StatefulService}, obtained through
+   * {@link SCMService#getServiceName()}
+   * @return configuration as a ByteString
+   * @throws IOException on failure
+   */
   ByteString readConfiguration(String serviceName) throws IOException;
 
   void reinitialize(Table<String, ByteString> statefulServiceConfig);
