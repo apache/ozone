@@ -1482,8 +1482,7 @@ message RevokeS3SecretRequest {
 
 message CreateTenantRequest {
     optional string tenantId = 1;  // Tenant name
-    optional string tenantDefaultPolicyName = 2;
-    optional string volumeName = 3;
+    optional string volumeName = 2;
 }
 
 message DeleteTenantRequest {
