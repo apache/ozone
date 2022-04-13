@@ -595,7 +595,7 @@ public class TestOzoneManagerLock {
     testDiffKeyPathWriteLockMultiThreading(10, 100);
   }
 
-  class Counter {
+  private static class Counter {
 
     private int count = 0;
 
