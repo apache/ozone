@@ -57,8 +57,6 @@ import java.util.TreeSet;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
@@ -115,7 +113,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String tenantId = request.getTenantId();
 
     // Caller should be an Ozone admin or tenant delegated admin
-    checkTenantAdmin(ozoneManager, tenantId);
+    ozoneManager.getMultiTenantManager().checkTenantAdmin(tenantId);
 
     final String userPrincipal = request.getUserPrincipal();
     final String accessId = request.getAccessId();
@@ -144,7 +142,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_ACCESS_ID);
     }
 
-    checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
+    ozoneManager.getMultiTenantManager().checkTenantExistence(tenantId);
 
     // Below call implies user existence check in authorizer.
     // If the user doesn't exist, Ranger return 400 and the call should throw.
@@ -238,8 +236,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     String volumeName = null;
 
     try {
-      volumeName = OMTenantRequestHelper.getTenantVolumeName(
-          omMetadataManager, tenantId);
+      volumeName = ozoneManager.getMultiTenantManager()
+          .getTenantVolumeName(tenantId);
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
