@@ -115,7 +115,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     // Check Ozone cluster admin privilege
-    OMTenantRequestHelper.checkAdmin(ozoneManager);
+    ozoneManager.getMultiTenantManager().checkAdmin();
 
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantId = request.getTenantId();

@@ -376,6 +376,8 @@ public class TestS3GetSecretRequest {
             ).preExecute(ozoneManager)
         );
 
+    when(omMultiTenantManager.getTenantVolumeName(TENANT_ID))
+        .thenReturn(TENANT_ID);
     // Run validateAndUpdateCache
     omClientResponse =
         omTenantAssignUserAccessIdRequest.validateAndUpdateCache(ozoneManager,

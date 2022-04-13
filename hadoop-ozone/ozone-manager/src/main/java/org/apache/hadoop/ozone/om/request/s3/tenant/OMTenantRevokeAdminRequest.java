@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -47,8 +48,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantAdmin;
-import static org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRequestHelper.checkTenantExistence;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 /*
@@ -79,19 +78,26 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
 
     final String accessId = request.getAccessId();
     String tenantId = request.getTenantId();
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
     // If tenantId is not specified, infer it from the accessId
     if (StringUtils.isEmpty(tenantId)) {
-      tenantId = OMTenantRequestHelper.getTenantIdFromAccessId(
-          ozoneManager.getMetadataManager(), accessId);
-      assert (tenantId != null);
+      Optional<String> optionalTenantId =
+          multiTenantManager.getTenantForAccessID(accessId);
+      if (!optionalTenantId.isPresent()) {
+        throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
+            accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
+      }
+      tenantId = optionalTenantId.get();
+      assert (!StringUtils.isEmpty(tenantId));
     }
 
     // Sanity check
-    checkTenantExistence(ozoneManager.getMetadataManager(), tenantId);
+    multiTenantManager.checkTenantExistence(tenantId);
 
     // Caller should be an Ozone admin or this tenant's delegated admin
-    checkTenantAdmin(ozoneManager, tenantId);
+    multiTenantManager.checkTenantAdmin(tenantId);
 
     OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
         .getTenantAccessIdTable().get(accessId);
@@ -156,8 +162,8 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     String volumeName = null;
 
     try {
-      volumeName = OMTenantRequestHelper.getTenantVolumeName(
-          omMetadataManager, tenantId);
+      volumeName = ozoneManager.getMultiTenantManager()
+          .getTenantVolumeName(tenantId);
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
