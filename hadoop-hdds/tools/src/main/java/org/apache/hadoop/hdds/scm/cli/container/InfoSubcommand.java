@@ -63,7 +63,7 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
-  @CommandLine.Option(names = { "--addReplicaDetails" },
+  @CommandLine.Option(names = { "--replicas" },
       defaultValue = "false",
       description = "Adds replica related details")
   private boolean addReplicaDetails;
