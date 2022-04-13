@@ -254,7 +254,8 @@ public class OzoneManagerLock {
 
   }
 
-  private List<String> getCurrentLocks() {
+  @VisibleForTesting
+  List<String> getCurrentLocks() {
     List<String> currentLocks = new ArrayList<>();
     short lockSetVal = lockSet.get();
     for (Resource value : Resource.values()) {
