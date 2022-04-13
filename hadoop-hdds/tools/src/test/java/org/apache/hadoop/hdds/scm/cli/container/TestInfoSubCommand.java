@@ -85,7 +85,7 @@ public class TestInfoSubCommand {
         .thenReturn(getReplicas());
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("1", "--addReplicaDetails");
+    c.parseArgs("1", "--replicas");
     cmd.execute(scmClient);
 
     // Ensure we have a line for Replicas:
