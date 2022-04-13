@@ -164,7 +164,7 @@ public class TestOzoneAuditLogger {
    * Test to verify no WRITE event is logged.
    */
   @Test
-  public void notLogWriteEvents() throws IOException {
+  public void excludedEventNotLogged() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(AuditLogger.AUDIT_LOG_DEBUG_CMD_LIST_PREFIX +
             AuditLoggerType.OMLOGGER.getType().toLowerCase(Locale.ROOT),

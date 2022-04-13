@@ -45,7 +45,7 @@ public class AuditLogger {
   private static final String FQCN = AuditLogger.class.getName();
   private static final Marker WRITE_MARKER = AuditMarker.WRITE.getMarker();
   private static final Marker READ_MARKER = AuditMarker.READ.getMarker();
-  private AtomicReference<Set<String>> debugCmdSetRef =
+  private final AtomicReference<Set<String>> debugCmdSetRef =
       new AtomicReference<>(new HashSet<>());
   public static final String AUDIT_LOG_DEBUG_CMD_LIST_PREFIX =
       "ozone.audit.log.debug.cmd.list.";
@@ -75,7 +75,7 @@ public class AuditLogger {
   }
 
   public void logWriteSuccess(AuditMessage msg) {
-    if (debugCmdSetRef.get().contains(msg.getOp().toLowerCase(Locale.ROOT))) {
+    if (shouldLogAtDebug(msg)) {
       this.logger.logIfEnabled(FQCN, Level.DEBUG, WRITE_MARKER, msg, null);
     } else {
       this.logger.logIfEnabled(FQCN, Level.INFO, WRITE_MARKER, msg, null);
@@ -88,7 +88,7 @@ public class AuditLogger {
   }
 
   public void logReadSuccess(AuditMessage msg) {
-    if (debugCmdSetRef.get().contains(msg.getOp().toLowerCase(Locale.ROOT))) {
+    if (shouldLogAtDebug(msg)) {
       this.logger.logIfEnabled(FQCN, Level.DEBUG, READ_MARKER, msg, null);
     } else {
       this.logger.logIfEnabled(FQCN, Level.INFO, READ_MARKER, msg, null);
@@ -102,17 +102,9 @@ public class AuditLogger {
 
   public void logWrite(AuditMessage auditMessage) {
     if (auditMessage.getThrowable() == null) {
-      if (debugCmdSetRef.get().contains(
-          auditMessage.getOp().toLowerCase(Locale.ROOT))) {
-        this.logger.logIfEnabled(FQCN, Level.DEBUG, WRITE_MARKER, auditMessage,
-            auditMessage.getThrowable());
-      } else {
-        this.logger.logIfEnabled(FQCN, Level.INFO, WRITE_MARKER, auditMessage,
-            auditMessage.getThrowable());
-      }
+      logWriteSuccess(auditMessage);
     } else {
-      this.logger.logIfEnabled(FQCN, Level.ERROR, WRITE_MARKER, auditMessage,
-          auditMessage.getThrowable());
+      logWriteFailure(auditMessage);
     }
   }
 
@@ -128,5 +120,10 @@ public class AuditLogger {
     LOG.info("Refresh DebugCmdSet for {} to {}.", type.getType(), cmds);
     debugCmdSetRef.set(
         cmds.stream().map(String::toLowerCase).collect(Collectors.toSet()));
+  }
+
+  private boolean shouldLogAtDebug(AuditMessage auditMessage) {
+    return debugCmdSetRef.get()
+        .contains(auditMessage.getOp().toLowerCase(Locale.ROOT));
   }
 }

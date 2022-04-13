@@ -3078,7 +3078,7 @@
     <value></value>
     <tag>SCM</tag>
     <description>
-      A comma separated list of OzoneManager commands that are written to the SCM audit logs only if the audit
+      A comma separated list of SCM commands that are written to the SCM audit logs only if the audit
       log level is debug. Ex: "GET_VERSION,REGISTER,SEND_HEARTBEAT".
     </description>
   </property>
@@ -3088,7 +3088,7 @@
     <value></value>
     <tag>DN</tag>
     <description>
-      A comma separated list of OzoneManager commands that are written to the DN audit logs only if the audit
+      A comma separated list of Datanode commands that are written to the DN audit logs only if the audit
       log level is debug. Ex: "CREATE_CONTAINER,READ_CONTAINER,UPDATE_CONTAINER".
     </description>
   </property>
