@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -150,6 +151,9 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantRevokeUsers();
+
     OMClientResponse omClientResponse = null;
     final OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -244,11 +248,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked user '{}' accessId '{}' to tenant '{}'",
           userPrincipal, accessId, tenantId);
-      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUser()
     } else {
       LOG.error("Failed to revoke user '{}' accessId '{}' to tenant '{}': {}",
           userPrincipal, accessId, tenantId, exception.getMessage());
-      // TODO: HDDS-6375: omMetrics.incNumTenantRevokeUserFails()
+      omMetrics.incNumTenantRevokeUserFails();
     }
     return omClientResponse;
   }

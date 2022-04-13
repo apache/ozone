@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -160,6 +161,9 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantAssignAdmins();
+
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -242,12 +246,11 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Assigned admin to accessId '{}' in tenant '{}', "
               + "delegated: {}", accessId, tenantId, delegated);
-      // TODO: HDDS-6375: omMetrics.incNumTenantAssignAdmin()
     } else {
       LOG.error("Failed to assign admin to accessId '{}' in tenant '{}', "
               + "delegated: {}: {}",
           accessId, tenantId, delegated, exception.getMessage());
-      // TODO: HDDS-6375: omMetrics.incNumTenantAssignAdminFails()
+      omMetrics.incNumTenantAssignAdminFails();
     }
     return omClientResponse;
   }
