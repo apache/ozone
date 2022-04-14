@@ -34,7 +34,7 @@ List buckets
 
 Get bucket info with Ozone Shell to check the owner field
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
-    ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '. | select(.name=="${BUCKET}") | .owner'
+    ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '.owner'
                         Should Be Equal     ${result}       testuser
                         # In ozonesecure(-ha) docker-config, hadoop.security.auth_to_local is set
                         # in the way that getShortUserName() converts the accessId to "testuser".
