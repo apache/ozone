@@ -38,7 +38,7 @@ public abstract class StatefulService implements SCMService {
    * @param defaultInstanceForType the
    * {@link Message#getDefaultInstanceForType()} for this message's actual type
    * @return the persisted {@link Message} that can be cast to the required type
-   * @throws IOException
+   * @throws IOException on failure
    */
   protected final Message readConfiguration(Message defaultInstanceForType)
       throws IOException {
