@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
@@ -387,30 +386,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
-      processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.InfoBucket
-  )
-  public static OMResponse disallowInfoBucketResponseWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
-      throws ServiceException {
-    if (!resp.hasInfoBucketResponse()) {
-      return resp;
-    }
-    HddsProtos.DefaultReplicationConfig repConfig =
-        resp.getInfoBucketResponse()
-            .getBucketInfo().getDefaultReplicationConfig();
-    if (repConfig.hasEcReplicationConfig()) {
-      throw new ServiceException("Bucket info contains an EC default"
-          + " replication config, which the client can not understand."
-          + " Please upgrade the client before trying to read the bucket "
-          + req.getInfoBucketRequest().getVolumeName() + "/"
-          + req.getInfoBucketRequest().getBucketName() + ".");
-    }
-    return resp;
-  }
-
   private LookupKeyResponse lookupKey(LookupKeyRequest request,
       int clientVersion) throws IOException {
     LookupKeyResponse.Builder resp =
@@ -428,7 +403,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     resp.setKeyInfo(keyInfo.getProtobuf(keyArgs.getHeadOp(), clientVersion));
 
-
     return resp.build();
   }
 
@@ -444,12 +418,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return resp;
     }
     if (resp.getLookupKeyResponse().getKeyInfo().hasEcReplicationConfig()) {
-      throw new ServiceException("Key is a key with"
-          + " Erasure Coded replication, which the client can not understand."
-          + " Please upgrade the client before trying to read the key info"
-          + " for" + req.getLookupKeyRequest().getKeyArgs().getVolumeName()
-          + "/" + req.getLookupKeyRequest().getKeyArgs().getBucketName()
-          + "/" + req.getLookupKeyRequest().getKeyArgs().getKeyName() + ".");
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is a key with Erasure Coded replication, which"
+              + " the client can not understand.\n"
+              + "Please upgrade the client before trying to read the key: "
+              + req.getLookupKeyRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupKeyResponse()
+          .build();
     }
     return resp;
   }
@@ -469,32 +448,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     return resp.build();
-  }
-
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
-      processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListBuckets
-  )
-  public static OMResponse disallowListBucketsResponseWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
-      throws ServiceException {
-    if (!resp.hasListBucketsResponse()) {
-      return resp;
-    }
-    List<BucketInfo> buckets =
-        resp.getListBucketsResponse().getBucketInfoList();
-    for (BucketInfo bucket : buckets) {
-      if (bucket.hasDefaultReplicationConfig()) {
-        if (bucket.getDefaultReplicationConfig().hasEcReplicationConfig()) {
-          throw new ServiceException("The list of buckets contains buckets"
-              + " with Erasure Coded replication set as default, hence the"
-              + " client is not able to represent the resulting elements."
-              + " Please upgrade the client to get the list of buckets.");
-        }
-      }
-    }
-    return resp;
   }
 
   private ListKeysResponse listKeys(ListKeysRequest request, int clientVersion)
@@ -529,10 +482,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     List<KeyInfo> keys = resp.getListKeysResponse().getKeyInfoList();
     for (KeyInfo key : keys) {
       if (key.hasEcReplicationConfig()) {
-        throw new ServiceException("The list of keys contains keys with"
-            + " Erasure Coded replication set, hence the client is not able to"
-            + " represent all the keys returned. Please upgrade the client to"
-            + " get the list of keys.");
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys with Erasure Coded"
+                + " replication set, hence the client is not able to"
+                + " represent all the keys returned. Please upgrade the"
+                + " client to get the list of keys.")
+            .clearListKeysResponse()
+            .build();
       }
     }
     return resp;
@@ -574,10 +531,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (RepeatedKeyInfo repeatedKey : repeatedKeys) {
       for (KeyInfo key : repeatedKey.getKeyInfoList()) {
         if (key.hasEcReplicationConfig()) {
-          throw new ServiceException("The list of keys contains keys with"
-              + " Erasure Coded replication set, hence the client is not able"
-              + " to represent all the keys returned. Please upgrade the client"
-              + " to get the list of keys.");
+          resp = resp.toBuilder()
+              .setStatus(Status.NOT_SUPPORTED_OPERATION)
+              .setMessage("The list of keys contains keys with Erasure Coded"
+                  + " replication set, hence the client is not able to"
+                  + " represent all the keys returned. Please upgrade the"
+                  + " client to get the list of keys.")
+              .clearListTrashResponse()
+              .build();
         }
       }
     }
@@ -724,13 +685,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     if (resp.getGetFileStatusResponse().getStatus().getKeyInfo()
         .hasEcReplicationConfig()) {
-      throw new ServiceException("Key is a key with"
-          + " Erasure Coded replication, which the client can not understand."
-          + " Please upgrade the client before trying to read the key info"
-          + " for " + req.getGetFileStatusRequest().getKeyArgs().getVolumeName()
-          + "/" + req.getGetFileStatusRequest().getKeyArgs().getBucketName()
-          + "/" + req.getGetFileStatusRequest().getKeyArgs().getKeyName()
-          + ".");
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is a key with Erasure Coded replication, which"
+              + " the client can not understand."
+              + " Please upgrade the client before trying to read the key info"
+              + " for "
+              + req.getGetFileStatusRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getBucketName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearGetFileStatusResponse()
+          .build();
     }
     return resp;
   }
@@ -763,12 +729,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return resp;
     }
     if (resp.getLookupFileResponse().getKeyInfo().hasEcReplicationConfig()) {
-      throw new ServiceException("Key is a key with"
-          + " Erasure Coded replication, which the client can not understand."
-          + " Please upgrade the client before trying to read the key info"
-          + " for " + req.getLookupFileRequest().getKeyArgs().getVolumeName()
-          + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
-          + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName() + ".");
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is a key with Erasure Coded replication, which the"
+              + " client can not understand."
+              + " Please upgrade the client before trying to read the key info"
+              + " for "
+              + req.getLookupFileRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupFileResponse()
+          .build();
     }
     return resp;
   }
@@ -811,10 +783,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         resp.getListStatusResponse().getStatusesList();
     for (OzoneFileStatusProto status : statuses) {
       if (status.getKeyInfo().hasEcReplicationConfig()) {
-        throw new ServiceException("The list of keys contains keys with"
-            + " Erasure Coded replication set, hence the client is not able to"
-            + " represent all the keys returned. Please upgrade the client to"
-            + " get the list of keys.");
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys with Erasure Coded"
+                + " replication set, hence the client is not able to"
+                + " represent all the keys returned."
+                + " Please upgrade the client to get the list of keys.")
+            .clearListStatusResponse()
+            .build();
       }
     }
     return resp;

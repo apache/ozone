@@ -25,7 +25,6 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -335,14 +334,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       requestType = Type.CommitKey
   )
   public static OMRequest disallowCommitKeyWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx) throws ServiceException {
-    if (ctx.versionManager()
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCommitKeyRequest().getKeyArgs().hasEcReplicationConfig()) {
-        throw new ServiceException("Cluster does not have the Erasure Coded"
+        throw new OMException("Cluster does not have the Erasure Coded"
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
-            + " please finalize the cluster upgrade and then try again.");
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }
     return req;

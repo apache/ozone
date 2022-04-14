@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.base.Optional;
-import com.google.protobuf.ServiceException;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -580,15 +579,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   )
   public static OMRequest
       disallowCompleteMultiPartUploadWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx) throws ServiceException {
-    if (ctx.versionManager().getMetadataLayoutVersion()
-        < OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion()) {
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager().isAllowed(
+        OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCompleteMultiPartUploadRequest().getKeyArgs()
           .hasEcReplicationConfig()) {
-        throw new ServiceException("Cluster does not have the Erasure Coded"
+        throw new OMException("Cluster does not have the Erasure Coded"
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
-            + " please finalize the cluster upgrade and then try again.");
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }
     return req;

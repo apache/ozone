@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import com.google.common.base.Optional;
-import com.google.protobuf.ServiceException;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -378,17 +377,18 @@ public class OMBucketCreateRequest extends OMClientRequest {
       requestType = Type.CreateBucket
   )
   public static OMRequest disallowCreateBucketWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx) throws ServiceException {
+      OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateBucketRequest()
           .getBucketInfo().hasDefaultReplicationConfig()
           && req.getCreateBucketRequest().getBucketInfo()
           .getDefaultReplicationConfig().hasEcReplicationConfig()) {
-        throw new ServiceException("Cluster does not have the Erasure Coded"
+        throw new OMException("Cluster does not have the Erasure Coded"
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
-            + " please finalize the cluster upgrade and then try again.");
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }
     return req;

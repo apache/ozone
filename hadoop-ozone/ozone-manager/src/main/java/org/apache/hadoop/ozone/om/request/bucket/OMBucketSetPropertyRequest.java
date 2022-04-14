@@ -23,7 +23,6 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -316,7 +315,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       requestType = Type.SetBucketProperty
   )
   public static OMRequest disallowSetBucketPropertyWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx) throws ServiceException {
+      OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       SetBucketPropertyRequest propReq =
@@ -325,10 +324,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           && propReq.getBucketArgs().hasDefaultReplicationConfig()
           && propReq.getBucketArgs().getDefaultReplicationConfig()
           .hasEcReplicationConfig()) {
-        throw new ServiceException("Cluster does not have the Erasure Coded"
+        throw new OMException("Cluster does not have the Erasure Coded"
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
-            + " please finalize the cluster upgrade and then try again.");
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }
     return req;

@@ -129,13 +129,14 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       switch (request.getCmdType()) {
       case AllocateScmBlock:
         if (scm.getLayoutVersionManager().needsFinalization() &&
-            scm.getLayoutVersionManager()
+            !scm.getLayoutVersionManager()
                 .isAllowed(HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)
         ) {
           if (request.getAllocateScmBlockRequest().hasEcReplicationConfig()) {
-            throw new ServiceException("Cluster is not finalized yet, it is"
+            throw new SCMException("Cluster is not finalized yet, it is"
                 + " not enabled to create blocks with Erasure Coded"
-                + " replication type.");
+                + " replication type.",
+                SCMException.ResultCodes.INTERNAL_ERROR);
           }
         }
         response.setAllocateScmBlockResponse(allocateScmBlock(

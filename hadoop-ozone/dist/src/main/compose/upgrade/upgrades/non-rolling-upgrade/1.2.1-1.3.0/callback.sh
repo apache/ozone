@@ -35,8 +35,7 @@ _check_om_mlvs() {
 }
 
 setup() {
-  # OM preparation is not implemented until 1.2.0.
-  export OZONE_OM_PREPARE='false'
+  export OZONE_OM_PREPARE='true'
 }
 
 with_old_version() {
@@ -45,11 +44,11 @@ with_old_version() {
 }
 
 with_new_version_pre_finalized() {
-  _check_hdds_mlvs 0
+  _check_hdds_mlvs 2
   _check_om_mlvs 0
 
   validate old1
-  # HDDS-6261: overwrite the same keys intentionally
+#   HDDS-6261: overwrite the same keys intentionally
   generate old1 --exclude create-volume-and-bucket
 
   generate new1
@@ -71,9 +70,8 @@ with_old_version_downgraded() {
 }
 
 with_new_version_finalized() {
-  _check_hdds_mlvs 2
-  # OM currently only has one layout version.
-  _check_om_mlvs 0
+  _check_hdds_mlvs 3
+  _check_om_mlvs 1
 
   validate old1
   validate new1
