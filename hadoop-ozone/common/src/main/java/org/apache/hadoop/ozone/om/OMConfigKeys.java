@@ -312,4 +312,11 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT
       = 10000;
 
+  /**
+   * This configuration shall be enabled to utilize the functionality of the
+   * fine-grained KEY_PATH_LOCK.
+   */
+  public static final String OZONE_OM_ENABLE_KEY_PATH_LOCK =
+      "ozone.om.enable.key.path.lock";
+  public static final boolean OZONE_OM_ENABLE_KEY_PATH_LOCK_DEFAULT = false;
 }
