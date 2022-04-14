@@ -1630,6 +1630,24 @@
   </property>
 
   <property>
+    <name>ozone.om.unflushed.transaction.max.count</name>
+    <value>10000</value>
+    <tag>OZONE, OM</tag>
+    <description>the unflushed transactions here are those requests that have been
+      applied to OM state machine but not been flushed to OM rocksdb. when OM meets
+      high concurrency-pressure and flushing is not fast enough, too many pending
+      requests will be hold in memory and will lead to long GC of OM, which will slow
+      down flushing further. there are some cases that flushing is slow, for example,
+      1 rocksdb is on a HDD, which has poor IO performance than SSD.
+      2 a big compaction is happening internally in rocksdb and write stall of
+      rocksdb happens.
+      3 long GC, which may caused by other factors.
+      the property is to limit the max count of unflushed transactions, so that the
+      maximum memory occupied by unflushed transactions is limited.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.lock.fair</name>
     <value>false</value>
     <description>If this is true, the Ozone Manager lock will be used in Fair
