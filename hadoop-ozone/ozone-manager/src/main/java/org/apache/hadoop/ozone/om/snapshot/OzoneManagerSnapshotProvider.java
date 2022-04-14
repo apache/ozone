@@ -136,10 +136,11 @@ public class OzoneManagerSnapshotProvider {
       try (InputStream inputStream = httpURLConnection.getInputStream()) {
         FileUtils.copyInputStreamToFile(inputStream, targetFile);
       } catch (IOException ex) {
-        boolean deleted = FileUtils.deleteQuietly(targetFile);
         LOG.error("OM snapshot {} cannot be downloaded.", targetFile, ex);
+        boolean deleted = FileUtils.deleteQuietly(targetFile);
         if (!deleted) {
-          LOG.error("OM snapshot {} cannot be deleted", targetFile);
+          LOG.error("OM snapshot which failed to download {} cannot be deleted",
+              targetFile);
         }
       }
       return null;
