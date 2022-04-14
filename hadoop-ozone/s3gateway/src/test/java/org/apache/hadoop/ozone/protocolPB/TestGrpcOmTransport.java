@@ -78,13 +78,16 @@ public class TestGrpcOmTransport {
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     GrpcOmTransport client = new GrpcOmTransport(conf, ugi, omServiceId);
+    Exception ex = null;
 
     try {
       client.start();
     } catch (Exception e) {
+      ex = new Exception(ex);
       e.printStackTrace();
     } finally {
       client.shutdown();
+      Assert.assertNull(ex);
     }
   }
 }
