@@ -845,6 +845,7 @@ public class TestOzoneTenantShell {
   }
 
   @Test
+  @SuppressWarnings("methodlength")
   public void testTenantAdminOperations()
       throws IOException, InterruptedException {
 
