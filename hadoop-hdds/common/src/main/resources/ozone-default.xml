@@ -2820,6 +2820,15 @@
   </property>
 
   <property>
+    <name>ozone.om.enable.key.path.lock</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, the fine-grained KEY_PATH_LOCK functionality is enabled.
+      If false, it is disabled.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.client.key.provider.cache.expiry</name>
     <tag>OZONE, CLIENT, SECURITY</tag>
     <value>10d</value>
