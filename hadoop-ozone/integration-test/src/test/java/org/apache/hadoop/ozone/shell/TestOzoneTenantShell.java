@@ -710,8 +710,7 @@ public class TestOzoneTenantShell {
   }
 
   @Test
-  public void testTenantSetSecretAndAssignRevokeUsersAsNonDelegatedAdmin()
-      throws IOException, InterruptedException {
+  public void testTenantSetSecret() throws IOException, InterruptedException {
 
     final String tenantName = "tenant-test-set-secret";
 
@@ -818,7 +817,62 @@ public class TestOzoneTenantShell {
       return null;
     });
 
-    // Assigning/revoking user accessIds should work for a non-delegated admin
+    // Clean up
+    executeHA(tenantShell, new String[] {"user", "revoke-admin",
+        tenantName + "$" + ugiBob.getShortUserName()});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked admin", false);
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", tenantName + "$bob"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", tenantName + "$alice"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {"delete", tenantName});
+    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume(tenantName);
+
+    // Sanity check: tenant list should be empty
+    executeHA(tenantShell, new String[] {"list"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
+  }
+
+  @Test
+  public void testAssignRevokeUsersAsNonDelegatedAdmin()
+      throws IOException, InterruptedException {
+
+    final String tenantName = "tenant-test-non-delegated-admin-assign-revoke";
+
+    final UserGroupInformation ugiBob = UserGroupInformation
+        .createUserForTesting("bob",  new String[] {"usergroup"});
+
+    // Preparation
+    executeHA(tenantShell, new String[] {"create", tenantName});
+    checkOutput(out, "Created tenant '" + tenantName + "'.\n", true);
+    checkOutput(err, "", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob", "--tenant=" + tenantName});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$bob'\n" +
+        "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'bob' to '" + tenantName + "'" +
+        " with accessId '" + tenantName + "$bob'.\n", true);
+
+    // Make bob a non-delegated tenant admin
+    executeHA(tenantShell, new String[] {"user", "assign-admin",
+        tenantName + "$" + ugiBob.getShortUserName(),
+        "--tenant=" + tenantName, "--delegated=false"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Assigned admin", false);
+
+    // Assigning / Revoking user accessIds should work for a non-delegated admin
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
           "user", "assign", "carol", "--tenant=" + tenantName});
@@ -845,19 +899,9 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "Revoked accessId", false);
 
-    executeHA(tenantShell, new String[] {
-        "user", "revoke", tenantName + "$alice"});
-    checkOutput(out, "", true);
-    checkOutput(err, "Revoked accessId", false);
-
     executeHA(tenantShell, new String[] {"delete", tenantName});
     checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
     checkOutput(err, "", true);
     deleteVolume(tenantName);
-
-    // Sanity check: tenant list should be empty
-    executeHA(tenantShell, new String[] {"list"});
-    checkOutput(out, "", true);
-    checkOutput(err, "", true);
   }
 }
