@@ -149,7 +149,7 @@
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>Determines where the per-disk rocksdb instances will be
-      stored. Defaults to empty if not specified, then rocksdb instances
+      stored. This setting is optional. If unspecified, then rocksdb instances
       are stored on the same disk as HDDS data.
       The directories should be tagged with corresponding storage types
       ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]) for storage policies. The default
