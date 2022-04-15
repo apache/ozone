@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
@@ -39,6 +40,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_F
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -59,7 +61,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -69,6 +71,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -82,26 +85,29 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.tag.Slow;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test SCM and DataNode Upgrade sequence.
  */
+@Timeout(11000)
+@Flaky({"HDDS-6028", "HDDS-6049"})
+@Slow
 public class TestHDDSUpgrade {
 
   /**
    * Set a timeout for each test.
    */
-  @Rule
-  public Timeout timeout = new Timeout(11000000);
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHDDSUpgrade.class);
   private static final int NUM_DATA_NODES = 3;
@@ -109,55 +115,74 @@ public class TestHDDSUpgrade {
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
   private StorageContainerManager scm;
-  private ContainerManagerV2 scmContainerManager;
+  private ContainerManager scmContainerManager;
   private PipelineManager scmPipelineManager;
   private final int numContainersCreated = 1;
   private HDDSLayoutVersionManager scmVersionManager;
   private AtomicBoolean testPassed = new AtomicBoolean(true);
 
   private static final ReplicationConfig RATIS_THREE =
-      ReplicationConfig.fromTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+      ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
+
+  private static MiniOzoneClusterProvider clusterProvider;
 
   /**
    * Create a MiniDFSCluster for testing.
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     init();
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     shutdown();
   }
 
-  public void init() throws Exception {
-    conf = new OzoneConfiguration();
+  @BeforeAll
+  public static void initClass() {
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
     conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
+
+    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(NUM_DATA_NODES)
         // allow only one FACTOR THREE pipeline.
         .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)
         .setHbInterval(500)
         .setHbProcessorInterval(500)
         .setScmLayoutVersion(INITIAL_VERSION.layoutVersion())
-        .setDnLayoutVersion(INITIAL_VERSION.layoutVersion())
-        .build();
-    cluster.waitForClusterToBeReady();
+        .setDnLayoutVersion(INITIAL_VERSION.layoutVersion());
+
+    // Setting the provider to a max of 100 clusters. Some of the tests here
+    // use multiple clusters, so its hard to know exactly how many will be
+    // needed. This means the provider will create 1 extra cluster than needed
+    // but that will not greatly affect runtimes.
+    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 100);
+  }
+
+  @AfterAll
+  public static void afterClass() throws InterruptedException {
+    clusterProvider.shutdown();
+  }
+
+  public void init() throws Exception {
+    cluster = clusterProvider.provide();
+    conf = cluster.getConf();
     loadSCMState();
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
-  public void shutdown() {
+  public void shutdown() throws IOException, InterruptedException {
     if (cluster != null) {
-      cluster.shutdown();
+      clusterProvider.destroy(cluster);
     }
   }
 
@@ -165,7 +190,7 @@ public class TestHDDSUpgrade {
    * Some tests repeatedly modify the cluster. Helper function to reload the
    * latest SCM state.
    */
-  private void loadSCMState(){
+  private void loadSCMState() {
     scm = cluster.getStorageContainerManager();
     scmContainerManager = scm.getContainerManager();
     scmPipelineManager = scm.getPipelineManager();
@@ -275,7 +300,16 @@ public class TestHDDSUpgrade {
   /*
    * Helper function to test Post-Upgrade conditions on all the DataNodes.
    */
-  private void testPostUpgradeConditionsDataNodes() {
+  private void testPostUpgradeConditionsDataNodes(
+      ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
+    List<ContainerProtos.ContainerDataProto.State> closeStates =
+        Arrays.asList(validClosedContainerStates);
+    // Allow closed and quasi closed containers as valid closed containers by
+    // default.
+    if (closeStates.isEmpty()) {
+      closeStates = Arrays.asList(CLOSED, QUASI_CLOSED);
+    }
+
     try {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {
@@ -308,9 +342,11 @@ public class TestHDDSUpgrade {
       // Also verify that all the existing containers are closed.
       for (Iterator<Container<?>> it =
            dsm.getContainer().getController().getContainers(); it.hasNext();) {
-        Container container = it.next();
-        Assert.assertTrue(container.getContainerState() == CLOSED ||
-            container.getContainerState() == QUASI_CLOSED);
+        Container<?> container = it.next();
+        Assert.assertTrue("Container had unexpected state " +
+                container.getContainerState(),
+            closeStates.stream().anyMatch(
+                state -> container.getContainerState().equals(state)));
         countContainers++;
       }
     }
@@ -434,7 +470,9 @@ public class TestHDDSUpgrade {
     testDataNodesStateOnSCM(HEALTHY_READONLY, HEALTHY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
-    testPostUpgradeConditionsDataNodes();
+    // In the happy path case, no containers should have been quasi closed as
+    // a result of the upgrade.
+    testPostUpgradeConditionsDataNodes(CLOSED);
 
     // Test that we can use a pipeline after upgrade.
     // Will fail with exception if there are no pipelines.
@@ -466,7 +504,7 @@ public class TestHDDSUpgrade {
       IOException {
     // For some tests this could get called in a different thread context.
     // We need to guard concurrent updates to the cluster.
-    synchronized(cluster) {
+    synchronized (cluster) {
       cluster.restartStorageContainerManager(true);
       loadSCMState();
     }
@@ -817,7 +855,6 @@ public class TestHDDSUpgrade {
    * Upgrade execution points as defined in
    * UpgradeFinalizer:UpgradeTestInjectionPoints.
    */
-  @Ignore
   @Test
   public void testDataNodeFailuresDuringDataNodeUpgrade()
       throws Exception {
@@ -862,7 +899,6 @@ public class TestHDDSUpgrade {
    * through upgrade-finalization. This test covers all the combinations of
    * SCM-Upgrade-execution points and DataNode-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testAllPossibleDataNodeFailuresAndSCMFailures()
       throws Exception {
@@ -922,7 +958,6 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * SCM-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringSCMUpgrade()
       throws Exception {
@@ -961,7 +996,6 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * DataNode-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringDataNodeUpgrade()
       throws Exception {
@@ -1053,7 +1087,7 @@ public class TestHDDSUpgrade {
     // Verify that new pipeline can be created with upgraded datanodes.
     try {
       testPostUpgradePipelineCreation();
-    } catch(SCMException e) {
+    } catch (SCMException e) {
       // If pipeline creation fails, make sure that there is a valid reason
       // for this i.e. all datanodes are already part of some pipeline.
       for (HddsDatanodeService dataNode : cluster.getHddsDatanodes()) {

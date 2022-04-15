@@ -15,7 +15,7 @@
 name: build-branch
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, ready_for_review, synchronize]
   push:
   schedule:
     - cron: 30 0,12 * * *
@@ -26,14 +26,53 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  build-info:
+    runs-on: ubuntu-18.04
+    env:
+      GITHUB_CONTEXT: ${{ toJson(github) }}
+    outputs:
+      basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
+      needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
+      needs-build: ${{ steps.selective-checks.outputs.needs-build }}
+      needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
+      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
+      needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
+      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+    steps:
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+      - name: Fetch incoming commit ${{ github.sha }} with its parent
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+        if: github.event_name  == 'pull_request'
+      - name: Selective checks
+        id: selective-checks
+        env:
+          PR_LABELS: "${{ toJSON(github.event.pull_request.labels.*.name) }}"
+          PR_DRAFT: "${{ github.event.pull_request.draft }}"
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            # Run selective checks
+            dev-support/ci/selective_ci_checks.sh "${GITHUB_SHA}"
+          else
+            # Run all checks
+            dev-support/ci/selective_ci_checks.sh
+          fi
   compile:
+    needs:
+      - build-info
     runs-on: ubuntu-18.04
     timeout-minutes: 30
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
         java: [ 8, 11 ]
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -74,23 +113,24 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   basic:
+    needs:
+      - build-info
     runs-on: ubuntu-18.04
-    timeout-minutes: 40
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 60
+    if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
       matrix:
-        check:
-          - author
-          - bats
-          - checkstyle
-          - docs
-          - findbugs
-          - rat
-          - unit
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+        check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
+        if: matrix.check != 'bats'
+      - name: Checkout project with history
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+        if: matrix.check == 'bats'
       - name: Cache for maven dependencies
         uses: actions/cache@v2
         with:
@@ -120,10 +160,12 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   dependency:
-    needs: compile
+    needs:
+      - build-info
+      - compile
     runs-on: ubuntu-18.04
     timeout-minutes: 5
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-dependency-check == 'true'
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -147,39 +189,39 @@ jobs:
           path: target/dependency
         continue-on-error: true
   acceptance:
-    needs: compile
+    needs:
+      - build-info
+      - compile
     runs-on: ubuntu-18.04
-    timeout-minutes: 120 # Todo HDDS-5270
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 150
+    if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
       matrix:
         suite:
           - secure
           - unsecure
+          - HA
+          - MR
           - misc
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-        with:
-          path: ozone
-      - name: Move Ozone to /mnt
-        run: |
-          sudo chmod 777 /mnt
-          mv ozone /mnt/
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v2
         with:
           name: ozone-bin
       - name: Untar binaries
         run: |
-          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
-          sudo chmod -R a+rwX /mnt/ozone/hadoop-ozone/dist/target
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          cd /mnt/ozone && hadoop-ozone/dev-support/checks/acceptance.sh
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
@@ -190,79 +232,77 @@ jobs:
         if: always()
         with:
           name: acceptance-${{ matrix.suite }}
-          path: /mnt/ozone/target/acceptance
+          path: target/acceptance
         continue-on-error: true
   kubernetes:
-    needs: compile
+    needs:
+      - build-info
+      - compile
     runs-on: ubuntu-18.04
     timeout-minutes: 60
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-        with:
-          path: ozone
-      - name: Move Ozone to /mnt
-        run: |
-          sudo chmod 777 /mnt
-          mv ozone /mnt/
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v2
         with:
           name: ozone-bin
       - name: Untar binaries
         run: |
-          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
-          tar xzvf ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/kubernetes.sh
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
         with:
           name: kubernetes
-          path: /mnt/ozone/target/kubernetes
+          path: target/kubernetes
         continue-on-error: true
   integration:
+    needs:
+      - build-info
     runs-on: ubuntu-18.04
     timeout-minutes: 150
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
       matrix:
         profile:
           - client
           - filesystem-hdds
           - ozone
-      fail-fast: ${{ github.event_name == 'pull_request' }}
+          - flaky
+      fail-fast: false
     steps:
-      - name: Setup link to SSD
-        run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
       - name: Checkout project
         uses: actions/checkout@v2
-        with:
-          path: mnt/ozone
       - name: Cache for maven dependencies
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8-${{ matrix.profile }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.profile }}
           restore-keys: |
-            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('mnt/ozone/**/pom.xml') }}
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Execute tests
-        run: mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+        continue-on-error: ${{ matrix.profile == 'flaky' }}
       - name: Summary of failures
-        run: cat mnt/ozone/target/${{ github.job }}/summary.txt
+        run: cat target/${{ github.job }}/summary.txt
         if: always()
       - name: Archive build results
         uses: actions/upload-artifact@v2
         if: always()
         with:
           name: it-${{ matrix.profile }}
-          path: mnt/ozone/target/integration
+          path: target/integration
         continue-on-error: true
       - name: Delete temporary build artifacts before caching
         run: |

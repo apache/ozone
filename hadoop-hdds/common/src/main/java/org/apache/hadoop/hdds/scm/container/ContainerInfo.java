@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -56,7 +57,12 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   // The wall-clock ms since the epoch at which the current state enters.
   private Instant stateEnterTime;
   private String owner;
-  private long containerID;
+  // This is JsonIgnored as originally this class held a long in instead of
+  // a containerID object. By emitting this in Json, it changes the JSON output.
+  // Therefore the method getContainerID is annotated to return the original
+  // field and hence maintain the original output.
+  @JsonIgnore
+  private ContainerID containerID;
   // Delete Transaction Id is updated when new transaction for a container
   // is stored in SCM delete Table.
   // TODO: Replication Manager should consider deleteTransactionId so that
@@ -86,7 +92,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       long deleteTransactionId,
       long sequenceId,
       ReplicationConfig repConfig) {
-    this.containerID = containerID;
+    this.containerID = ContainerID.valueOf(containerID);
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
     this.numberOfKeys = numberOfKeys;
@@ -108,7 +114,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
     final ReplicationConfig config = ReplicationConfig
-        .fromProto(info.getReplicationType(), info.getReplicationFactor());
+        .fromProtoTypeAndFactor(
+            info.getReplicationType(), info.getReplicationFactor());
     builder.setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
         .setState(info.getState())
@@ -128,12 +135,12 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   /**
-   * This method is depricated, use {@code containerID()} which returns
-   * {@link ContainerID} object.
+   * Unless the long value of the ContainerID is needed, use the containerID()
+   * method to obtain the {@link ContainerID} object.
    */
-  @Deprecated
+  @JsonProperty
   public long getContainerID() {
-    return containerID;
+    return containerID.getId();
   }
 
   public HddsProtos.LifeCycleState getState() {
@@ -154,6 +161,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   public HddsProtos.ReplicationType getReplicationType() {
     return replicationConfig.getReplicationType();
+  }
+
+  public HddsProtos.ReplicationFactor getReplicationFactor() {
+    return ReplicationConfig.getLegacyFactor(replicationConfig);
   }
 
   public PipelineID getPipelineID() {
@@ -194,7 +205,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public ContainerID containerID() {
-    return ContainerID.valueOf(containerID);
+    return containerID;
   }
 
   /**
@@ -214,7 +225,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
         HddsProtos.ContainerInfoProto.newBuilder();
-    Preconditions.checkState(containerID > 0);
     builder.setContainerID(getContainerID())
         .setUsedBytes(getUsedBytes())
         .setNumberOfKeys(getNumberOfKeys()).setState(getState())

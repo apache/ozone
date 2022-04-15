@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,17 +29,27 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
@@ -58,6 +70,8 @@ public class TestRatisPipelineProvider {
   private MockNodeManager nodeManager;
   private RatisPipelineProvider provider;
   private PipelineStateManager stateManager;
+  private File testDir;
+  private DBStore dbStore;
 
   public void init(int maxPipelinePerNode) throws Exception {
     init(maxPipelinePerNode, new OzoneConfiguration());
@@ -65,13 +79,32 @@ public class TestRatisPipelineProvider {
 
   public void init(int maxPipelinePerNode, OzoneConfiguration conf)
       throws Exception {
+    testDir = GenericTestUtils.getTestDir(
+        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(
+        conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 10);
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
         maxPipelinePerNode);
-    stateManager = new PipelineStateManager();
+    stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
     provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, conf);
+  }
+
+  private void cleanup() throws Exception {
+    if (dbStore != null) {
+      dbStore.close();
+    }
+
+    FileUtil.fullyDelete(testDir);
   }
 
   private static void assertPipelineProperties(
@@ -87,13 +120,19 @@ public class TestRatisPipelineProvider {
 
   private void createPipelineAndAssertions(
       HddsProtos.ReplicationFactor factor) throws IOException {
-    Pipeline pipeline = provider.create(new RatisReplicationConfig(factor));
+    Pipeline pipeline = provider.create(RatisReplicationConfig
+        .getInstance(factor));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
-    stateManager.addPipeline(pipeline);
+    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
+    stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(pipeline);
 
-    Pipeline pipeline1 = provider.create(new RatisReplicationConfig(factor));
+    Pipeline pipeline1 = provider.create(RatisReplicationConfig
+        .getInstance(factor));
+    HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
@@ -103,7 +142,7 @@ public class TestRatisPipelineProvider {
     if (pipeline.getReplicationConfig().getRequiredNodes() == 3) {
       assertNotEquals(pipeline.getNodeSet(), pipeline1.getNodeSet());
     }
-    stateManager.addPipeline(pipeline1);
+    stateManager.addPipeline(pipelineProto1);
     nodeManager.addPipeline(pipeline1);
   }
 
@@ -111,12 +150,14 @@ public class TestRatisPipelineProvider {
   public void testCreatePipelineWithFactorThree() throws Exception {
     init(1);
     createPipelineAndAssertions(HddsProtos.ReplicationFactor.THREE);
+    cleanup();
   }
 
   @Test
   public void testCreatePipelineWithFactorOne() throws Exception {
     init(1);
     createPipelineAndAssertions(HddsProtos.ReplicationFactor.ONE);
+    cleanup();
   }
 
   private List<DatanodeDetails> createListOfNodes(int nodeCount) {
@@ -131,19 +172,26 @@ public class TestRatisPipelineProvider {
   public void testCreatePipelineWithFactor() throws Exception {
     init(1);
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
-    Pipeline pipeline = provider.create(new RatisReplicationConfig(factor));
+    Pipeline pipeline = provider.create(RatisReplicationConfig
+        .getInstance(factor));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
-    stateManager.addPipeline(pipeline);
+    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
+    stateManager.addPipeline(pipelineProto);
 
     factor = HddsProtos.ReplicationFactor.ONE;
-    Pipeline pipeline1 = provider.create(new RatisReplicationConfig(factor));
+    Pipeline pipeline1 = provider.create(RatisReplicationConfig
+        .getInstance(factor));
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
-    stateManager.addPipeline(pipeline1);
+    HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
+    stateManager.addPipeline(pipelineProto1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
     assertNotEquals(pipeline.getNodeSet(), pipeline1.getNodeSet());
+    cleanup();
   }
 
   @Test
@@ -151,16 +199,17 @@ public class TestRatisPipelineProvider {
     init(1);
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
-        provider.create(new RatisReplicationConfig(factor),
+        provider.create(RatisReplicationConfig.getInstance(factor),
             createListOfNodes(factor.getNumber()));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.OPEN);
 
     factor = HddsProtos.ReplicationFactor.ONE;
-    pipeline = provider.create(new RatisReplicationConfig(factor),
+    pipeline = provider.create(RatisReplicationConfig.getInstance(factor),
         createListOfNodes(factor.getNumber()));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.OPEN);
+    cleanup();
   }
 
   @Test
@@ -172,11 +221,14 @@ public class TestRatisPipelineProvider {
         .limit(3).collect(Collectors.toList());
 
     Pipeline pipeline1 = provider.create(
-        new RatisReplicationConfig(ReplicationFactor.THREE), healthyNodes);
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        healthyNodes);
     Pipeline pipeline2 = provider.create(
-        new RatisReplicationConfig(ReplicationFactor.THREE), healthyNodes);
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        healthyNodes);
 
     Assert.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
+    cleanup();
   }
 
   @Test
@@ -196,23 +248,25 @@ public class TestRatisPipelineProvider {
     for (int i = 0; i < maxPipelinePerNode; i++) {
       // Saturate pipeline counts on all the 1st 3 DNs.
       addPipeline(dns, Pipeline.PipelineState.OPEN,
-          new RatisReplicationConfig(factor));
+          RatisReplicationConfig.getInstance(factor));
     }
     Set<DatanodeDetails> membersOfOpenPipelines = new HashSet<>(dns);
 
     // Use up next 3 DNs for a closed pipeline.
     dns = healthyNodes.subList(3, 6);
     addPipeline(dns, Pipeline.PipelineState.CLOSED,
-        new RatisReplicationConfig(factor));
+        RatisReplicationConfig.getInstance(factor));
     Set<DatanodeDetails> membersOfClosedPipelines = new HashSet<>(dns);
 
     // only 2 healthy DNs left that are not part of any pipeline
     Pipeline pipeline = provider.create(
-        new RatisReplicationConfig(factor));
+        RatisReplicationConfig.getInstance(factor));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
+    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
     nodeManager.addPipeline(pipeline);
-    stateManager.addPipeline(pipeline);
+    stateManager.addPipeline(pipelineProto);
 
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
@@ -223,6 +277,7 @@ public class TestRatisPipelineProvider {
     assertTrue(
         "at least 1 node should have been from members of closed pipelines",
         nodes.stream().anyMatch(membersOfClosedPipelines::contains));
+    cleanup();
   }
 
   @Test
@@ -237,10 +292,10 @@ public class TestRatisPipelineProvider {
     init(1, largeContainerConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       try {
-        provider.create(new RatisReplicationConfig(factor));
+        provider.create(RatisReplicationConfig.getInstance(factor));
         Assert.fail("Expected SCMException for large container size with " +
             "replication factor " + factor.toString());
-      } catch(SCMException ex) {
+      } catch (SCMException ex) {
         Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
@@ -250,13 +305,14 @@ public class TestRatisPipelineProvider {
     init(1, largeMetadataConf);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       try {
-        provider.create(new RatisReplicationConfig(factor));
+        provider.create(RatisReplicationConfig.getInstance(factor));
         Assert.fail("Expected SCMException for large metadata size with " +
             "replication factor " + factor.toString());
-      } catch(SCMException ex) {
+      } catch (SCMException ex) {
         Assert.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
+    cleanup();
   }
 
   private void addPipeline(
@@ -269,8 +325,10 @@ public class TestRatisPipelineProvider {
         .setState(open)
         .setId(PipelineID.randomId())
         .build();
+    HddsProtos.Pipeline pipelineProto = openPipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
 
-    stateManager.addPipeline(openPipeline);
+    stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);
   }
 }

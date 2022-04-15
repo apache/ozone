@@ -25,6 +25,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -65,8 +66,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMAllocateBlockRequest.class);
 
-  public OMAllocateBlockRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMAllocateBlockRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -78,6 +80,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     Preconditions.checkNotNull(allocateBlockRequest);
 
     KeyArgs keyArgs = allocateBlockRequest.getKeyArgs();
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     ExcludeList excludeList = new ExcludeList();
     if (allocateBlockRequest.hasExcludeList()) {
@@ -106,10 +111,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());
 
     // Set modification time and normalize key if required.
-    KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
-        .setModificationTime(Time.now())
-        .setKeyName(validateAndNormalizeKey(
-            ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+    KeyArgs.Builder newKeyArgs =
+        keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()
@@ -184,9 +187,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
 
-      openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
-          keyName, clientID);
-      openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKeyName);
+      openKeyName = omMetadataManager
+          .getOpenKey(volumeName, bucketName, keyName, clientID);
+      openKeyInfo =
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
             KEY_NOT_FOUND);
@@ -213,7 +217,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKeyName),
           new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 
@@ -221,7 +225,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, omBucketInfo.copyObject());
+          openKeyInfo, clientID, omBucketInfo.copyObject(), getBucketLayout());
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
@@ -229,7 +233,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
             "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {

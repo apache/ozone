@@ -157,6 +157,12 @@ public final class RandomKeyGenerator implements Callable<Void> {
   )
   private boolean validateWrites = false;
 
+  @Option(names = {"--num-of-validate-threads", "--numOfValidateThreads"},
+      description = "number of threads to be launched for validating keys." +
+          "Full name --numOfValidateThreads will be removed in later versions.",
+      defaultValue = "1")
+  private int numOfValidateThreads = 1;
+
   @Option(
       names = {"--buffer-size", "--bufferSize"},
       description = "Specifies the buffer size while writing. Full name " +
@@ -231,9 +237,9 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private AtomicInteger numberOfBucketsCleaned;
   private AtomicInteger numberOfVolumesCleaned;
 
-  private Long totalWritesValidated;
-  private Long writeValidationSuccessCount;
-  private Long writeValidationFailureCount;
+  private AtomicLong totalWritesValidated;
+  private AtomicLong writeValidationSuccessCount;
+  private AtomicLong writeValidationFailureCount;
 
   private BlockingQueue<KeyValidate> validationQueue;
   private ArrayList<Histogram> histograms = new ArrayList<>();
@@ -324,20 +330,23 @@ public final class RandomKeyGenerator implements Callable<Void> {
     LOG.info("Key size: {} bytes", keySize);
     LOG.info("Buffer size: {} bytes", bufferSize);
     LOG.info("validateWrites : {}", validateWrites);
+    LOG.info("Number of Validate Threads: {}", numOfValidateThreads);
     LOG.info("cleanObjects : {}", cleanObjects);
     for (int i = 0; i < numOfThreads; i++) {
       executor.execute(new ObjectCreator());
     }
 
-    Thread validator = null;
+    ExecutorService validateExecutor = null;
     if (validateWrites) {
-      totalWritesValidated = 0L;
-      writeValidationSuccessCount = 0L;
-      writeValidationFailureCount = 0L;
+      totalWritesValidated = new AtomicLong();
+      writeValidationSuccessCount = new AtomicLong();
+      writeValidationFailureCount = new AtomicLong();
 
       validationQueue = new LinkedBlockingQueue<>();
-      validator = new Thread(new Validator());
-      validator.start();
+      validateExecutor = Executors.newFixedThreadPool(numOfValidateThreads);
+      for (int i = 0; i < numOfValidateThreads; i++) {
+        validateExecutor.execute(new Validator());
+      }
       LOG.info("Data validation is enabled.");
     }
 
@@ -367,8 +376,17 @@ public final class RandomKeyGenerator implements Callable<Void> {
       progressbar.shutdown();
     }
 
-    if (validator != null) {
-      validator.join();
+    if (validateExecutor != null) {
+      while (!validationQueue.isEmpty()) {
+        try {
+          Thread.sleep(CHECK_INTERVAL_MILLIS);
+        } catch (InterruptedException e) {
+          throw e;
+        }
+      }
+      validateExecutor.shutdown();
+      validateExecutor.awaitTermination(Integer.MAX_VALUE,
+          TimeUnit.MILLISECONDS);
     }
     if (cleanObjects && exception == null) {
       doCleanObjects();
@@ -488,7 +506,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       out.println("Total number of writes validated: " +
           totalWritesValidated);
       out.println("Writes validated: " +
-          (100.0 * totalWritesValidated / numberOfKeysAdded.get())
+          (100.0 * totalWritesValidated.get() / numberOfKeysAdded.get())
           + " %");
       out.println("Successful validation: " +
           writeValidationSuccessCount);
@@ -625,7 +643,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
    */
   @VisibleForTesting
   long getTotalKeysValidated() {
-    return totalWritesValidated;
+    return totalWritesValidated.get();
   }
 
   /**
@@ -635,7 +653,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
    */
   @VisibleForTesting
   long getSuccessfulValidationCount() {
-    return writeValidationSuccessCount;
+    return writeValidationSuccessCount.get();
   }
 
   /**
@@ -645,7 +663,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
    */
   @VisibleForTesting
   long getUnsuccessfulValidationCount() {
-    return validateWrites ? writeValidationFailureCount : 0;
+    return validateWrites ? writeValidationFailureCount.get() : 0;
   }
 
   /**
@@ -1189,11 +1207,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
             OzoneInputStream is = kv.bucket.readKey(kv.keyName);
             dig.getMessageDigest().reset();
             byte[] curDigest = dig.digest(is);
-            totalWritesValidated++;
+            totalWritesValidated.getAndIncrement();
             if (MessageDigest.isEqual(kv.digest, curDigest)) {
-              writeValidationSuccessCount++;
+              writeValidationSuccessCount.getAndIncrement();
             } else {
-              writeValidationFailureCount++;
+              writeValidationFailureCount.getAndIncrement();
               LOG.warn("Data validation error for key {}/{}/{}",
                   kv.bucket.getVolumeName(), kv.bucket, kv.keyName);
               LOG.warn("Expected checksum: {}, Actual checksum: {}",

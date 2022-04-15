@@ -22,6 +22,7 @@ import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
@@ -58,9 +59,13 @@ public class TestDBDefinitionFactory {
     definition = DBDefinitionFactory.getDefinition(
         RECON_CONTAINER_KEY_DB + "_1");
     assertTrue(definition instanceof ReconDBDefinition);
-
+    DBDefinitionFactory.setDnDBSchemaVersion("V2");
     definition =
         DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"));
     assertTrue(definition instanceof DatanodeSchemaTwoDBDefinition);
+    DBDefinitionFactory.setDnDBSchemaVersion("V1");
+    definition =
+        DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"));
+    assertTrue(definition instanceof DatanodeSchemaOneDBDefinition);
   }
 }

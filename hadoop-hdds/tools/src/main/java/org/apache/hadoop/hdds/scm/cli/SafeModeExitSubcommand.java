@@ -42,7 +42,7 @@ public class SafeModeExitSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean execReturn = scmClient.forceExitSafeMode();
-    if(execReturn){
+    if (execReturn) {
       LOG.info("SCM exit safe mode successfully.");
     }
   }

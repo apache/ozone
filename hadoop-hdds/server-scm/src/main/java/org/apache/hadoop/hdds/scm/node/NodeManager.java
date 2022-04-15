@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collection;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -152,6 +153,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed);
 
   /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails DatanodeDetails.
    * @return node stat if it is live/stale, null if it is decommissioned or
@@ -226,6 +235,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                     ContainerID containerId) throws NodeNotFoundException;
 
   /**
+   * Removes the given container from the specified datanode.
+   *
+   * @param datanodeDetails - DatanodeDetails
+   * @param containerId - containerID
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  void removeContainer(DatanodeDetails datanodeDetails,
+      ContainerID containerId) throws NodeNotFoundException;
+
+  /**
    * Remaps datanode to containers mapping to the new set of containers.
    * @param datanodeDetails - DatanodeDetails
    * @param containerIds - Set of containerIDs
@@ -250,6 +270,13 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param command
    */
   void addDatanodeCommand(UUID dnId, SCMCommand command);
+
+
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  void refreshAllHealthyDnUsageInfo();
 
   /**
    * Process node report.
@@ -307,7 +334,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   int minPipelineLimit(List<DatanodeDetails> dn);
 
-  default HDDSLayoutVersionManager getLayoutVersionManager(){
+  /**
+   * Gets the peers in all the pipelines for the particular datnode.
+   * @param dn datanode
+   */
+  default Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
+    return null;
+  }
+
+  default HDDSLayoutVersionManager getLayoutVersionManager() {
     return null;
   }
 

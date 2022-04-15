@@ -20,7 +20,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
-import org.apache.hadoop.hdds.scm.container.ContainerStateManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -67,6 +67,11 @@ public class TestReplicationAnnotation {
       }
 
       @Override
+      public boolean isStopped() {
+        return false;
+      }
+
+      @Override
       public RaftServer.Division getDivision() {
         return null;
       }
@@ -105,10 +110,11 @@ public class TestReplicationAnnotation {
     scmhaInvocationHandler = new SCMHAInvocationHandler(
         RequestType.CONTAINER, null, scmRatisServer);
 
-    ContainerStateManagerV2 proxy =
-        (ContainerStateManagerV2) Proxy.newProxyInstance(
-        SCMHAInvocationHandler.class.getClassLoader(),
-        new Class<?>[]{ContainerStateManagerV2.class}, scmhaInvocationHandler);
+    ContainerStateManager proxy =
+        (ContainerStateManager) Proxy.newProxyInstance(
+            SCMHAInvocationHandler.class.getClassLoader(),
+            new Class<?>[]{ContainerStateManager.class},
+            scmhaInvocationHandler);
 
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
@@ -124,8 +130,9 @@ public class TestReplicationAnnotation {
 
     CertificateStore certificateStore =
         (CertificateStore) Proxy.newProxyInstance(
-        SCMHAInvocationHandler.class.getClassLoader(),
-        new Class<?>[]{CertificateStore.class}, scmhaInvocationHandler);
+            SCMHAInvocationHandler.class.getClassLoader(),
+            new Class<?>[]{CertificateStore.class},
+            scmhaInvocationHandler);
 
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     try {

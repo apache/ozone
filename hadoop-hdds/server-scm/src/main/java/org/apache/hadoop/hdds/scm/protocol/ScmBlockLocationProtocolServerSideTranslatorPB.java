@@ -179,7 +179,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),
-            ReplicationConfig.fromProto(
+            ReplicationConfig.fromProtoTypeAndFactor(
                 request.getType(),
                 request.getFactor()),
             request.getOwner(),

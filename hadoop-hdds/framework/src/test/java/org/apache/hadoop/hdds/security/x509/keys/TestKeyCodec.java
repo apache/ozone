@@ -150,9 +150,10 @@ public class TestKeyCodec {
 
     // Now let us assert the permissions on the Directories and files are as
     // expected.
-    Set<PosixFilePermission> expectedSet = pemWriter.getPermissionSet();
+    Set<PosixFilePermission> expectedSet = pemWriter.getFilePermissionSet();
     Set<PosixFilePermission> currentSet =
         Files.getPosixFilePermissions(privateKeyPath);
+    Assert.assertEquals(expectedSet.size(), currentSet.size());
     currentSet.removeAll(expectedSet);
     Assert.assertEquals(0, currentSet.size());
 
@@ -161,8 +162,10 @@ public class TestKeyCodec {
     currentSet.removeAll(expectedSet);
     Assert.assertEquals(0, currentSet.size());
 
+    expectedSet = pemWriter.getDirPermissionSet();
     currentSet =
         Files.getPosixFilePermissions(keyLocation);
+    Assert.assertEquals(expectedSet.size(), currentSet.size());
     currentSet.removeAll(expectedSet);
     Assert.assertEquals(0, currentSet.size());
   }

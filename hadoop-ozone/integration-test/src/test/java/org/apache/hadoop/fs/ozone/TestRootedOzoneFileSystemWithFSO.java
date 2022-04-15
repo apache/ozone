@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.junit.Assert;
@@ -31,6 +32,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.TimeoutException;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests to verify ofs with prefix enabled cases.
@@ -45,19 +50,20 @@ public class TestRootedOzoneFileSystemWithFSO
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true},
-        new Object[]{true, false});
+        new Object[]{true, true, false},
+        new Object[]{true, false, false}
+    );
   }
 
   public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis) throws Exception {
-    super(setDefaultFs, enableOMRatis);
+      boolean enableOMRatis, boolean enableAcl) {
+    super(setDefaultFs, enableOMRatis, enableAcl);
   }
 
   @BeforeClass
-  public static void init() throws Exception {
+  public static void init()
+      throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
-    TestRootedOzoneFileSystem.init();
   }
 
   @Override
@@ -85,13 +91,6 @@ public class TestRootedOzoneFileSystemWithFSO
   @Test
   @Ignore("HDDS-2939")
   public void testDeleteEmptyVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testMkdirNonExistentVolumeBucket() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
@@ -137,6 +136,25 @@ public class TestRootedOzoneFileSystemWithFSO
     Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
+  @Test
+  public void testRenameDir() throws Exception {
+    final String dir = "dir1";
+    final Path source = new Path(getBucketPath(), dir);
+    final Path dest = new Path(source.toString() + ".renamed");
+    // Add a sub-dir to the directory to be moved.
+    final Path subdir = new Path(source, "sub_dir1");
+    getFs().mkdirs(subdir);
+    LOG.info("Created dir {}", subdir);
+    LOG.info("Will move {} to {}", source, dest);
+    getFs().rename(source, dest);
+    assertTrue("Directory rename failed", getFs().exists(dest));
+    // Verify that the subdir is also renamed i.e. keys corresponding to the
+    // sub-directories of the renamed directory have also been renamed.
+    assertTrue("Keys under the renamed directory not renamed",
+        getFs().exists(new Path(dest, "sub_dir1")));
+    // cleanup
+    getFs().delete(dest, true);
+  }
   /**
    *  Cannot rename a directory to its own subdirectory.
    */
@@ -155,6 +173,52 @@ public class TestRootedOzoneFileSystemWithFSO
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
     //  rename should fail and return false
     Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
+  }
+
+  @Override
+  @Test
+  public void testDeleteVolumeAndBucket() throws IOException {
+    String volumeStr1 = getRandomNonExistVolumeName();
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
+    String bucketStr2 = "bucket3";
+    Path bucketPath2 = new Path(volumePath1, bucketStr2);
+
+    for (int i = 1; i <= 5; i++) {
+      String dirStr1 = "dir1" + i;
+      String dirStr2 = "dir2" + i;
+      String fileStr3 = "file3" + i;
+      Path dirLevel1 = new Path(bucketPath2, dirStr1);
+      Path dirLevel2 = new Path(dirLevel1, dirStr2);
+      getFs().mkdirs(dirLevel2);
+      Path filePath3 = new Path(dirLevel2, fileStr3);
+
+      try (FSDataOutputStream out1 = getFs().create(filePath3)) {
+        out1.write(2);
+      }
+    }
+    // create another top level file
+    Path file16 = new Path(bucketPath2, "file16");
+    try (FSDataOutputStream out1 = getFs().create(file16)) {
+      out1.write(2);
+    }
+
+    /*         bucket
+        _________|_________________________
+        |       |      |     |      |     |
+       dir11   dir12  dir13 dir14 dir15   file16
+        |       |      |      |     |
+       dir21   dir22  dir23 dir24  dir25
+        |       |      |      |     |
+        file31  file32 file33 file34 file35
+
+        Total dirs =10 , files = 6 , keys = 16
+
+     */
+
+    long prevDeletes = getOMMetrics().getNumKeyDeletes();
+    Assert.assertTrue(getFs().delete(volumePath1, true));
+    long deletes = getOMMetrics().getNumKeyDeletes();
+    Assert.assertTrue(deletes == prevDeletes + 1);
   }
 
 }

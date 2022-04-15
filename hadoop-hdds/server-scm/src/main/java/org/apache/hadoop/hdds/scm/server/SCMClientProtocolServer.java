@@ -34,25 +34,30 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
+import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
+import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -70,22 +75,23 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
-import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
-import java.util.ArrayList;
 import java.util.Optional;
-import java.util.TreeSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
@@ -94,8 +100,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_K
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
-
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
 /**
  * The RPC server that listens to requests from clients.
@@ -199,7 +203,7 @@ public class SCMClientProtocolServer implements
 
     final ContainerInfo container = scm.getContainerManager()
         .allocateContainer(
-            ReplicationConfig.fromTypeAndFactor(replicationType, factor),
+            ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
             owner);
     final Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
@@ -222,7 +226,7 @@ public class SCMClientProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_CONTAINER, auditMap)
         );
@@ -258,7 +262,7 @@ public class SCMClientProtocolServer implements
 
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
-          new StandaloneReplicationConfig(ReplicationConfig
+          StandaloneReplicationConfig.getInstance(ReplicationConfig
               .getLegacyFactor(container.getReplicationConfig())),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
@@ -288,6 +292,28 @@ public class SCMClientProtocolServer implements
               ContainerID.valueOf(containerID).toString()), ex));
       throw ex;
     }
+  }
+
+  @Override
+  public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId, int clientVersion) throws IOException {
+    List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
+
+    Set<ContainerReplica> replicas = getScm().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerId));
+    for (ContainerReplica r : replicas) {
+      results.add(
+          HddsProtos.SCMContainerReplicaProto.newBuilder()
+              .setContainerID(containerId)
+              .setState(r.getState().toString())
+              .setDatanodeDetails(r.getDatanodeDetails().toProto(clientVersion))
+              .setBytesUsed(r.getBytesUsed())
+              .setPlaceOfBirth(r.getOriginDatanodeId().toString())
+              .setKeyCount(r.getKeyCount())
+              .setSequenceID(r.getSequenceId()).build()
+      );
+    }
+    return results;
   }
 
   @Override
@@ -341,7 +367,7 @@ public class SCMClientProtocolServer implements
    * replication factor.
    */
   private boolean hasRequiredReplicas(ContainerInfo contInfo) {
-    try{
+    try {
       return getScm().getContainerManager()
           .getContainerReplicas(contInfo.containerID())
           .size() >= contInfo.getReplicationConfig().getRequiredNodes();
@@ -364,7 +390,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count) throws IOException {
-    return listContainer(startContainerID, count, null);
+    return listContainer(startContainerID, count, null, null);
   }
 
   /**
@@ -380,6 +406,23 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
+    return listContainer(startContainerID, count, state, null);
+  }
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
+   * @param factor Container factor.
+   * @return a list of pipeline.
+   * @throws IOException
+   */
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationFactor factor) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -387,21 +430,39 @@ public class SCMClientProtocolServer implements
     if (state != null) {
       auditMap.put("state", state.name());
     }
+    if (factor != null) {
+      auditMap.put("factor", factor.name());
+    }
     try {
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
-      if(null == state) {
-        return scm.getContainerManager().getContainers(containerId, count);
+      if (state != null) {
+        if (factor != null) {
+          return scm.getContainerManager().getContainers(state).stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .filter(info -> (info.getReplicationFactor() == factor))
+              .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(state).stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .sorted().limit(count).collect(Collectors.toList());
+        }
+      } else {
+        if (factor != null) {
+          return scm.getContainerManager().getContainers().stream()
+              .filter(info -> info.containerID().getId() >= startContainerID)
+              .filter(info -> info.getReplicationFactor() == factor)
+              .sorted().limit(count).collect(Collectors.toList());
+        } else {
+          return scm.getContainerManager().getContainers(containerId, count);
+        }
       }
-      return scm.getContainerManager().getContainers(state).stream()
-          .filter(info -> info.containerID().getId() >= startContainerID)
-          .sorted().limit(count).collect(Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(SCMAction.LIST_CONTAINER, auditMap, ex));
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.LIST_CONTAINER, auditMap));
       }
@@ -426,7 +487,7 @@ public class SCMClientProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.DELETE_CONTAINER, auditMap)
         );
@@ -529,7 +590,7 @@ public class SCMClientProtocolServer implements
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
     Pipeline result = scm.getPipelineManager()
-        .createPipeline(ReplicationConfig.fromTypeAndFactor(type, factor));
+        .createPipeline(ReplicationConfig.fromProtoTypeAndFactor(type, factor));
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.CREATE_PIPELINE, null));
     return result;
@@ -586,7 +647,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ScmInfo getScmInfo() throws IOException {
     boolean auditSuccess = true;
-    try{
+    try {
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
@@ -610,7 +671,7 @@ public class SCMClientProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
@@ -677,6 +738,15 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public ReplicationManagerReport getReplicationManagerReport()
+      throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
+    return scm.getReplicationManager().getContainerReport();
+  }
+
+  @Override
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
       IOException {
     // check admin authorization
@@ -709,47 +779,79 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public boolean startContainerBalancer(Optional<Double> threshold,
-                  Optional<Integer> idleiterations,
-                  Optional<Integer> maxDatanodesToBalance,
-                  Optional<Long> maxSizeToMoveInGB) throws IOException{
+  public StartContainerBalancerResponseProto startContainerBalancer(
+      Optional<Double> threshold, Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTarget,
+      Optional<Long> maxSizeLeavingSource) throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
-    ContainerBalancerConfiguration cbc = new ContainerBalancerConfiguration();
+    ContainerBalancerConfiguration cbc =
+        scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     if (threshold.isPresent()) {
       double tsd = threshold.get();
-      Preconditions.checkState(tsd >= 0.0D && tsd < 1.0D,
-          "threshold should to be specified in range [0.0, 1.0).");
+      Preconditions.checkState(tsd >= 0.0D && tsd < 100.0D,
+          "threshold should be specified in range [0.0, 100.0).");
       cbc.setThreshold(tsd);
     }
-    if (maxSizeToMoveInGB.isPresent()) {
-      long mstm = maxSizeToMoveInGB.get();
+    if (maxSizeToMovePerIterationInGB.isPresent()) {
+      long mstm = maxSizeToMovePerIterationInGB.get();
       Preconditions.checkState(mstm > 0,
-          "maxSizeToMoveInGB must be positive.");
-      cbc.setMaxSizeToMove(mstm * OzoneConsts.GB);
+          "maxSizeToMovePerIterationInGB must be positive.");
+      cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
     }
-    if (maxDatanodesToBalance.isPresent()) {
-      int mdtb = maxDatanodesToBalance.get();
-      Preconditions.checkState(mdtb > 0,
-          "maxDatanodesToBalance must be positive.");
-      cbc.setMaxDatanodesToBalance(mdtb);
+    if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
+      int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
+      Preconditions.checkState(mdti >= 0,
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
+              "greater than equal to zero.");
+      Preconditions.checkState(mdti <= 100,
+          "maxDatanodesPercentageToInvolvePerIteration must be " +
+              "lesser than or equal to 100.");
+      cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
     }
-    if (idleiterations.isPresent()) {
-      int idi = idleiterations.get();
-      Preconditions.checkState(idi > 0 || idi == -1,
-          "idleiterations must be positive or" +
-              " -1(infinitly run container balancer).");
-      cbc.setIdleIteration(idi);
+    if (iterations.isPresent()) {
+      int i = iterations.get();
+      Preconditions.checkState(i > 0 || i == -1,
+          "number of iterations must be positive or" +
+              " -1 (for running container balancer infinitely).");
+      cbc.setIterations(i);
     }
 
-    boolean isStartedSuccessfully = scm.getContainerBalancer().start(cbc);
-    if (isStartedSuccessfully) {
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.START_CONTAINER_BALANCER, null));
-    } else {
-      AUDIT.logWriteFailure(buildAuditMessageForSuccess(
-          SCMAction.START_CONTAINER_BALANCER, null));
+    if (maxSizeEnteringTarget.isPresent()) {
+      long mset = maxSizeEnteringTarget.get();
+      Preconditions.checkState(mset > 0,
+          "maxSizeEnteringTarget must be " +
+              "greater than zero.");
+      cbc.setMaxSizeEnteringTarget(mset * OzoneConsts.GB);
     }
-    return  isStartedSuccessfully;
+
+    if (maxSizeLeavingSource.isPresent()) {
+      long msls = maxSizeLeavingSource.get();
+      Preconditions.checkState(msls > 0,
+          "maxSizeLeavingSource must be " +
+              "greater than zero.");
+      cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
+    }
+
+    ContainerBalancer containerBalancer = scm.getContainerBalancer();
+    containerBalancer.setConfig(cbc);
+    try {
+      containerBalancer.startBalancer();
+    } catch (IllegalContainerBalancerStateException |
+        InvalidContainerBalancerConfigurationException e) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.START_CONTAINER_BALANCER, null, e));
+      return StartContainerBalancerResponseProto.newBuilder()
+          .setStart(false)
+          .setMessage(e.getMessage())
+          .build();
+    }
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.START_CONTAINER_BALANCER, null));
+    return StartContainerBalancerResponseProto.newBuilder()
+        .setStart(true)
+        .build();
   }
 
   @Override
@@ -757,7 +859,7 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_CONTAINER_BALANCER, null));
-    scm.getContainerBalancer().stop();
+    scm.getContainerBalancer().stopBalancer();
   }
 
   @Override
@@ -779,7 +881,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
+      String ipaddress, String uuid, int clientVersion) throws IOException {
 
     // check admin authorisation
     try {
@@ -804,7 +906,7 @@ public class SCMClientProtocolServer implements
     // get datanode usage info
     List<HddsProtos.DatanodeUsageInfoProto> infoList = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
-      infoList.add(getUsageInfoFromDatanodeDetails(node));
+      infoList.add(getUsageInfoFromDatanodeDetails(node, clientVersion));
     }
 
     return infoList;
@@ -817,7 +919,7 @@ public class SCMClientProtocolServer implements
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
-      DatanodeDetails node) {
+      DatanodeDetails node, int clientVersion) {
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
 
     long capacity = stat.getCapacity().get();
@@ -828,7 +930,7 @@ public class SCMClientProtocolServer implements
         .setCapacity(capacity)
         .setUsed(used)
         .setRemaining(remaining)
-        .setNode(node.toProto(node.getCurrentVersion()))
+        .setNode(node.toProto(clientVersion))
         .build();
   }
 
@@ -846,7 +948,8 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count) throws IOException, IllegalArgumentException{
+      boolean mostUsed, int count, int clientVersion)
+      throws IOException, IllegalArgumentException {
 
     // check admin authorisation
     try {
@@ -872,7 +975,7 @@ public class SCMClientProtocolServer implements
 
     // return count number of DatanodeUsageInfoProto
     return datanodeUsageInfoList.stream()
-        .map(DatanodeUsageInfo::toProto)
+        .map(each -> each.toProto(clientVersion))
         .limit(count)
         .collect(Collectors.toList());
   }
@@ -885,6 +988,11 @@ public class SCMClientProtocolServer implements
 
     return scm.getContainerTokenGenerator()
         .generateToken(remoteUser.getUserName(), containerID);
+  }
+
+  @Override
+  public long getContainerCount() throws IOException {
+    return scm.getContainerManager().getContainers().size();
   }
 
   /**

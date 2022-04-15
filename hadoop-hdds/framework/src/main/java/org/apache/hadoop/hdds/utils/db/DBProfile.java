@@ -48,25 +48,13 @@ public enum DBProfile {
 
     @Override
     public ColumnFamilyOptions getColumnFamilyOptions() {
-
-      // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
-      final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
-
-      // Set the Default block size to 16KB
-      final long blockSize = toLong(StorageUnit.KB.toBytes(16));
-
       // Write Buffer Size -- set to 128 MB
       final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
 
       return new ColumnFamilyOptions()
           .setLevelCompactionDynamicLevelBytes(true)
           .setWriteBufferSize(writeBufferSize)
-          .setTableFormatConfig(
-              new BlockBasedTableConfig()
-                  .setBlockCache(new LRUCache(blockCacheSize))
-                  .setBlockSize(blockSize)
-                  .setPinL0FilterAndIndexBlocksInCache(true)
-                  .setFilterPolicy(new BloomFilter()));
+          .setTableFormatConfig(getBlockBasedTableConfig());
     }
 
     @Override
@@ -85,6 +73,20 @@ public enum DBProfile {
           .setCreateMissingColumnFamilies(createMissingColumnFamilies);
     }
 
+    @Override
+    public BlockBasedTableConfig getBlockBasedTableConfig() {
+      // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
+      final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
+
+      // Set the Default block size to 16KB
+      final long blockSize = toLong(StorageUnit.KB.toBytes(16));
+
+      return new BlockBasedTableConfig()
+          .setBlockCache(new LRUCache(blockCacheSize))
+          .setBlockSize(blockSize)
+          .setPinL0FilterAndIndexBlocksInCache(true)
+          .setFilterPolicy(new BloomFilter());
+    }
 
   },
   DISK {
@@ -106,7 +108,10 @@ public enum DBProfile {
       return columnFamilyOptions;
     }
 
-
+    @Override
+    public BlockBasedTableConfig getBlockBasedTableConfig() {
+      return SSD.getBlockBasedTableConfig();
+    }
   };
 
   private static long toLong(double value) {
@@ -117,4 +122,6 @@ public enum DBProfile {
   public abstract DBOptions getDBOptions();
 
   public abstract ColumnFamilyOptions getColumnFamilyOptions();
+
+  public abstract BlockBasedTableConfig getBlockBasedTableConfig();
 }

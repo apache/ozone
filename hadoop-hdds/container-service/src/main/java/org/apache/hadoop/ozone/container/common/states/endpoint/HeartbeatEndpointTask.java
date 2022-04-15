@@ -24,6 +24,7 @@ import com.google.protobuf.GeneratedMessage;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -54,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
@@ -64,6 +66,7 @@ import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys
@@ -171,6 +174,7 @@ public class HeartbeatEndpointTask
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
+      addQueuedCommandCounts(requestBuilder);
       SCMHeartbeatRequestProto request = requestBuilder.build();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Sending heartbeat message :: {}", request.toString());
@@ -266,6 +270,24 @@ public class HeartbeatEndpointTask
   }
 
   /**
+   * Adds the count of all queued commands to the heartbeat.
+   * @param requestBuilder Builder to which the details will be added.
+   */
+  private void addQueuedCommandCounts(
+      SCMHeartbeatRequestProto.Builder requestBuilder) {
+    Map<SCMCommandProto.Type, Integer> commandCount =
+        context.getParent().getQueuedCommandCount();
+    CommandQueueReportProto.Builder reportProto =
+        CommandQueueReportProto.newBuilder();
+    for (Map.Entry<SCMCommandProto.Type, Integer> entry
+        : commandCount.entrySet()) {
+      reportProto.addCommand(entry.getKey())
+          .addCount(entry.getValue());
+    }
+    requestBuilder.setQueuedCommandReport(reportProto.build());
+  }
+
+  /**
    * Returns a builder class for HeartbeatEndpointTask task.
    * @return   Builder.
    */
@@ -284,8 +306,7 @@ public class HeartbeatEndpointTask
             .equalsIgnoreCase(datanodeDetails.getUuid()),
         "Unexpected datanode ID in the response.");
     // Verify the response is indeed for this datanode.
-    for (SCMCommandProto commandResponseProto : response
-        .getCommandsList()) {
+    for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
       switch (commandResponseProto.getCommandType()) {
       case reregisterCommand:
         if (rpcEndpoint.getState() == EndPointStates.HEARTBEAT) {
@@ -302,19 +323,19 @@ public class HeartbeatEndpointTask
         }
         break;
       case deleteBlocksCommand:
-        DeleteBlocksCommand db = DeleteBlocksCommand
+        DeleteBlocksCommand deleteBlocksCommand = DeleteBlocksCommand
             .getFromProtobuf(
                 commandResponseProto.getDeleteBlocksCommandProto());
         if (commandResponseProto.hasTerm()) {
-          db.setTerm(commandResponseProto.getTerm());
+          deleteBlocksCommand.setTerm(commandResponseProto.getTerm());
         }
-        if (!db.blocksTobeDeleted().isEmpty()) {
+        if (!deleteBlocksCommand.blocksTobeDeleted().isEmpty()) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(DeletedContainerBlocksSummary
-                .getFrom(db.blocksTobeDeleted())
+                .getFrom(deleteBlocksCommand.blocksTobeDeleted())
                 .toString());
           }
-          this.context.addCommand(db);
+          this.context.addCommand(deleteBlocksCommand);
         }
         break;
       case closeContainerCommand:
@@ -414,6 +435,15 @@ public class HeartbeatEndpointTask
               finalizeNewLayoutVersionCommand.getId());
         }
         this.context.addCommand(finalizeNewLayoutVersionCommand);
+        break;
+      case refreshVolumeUsageInfo:
+        RefreshVolumeUsageCommand refreshVolumeUsageCommand =
+            RefreshVolumeUsageCommand.getFromProtobuf(
+            commandResponseProto.getRefreshVolumeUsageCommandProto());
+        if (commandResponseProto.hasTerm()) {
+          refreshVolumeUsageCommand.setTerm(commandResponseProto.getTerm());
+        }
+        this.context.addCommand(refreshVolumeUsageCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "

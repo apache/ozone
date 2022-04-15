@@ -67,6 +67,7 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 
 /**
@@ -94,7 +95,6 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("marker") String marker,
       @DefaultValue("1000") @QueryParam("max-keys") int maxKeys,
       @QueryParam("prefix") String prefix,
-      @QueryParam("browser") String browser,
       @QueryParam("continuation-token") String continueToken,
       @QueryParam("start-after") String startAfter,
       @QueryParam("uploads") String uploads,
@@ -103,16 +103,8 @@ public class BucketEndpoint extends EndpointBase {
 
     if (aclMarker != null) {
       S3BucketAcl result = getAcl(bucketName);
+      getMetrics().incGetAclSuccess();
       return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
-    }
-
-    if (browser != null) {
-      InputStream browserPage = getClass()
-          .getResourceAsStream("/browser.html");
-      return Response.ok(browserPage,
-            MediaType.TEXT_HTML_TYPE)
-            .build();
-
     }
 
     if (uploads != null) {
@@ -123,7 +115,6 @@ public class BucketEndpoint extends EndpointBase {
       prefix = "";
     }
 
-    OzoneBucket bucket = getBucket(bucketName);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator;
 
@@ -135,6 +126,7 @@ public class BucketEndpoint extends EndpointBase {
       startAfter = marker;
     }
     try {
+      OzoneBucket bucket = getBucket(bucketName);
       if (startAfter != null && continueToken != null) {
         // If continuation token and start after both are provided, then we
         // ignore start After
@@ -147,11 +139,15 @@ public class BucketEndpoint extends EndpointBase {
         ozoneKeyIterator = bucket.listKeys(prefix);
       }
     } catch (OMException ex) {
+      getMetrics().incGetBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         throw ex;
       }
+    } catch (OS3Exception ex) {
+      getMetrics().incGetBucketFailure();
+      throw ex;
     }
 
     ListObjectResponse response = new ListObjectResponse();
@@ -212,7 +208,7 @@ public class BucketEndpoint extends EndpointBase {
 
     if (count < maxKeys) {
       response.setTruncated(false);
-    } else if(ozoneKeyIterator.hasNext()) {
+    } else if (ozoneKeyIterator.hasNext()) {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
@@ -222,6 +218,7 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(false);
     }
 
+    getMetrics().incGetBucketSuccess();
     response.setKeyCount(
         response.getCommonPrefixes().size() + response.getContents().size());
     return Response.ok(response).build();
@@ -229,24 +226,25 @@ public class BucketEndpoint extends EndpointBase {
 
   @PUT
   public Response put(@PathParam("bucket") String bucketName,
-      @QueryParam("acl") String aclMarker,
-      @Context HttpHeaders httpHeaders,
-      InputStream body) throws IOException, OS3Exception {
+                      @QueryParam("acl") String aclMarker,
+                      @Context HttpHeaders httpHeaders,
+                      InputStream body) throws IOException, OS3Exception {
     if (aclMarker != null) {
       return putAcl(bucketName, httpHeaders, body);
     }
     try {
       String location = createS3Bucket(bucketName);
       LOG.info("Location is {}", location);
+      getMetrics().incCreateBucketSuccess();
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
     } catch (OMException exception) {
+      getMetrics().incCreateBucketFailure();
+      if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
+        throw newError(S3ErrorTable.INVALID_BUCKET_NAME, bucketName, exception);
+      }
       LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
           exception);
-      if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_BUCKET_NAME,
-            bucketName);
-      }
       throw exception;
     }
   }
@@ -262,9 +260,9 @@ public class BucketEndpoint extends EndpointBase {
     try {
       ozoneMultipartUploadList = bucket.listMultipartUploads(prefix);
     } catch (OMException exception) {
+      getMetrics().incListMultipartUploadsFailure();
       if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
-            prefix);
+        throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
     }
@@ -280,8 +278,10 @@ public class BucketEndpoint extends EndpointBase {
             S3StorageType.fromReplicationType(upload.getReplicationType(),
                 upload.getReplicationFactor())
         )));
+    getMetrics().incListMultipartUploadsSuccess();
     return Response.ok(result).build();
   }
+
   /**
    * Rest endpoint to check the existence of a bucket.
    * <p>
@@ -291,12 +291,8 @@ public class BucketEndpoint extends EndpointBase {
   @HEAD
   public Response head(@PathParam("bucket") String bucketName)
       throws OS3Exception, IOException {
-    try {
-      getBucket(bucketName);
-    } catch (OS3Exception ex) {
-      LOG.error("Exception occurred in headBucket", ex);
-      throw ex;
-    }
+    getBucket(bucketName);
+    getMetrics().incHeadBucketSuccess();
     return Response.ok().build();
   }
 
@@ -313,19 +309,19 @@ public class BucketEndpoint extends EndpointBase {
     try {
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
+      getMetrics().incDeleteBucketFailure();
       if (ex.getResult() == ResultCodes.BUCKET_NOT_EMPTY) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .BUCKET_NOT_EMPTY, bucketName);
+        throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .NO_SUCH_BUCKET, bucketName);
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         throw ex;
       }
     }
 
+    getMetrics().incDeleteBucketSuccess();
     return Response
         .status(HttpStatus.SC_NO_CONTENT)
         .build();
@@ -341,8 +337,9 @@ public class BucketEndpoint extends EndpointBase {
   @POST
   @Produces(MediaType.APPLICATION_XML)
   public MultiDeleteResponse multiDelete(@PathParam("bucket") String bucketName,
-      @QueryParam("delete") String delete,
-      MultiDeleteRequest request) throws OS3Exception, IOException {
+                                         @QueryParam("delete") String delete,
+                                         MultiDeleteRequest request)
+      throws OS3Exception, IOException {
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     if (request.getObjects() != null) {
@@ -406,16 +403,18 @@ public class BucketEndpoint extends EndpointBase {
           new S3BucketAcl.AccessControlList(grantList));
       return result;
     } catch (OMException ex) {
+      getMetrics().incGetAclFailure();
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .NO_SUCH_BUCKET, bucketName);
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .ACCESS_DENIED, bucketName);
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         LOG.error("Failed to get acl of Bucket " + bucketName, ex);
-        throw S3ErrorTable.newError(S3ErrorTable.INTERNAL_ERROR, bucketName);
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       }
+    } catch (OS3Exception ex) {
+      getMetrics().incGetAclFailure();
+      throw ex;
     }
   }
 
@@ -425,7 +424,7 @@ public class BucketEndpoint extends EndpointBase {
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
   public Response putAcl(String bucketName, HttpHeaders httpHeaders,
-      InputStream body) throws IOException, OS3Exception {
+                         InputStream body) throws IOException, OS3Exception {
     String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
     String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
     String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);
@@ -443,7 +442,7 @@ public class BucketEndpoint extends EndpointBase {
           && grantWriteACP == null && grantFull == null) {
         S3BucketAcl putBucketAclRequest =
             new PutBucketAclRequestUnmarshaller().readFrom(
-            null, null, null, null, null, body);
+                null, null, null, null, null, body);
         // Handle grants in body
         ozoneAclListOnBucket.addAll(
             S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
@@ -483,7 +482,6 @@ public class BucketEndpoint extends EndpointBase {
               S3Acl.ACLType.FULL_CONTROL.getValue()));
         }
       }
-
       // A put request will reset all previous ACLs on bucket
       bucket.setAcl(ozoneAclListOnBucket);
       // A put request will reset input user/group's permission on volume
@@ -503,46 +501,50 @@ public class BucketEndpoint extends EndpointBase {
         }
       }
       // Add new permission on Volume
-      for(OzoneAcl acl : ozoneAclListOnVolume) {
+      for (OzoneAcl acl : ozoneAclListOnVolume) {
         volume.addAcl(acl);
       }
     } catch (OMException exception) {
+      getMetrics().incPutAclFailure();
+      if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
+      } else if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, exception);
+      }
       LOG.error("Error in set ACL Request for bucket: {}", bucketName,
           exception);
-      if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET,
-            bucketName);
-      } else if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw S3ErrorTable.newError(S3ErrorTable
-            .ACCESS_DENIED, bucketName);
-      }
       throw exception;
+    } catch (OS3Exception ex) {
+      getMetrics().incPutAclFailure();
+      throw ex;
     }
+    getMetrics().incPutAclSuccess();
     return Response.status(HttpStatus.SC_OK).build();
   }
 
   /**
-   *  Example: x-amz-grant-write: \
-   *  uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
-   *  id="555566667777".
+   * Example: x-amz-grant-write: \
+   * uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
+   * id="555566667777".
    */
   private List<OzoneAcl> getAndConvertAclOnBucket(String value,
-      String permission) throws OS3Exception {
+                                                  String permission)
+      throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;
     }
     String[] subValues = value.split(",");
-    for (String acl: subValues) {
+    for (String acl : subValues) {
       String[] part = acl.split("=");
       if (part.length != 2) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, acl);
+        throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
       }
       S3Acl.ACLIdentityType type =
           S3Acl.ACLIdentityType.getTypeFromHeaderType(part[0]);
       if (type == null || !type.isSupported()) {
         LOG.warn("S3 grantee {} is null or not supported", part[0]);
-        throw S3ErrorTable.newError(NOT_IMPLEMENTED, part[0]);
+        throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Bucket
       BitSet aclsOnBucket =
@@ -560,22 +562,23 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   private List<OzoneAcl> getAndConvertAclOnVolume(String value,
-      String permission) throws OS3Exception {
+                                                  String permission)
+      throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;
     }
     String[] subValues = value.split(",");
-    for (String acl: subValues) {
+    for (String acl : subValues) {
       String[] part = acl.split("=");
       if (part.length != 2) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, acl);
+        throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
       }
       S3Acl.ACLIdentityType type =
           S3Acl.ACLIdentityType.getTypeFromHeaderType(part[0]);
       if (type == null || !type.isSupported()) {
         LOG.warn("S3 grantee {} is null or not supported", part[0]);
-        throw S3ErrorTable.newError(NOT_IMPLEMENTED, part[0]);
+        throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Volume
       BitSet aclsOnVolume =
@@ -601,5 +604,10 @@ public class BucketEndpoint extends EndpointBase {
     }
     keyMetadata.setLastModified(next.getModificationTime());
     response.addKey(keyMetadata);
+  }
+
+  @Override
+  public void init() {
+
   }
 }

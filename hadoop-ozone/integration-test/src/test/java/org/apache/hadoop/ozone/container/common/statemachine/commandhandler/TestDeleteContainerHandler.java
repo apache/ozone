@@ -87,6 +87,7 @@ public class TestDeleteContainerHandler {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 30000);
 
     OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
@@ -243,7 +244,7 @@ public class TestDeleteContainerHandler {
   private void createKey(String keyName) throws IOException {
     OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
-        .createKey(keyName, 1024, ReplicationType.STAND_ALONE,
+        .createKey(keyName, 1024, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
     key.write("test".getBytes(UTF_8));
     key.close();
@@ -259,7 +260,7 @@ public class TestDeleteContainerHandler {
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();
@@ -281,7 +282,7 @@ public class TestDeleteContainerHandler {
   private Boolean isContainerClosed(HddsDatanodeService hddsDatanodeService,
       long containerID) {
     ContainerData containerData;
-    containerData =hddsDatanodeService
+    containerData = hddsDatanodeService
         .getDatanodeStateMachine().getContainer().getContainerSet()
         .getContainer(containerID).getContainerData();
     return !containerData.isOpen();

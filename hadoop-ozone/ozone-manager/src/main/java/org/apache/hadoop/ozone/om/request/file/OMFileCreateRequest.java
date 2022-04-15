@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -75,8 +76,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileCreateRequest.class);
-  public OMFileCreateRequest(OMRequest omRequest) {
-    super(omRequest);
+
+  public OMFileCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -90,7 +92,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if(checkKeyNameEnabled){
+    if (checkKeyNameEnabled) {
       OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
     }
@@ -219,12 +221,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
-      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(ozoneKey);
-
-      if (dbKeyInfo != null) {
-        ozoneManager.getKeyManager().refresh(dbKeyInfo);
-      }
 
       OMFileRequest.OMPathInfo pathInfo =
           OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
@@ -276,7 +274,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
@@ -293,7 +291,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
       numMissingParents = missingParentInfos.size();
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()))
+          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+              keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(CreateFile);
@@ -307,7 +306,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
-            omResponse, exception));
+            omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -386,5 +385,4 @@ public class OMFileCreateRequest extends OMKeyRequest {
           OMException.ResultCodes.DIRECTORY_NOT_FOUND);
     }
   }
-
 }

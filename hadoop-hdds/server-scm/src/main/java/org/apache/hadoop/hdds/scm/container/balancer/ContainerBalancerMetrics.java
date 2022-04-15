@@ -19,9 +19,11 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
 /**
  * Metrics related to Container Balancer running in SCM.
@@ -29,102 +31,167 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 @Metrics(name = "ContainerBalancer Metrics", about = "Metrics related to " +
     "Container Balancer running in SCM", context = "SCM")
 public final class ContainerBalancerMetrics {
+  public static final String NAME =
+      ContainerBalancerMetrics.class.getSimpleName();
 
-  @Metric(about = "The total amount of used space in GigaBytes that needs to " +
-      "be balanced.")
-  private LongMetric dataSizeToBalanceGB;
+  private final MetricsSystem ms;
 
-  @Metric(about = "The amount of Giga Bytes that have been moved to achieve " +
-      "balance.")
-  private LongMetric dataSizeBalancedGB;
+  @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
+      " in the latest iteration.")
+  private MutableCounterLong dataSizeMovedGBInLatestIteration;
 
-  @Metric(about = "Number of containers that Container Balancer has moved" +
-      " until now.")
-  private LongMetric movedContainersNum;
+  @Metric(about = "Number of container moves performed by Container Balancer " +
+      "in the latest iteration.")
+  private MutableCounterLong numContainerMovesInLatestIteration;
 
-  @Metric(about = "The total number of datanodes that need to be balanced.")
-  private LongMetric datanodesNumToBalance;
+  @Metric(about = "Number of iterations that Container Balancer has run for.")
+  private MutableCounterLong numIterations;
 
-  @Metric(about = "Number of datanodes that Container Balancer has balanced " +
-      "until now.")
-  private LongMetric datanodesNumBalanced;
+  @Metric(about = "Number of datanodes that were involved in balancing in the" +
+      " latest iteration.")
+  private MutableCounterLong numDatanodesInvolvedInLatestIteration;
 
-  @Metric(about = "Utilisation value of the current maximum utilised datanode.")
-  private double maxDatanodeUtilizedRatio;
+  @Metric(about = "Amount of data in Gigabytes that is causing unbalance.")
+  private MutableCounterLong dataSizeUnbalancedGB;
 
-  /**
-   * Initialise metrics for ContainerBalancer.
-   */
-  public ContainerBalancerMetrics() {
-    dataSizeToBalanceGB = new LongMetric(0L);
-    dataSizeBalancedGB = new LongMetric(0L);
-    movedContainersNum = new LongMetric(0L);
-    datanodesNumToBalance = new LongMetric(0L);
-    datanodesNumBalanced = new LongMetric(0L);
-    maxDatanodeUtilizedRatio = 0D;
-  }
+  @Metric(about = "Number of unbalanced datanodes.")
+  private MutableCounterLong numDatanodesUnbalanced;
 
-  public LongMetric getDataSizeToBalanceGB() {
-    return dataSizeToBalanceGB;
-  }
+  @Metric(about = "Total number of container moves across all iterations of " +
+      "Container Balancer.")
+  private MutableCounterLong numContainerMoves;
 
-  public void setDataSizeToBalanceGB(long size) {
-    this.dataSizeToBalanceGB = new LongMetric(size);
-  }
-
-  public LongMetric getDataSizeBalancedGB() {
-    return dataSizeBalancedGB;
-  }
-
-  public void setDataSizeBalancedGB(
-      LongMetric dataSizeBalancedGB) {
-    this.dataSizeBalancedGB = dataSizeBalancedGB;
-  }
-
-  public LongMetric getMovedContainersNum() {
-    return movedContainersNum;
-  }
-
-  public void setMovedContainersNum(
-      LongMetric movedContainersNum) {
-    this.movedContainersNum = movedContainersNum;
-  }
-
-  public LongMetric getDatanodesNumToBalance() {
-    return datanodesNumToBalance;
-  }
-
-  public void setDatanodesNumToBalance(
-      LongMetric datanodesNumToBalance) {
-    this.datanodesNumToBalance = datanodesNumToBalance;
-  }
-
-  public LongMetric getDatanodesNumBalanced() {
-    return datanodesNumBalanced;
-  }
-
-  public void setDatanodesNumBalanced(
-      LongMetric datanodesNumBalanced) {
-    this.datanodesNumBalanced = datanodesNumBalanced;
-  }
+  @Metric(about = "Total data size in GB moved across all iterations of " +
+      "Container Balancer.")
+  private MutableCounterLong dataSizeMovedGB;
 
   /**
-   * Add specified valueToAdd to datanodesNumBalanced.
+   * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
+   * for {@link ContainerBalancer}.
    *
-   * @param valueToAdd The value to add.
-   * @return The result after addition.
+   * @return {@link ContainerBalancerMetrics}
    */
-  public long incrementDatanodesNumBalanced(long valueToAdd) {
-    datanodesNumBalanced.add(valueToAdd);
-    return datanodesNumBalanced.get();
+  public static ContainerBalancerMetrics create() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(NAME, "Container Balancer Metrics",
+        new ContainerBalancerMetrics(ms));
   }
 
-  public double getMaxDatanodeUtilizedRatio() {
-    return maxDatanodeUtilizedRatio;
+  private ContainerBalancerMetrics(MetricsSystem ms) {
+    this.ms = ms;
   }
 
-  public void setMaxDatanodeUtilizedRatio(
-      double maxDatanodeUtilizedRatio) {
-    this.maxDatanodeUtilizedRatio = maxDatanodeUtilizedRatio;
+  /**
+   * Gets the amount of data moved by Container Balancer in the latest
+   * iteration.
+   * @return size in GB
+   */
+  public long getDataSizeMovedGBInLatestIteration() {
+    return dataSizeMovedGBInLatestIteration.value();
+  }
+
+  public void incrementDataSizeMovedGBInLatestIteration(long valueToAdd) {
+    this.dataSizeMovedGBInLatestIteration.incr(valueToAdd);
+  }
+
+  public void resetDataSizeMovedGBInLatestIteration() {
+    dataSizeMovedGBInLatestIteration.incr(
+        -getDataSizeMovedGBInLatestIteration());
+  }
+
+  /**
+   * Gets the number of container moves performed by Container Balancer in the
+   * latest iteration.
+   * @return number of container moves
+   */
+  public long getNumContainerMovesInLatestIteration() {
+    return numContainerMovesInLatestIteration.value();
+  }
+
+  public void incrementNumContainerMovesInLatestIteration(long valueToAdd) {
+    this.numContainerMovesInLatestIteration.incr(valueToAdd);
+  }
+
+  public void resetNumContainerMovesInLatestIteration() {
+    numContainerMovesInLatestIteration.incr(
+        -getNumContainerMovesInLatestIteration());
+  }
+
+  /**
+   * Gets the number of iterations that Container Balancer has run for.
+   * @return number of iterations
+   */
+  public long getNumIterations() {
+    return numIterations.value();
+  }
+
+  public void incrementNumIterations(long valueToAdd) {
+    numIterations.incr(valueToAdd);
+  }
+
+  /**
+   * Gets number of datanodes that were involved in balancing in the latest
+   * iteration.
+   * @return number of datanodes
+   */
+  public long getNumDatanodesInvolvedInLatestIteration() {
+    return numDatanodesInvolvedInLatestIteration.value();
+  }
+
+  public void incrementNumDatanodesInvolvedInLatestIteration(long valueToAdd) {
+    numDatanodesInvolvedInLatestIteration.incr(valueToAdd);
+  }
+
+  public void resetNumDatanodesInvolvedInLatestIteration() {
+    numDatanodesInvolvedInLatestIteration.incr(
+        -getNumDatanodesInvolvedInLatestIteration());
+  }
+
+  /**
+   * Gets the amount of data in Gigabytes that is causing unbalance.
+   * @return size of data as a long value
+   */
+  public long getDataSizeUnbalancedGB() {
+    return dataSizeUnbalancedGB.value();
+  }
+
+  public void incrementDataSizeUnbalancedGB(long valueToAdd) {
+    dataSizeUnbalancedGB.incr(valueToAdd);
+  }
+
+  public void resetDataSizeUnbalancedGB() {
+    dataSizeUnbalancedGB.incr(-getDataSizeUnbalancedGB());
+  }
+
+  /**
+   * Gets the number of datanodes that are unbalanced.
+   * @return long value
+   */
+  public long getNumDatanodesUnbalanced() {
+    return numDatanodesUnbalanced.value();
+  }
+
+  public void incrementNumDatanodesUnbalanced(long valueToAdd) {
+    numDatanodesUnbalanced.incr(valueToAdd);
+  }
+
+  public void resetNumDatanodesUnbalanced() {
+    numDatanodesUnbalanced.incr(-getNumDatanodesUnbalanced());
+  }
+
+  public long getNumContainerMoves() {
+    return numContainerMoves.value();
+  }
+
+  public void incrementNumContainerMoves(long valueToAdd) {
+    numContainerMoves.incr(valueToAdd);
+  }
+
+  public long getDataSizeMovedGB() {
+    return dataSizeMovedGB.value();
+  }
+
+  public void incrementDataSizeMovedGB(long valueToAdd) {
+    dataSizeMovedGB.incr(valueToAdd);
   }
 }

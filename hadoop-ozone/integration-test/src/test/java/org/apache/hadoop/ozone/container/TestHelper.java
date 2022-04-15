@@ -20,7 +20,13 @@ package org.apache.hadoop.ozone.container;
 
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -28,7 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -119,9 +125,12 @@ public final class TestHelper {
   public static OzoneOutputStream createKey(String keyName,
       ReplicationType type, long size, ObjectStore objectStore,
       String volumeName, String bucketName) throws Exception {
+    if (type == ReplicationType.STAND_ALONE) {
+      throw new IllegalArgumentException(ReplicationType.STAND_ALONE +
+          " replication type should not be used in tests to write keys anymore."
+      );
+    }
     org.apache.hadoop.hdds.client.ReplicationFactor factor =
-        type == ReplicationType.STAND_ALONE ?
-            org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
             org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey(keyName, size, type, factor, new HashMap<>());
@@ -359,7 +368,7 @@ public final class TestHelper {
   }
 
   public static int countReplicas(long containerID, MiniOzoneCluster cluster) {
-    ContainerManagerV2 containerManager = cluster.getStorageContainerManager()
+    ContainerManager containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
     try {
       Set<ContainerReplica> replicas = containerManager

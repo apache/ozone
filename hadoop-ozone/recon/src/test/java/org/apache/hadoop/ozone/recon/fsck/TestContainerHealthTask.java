@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static junit.framework.TestCase.assertEquals;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,7 +42,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
@@ -63,6 +64,8 @@ import org.junit.Test;
  * Class to test a single run of the Container Health Task.
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
+
+  @SuppressWarnings("checkstyle:methodlength")
   @Test
   public void testRun() throws Exception {
     UnhealthyContainersDao unHealthyContainersTableHandle =
@@ -75,7 +78,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     MockPlacementPolicy placementMock = new MockPlacementPolicy();
-    ContainerManagerV2 containerManagerMock = mock(ContainerManagerV2.class);
+    ContainerManager containerManagerMock = mock(ContainerManager.class);
     StorageContainerServiceProvider scmClientMock =
         mock(StorageContainerServiceProvider.class);
     ContainerReplica unhealthyReplicaMock = mock(ContainerReplica.class);
@@ -98,7 +101,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.UNHEALTHY));
 
-    // return one UNHEALTHY replica for container ID 2 -> Missing
+    // return all UNHEALTHY replicas for container ID 2 -> UNDER_REPLICATED
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L, State.UNHEALTHY));
 
@@ -145,8 +148,17 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(2, rec.getReplicaDelta().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(2L).get(0);
-    assertEquals("MISSING", rec.getContainerState());
+    assertEquals("UNDER_REPLICATED", rec.getContainerState());
     assertEquals(3, rec.getReplicaDelta().intValue());
+
+    List<UnhealthyContainers> unhealthyContainers =
+        containerHealthSchemaManager.getUnhealthyContainers(
+            ALL_REPLICAS_UNHEALTHY, 0, Integer.MAX_VALUE);
+    assertEquals(1, unhealthyContainers.size());
+    assertEquals(2L,
+        unhealthyContainers.get(0).getContainerId().longValue());
+    assertEquals(0,
+        unhealthyContainers.get(0).getActualReplicaCount().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(3L).get(0);
     assertEquals("MISSING", rec.getContainerState());
@@ -227,7 +239,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     MockPlacementPolicy placementMock = new MockPlacementPolicy();
-    ContainerManagerV2 containerManagerMock = mock(ContainerManagerV2.class);
+    ContainerManager containerManagerMock = mock(ContainerManager.class);
     StorageContainerServiceProvider scmClientMock =
         mock(StorageContainerServiceProvider.class);
 
@@ -305,7 +317,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       ContainerInfo c = mock(ContainerInfo.class);
       when(c.getContainerID()).thenReturn((long)i);
       when(c.getReplicationConfig())
-          .thenReturn(new RatisReplicationConfig(
+          .thenReturn(RatisReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.THREE));
       when(c.containerID()).thenReturn(ContainerID.valueOf(i));
       containers.add(c);
@@ -317,8 +329,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerInfo c = mock(ContainerInfo.class);
     when(c.getContainerID()).thenReturn((long)containerID);
     when(c.getReplicationConfig())
-        .thenReturn(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+        .thenReturn(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE));
     when(c.containerID()).thenReturn(ContainerID.valueOf(containerID));
     when(c.getState()).thenReturn(HddsProtos.LifeCycleState.DELETED);
     return c;
@@ -358,7 +370,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     }
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
-      for(DatanodeDetails dn : dns) {
+      for (DatanodeDetails dn : dns) {
         if (misRepWhenDnPresent != null
             && dn.getUuid().equals(misRepWhenDnPresent)) {
           return true;

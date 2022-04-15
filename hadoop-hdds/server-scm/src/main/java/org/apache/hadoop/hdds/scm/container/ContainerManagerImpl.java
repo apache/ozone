@@ -57,7 +57,7 @@ import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
 /**
  * TODO: Add javadoc.
  */
-public class ContainerManagerImpl implements ContainerManagerV2 {
+public class ContainerManagerImpl implements ContainerManager {
 
   /*
    * TODO: Introduce container level locks.
@@ -83,7 +83,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   /**
    *
    */
-  private final ContainerStateManagerV2 containerStateManager;
+  private final ContainerStateManager containerStateManager;
 
   private final SCMHAManager haManager;
   private final SequenceIdGenerator sequenceIdGen;
@@ -143,7 +143,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {
     return Optional.ofNullable(containerStateManager
-        .getContainer(id.getProtobuf()))
+        .getContainer(id))
         .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
   }
 
@@ -157,52 +157,100 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
     final List<ContainerID> containersIds =
         new ArrayList<>(containerStateManager.getContainerIDs());
     Collections.sort(containersIds);
-    return containersIds.stream()
-        .filter(id -> id.getId() >= start).limit(count)
-        .map(ContainerID::getProtobuf)
-        .map(containerStateManager::getContainer)
-        .collect(Collectors.toList());
+    List<ContainerInfo> containers;
+    lock.lock();
+    try {
+      containers = containersIds.stream()
+          .filter(id -> id.getId() >= start).limit(count)
+          .map(containerStateManager::getContainer)
+          .collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    return containers;
   }
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
-    return containerStateManager.getContainerIDs(state).stream()
-        .map(ContainerID::getProtobuf)
-        .map(containerStateManager::getContainer)
-        .filter(Objects::nonNull).collect(Collectors.toList());
+    List<ContainerInfo> containers;
+    lock.lock();
+    try {
+      containers = containerStateManager.getContainerIDs(state).stream()
+          .map(containerStateManager::getContainer)
+          .filter(Objects::nonNull).collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    return containers;
+  }
+
+  @Override
+  public int getContainerStateCount(final LifeCycleState state) {
+    return containerStateManager.getContainerIDs(state).size();
   }
 
   @Override
   public ContainerInfo allocateContainer(
       final ReplicationConfig replicationConfig, final String owner)
       throws IOException {
+    // Acquire pipeline manager lock, to avoid any updates to pipeline
+    // while allocate container happens. This is to avoid scenario like
+    // mentioned in HDDS-5655.
+    pipelineManager.acquireReadLock();
     lock.lock();
+    List<Pipeline> pipelines;
+    Pipeline pipeline;
+    ContainerInfo containerInfo = null;
     try {
-      final List<Pipeline> pipelines = pipelineManager
+      pipelines = pipelineManager
           .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
-
-      final Pipeline pipeline;
-      if (pipelines.isEmpty()) {
-        try {
-          pipeline = pipelineManager.createPipeline(replicationConfig);
-          pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-        } catch (IOException e) {
-          scmContainerManagerMetrics.incNumFailureCreateContainers();
-          throw new IOException("Could not allocate container. Cannot get any" +
-              " matching pipeline for replicationConfig: " + replicationConfig
-              + ", State:PipelineState.OPEN", e);
-        }
-      } else {
+      if (!pipelines.isEmpty()) {
         pipeline = pipelines.get(random.nextInt(pipelines.size()));
+        containerInfo = createContainer(pipeline, owner);
       }
-      final ContainerInfo containerInfo = allocateContainer(pipeline, owner);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("New container allocated: {}", containerInfo);
-      }
-      return containerInfo;
     } finally {
       lock.unlock();
+      pipelineManager.releaseReadLock();
     }
+
+    if (pipelines.isEmpty()) {
+      try {
+        pipeline = pipelineManager.createPipeline(replicationConfig);
+        pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+      } catch (IOException e) {
+        scmContainerManagerMetrics.incNumFailureCreateContainers();
+        throw new IOException("Could not allocate container. Cannot get any" +
+            " matching pipeline for replicationConfig: " + replicationConfig
+            + ", State:PipelineState.OPEN", e);
+      }
+      pipelineManager.acquireReadLock();
+      lock.lock();
+      try {
+        pipelines = pipelineManager
+            .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+        if (!pipelines.isEmpty()) {
+          pipeline = pipelines.get(random.nextInt(pipelines.size()));
+          containerInfo = createContainer(pipeline, owner);
+        } else {
+          throw new IOException("Could not allocate container. Cannot get any" +
+              " matching pipeline for replicationConfig: " + replicationConfig
+              + ", State:PipelineState.OPEN");
+        }
+      } finally {
+        lock.unlock();
+        pipelineManager.releaseReadLock();
+      }
+    }
+    return containerInfo;
+  }
+
+  private ContainerInfo createContainer(Pipeline pipeline, String owner)
+      throws IOException {
+    final ContainerInfo containerInfo = allocateContainer(pipeline, owner);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("New container allocated: {}", containerInfo);
+    }
+    return containerInfo;
   }
 
   private ContainerInfo allocateContainer(final Pipeline pipeline,
@@ -228,18 +276,18 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
         .build();
     containerStateManager.addContainer(containerInfo);
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
-    return containerStateManager.getContainer(containerID.getProtobuf());
+    return containerStateManager.getContainer(containerID);
   }
 
   @Override
-  public void updateContainerState(final ContainerID id,
+  public void updateContainerState(final ContainerID cid,
                                    final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
+    HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.updateContainerState(cid, event);
+        containerStateManager.updateContainerState(protoId, event);
       } else {
         throwContainerNotFoundException(cid);
       }
@@ -252,15 +300,14 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
     return Optional.ofNullable(containerStateManager
-        .getContainerReplicas(id.getProtobuf()))
+        .getContainerReplicas(id))
         .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
   }
 
   @Override
-  public void updateContainerReplica(final ContainerID id,
+  public void updateContainerReplica(final ContainerID cid,
                                      final ContainerReplica replica)
       throws ContainerNotFoundException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(cid, replica);
     } else {
@@ -269,10 +316,9 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   @Override
-  public void removeContainerReplica(final ContainerID id,
+  public void removeContainerReplica(final ContainerID cid,
                                      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(cid, replica);
     } else {
@@ -364,13 +410,13 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   @Override
-  public void deleteContainer(final ContainerID id)
+  public void deleteContainer(final ContainerID cid)
       throws IOException {
-    final HddsProtos.ContainerID cid = id.getProtobuf();
+    HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.removeContainer(cid);
+        containerStateManager.removeContainer(protoId);
         scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
       } else {
         scmContainerManagerMetrics.incNumFailureDeleteContainers();
@@ -381,28 +427,15 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
     }
   }
 
-  @Deprecated
-  private void checkIfContainerExist(final HddsProtos.ContainerID id)
-      throws ContainerNotFoundException {
-    if (!containerStateManager.contains(id)) {
-      throw new ContainerNotFoundException("Container with id #" +
-          id.getId() + " not found.");
-    }
-  }
-
   @Override
   public boolean containerExist(final ContainerID id) {
-    return containerExist(id.getProtobuf());
-  }
-
-  private boolean containerExist(final HddsProtos.ContainerID id) {
     return containerStateManager.contains(id);
   }
 
-  private void throwContainerNotFoundException(final HddsProtos.ContainerID id)
+  private void throwContainerNotFoundException(final ContainerID id)
       throws ContainerNotFoundException {
-    throw new ContainerNotFoundException("Container with id #" +
-        id.getId() + " not found.");
+    throw new ContainerNotFoundException("Container with id " +
+        id + " not found.");
   }
 
   @Override
@@ -411,8 +444,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   // Remove this after fixing Recon
-  @Deprecated
-  protected ContainerStateManagerV2 getContainerStateManager() {
+  @VisibleForTesting
+  public ContainerStateManager getContainerStateManager() {
     return containerStateManager;
   }
 

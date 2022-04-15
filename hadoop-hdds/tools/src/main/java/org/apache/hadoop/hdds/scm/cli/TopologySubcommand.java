@@ -23,8 +23,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.InvalidPropertiesFormatException;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
@@ -68,6 +70,18 @@ public class TopologySubcommand extends ScmSubcommand
       description = "Print Topology with full node infos")
   private boolean fullInfo;
 
+  @CommandLine.Option(names = {"--operational-state"},
+      description = "Only show datanodes in a specific operational state " +
+          "(IN_SERVICE, DECOMMISSIONING, " +
+          "DECOMMISSIONED, ENTERING_MAINTENANCE, " +
+          "IN_MAINTENANCE)")
+  private String nodeOperationalState;
+
+  @CommandLine.Option(names = {"--node-state"},
+      description = "Only show datanodes in a specific node state(" +
+          " HEALTHY, STALE, DEAD)")
+  private String nodeState;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     for (HddsProtos.NodeState state : STATES) {
@@ -76,6 +90,35 @@ public class TopologySubcommand extends ScmSubcommand
       if (nodes != null && nodes.size() > 0) {
         // show node state
         System.out.println("State = " + state.toString());
+        if (nodeOperationalState != null) {
+          if (nodeOperationalState.equals("IN_SERVICE") ||
+              nodeOperationalState.equals("DECOMMISSIONING") ||
+              nodeOperationalState.equals("DECOMMISSIONED") ||
+              nodeOperationalState.equals("ENTERING_MAINTENANCE") ||
+              nodeOperationalState.equals("IN_MAINTENANCE")) {
+            nodes = nodes.stream().filter(
+                info -> info.getNodeOperationalStates(0).toString()
+                    .equals(nodeOperationalState)).collect(Collectors.toList());
+          } else {
+            throw new InvalidPropertiesFormatException(
+                "the nodeOperationalState isn't " +
+                    "IN_SERVICE/DECOMMISSIONING/DECOMMISSIONED/" +
+                    "ENTERING_MAINTENANCE/IN_MAINTENANCE " +
+                    "the nodeOperationalState is " + nodeState);
+          }
+        }
+        if (nodeState != null) {
+          if (nodeState.equals("HEALTHY")
+              || nodeState.equals("STALE")
+              || nodeState.equals("DEAD")) {
+            nodes = nodes.stream().filter(
+                info -> info.getNodeStates(0).toString()
+                    .equals(nodeState)).collect(Collectors.toList());
+          } else {
+            throw new InvalidPropertiesFormatException("the nodeState isn't " +
+                "HEALTHY/STALE/DEAD the nodeState is " + nodeState);
+          }
+        }
         if (order) {
           printOrderedByLocation(nodes);
         } else {
@@ -98,7 +141,6 @@ public class TopologySubcommand extends ScmSubcommand
         new HashMap<>();
     HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
         new HashMap<>();
-
     for (HddsProtos.Node node : nodes) {
       String location = node.getNodeID().getNetworkLocation();
       if (location != null && !tree.containsKey(location)) {
@@ -115,7 +157,7 @@ public class TopologySubcommand extends ScmSubcommand
       System.out.println("Location: " + location);
       tree.get(location).forEach(n -> {
         System.out.println(" " + n.getIpAddress() + "(" + n.getHostName()
-            + ") "+state.get(n));
+            + ") " + state.get(n));
       });
     });
   }

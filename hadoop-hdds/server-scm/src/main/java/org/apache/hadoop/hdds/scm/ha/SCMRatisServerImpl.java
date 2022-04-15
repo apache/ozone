@@ -33,7 +33,9 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -58,7 +60,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
-import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMServerTlsParameters;
 
 /**
  * TODO.
@@ -67,6 +68,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMRatisServerImpl.class);
 
+  private final OzoneConfiguration ozoneConf = new OzoneConfiguration();
   private final RaftServer server;
   private final SCMStateMachine stateMachine;
   private final StorageContainerManager scm;
@@ -74,6 +76,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final AtomicLong callId = new AtomicLong();
   private final RaftServer.Division division;
   private final GrpcTlsConfig grpcTlsConfig;
+  private boolean isStopped;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -95,7 +98,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
     grpcTlsConfig = createSCMRatisTLSConfig(new SecurityConfig(conf),
         scm.getScmCertificateClient());
-    Parameters parameters = createSCMServerTlsParameters(grpcTlsConfig);
+    final Parameters parameters = RatisHelper.setServerTlsConf(grpcTlsConfig);
 
     this.server = newRaftServer(scm.getScmId(), conf)
         .setStateMachineRegistry((gId) -> new SCMStateMachine(scm, buffer))
@@ -106,6 +109,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         (SCMStateMachine) server.getDivision(groupId).getStateMachine();
 
     this.division = server.getDivision(groupId);
+    this.isStopped = false;
   }
 
   public static void initialize(String clusterId, String scmId,
@@ -134,9 +138,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       OzoneConfiguration conf, RaftGroup group) throws IOException {
     boolean ready;
     long st = Time.monotonicNow();
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
-    long waitTimeout = haConf.getLeaderReadyWaitTimeout();
-    long retryInterval = haConf.getLeaderReadyCheckInterval();
+    long waitTimeout = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    long retryInterval = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL,
+            ScmConfigKeys.
+                    OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
 
     do {
       ready = server.getDivision(group.getGroupId()).getInfo().isLeaderReady();
@@ -158,9 +168,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   private static RaftServer.Builder newRaftServer(final String scmId,
       final ConfigurationSource conf) {
-    final SCMHAConfiguration haConf = conf.getObject(SCMHAConfiguration.class);
     final RaftProperties serverProperties =
-        RatisUtil.newRaftProperties(haConf, conf);
+        RatisUtil.newRaftProperties(conf);
     return RaftServer.newBuilder().setServerId(RaftPeerId.getRaftPeerId(scmId))
         .setProperties(serverProperties);
   }
@@ -205,9 +214,12 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setType(RaftClientRequest.writeRequestType())
         .build();
     // any request submitted to
-    final long requestTimeout =
-        scm.getConfiguration().getObject(SCMHAConfiguration.class)
-            .getRatisRequestTimeout();
+    final long requestTimeout = ozoneConf.getTimeDuration(
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
+                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
+                TimeUnit.MILLISECONDS);
+    Preconditions.checkArgument(requestTimeout > 1000L,
+            "Ratis request timeout cannot be less than 1000ms.");
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
@@ -225,7 +237,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   public void stop() throws IOException {
     LOG.info("stopping ratis server {}", server.getPeer().getAddress());
     server.close();
+    isStopped = true;
+    getSCMStateMachine().close();
   }
+
+  @Override
+  public boolean isStopped() {
+    return isStopped;
+  }
+
 
   @Override
   public List<String> getRatisRoles() throws IOException {
@@ -247,7 +267,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       ratisRoles.add((peer.getAddress() == null ? "" :
               peer.getAddress().concat(isLocal ?
                   ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
-                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))));
+                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
+                  .concat(":".concat(peer.getId().toString()))
+                  .concat(":".concat(peerInetAddress.getHostAddress()))));
     }
     return ratisRoles;
   }

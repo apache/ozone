@@ -19,7 +19,8 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
 
-current_version=1.1.0
+current_version=1.3.0
+old_versions="1.0.0 1.1.0 1.2.1" # container is needed for each version in clients.yaml
 
 # shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
 source "${COMPOSE_DIR}/../testlib.sh"
@@ -59,11 +60,8 @@ test_cross_compatibility() {
   new_client _write
   new_client _read ${current_version}
 
-  for client in $(docker ps | grep _old_client_ | awk '{ print $NF }'); do
-    client=${client#${basename}_}
-    client=${client%_1}
-    client_version=${client#old_client_}
-    client_version=${client_version//_/.}
+  for client_version in "$@"; do
+    client="old_client_${client_version//./_}"
 
     old_client _write
     old_client _read ${client_version}
@@ -78,15 +76,12 @@ test_cross_compatibility() {
 create_results_dir
 
 # current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility
+COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions}
 
-for cluster_version in 1.0.0; do
-  load_version_specifics ${cluster_version}
-
+# old cluster with clients: same version and current version
+for cluster_version in ${old_versions}; do
   export OZONE_VERSION=${cluster_version}
-  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility
-
-  unload_version_specifics
+  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version}
 done
 
 generate_report

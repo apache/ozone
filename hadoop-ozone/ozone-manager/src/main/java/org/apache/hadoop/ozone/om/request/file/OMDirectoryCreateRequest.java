@@ -30,10 +30,11 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -100,8 +101,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     FAILURE // The request failed and exception was thrown
   }
 
-  public OMDirectoryCreateRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMDirectoryCreateRequest(OMRequest omRequest,
+                                  BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -185,7 +187,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException("Unable to create directory: " +keyName
+        throw new OMException("Unable to create directory: " + keyName
             + " in volume/bucket: " + volumeName + "/" + bucketName,
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
@@ -207,7 +209,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             Optional.of(missingParentInfos), trxnLogIndex);
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos, result);
+            dirKeyInfo, missingParentInfos, result, getBucketLayout());
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         result = Result.DIRECTORY_ALREADY_EXISTS;
@@ -281,7 +283,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
-      omMetadataManager.getKeyTable().addCacheEntry(
+      omMetadataManager.getKeyTable(BucketLayout.DEFAULT).addCacheEntry(
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
               bucketName, parentKeyInfo.getKeyName())),
           new CacheValue<>(Optional.of(parentKeyInfo),
@@ -357,7 +359,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setModificationTime(keyArgs.getModificationTime())
         .setDataSize(0)
         .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
+                .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()))
         .setObjectID(objectId)
         .setUpdateID(objectId);
   }

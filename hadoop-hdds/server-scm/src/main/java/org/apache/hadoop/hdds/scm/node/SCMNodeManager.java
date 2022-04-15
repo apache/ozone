@@ -17,24 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-
-import javax.management.ObjectName;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.Collections;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.stream.Collectors;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -45,8 +27,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
@@ -64,6 +45,8 @@ import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -76,6 +59,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
@@ -84,6 +68,27 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.management.ObjectName;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 
 /**
  * Maintains information about the Datanodes on SCM side.
@@ -265,7 +270,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
-      NodeOperationalState newState) throws NodeNotFoundException{
+      NodeOperationalState newState) throws NodeNotFoundException {
     setNodeOperationalState(datanodeDetails, newState, 0);
   }
 
@@ -280,7 +285,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       NodeOperationalState newState, long opStateExpiryEpocSec)
-      throws NodeNotFoundException{
+      throws NodeNotFoundException {
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
   }
@@ -609,7 +614,7 @@ public class SCMNodeManager implements NodeManager {
         // send Finalize command multiple times.
         scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
             new CommandForDatanode<>(datanodeDetails.getUuid(), finalizeCmd));
-      } catch(NotLeaderException ex) {
+      } catch (NotLeaderException ex) {
         LOG.warn("Skip sending finalize upgrade command since current SCM is" +
             "not leader.", ex);
       }
@@ -673,10 +678,11 @@ public class SCMNodeManager implements NodeManager {
    * @param mostUsed true if most used, false if least used
    * @return List of DatanodeUsageInfo
    */
+  @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
     List<DatanodeDetails> healthyNodes =
-        getNodes(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY);
+        getNodes(IN_SERVICE, NodeState.HEALTHY);
 
     List<DatanodeUsageInfo> datanodeUsageInfoList =
         new ArrayList<>(healthyNodes.size());
@@ -691,12 +697,24 @@ public class SCMNodeManager implements NodeManager {
     // sort the list according to appropriate comparator
     if (mostUsed) {
       datanodeUsageInfoList.sort(
-          DatanodeUsageInfo.getMostUsedByRemainingRatio().reversed());
+          DatanodeUsageInfo.getMostUtilized().reversed());
     } else {
       datanodeUsageInfoList.sort(
-          DatanodeUsageInfo.getMostUsedByRemainingRatio());
+          DatanodeUsageInfo.getMostUtilized());
     }
     return datanodeUsageInfoList;
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
+    SCMNodeStat stat = getNodeStatInternal(dn);
+    return new DatanodeUsageInfo(dn, stat);
   }
 
   /**
@@ -748,7 +766,7 @@ public class SCMNodeManager implements NodeManager {
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
       NodeStatus status = dni.getNodeStatus();
       nodes.get(status.getOperationalState().name())
-          .compute(status.getHealth().name(), (k, v) -> v+1);
+          .compute(status.getHealth().name(), (k, v) -> v + 1);
     }
     return nodes;
   }
@@ -885,6 +903,29 @@ public class SCMNodeManager implements NodeManager {
     return Collections.min(pipelineCountList);
   }
 
+  @Override
+  public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
+    HashSet<DatanodeDetails> dns = new HashSet<>();
+    Preconditions.checkNotNull(dn);
+    Set<PipelineID> pipelines =
+        nodeStateManager.getPipelineByDnID(dn.getUuid());
+    PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
+    if (!pipelines.isEmpty()) {
+      pipelines.forEach(id -> {
+        try {
+          Pipeline pipeline = pipelineManager.getPipeline(id);
+          List<DatanodeDetails> peers = pipeline.getNodes();
+          dns.addAll(peers);
+        } catch (PipelineNotFoundException pnfe) {
+          //ignore the pipeline not found exception here
+        }
+      });
+    }
+    // renove self node from the set
+    dns.remove(dn);
+    return dns;
+  }
+
   /**
    * Get set of pipelines a datanode is part of.
    *
@@ -933,6 +974,13 @@ public class SCMNodeManager implements NodeManager {
     nodeStateManager.addContainer(datanodeDetails.getUuid(), containerId);
   }
 
+  @Override
+  public void removeContainer(final DatanodeDetails datanodeDetails,
+                           final ContainerID containerId)
+      throws NodeNotFoundException {
+    nodeStateManager.removeContainer(datanodeDetails.getUuid(), containerId);
+  }
+
   /**
    * Update set of containers available on a datanode.
    *
@@ -949,7 +997,9 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Return set of containerIDs available on a datanode.
+   * Return set of containerIDs available on a datanode. This is a copy of the
+   * set which resides inside NodeManager and hence can be modified without
+   * synchronization or side effects.
    *
    * @param datanodeDetails - DatanodeID
    * @return - set of containerIDs
@@ -967,6 +1017,25 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
     this.commandQueue.addCommand(dnId, command);
+  }
+
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    RefreshVolumeUsageCommand refreshVolumeUsageCommand =
+        new RefreshVolumeUsageCommand();
+    try {
+      refreshVolumeUsageCommand.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending refreshVolumeUsage command,"
+          + " since current SCM is not leader.", nle);
+      return;
+    }
+    getNodes(IN_SERVICE, HEALTHY).forEach(datanode ->
+        addDatanodeCommand(datanode.getUuid(), refreshVolumeUsageCommand));
   }
 
   /**

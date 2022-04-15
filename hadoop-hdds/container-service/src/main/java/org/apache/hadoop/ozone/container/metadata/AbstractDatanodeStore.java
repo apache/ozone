@@ -21,18 +21,19 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdds.utils.db.*;
+import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.BloomFilter;
+import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
-import org.rocksdb.LRUCache;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
@@ -40,18 +41,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -74,9 +70,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private final long containerID;
   private final ColumnFamilyOptions cfOptions;
 
-  private final DBProfile dbProfile;
-  private static final Map<ConfigurationSource, ColumnFamilyOptions>
-      OPTIONS_CACHE = new ConcurrentHashMap<>();
+  private static DatanodeDBProfile dbProfile;
   private final boolean openReadOnly;
 
   /**
@@ -89,16 +83,13 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
 
-    dbProfile = config.getEnum(HDDS_DB_PROFILE,
-        HDDS_DEFAULT_DB_PROFILE);
+    dbProfile = DatanodeDBProfile
+        .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
     // for all containers on a datanode.
-    if (!OPTIONS_CACHE.containsKey(config)) {
-      OPTIONS_CACHE.put(config, buildColumnFamilyOptions(config));
-    }
-    cfOptions = OPTIONS_CACHE.get(config);
+    cfOptions = dbProfile.getColumnFamilyOptions(config);
 
     this.dbDef = dbDef;
     this.containerID = containerID;
@@ -214,13 +205,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @VisibleForTesting
-  public static Map<ConfigurationSource, ColumnFamilyOptions>
-      getColumnFamilyOptionsCache() {
-    return Collections.unmodifiableMap(OPTIONS_CACHE);
-  }
-
-  @VisibleForTesting
-  public DBProfile getDbProfile() {
+  public DatanodeDBProfile getDbProfile() {
     return dbProfile;
   }
 
@@ -234,22 +219,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       LOG.error(String.format(logMessage, name));
       throw new IOException(String.format(errMsg, name));
     }
-  }
-
-  private ColumnFamilyOptions buildColumnFamilyOptions(
-      ConfigurationSource config) {
-    long cacheSize = (long) config.getStorageSize(
-        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
-        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-
-    BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-    tableConfig.setBlockCache(new LRUCache(cacheSize))
-        .setPinL0FilterAndIndexBlocksInCache(true)
-        .setFilterPolicy(new BloomFilter());
-
-    return dbProfile.getColumnFamilyOptions()
-        .setTableFormatConfig(tableConfig);
   }
 
   /**
@@ -311,7 +280,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         nextBlock = null;
         return currentBlock;
       }
-      if(hasNext()) {
+      if (hasNext()) {
         return nextBlock();
       }
       throw new NoSuchElementException("Block Iterator reached end for " +

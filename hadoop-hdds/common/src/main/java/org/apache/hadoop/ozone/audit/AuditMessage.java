@@ -64,12 +64,12 @@ public final class AuditMessage implements Message {
     private Map<String, String> params;
     private String ret;
 
-    public Builder setUser(String usr){
+    public Builder setUser(String usr) {
       this.user = usr;
       return this;
     }
 
-    public Builder atIp(String ipAddr){
+    public Builder atIp(String ipAddr) {
       this.ip = ipAddr;
       return this;
     }
@@ -79,7 +79,7 @@ public final class AuditMessage implements Message {
       return this;
     }
 
-    public Builder withParams(Map<String, String> args){
+    public Builder withParams(Map<String, String> args) {
       this.params = args;
       return this;
     }
@@ -89,12 +89,12 @@ public final class AuditMessage implements Message {
       return this;
     }
 
-    public Builder withException(Throwable ex){
+    public Builder withException(Throwable ex) {
       this.throwable = ex;
       return this;
     }
 
-    public AuditMessage build(){
+    public AuditMessage build() {
       String message = "user=" + this.user + " | ip=" + this.ip + " | " +
           "op=" + this.op + " " + this.params + " | " + "ret=" + this.ret;
       return new AuditMessage(message, throwable);

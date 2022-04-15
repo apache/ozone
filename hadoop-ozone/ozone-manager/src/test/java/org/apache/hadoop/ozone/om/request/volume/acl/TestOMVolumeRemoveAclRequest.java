@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.volume.TestOMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -42,7 +42,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     OMRequest originalRequest =
-        TestOMRequestUtils.createVolumeRemoveAclRequest(volumeName, acl);
+        OMRequestTestUtils.createVolumeRemoveAclRequest(volumeName, acl);
     long originModTime = originalRequest.getRemoveAclRequest()
         .getModificationTime();
 
@@ -65,13 +65,13 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String ownerName = "user1";
 
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
     // add acl first
     OMRequest addAclRequest =
-        TestOMRequestUtils.createVolumeAddAclRequest(volumeName, acl);
+        OMRequestTestUtils.createVolumeAddAclRequest(volumeName, acl);
     OMVolumeAddAclRequest omVolumeAddAclRequest =
         new OMVolumeAddAclRequest(addAclRequest);
     omVolumeAddAclRequest.preExecute(ozoneManager);
@@ -85,7 +85,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
 
     // remove acl
     OMRequest removeAclRequest =
-        TestOMRequestUtils.createVolumeRemoveAclRequest(volumeName, acl);
+        OMRequestTestUtils.createVolumeRemoveAclRequest(volumeName, acl);
     OMVolumeRemoveAclRequest omVolumeRemoveAclRequest =
         new OMVolumeRemoveAclRequest(removeAclRequest);
     omVolumeRemoveAclRequest.preExecute(ozoneManager);
@@ -121,7 +121,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     OMRequest originalRequest =
-        TestOMRequestUtils.createVolumeRemoveAclRequest(volumeName, acl);
+        OMRequestTestUtils.createVolumeRemoveAclRequest(volumeName, acl);
 
     OMVolumeRemoveAclRequest omVolumeRemoveAclRequest =
         new OMVolumeRemoveAclRequest(originalRequest);
