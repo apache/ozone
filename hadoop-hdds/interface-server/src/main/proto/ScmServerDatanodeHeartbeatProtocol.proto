@@ -159,6 +159,7 @@ message SCMNodeAddressList {
 message NodeReportProto {
   repeated StorageReportProto storageReport = 1;
   repeated MetadataStorageReportProto metadataStorageReport = 2;
+  repeated StorageReportProto dbStorageReport = 3;
 }
 
 message StorageReportProto {

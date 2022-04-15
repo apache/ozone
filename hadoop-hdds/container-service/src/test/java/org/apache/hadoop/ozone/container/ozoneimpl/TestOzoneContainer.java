@@ -59,6 +59,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Random;
 import java.util.UUID;
 import java.util.HashMap;
@@ -184,6 +185,16 @@ public class TestOzoneContainer {
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             String.join(",",
             path + "/ratis1", path + "/ratis2", path + "ratis3"));
+
+    File[] dbPaths = new File[3];
+    StringBuilder dbDirString = new StringBuilder();
+    for (int i = 0; i < 3; i++) {
+      dbPaths[i] = folder.newFolder();
+      dbDirString.append(dbPaths[i]).append(",");
+    }
+    conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
+        dbDirString.toString());
+
     DatanodeStateMachine stateMachine = Mockito.mock(
             DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);
@@ -199,7 +210,8 @@ public class TestOzoneContainer {
     Assert.assertEquals(3,
             ozoneContainer.getNodeReport().getMetadataStorageReportList()
                     .size());
-
+    Assert.assertEquals(3,
+            ozoneContainer.getNodeReport().getDbStorageReportList().size());
   }
 
   @Test

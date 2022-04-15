@@ -378,6 +378,9 @@ public class OzoneContainer {
     volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
     volumeSet.shutdown();
     metaVolumeSet.shutdown();
+    if (dbVolumeSet != null) {
+      dbVolumeSet.shutdown();
+    }
     blockDeletingService.shutdown();
     ContainerMetrics.remove();
   }
@@ -436,6 +439,14 @@ public class OzoneContainer {
       nrb.addMetadataStorageReport(
           metaReports[i].getMetadataProtoBufMessage());
     }
+
+    if (dbVolumeSet != null) {
+      StorageLocationReport[] dbReports = dbVolumeSet.getStorageReport();
+      for (int i = 0; i < dbReports.length; i++) {
+        nrb.addDbStorageReport(dbReports[i].getProtoBufMessage());
+      }
+    }
+
     return nrb.build();
   }
 
