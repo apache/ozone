@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.ec.ContainerRecoveryStore;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,6 +168,14 @@ public class ContainerController {
       final TarContainerPacker packer) throws IOException {
     handlers.get(type).exportContainer(
         containerSet.getContainer(containerId), outputStream, packer);
+  }
+
+  public Container consolidateContainer(
+      final Container container,
+      final ContainerRecoveryStore recoveryStore)
+      throws IOException {
+    return handlers.get(container.getContainerData().getContainerType())
+        .consolidateContainer(container, recoveryStore);
   }
 
   /**

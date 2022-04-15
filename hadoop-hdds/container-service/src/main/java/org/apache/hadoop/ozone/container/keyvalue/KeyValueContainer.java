@@ -266,7 +266,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
   }
 
-  private void createContainerFile(File containerFile)
+  public void createContainerFile(File containerFile)
       throws StorageContainerException {
     writeToContainerFile(containerFile, true);
   }

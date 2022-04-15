@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.ec.ContainerRecoveryStore;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
@@ -962,6 +963,15 @@ public class KeyValueHandler extends Handler {
       throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
+  }
+
+  @Override
+  public Container consolidateContainer(Container container,
+      ContainerRecoveryStore recoveryStore)
+      throws IOException {
+    recoveryStore.consolidateContainer((KeyValueContainer) container);
+    sendICR(container);
+    return container;
   }
 
   @Override
