@@ -185,7 +185,7 @@ public class TestReconContainerManager
   ContainerInfo newContainerInfo(long containerId, Pipeline pipeline) {
     return new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.OPEN)
         .setOwner("owner2")
@@ -206,9 +206,9 @@ public class TestReconContainerManager
     final UUID uuid1 = UUID.randomUUID();
     final DatanodeDetails datanodeDetails1 = DatanodeDetails.newBuilder()
         .setUuid(uuid1).setHostName("host1").setIpAddress("127.0.0.1").build();
-    final ContainerReplica containerReplica1 = ContainerReplica.newBuilder()
+    ContainerReplica containerReplica1 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
-        .setDatanodeDetails(datanodeDetails1).build();
+        .setDatanodeDetails(datanodeDetails1).setSequenceId(1001L).build();
 
     final ReconContainerManager containerManager = getContainerManager();
     final Map<Long, Map<UUID, ContainerReplicaHistory>> repHistMap =
@@ -234,13 +234,19 @@ public class TestReconContainerManager
     Assert.assertEquals(uuid1, repHist1.getUuid());
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist1.getLastSeenTime(), repHist1.getFirstSeenTime());
+    assertEquals(containerReplica1.getSequenceId().longValue(),
+        repHist1.getBcsId());
 
     // Let's update the entry again
+    containerReplica1 = ContainerReplica.newBuilder()
+        .setContainerID(containerID1).setContainerState(State.OPEN)
+        .setDatanodeDetails(datanodeDetails1).setSequenceId(1051L).build();
     containerManager.updateContainerReplica(containerID1, containerReplica1);
     // Should still have 1 entry in the replica history map
     Assert.assertEquals(1, repHistMap.size());
     // Now last seen time should be larger than first seen time
     Assert.assertTrue(repHist1.getLastSeenTime() > repHist1.getFirstSeenTime());
+    assertEquals(1051L, repHist1.getBcsId());
 
     // Init DN02
     final UUID uuid2 = UUID.randomUUID();
@@ -248,7 +254,7 @@ public class TestReconContainerManager
         .setUuid(uuid2).setHostName("host2").setIpAddress("127.0.0.2").build();
     final ContainerReplica containerReplica2 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
-        .setDatanodeDetails(datanodeDetails2).build();
+        .setDatanodeDetails(datanodeDetails2).setSequenceId(1051L).build();
 
     // Add replica to DN02
     containerManager.updateContainerReplica(containerID1, containerReplica2);
@@ -261,6 +267,7 @@ public class TestReconContainerManager
     Assert.assertEquals(uuid2, repHist2.getUuid());
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist2.getLastSeenTime(), repHist2.getFirstSeenTime());
+    assertEquals(1051L, repHist2.getBcsId());
 
     // Remove replica from DN01
     containerManager.removeContainerReplica(containerID1, containerReplica1);

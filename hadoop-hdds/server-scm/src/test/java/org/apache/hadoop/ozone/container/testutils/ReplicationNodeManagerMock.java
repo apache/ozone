@@ -177,6 +177,17 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
+    return null;
+  }
+
+  /**
    * Return the node stat of the specified datanode.
    *
    * @param dd - datanode details.
@@ -271,6 +282,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void addContainer(DatanodeDetails datanodeDetails,
                            ContainerID containerId)
       throws NodeNotFoundException {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
     throw new UnsupportedOperationException("Not yet implemented");
   }
 
@@ -383,6 +400,14 @@ public class ReplicationNodeManagerMock implements NodeManager {
     this.commandQueue.addCommand(dnId, command);
   }
 
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
   /**
    * Empty implementation for processNodeReport.
    * @param dnUuid

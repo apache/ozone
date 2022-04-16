@@ -23,7 +23,13 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.*;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -104,7 +110,7 @@ public class TestDatanodeAdminMonitor {
    */
   @Test
   public void testClosePipelinesEventFiredWhenAdminStarted()
-      throws NodeNotFoundException{
+      throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -424,7 +430,7 @@ public class TestDatanodeAdminMonitor {
    */
   private Set<ContainerID> generateContainers(int count) {
     Set<ContainerID> containers = new HashSet<>();
-    for (int i=0; i<count; i++) {
+    for (int i = 0; i < count; i++) {
       containers.add(ContainerID.valueOf(i));
     }
     return containers;

@@ -26,10 +26,12 @@ export OZONE_REPLICATION_FACTOR=3
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env
+start_docker_env 5
 
 execute_robot_test scm lib
 execute_robot_test scm ozone-lib
+
+execute_robot_test om auditparser
 
 execute_robot_test scm basic
 
@@ -50,27 +52,10 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 execute_robot_test scm admincli
 
+execute_debug_tests
 
-execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-simple-ofs-bucket ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-simple-o3fs-link ozonefs/ozonefs.robot
-
-# running FS tests with different config requires restart of the cluster
-export OZONE_KEEP_RESULTS=true
-stop_docker_env
-
-## Restarting the cluster with prefix-layout enabled (FSO)
-export OZONE_OM_METADATA_LAYOUT=PREFIX
-export OZONE_OM_ENABLE_FILESYSTEM_PATHS=true
-start_docker_env
-
-execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-prefix-ofs-link ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-prefix-o3fs-bucket ozonefs/ozonefs.robot
-
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-prefix-layout-objectputget s3/objectputget.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-prefix-layout-objectdelete s3/objectdelete.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-prefix-layout-objectcopy s3/objectcopy.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-prefix-layout-objectmultidelete s3/objectmultidelete.robot
-execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket}-prefix-layout-MultipartUpload s3/MultipartUpload.robot
+execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-fso-ofs-link ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-fso-o3fs-bucket ozonefs/ozonefs.robot
 
 stop_docker_env
 

@@ -26,17 +26,16 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.ozone.test.tag.Flaky;
 
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
-@Ignore("HDDS-3290")
 public class TestRandomKeyGenerator {
 
   private static MiniOzoneCluster cluster;
@@ -48,7 +47,7 @@ public class TestRandomKeyGenerator {
    * Ozone is made active by setting OZONE_ENABLED = true
    *
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
@@ -70,7 +69,7 @@ public class TestRandomKeyGenerator {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -127,7 +126,6 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  @Ignore("HDDS-2011")
   public void bigFileThan2GB() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
@@ -181,6 +179,7 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
+  @Flaky("HDDS-5993")
   public void cleanObjectsTest() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());

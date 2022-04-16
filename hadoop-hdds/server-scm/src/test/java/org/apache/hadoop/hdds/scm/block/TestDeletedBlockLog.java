@@ -25,13 +25,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -80,17 +80,18 @@ import static org.mockito.Mockito.when;
  */
 public class TestDeletedBlockLog {
 
-  private  DeletedBlockLogImplV2 deletedBlockLog;
+  private  DeletedBlockLogImpl deletedBlockLog;
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
   private File testDir;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private Table<ContainerID, ContainerInfo> containerTable;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
   private SCMHADBTransactionBuffer scmHADBTransactionBuffer;
   private Map<Long, ContainerInfo> containers = new HashMap<>();
   private Map<Long, Set<ContainerReplica>> replicas = new HashMap<>();
+  private ScmBlockDeletingServiceMetrics metrics;
 
   @Before
   public void setup() throws Exception {
@@ -100,18 +101,20 @@ public class TestDeletedBlockLog {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    scm = TestUtils.getScm(conf);
-    containerManager = Mockito.mock(ContainerManagerV2.class);
+    scm = HddsTestUtils.getScm(conf);
+    containerManager = Mockito.mock(ContainerManager.class);
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
-        new MockSCMHADBTransactionBuffer(scm.getScmMetadataStore().getStore());
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+        new SCMHADBTransactionBufferStub(scm.getScmMetadataStore().getStore());
+    metrics = Mockito.mock(ScmBlockDeletingServiceMetrics.class);
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     dnList = new ArrayList<>(3);
     setupContainerManager();
   }
@@ -161,7 +164,7 @@ public class TestDeletedBlockLog {
     final ContainerInfo container =
         new ContainerInfo.Builder()
             .setContainerID(cid)
-            .setReplicationConfig(new RatisReplicationConfig(THREE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
             .setState(HddsProtos.LifeCycleState.CLOSED)
             .setOwner("TestDeletedBlockLog")
             .setPipelineID(PipelineID.randomId())
@@ -396,13 +399,14 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // transactions are stored persistently.
     deletedBlockLog.close();
-    deletedBlockLog = new DeletedBlockLogImplV2(conf,
+    deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(BLOCKS_PER_TXN * 10);
     Assert.assertEquals(10, blocks.size());
@@ -414,13 +418,14 @@ public class TestDeletedBlockLog {
     // close db and reopen it again to make sure
     // currentTxnID = 50
     deletedBlockLog.close();
-    new DeletedBlockLogImplV2(conf,
+    new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
         scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
         scm.getScmContext(),
-        scm.getSequenceIdGen());
+        scm.getSequenceIdGen(),
+        metrics);
     blocks = getTransactions(BLOCKS_PER_TXN * 40);
     Assert.assertEquals(0, blocks.size());
     //Assert.assertEquals((long)deletedBlockLog.getCurrentTXID(), 50L);
@@ -477,7 +482,7 @@ public class TestDeletedBlockLog {
     List<DatanodeDetails> dns = Collections.singletonList(dd);
     Pipeline pipeline = Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setState(Pipeline.PipelineState.OPEN)
             .setId(PipelineID.randomId())
             .setNodes(dns)

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServi
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
@@ -48,7 +49,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Client to read container data from gRPC.
  */
-public class GrpcReplicationClient implements AutoCloseable{
+public class GrpcReplicationClient implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcReplicationClient.class);
@@ -74,7 +75,8 @@ public class GrpcReplicationClient implements AutoCloseable{
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (certClient != null) {
         sslContextBuilder
-            .trustManager(certClient.getCACertificate())
+            .trustManager(HAUtils.buildCAX509List(certClient,
+                secConfig.getConfiguration()))
             .clientAuth(ClientAuth.REQUIRE)
             .keyManager(certClient.getPrivateKey(),
                 certClient.getCertificate());
@@ -159,7 +161,16 @@ public class GrpcReplicationClient implements AutoCloseable{
       try {
         chunk.getData().writeTo(stream);
       } catch (IOException e) {
-        response.completeExceptionally(e);
+        LOG.error("Failed to write the stream buffer to {} for container {}",
+            outputPath, containerId, e);
+        try {
+          stream.close();
+        } catch (IOException ex) {
+          LOG.error("Failed to close OutputStream {}", outputPath, e);
+        } finally {
+          deleteOutputOnFailure();
+          response.completeExceptionally(e);
+        }
       }
     }
 
@@ -174,6 +185,7 @@ public class GrpcReplicationClient implements AutoCloseable{
       } catch (IOException e) {
         LOG.error("Failed to close {} for container {}",
             outputPath, containerId, e);
+        deleteOutputOnFailure();
         response.completeExceptionally(e);
       }
     }
@@ -187,9 +199,9 @@ public class GrpcReplicationClient implements AutoCloseable{
       } catch (IOException e) {
         LOG.error("Downloaded container {} OK, but failed to close {}",
             containerId, outputPath, e);
+        deleteOutputOnFailure();
         response.completeExceptionally(e);
       }
-
     }
 
     private void deleteOutputOnFailure() {
@@ -202,5 +214,4 @@ public class GrpcReplicationClient implements AutoCloseable{
       }
     }
   }
-
 }

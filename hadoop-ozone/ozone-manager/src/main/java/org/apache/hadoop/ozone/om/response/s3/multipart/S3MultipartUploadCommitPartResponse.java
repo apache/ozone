@@ -20,12 +20,13 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
@@ -48,8 +50,8 @@ import javax.annotation.Nullable;
  * Response for S3MultipartUploadCommitPart request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE,
-    MULTIPARTINFO_TABLE})
-public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
+    MULTIPARTINFO_TABLE, BUCKET_TABLE})
+public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
 
   private String multipartKey;
   private String openKey;
@@ -79,8 +81,9 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse);
+      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
@@ -148,8 +151,8 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
 
     //  This information has been added to multipartKeyInfo. So, we can
     //  safely delete part key info from open key table.
-    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        openKey);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .deleteWithBatch(batchOperation, openKey);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

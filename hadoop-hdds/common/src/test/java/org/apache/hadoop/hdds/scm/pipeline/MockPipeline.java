@@ -51,7 +51,7 @@ public final class MockPipeline {
   public static Pipeline createPipeline(int numNodes) throws IOException {
     Preconditions.checkArgument(numNodes >= 1);
     final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
-    for(int i = 0; i < numNodes; i++) {
+    for (int i = 0; i < numNodes; i++) {
       ids.add(MockDatanodeDetails.randomLocalDatanodeDetails());
     }
     return createPipeline(ids);
@@ -66,7 +66,7 @@ public final class MockPipeline {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setNodes(dns)
         .build();
   }
@@ -82,7 +82,7 @@ public final class MockPipeline {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes)
         .build();
   }

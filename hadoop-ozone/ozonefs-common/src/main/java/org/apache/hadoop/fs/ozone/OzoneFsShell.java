@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.shell.CommandFactory;
 import org.apache.hadoop.fs.shell.FsCommand;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.ToolRunner;
 
 /** Provide command line access to a Ozone FileSystem. */
@@ -73,7 +74,8 @@ public class OzoneFsShell extends FsShell {
    */
   public static void main(String[] argv) throws Exception {
     OzoneFsShell shell = newShellInstance();
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    TracingUtil.initTracing("FsShell", conf);
     conf.setQuietMode(false);
     shell.setConf(conf);
     int res;

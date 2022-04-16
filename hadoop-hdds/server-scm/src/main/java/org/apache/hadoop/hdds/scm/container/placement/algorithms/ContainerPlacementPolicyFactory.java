@@ -47,7 +47,7 @@ public final class ContainerPlacementPolicyFactory {
   public static PlacementPolicy getPolicy(
       ConfigurationSource conf, final NodeManager nodeManager,
       NetworkTopology clusterMap, final boolean fallback,
-      SCMContainerPlacementMetrics metrics) throws SCMException{
+      SCMContainerPlacementMetrics metrics) throws SCMException {
     final Class<? extends PlacementPolicy> placementClass = conf
         .getClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
             OZONE_SCM_CONTAINER_PLACEMENT_IMPL_DEFAULT,

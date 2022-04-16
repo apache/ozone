@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -73,6 +75,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -164,7 +167,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.ONE))
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(ReplicationFactor.ONE))
         .setState(LifeCycleState.OPEN)
         .setOwner("test")
         .setPipelineID(pipeline.getId())
@@ -199,6 +203,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(urlConnectionMock.getInputStream()).thenReturn(inputStream);
     when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
         anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+    when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
+        anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
@@ -631,7 +637,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         TypedTable.TypedKeyValue.class);
 
     when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
+    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
     when(mockKeyIter.hasNext())
         .thenReturn(true)
         .thenReturn(true)
@@ -712,5 +718,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

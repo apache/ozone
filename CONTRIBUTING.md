@@ -20,7 +20,8 @@ We welcome contributions of:
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)
       * Blockade tests (python + blockade) 
-      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`, `ozone genesis`), which can be used to test cluster and report problems.
+      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`),
+        which can be used to test cluster and report problems.
  * **Bug reports** pointing out broken functionality, docs, or suggestions for improvements are always welcome!
  
 ## Who To Contact
@@ -188,7 +189,9 @@ Checkstyle plugin may help to detect violations directly from the IDE.
 IntelliJ may not pick up protoc generated classes as they can be very huge. If the protoc files can't be compiled try the following:
 
 1. Open _Help_ -> _Edit custom properties_ menu.
-2. Add `idea.max.intellisense.filesize=5000` entry
+2. Add `idea.max.intellisense.filesize=10000` entry
 3. Restart your IDE
 
 
+## CI
+The Ozone project uses Github Actions for its CI system.  The configuration is described in detail [here](.github/ci.md).

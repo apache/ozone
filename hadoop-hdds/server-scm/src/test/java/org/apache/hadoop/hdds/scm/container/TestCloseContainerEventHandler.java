@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -63,8 +63,8 @@ public class TestCloseContainerEventHandler {
 
   private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
-  private static PipelineManagerV2Impl pipelineManager;
-  private static ContainerManagerV2 containerManager;
+  private static PipelineManagerImpl pipelineManager;
+  private static ContainerManager containerManager;
   private static long size;
   private static File testDir;
   private static EventQueue eventQueue;
@@ -87,14 +87,14 @@ public class TestCloseContainerEventHandler {
     eventQueue = new EventQueue();
     scmContext = SCMContext.emptyContext();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         configuration, scmhaManager, scmMetadataStore.getSequenceIdTable());
 
     SCMServiceManager serviceManager = new SCMServiceManager();
 
     pipelineManager =
-        PipelineManagerV2Impl.newPipelineManager(
+        PipelineManagerImpl.newPipelineManager(
             configuration,
             scmhaManager,
             nodeManager,
@@ -123,7 +123,7 @@ public class TestCloseContainerEventHandler {
     eventQueue.addHandler(DATANODE_COMMAND, nodeManager);
     // Move all pipelines created by background from ALLOCATED to OPEN state
     Thread.sleep(2000);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
   }
 
   @AfterClass
@@ -166,7 +166,7 @@ public class TestCloseContainerEventHandler {
   @Test
   public void testCloseContainerEventWithValidContainers() throws IOException {
     ContainerInfo container = containerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE), OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     DatanodeDetails datanode = pipelineManager
@@ -185,7 +185,7 @@ public class TestCloseContainerEventHandler {
     GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     ContainerInfo container = containerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     int[] closeCount = new int[3];

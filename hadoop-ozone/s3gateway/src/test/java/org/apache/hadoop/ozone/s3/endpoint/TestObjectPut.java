@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -42,6 +43,7 @@ import org.mockito.Mockito;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
@@ -52,9 +54,9 @@ import static org.mockito.Mockito.when;
 public class TestObjectPut {
   public static final String CONTENT = "0123456789";
   private String bucketName = "b1";
-  private String keyName = "key1";
+  private String keyName = "key=value/1";
   private String destBucket = "b2";
-  private String destkey = "key2";
+  private String destkey = "key=value/2";
   private String nonexist = "nonexist";
   private OzoneClient clientStub;
   private ObjectEndpoint objectEndpoint;
@@ -71,6 +73,7 @@ public class TestObjectPut {
     // Create PutObject and setClient to OzoneClientStub
     objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(clientStub);
+    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   @Test
@@ -150,7 +153,7 @@ public class TestObjectPut {
 
     // Add copy header, and then call put
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-        bucketName  + "/" + keyName);
+        bucketName  + "/" + urlEncode(keyName));
 
     response = objectEndpoint.put(destBucket, destkey, CONTENT.length(), 1,
         null, body);
@@ -176,7 +179,7 @@ public class TestObjectPut {
     // source bucket not found
     try {
       when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          nonexist + "/"  + keyName);
+          nonexist + "/"  + urlEncode(keyName));
       objectEndpoint.put(destBucket, destkey, CONTENT.length(), 1, null,
           body);
       fail("test copy object failed");
@@ -187,7 +190,7 @@ public class TestObjectPut {
     // dest bucket not found
     try {
       when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          bucketName + "/" + keyName);
+          bucketName + "/" + urlEncode(keyName));
       objectEndpoint.put(nonexist, destkey, CONTENT.length(), 1, null, body);
       fail("test copy object failed");
     } catch (OS3Exception ex) {
@@ -197,7 +200,7 @@ public class TestObjectPut {
     //Both source and dest bucket not found
     try {
       when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          nonexist + "/" + keyName);
+          nonexist + "/" + urlEncode(keyName));
       objectEndpoint.put(nonexist, destkey, CONTENT.length(), 1, null, body);
       fail("test copy object failed");
     } catch (OS3Exception ex) {
@@ -207,7 +210,7 @@ public class TestObjectPut {
     // source key not found
     try {
       when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          bucketName + "/" + nonexist);
+          bucketName + "/" + urlEncode(nonexist));
       objectEndpoint.put("nonexistent", keyName, CONTENT.length(), 1,
           null, body);
       fail("test copy object failed");

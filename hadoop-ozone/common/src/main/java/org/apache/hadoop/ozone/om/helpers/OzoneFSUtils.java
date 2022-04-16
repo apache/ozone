@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.util.StringUtils;
 
 import javax.annotation.Nonnull;
 import java.nio.file.Paths;
-import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -33,7 +31,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  */
 public final class OzoneFSUtils {
 
-  private OzoneFSUtils() {}
+  private OzoneFSUtils() { }
 
   /**
    * Returns string representation of path after removing the leading slash.
@@ -122,6 +120,23 @@ public final class OzoneFSUtils {
   }
 
   /**
+   * Checks whether the bucket layout is valid for File System operations
+   * otherwise throws IllegalArgumentException.
+   * Allowed bucket layouts are FILE_SYSTEM_OPTIMIZED and LEGACY.
+   */
+  public static void validateBucketLayout(String bucketName,
+                                          BucketLayout bucketLayout) {
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      throw new IllegalArgumentException(
+          "Bucket: " + bucketName + " has layout: " + bucketLayout +
+              ", which does not support" +
+              " file system semantics. Bucket Layout must be " +
+              BucketLayout.FILE_SYSTEM_OPTIMIZED + " or "
+              + BucketLayout.LEGACY + ".");
+    }
+  }
+
+  /**
    * The function returns leaf node name from the given absolute path. For
    * example, the given key path '/a/b/c/d/e/file1' then it returns leaf node
    * name 'file1'.
@@ -206,28 +221,6 @@ public final class OzoneFSUtils {
   public static int getFileCount(String keyName) {
     java.nio.file.Path keyPath = Paths.get(keyName);
     return keyPath.getNameCount();
-  }
-
-
-  /**
-   * Returns true if the bucket is FS Optimised.
-   * @param bucketMetadata
-   * @return
-   */
-  public static boolean isFSOptimizedBucket(
-      Map<String, String> bucketMetadata) {
-    // layout 'PREFIX' represents optimized FS path
-    boolean metadataLayoutEnabled =
-        org.apache.commons.lang3.StringUtils.equalsIgnoreCase(
-            OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX,
-            bucketMetadata
-                .get(OMConfigKeys.OZONE_OM_METADATA_LAYOUT));
-
-    boolean fsEnabled =
-        Boolean.parseBoolean(bucketMetadata
-            .get(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS));
-
-    return metadataLayoutEnabled && fsEnabled;
   }
 
   public static String removeTrailingSlashIfNeeded(String key) {

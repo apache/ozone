@@ -86,15 +86,15 @@ Key read passthrough
                         Key Should Match Local File     ${source}/bucket1/key2    /opt/hadoop/NOTICE.txt
 
 Key list passthrough
-    ${target_list} =    Execute                     ozone sh key list ${target}/link1 | jq -r '.name'
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.name'
+    ${target_list} =    Execute                     ozone sh key list ${target}/link1 | jq -r '.[].name'
+    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Be Equal             ${target_list}    ${source_list}
                         Should Contain              ${source_list}    key1
                         Should Contain              ${source_list}    key2
 
 Key delete passthrough
                         Execute                     ozone sh key delete ${target}/link1/key2
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.name'
+    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Not Contain          ${source_list}    key2
 
 Bucket list contains links
@@ -103,8 +103,14 @@ Bucket list contains links
                         Should Contain              ${result}         dangling-link
 
 Bucket info shows source
-    ${result} =         Execute                     ozone sh bucket info ${target}/link1 | jq -r '.sourceVolume, .sourceBucket' | xargs
-                        Should Be Equal             ${result}    ${source} bucket1
+    ${result} =         Execute                     ozone sh bucket info ${target}/link1
+                        Should Contain              ${result}            ${source}
+                        Should Contain              ${result}            bucket1
+                        Should Contain              ${result}            ${target}
+                        Should Contain              ${result}            link1
+                        Should Contain              ${result}            modificationTime
+                        Should Contain              ${result}            creationTime
+                        Should Not contain          ${result}            metadata
 
 Source and target have separate ACLs
     Execute       ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
@@ -149,5 +155,5 @@ Source bucket not affected by deleting link
                         Execute                     ozone sh bucket delete ${target}/link1
     ${bucket_list} =    Execute                     ozone sh bucket list ${target}
                         Should Not Contain          ${bucket_list}    link1
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.name'
+    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Contain              ${source_list}    key1

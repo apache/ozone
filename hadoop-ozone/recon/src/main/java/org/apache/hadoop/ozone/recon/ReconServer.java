@@ -18,20 +18,27 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusMetrics;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
@@ -40,16 +47,22 @@ import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.security.cert.CertificateException;
+
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
+import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * Recon server main class that stops and starts recon services.
@@ -66,6 +79,9 @@ public class ReconServer extends GenericCli {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
   private OzoneConfiguration configuration;
+  private ReconStorageConfig reconStorage;
+  private CertificateClient certClient;
+  private ReconTaskStatusMetrics reconTaskStatusMetrics;
 
   private volatile boolean isStarted = false;
 
@@ -85,20 +101,35 @@ public class ReconServer extends GenericCli {
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),
-        new ReconRestServletModule() {
-          @Override
-          protected void configureServlets() {
-            rest("/api/v1/*")
-              .packages("org.apache.hadoop.ozone.recon.api");
-          }
-        }, new ReconSchemaGenerationModule());
+        new ReconRestServletModule(configuration),
+        new ReconSchemaGenerationModule());
 
     //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
     ReconGuiceServletContextListener.setInjector(injector);
 
+    reconStorage = injector.getInstance(ReconStorageConfig.class);
+
     LOG.info("Initializing Recon server...");
     try {
       loginReconUserIfSecurityEnabled(configuration);
+      try {
+        if (reconStorage.getState() != INITIALIZED) {
+          if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
+            initializeCertificateClient(configuration);
+          }
+          reconStorage.initialize();
+        } else {
+          if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
+              reconStorage.getReconCertSerialId() == null) {
+            LOG.info("ReconStorageConfig is already initialized." +
+                "Initializing certificate.");
+            initializeCertificateClient(configuration);
+            reconStorage.persistCurrentState();
+          }
+        }
+      } catch (Exception e) {
+        LOG.error("Error during initializing Recon certificate", e);
+      }
       this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
       this.reconContainerMetadataManager =
           injector.getInstance(ReconContainerMetadataManager.class);
@@ -115,6 +146,8 @@ public class ReconServer extends GenericCli {
           injector.getInstance(OzoneManagerServiceProvider.class);
       this.reconStorageContainerManager =
           injector.getInstance(OzoneStorageContainerManager.class);
+      this.reconTaskStatusMetrics =
+          injector.getInstance(ReconTaskStatusMetrics.class);
       LOG.info("Recon server initialized successfully!");
 
     } catch (Exception e) {
@@ -136,6 +169,88 @@ public class ReconServer extends GenericCli {
   }
 
   /**
+   * Initializes secure Recon.
+   * */
+  private void initializeCertificateClient(OzoneConfiguration conf)
+      throws IOException {
+    LOG.info("Initializing secure Recon.");
+    certClient = new ReconCertificateClient(
+        new SecurityConfig(configuration),
+        reconStorage.getReconCertSerialId());
+
+    CertificateClient.InitResponse response = certClient.init();
+    LOG.info("Init response: {}", response);
+    switch (response) {
+    case SUCCESS:
+      LOG.info("Initialization successful, case:{}.", response);
+      break;
+    case GETCERT:
+      getSCMSignedCert(conf);
+      LOG.info("Successfully stored SCM signed certificate, case:{}.",
+          response);
+      break;
+    case FAILURE:
+      LOG.error("Recon security initialization failed, case:{}.", response);
+      throw new RuntimeException("Recon security initialization failed.");
+    case RECOVER:
+      LOG.error("Recon security initialization failed. Recon certificate is " +
+          "missing.");
+      throw new RuntimeException("Recon security initialization failed.");
+    default:
+      LOG.error("Recon security initialization failed. Init response: {}",
+          response);
+      throw new RuntimeException("Recon security initialization failed.");
+    }
+  }
+
+  /**
+   * Get SCM signed certificate and store it using certificate client.
+   * @param config
+   * */
+  private void getSCMSignedCert(OzoneConfiguration config) {
+    try {
+      PKCS10CertificationRequest csr = ReconUtils.getCSR(config, certClient);
+      LOG.info("Creating CSR for Recon.");
+
+      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
+          HddsServerUtil.getScmSecurityClientWithMaxRetry(config);
+      HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
+          HddsProtos.NodeDetailsProto.newBuilder()
+              .setHostName(InetAddress.getLocalHost().getHostName())
+              .setClusterId(reconStorage.getClusterID())
+              .setUuid(reconStorage.getReconId())
+              .setNodeType(HddsProtos.NodeType.RECON);
+
+      SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
+          secureScmClient.getCertificateChain(
+              reconDetailsProtoBuilder.build(),
+              getEncodedString(csr));
+      // Persist certificates.
+      if (response.hasX509CACertificate()) {
+        String pemEncodedCert = response.getX509Certificate();
+        certClient.storeCertificate(pemEncodedCert, true);
+        certClient.storeCertificate(response.getX509CACertificate(), true,
+            true);
+
+        // Store Root CA certificate.
+        if (response.hasX509RootCACertificate()) {
+          certClient.storeRootCACertificate(
+              response.getX509RootCACertificate(), true);
+        }
+        String reconCertSerialId = getX509Certificate(pemEncodedCert).
+            getSerialNumber().toString();
+        reconStorage.setReconCertSerialId(reconCertSerialId);
+      } else {
+        throw new RuntimeException("Unable to retrieve recon certificate " +
+            "chain");
+      }
+    } catch (IOException | CertificateException e) {
+      LOG.error("Error while storing SCM signed certificate.", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
    * Need a way to restart services from tests.
    */
   public void start() throws Exception {
@@ -144,6 +259,7 @@ public class ReconServer extends GenericCli {
       isStarted = true;
       // Initialize metrics for Recon
       HddsServerUtil.initializeMetrics(configuration, "Recon");
+      reconTaskStatusMetrics.register();
       if (httpServer != null) {
         httpServer.start();
       }
@@ -170,6 +286,9 @@ public class ReconServer extends GenericCli {
       }
       if (reconDBProvider != null) {
         reconDBProvider.close();
+      }
+      if (reconTaskStatusMetrics != null) {
+        reconTaskStatusMetrics.unregister();
       }
       isStarted = false;
     }
@@ -245,6 +364,11 @@ public class ReconServer extends GenericCli {
   @VisibleForTesting
   public ReconContainerMetadataManager getReconContainerMetadataManager() {
     return reconContainerMetadataManager;
+  }
+
+  @VisibleForTesting
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
   }
 
   @VisibleForTesting

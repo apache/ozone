@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -115,9 +115,9 @@ public class TestReconAsPassiveScm {
     LambdaTestUtils.intercept(UnsupportedOperationException.class,
         "Trying to create pipeline in Recon, which is prohibited!",
         () -> reconPipelineManager
-            .createPipeline(new RatisReplicationConfig(ONE)));
+            .createPipeline(RatisReplicationConfig.getInstance(ONE)));
 
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
 
     // Verify if all the 3 nodes are registered with Recon.
@@ -127,10 +127,10 @@ public class TestReconAsPassiveScm {
         reconNodeManager.getAllNodes().size());
 
     // Create container
-    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(new RatisReplicationConfig(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -158,9 +158,9 @@ public class TestReconAsPassiveScm {
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
     // Stop Recon
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
-    ContainerManagerV2 reconContainerManager = reconScm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
     assertTrue(reconContainerManager.getContainers().isEmpty());
 
     LambdaTestUtils.await(60000, 5000,
@@ -171,7 +171,7 @@ public class TestReconAsPassiveScm {
     // Create container in SCM.
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(new RatisReplicationConfig(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =
@@ -182,7 +182,7 @@ public class TestReconAsPassiveScm {
 
     // Close a pipeline
     Optional<Pipeline> pipelineToClose = scmPipelineManager
-        .getPipelines(new RatisReplicationConfig(ONE))
+        .getPipelines(RatisReplicationConfig.getInstance(ONE))
         .stream()
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();

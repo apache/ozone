@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   /** Format of checkpoint directories used prior to Hadoop 0.23. */
   private static final DateFormat OLD_CHECKPOINT =
       new SimpleDateFormat("yyMMddHHmm");
-  private static final int MSECS_PER_MINUTE = 60*1000;
+  private static final int MSECS_PER_MINUTE = 60 * 1000;
 
   private long emptierInterval;
 
@@ -77,7 +78,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private OzoneManager om;
 
-  public TrashPolicyOzone(){
+  public TrashPolicyOzone() {
   }
 
   @Override
@@ -109,7 +110,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     }
   }
 
-  TrashPolicyOzone(FileSystem fs, Configuration conf, OzoneManager om){
+  TrashPolicyOzone(FileSystem fs, Configuration conf, OzoneManager om) {
     initialize(conf, fs);
     this.om = om;
   }
@@ -123,9 +124,18 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   @Override
   public boolean moveToTrash(Path path) throws IOException {
     this.fs.getFileStatus(path);
+    String key = path.toUri().getPath();
+    // Check to see if bucket is path item to be deleted.
+    // Cannot moveToTrash if bucket is deleted,
+    // return error for this condition
+    OFSPath ofsPath = new OFSPath(key.substring(1));
+    if (path.isRoot() || ofsPath.isBucket()) {
+      throw new IOException("Recursive rm of bucket "
+          + path.toString() + " not permitted");
+    }
+
     Path trashRoot = this.fs.getTrashRoot(path);
 
-    String key = path.toUri().getPath();
     LOG.debug("Key path to moveToTrash: {}", key);
     String trashRootKey = trashRoot.toUri().getPath();
     LOG.debug("TrashrootKey for moveToTrash: {}", trashRootKey);
@@ -188,10 +198,11 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           // sleep for interval
           Thread.sleep(end - now);
           // if not leader, thread will always be sleeping
-          if (!om.isLeaderReady()){
+          if (!om.isLeaderReady()) {
             continue;
           }
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           break;                                  // exit on interrupt
         }
 
@@ -208,7 +219,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
                 continue;
               }
               TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
-              Runnable task = ()->{
+              Runnable task = () -> {
                 try {
                   om.getMetrics().incNumTrashRootsProcessed();
                   trash.deleteCheckpoint(trashRoot.getPath(), false);
@@ -230,7 +241,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
       }
       try {
         fs.close();
-      } catch(IOException e) {
+      } catch (IOException e) {
         LOG.warn("Trash cannot close FileSystem: ", e);
       } finally {
         executor.shutdown();

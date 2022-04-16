@@ -26,18 +26,20 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyInfo;
@@ -91,7 +93,7 @@ public class TestS3MultipartResponse {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(multipartUploadID)
         .setCreationTime(Time.now())
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .build();
 
@@ -101,7 +103,7 @@ public class TestS3MultipartResponse {
         .setKeyName(keyName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
@@ -182,7 +184,7 @@ public class TestS3MultipartResponse {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
             .setUploadID(multipartUploadID)
             .setCreationTime(Time.now())
-            .setReplicationConfig(new RatisReplicationConfig(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setParentID(parentID)
             .build();
@@ -196,7 +198,7 @@ public class TestS3MultipartResponse {
             .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
-            .setReplicationConfig(new RatisReplicationConfig(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
                     new OmKeyLocationInfoGroup(0, new ArrayList<>())))
@@ -218,7 +220,7 @@ public class TestS3MultipartResponse {
         keyName, multipartUploadID);
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos);
+        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos, getBucketLayout());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -233,7 +235,7 @@ public class TestS3MultipartResponse {
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
               .setUploadID(multipartUploadID)
               .setCreationTime(Time.now())
-              .setReplicationConfig(new RatisReplicationConfig(
+              .setReplicationConfig(RatisReplicationConfig.getInstance(
                       HddsProtos.ReplicationFactor.ONE))
               .setParentID(parentID)
               .build();
@@ -256,7 +258,7 @@ public class TestS3MultipartResponse {
             .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
-            .setReplicationConfig(new RatisReplicationConfig(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
                     new OmKeyLocationInfoGroup(0, new ArrayList<>())))
@@ -271,7 +273,8 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
         multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,
-        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo);
+        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo,
+        getBucketLayout());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -279,7 +282,9 @@ public class TestS3MultipartResponse {
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID, OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.Status status,
-          List<OmKeyInfo> unUsedParts) {
+          List<OmKeyInfo> unUsedParts,
+          OmBucketInfo omBucketInfo,
+          RepeatedOmKeyInfo keysToDelete) {
 
 
     String multipartKey = omMetadataManager
@@ -297,7 +302,8 @@ public class TestS3MultipartResponse {
                             .setVolume(volumeName).setKey(keyName)).build();
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
-        multipartKey, multipartOpenKey, omKeyInfo, unUsedParts);
+        multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout(), omBucketInfo, keysToDelete);
   }
 
   private String getMultipartKey(long parentID, String keyName,
@@ -311,7 +317,7 @@ public class TestS3MultipartResponse {
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
       OMResponse omResponse) {
     return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
-        omKeyInfo);
+        omKeyInfo, getBucketLayout());
   }
 
   protected S3MultipartUploadAbortResponse getS3MultipartUploadAbortResp(
@@ -319,6 +325,11 @@ public class TestS3MultipartResponse {
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OMResponse omResponse) {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo);
+        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        getBucketLayout());
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

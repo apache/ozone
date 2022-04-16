@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
@@ -136,7 +137,7 @@ public final class RatisHelper {
   }
 
   private static RaftGroup newRaftGroup(Collection<RaftPeer> peers) {
-    return peers.isEmpty()? emptyRaftGroup()
+    return peers.isEmpty() ? emptyRaftGroup()
         : RaftGroup.valueOf(DUMMY_GROUP_ID, peers);
   }
 
@@ -182,9 +183,9 @@ public final class RatisHelper {
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
-  public static RaftClient newRaftClient(RaftPeer leader,
-      ConfigurationSource conf, GrpcTlsConfig tlsConfig) {
-    return newRaftClient(getRpcType(conf), leader,
+  public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient(
+      ConfigurationSource conf) {
+    return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
   }
 
@@ -212,26 +213,72 @@ public final class RatisHelper {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
     }
-    final RaftProperties properties = new RaftProperties();
-
-    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    final RaftProperties properties = newRaftProperties(rpcType);
 
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
 
-    RaftClient.Builder builder =  RaftClient.newBuilder()
+    return RaftClient.newBuilder()
         .setRaftGroup(group)
         .setLeaderId(leader)
         .setProperties(properties)
-        .setRetryPolicy(retryPolicy);
+        .setParameters(setClientTlsConf(rpcType, tlsConfig))
+        .setRetryPolicy(retryPolicy)
+        .build();
+  }
 
+  public static Parameters setClientTlsConf(RpcType rpcType,
+      GrpcTlsConfig tlsConfig) {
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
       Parameters parameters = new Parameters();
-      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
-      builder.setParameters(parameters);
+      setAdminTlsConf(parameters, tlsConfig);
+      setClientTlsConf(parameters, tlsConfig);
+      return parameters;
     }
-    return builder.build();
+    return null;
+  }
+
+  private static void setAdminTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Admin.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  private static void setClientTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  public static Parameters setServerTlsConf(
+      GrpcTlsConfig serverConf, GrpcTlsConfig clientConf) {
+    final Parameters parameters = new Parameters();
+    if (serverConf != null) {
+      GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
+      GrpcConfigKeys.TLS.setConf(parameters, serverConf);
+      setAdminTlsConf(parameters, serverConf);
+    }
+    setClientTlsConf(parameters, clientConf);
+    return parameters;
+  }
+
+  public static Parameters setServerTlsConf(GrpcTlsConfig tlsConf) {
+    return setServerTlsConf(tlsConf, tlsConf);
+  }
+
+  public static RaftProperties newRaftProperties(RpcType rpcType) {
+    final RaftProperties properties = new RaftProperties();
+    setRpcType(properties, rpcType);
+    return properties;
+  }
+
+  public static RaftProperties setRpcType(RaftProperties properties,
+      RpcType rpcType) {
+    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    return properties;
   }
 
   /**

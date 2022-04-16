@@ -31,6 +31,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -48,7 +49,7 @@ import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -181,19 +182,21 @@ public class GeneratorDatanode extends BaseGenerator {
 
   private String getScmIdFromStoragePath(Path hddsDir)
       throws IOException {
-    final Optional<Path> scmSpecificDir = Files.list(hddsDir)
-        .filter(Files::isDirectory)
-        .findFirst();
-    if (!scmSpecificDir.isPresent()) {
-      throw new NoSuchFileException(
+    try (Stream<Path> stream = Files.list(hddsDir)) {
+      final Optional<Path> scmSpecificDir = stream
+          .filter(Files::isDirectory)
+          .findFirst();
+      if (!scmSpecificDir.isPresent()) {
+        throw new NoSuchFileException(
           "SCM specific datanode directory doesn't exist " + hddsDir);
-    }
-    final Path scmDirName = scmSpecificDir.get().getFileName();
-    if (scmDirName == null) {
-      throw new IllegalArgumentException(
+      }
+      final Path scmDirName = scmSpecificDir.get().getFileName();
+      if (scmDirName == null) {
+        throw new IllegalArgumentException(
           "SCM specific datanode directory doesn't exist");
+      }
+      return scmDirName.toString();
     }
-    return scmDirName.toString();
   }
 
 
@@ -313,8 +316,8 @@ public class GeneratorDatanode extends BaseGenerator {
 
   private KeyValueContainer createContainer(long containerId)
       throws IOException {
-    ChunkLayOutVersion layoutVersion =
-        ChunkLayOutVersion.getConfiguredVersion(config);
+    ContainerLayoutVersion layoutVersion =
+        ContainerLayoutVersion.getConfiguredVersion(config);
     KeyValueContainerData keyValueContainerData =
         new KeyValueContainerData(containerId, layoutVersion,
             getContainerSize(config),

@@ -46,7 +46,7 @@ public enum ReplicationFactor {
    * @return ReplicationFactor
    */
   public static ReplicationFactor valueOf(int value) {
-    if(value == 1) {
+    if (value == 1) {
       return ONE;
     }
     if (value == 3) {

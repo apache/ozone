@@ -42,9 +42,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
@@ -75,6 +75,7 @@ public class BlockInputStream extends InputStream
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private boolean initialized = false;
+  // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy =
       HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
   private int retries;
@@ -142,15 +143,34 @@ public class BlockInputStream extends InputStream
       return;
     }
 
-    List<ChunkInfo> chunks;
-    try {
-      chunks = getChunkInfos();
-    } catch (ContainerNotFoundException ioEx) {
-      refreshPipeline(ioEx);
-      chunks = getChunkInfos();
+    List<ChunkInfo> chunks = null;
+    IOException catchEx = null;
+    do {
+      try {
+        // If refresh returns new pipeline, retry with it.
+        // If we get IOException due to connectivity issue,
+        // retry according to retry policy.
+        chunks = getChunkInfos();
+        break;
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException ex) {
+        refreshPipeline(ex);
+        catchEx = ex;
+      } catch (IOException ex) {
+        LOG.debug("Retry to get chunk info fail", ex);
+        catchEx = ex;
+      }
+    } while (shouldRetryRead(catchEx));
+
+    if (chunks == null) {
+      throw catchEx;
+    } else {
+      // Reset retry count if we get chunks successfully.
+      retries = 0;
     }
 
-    if (chunks != null && !chunks.isEmpty()) {
+    if (!chunks.isEmpty()) {
       // For each chunk in the block, create a ChunkInputStream and compute
       // its chunkOffset
       this.chunkOffsets = new long[chunks.size()];
@@ -201,7 +221,7 @@ public class BlockInputStream extends InputStream
     // protocol.
     if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               ReplicationConfig
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
@@ -319,6 +339,17 @@ public class BlockInputStream extends InputStream
           continue;
         } else {
           throw e;
+        }
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (IOException ex) {
+        // We got a IOException which might be due
+        // to DN down or connectivity issue.
+        if (shouldRetryRead(ex)) {
+          current.releaseClient();
+          continue;
+        } else {
+          throw ex;
         }
       }
 
@@ -481,7 +512,7 @@ public class BlockInputStream extends InputStream
   }
 
   @Override
-  public void unbuffer() {
+  public synchronized void unbuffer() {
     storePosition();
     releaseClient();
 
@@ -524,5 +555,10 @@ public class BlockInputStream extends InputStream
   @VisibleForTesting
   public synchronized List<ChunkInputStream> getChunkStreams() {
     return chunkStreams;
+  }
+
+  @VisibleForTesting
+  public static Logger getLog() {
+    return LOG;
   }
 }

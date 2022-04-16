@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -32,13 +33,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for create file request - prefix layout.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE,
+    BUCKET_TABLE})
 public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
@@ -57,8 +60,9 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
+                                     @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override
@@ -91,4 +95,8 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
                     getOmKeyInfo().getBucketName()), getOmBucketInfo());
   }
 
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
 }

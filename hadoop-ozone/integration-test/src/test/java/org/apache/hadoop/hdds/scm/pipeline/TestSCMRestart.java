@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.AfterClass;
@@ -53,8 +53,8 @@ public class TestSCMRestart {
   private static OzoneConfiguration conf;
   private static Pipeline ratisPipeline1;
   private static Pipeline ratisPipeline2;
-  private static ContainerManagerV2 containerManager;
-  private static ContainerManagerV2 newContainerManager;
+  private static ContainerManager containerManager;
+  private static ContainerManager newContainerManager;
   private static PipelineManager pipelineManager;
 
   /**
@@ -82,12 +82,12 @@ public class TestSCMRestart {
     pipelineManager = scm.getPipelineManager();
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(
+            RatisReplicationConfig.getInstance(
                 ReplicationFactor.THREE), "Owner1").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            new RatisReplicationConfig(
+            RatisReplicationConfig.getInstance(
                 ReplicationFactor.ONE), "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     // At this stage, there should be 2 pipeline one with 1 open container
@@ -124,7 +124,7 @@ public class TestSCMRestart {
     // Try creating a new container, it should be from the same pipeline
     // as was before restart
     ContainerInfo containerInfo = newContainerManager
-        .allocateContainer(new RatisReplicationConfig(
+        .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "Owner1");
     Assert.assertEquals(containerInfo.getPipelineID(), ratisPipeline1.getId());
   }
