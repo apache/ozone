@@ -52,7 +52,9 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -461,7 +463,6 @@ public class ContainerBalancer implements SCMService {
    */
   private void checkIterationMoveResults(Set<DatanodeDetails> selectedTargets) {
     this.countDatanodesInvolvedPerIteration = 0;
-    this.sizeMovedPerIteration = 0;
 
     CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(
         moveSelectionToFutureMap.values()
@@ -471,83 +472,36 @@ public class ContainerBalancer implements SCMService {
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-    } catch (Exception e) {
-      // For exceptions other than InterruptedException, we ignore them.
+    } catch (TimeoutException e) {
+      long timeoutCounts = moveSelectionToFutureMap.entrySet().stream()
+          .filter(entry -> !entry.getValue().isDone())
+          .map(entry -> {
+            LOG.warn("Container move canceled for container {} to target {} " +
+                "due to timeout.", entry.getKey().getContainerID(),
+                entry.getKey().getTargetNode().getUuidString());
+            entry.getValue().cancel(true);
+            return entry;
+          }).count();
+      LOG.warn(timeoutCounts + " futures are canceled.");
+      metrics.incrementNumTimeoutContainerMovesInLatestIteration(timeoutCounts);
+    } catch (ExecutionException e) {
       e.printStackTrace();
-    }
-
-    List<ContainerMoveSelection> completeKeyList =
-        moveSelectionToFutureMap.keySet().stream()
-        .filter(key -> moveSelectionToFutureMap.get(key).isDone())
-        .collect(Collectors.toList());
-
-    // Handle completed futures
-    for (ContainerMoveSelection moveSelection : completeKeyList) {
-      try {
-        CompletableFuture<ReplicationManager.MoveResult> future =
-            moveSelectionToFutureMap.get(moveSelection);
-        if (future.isCompletedExceptionally()) {
-          try {
-            future.join();
-          } catch (CompletionException ex) {
-            LOG.info("Container move for container {} to target {} " +
-                    "failed with exceptions",
-                moveSelection.getContainerID().toString(),
-                moveSelection.getTargetNode().getUuidString(),
-                ex.getCause());
-          }
-        } else {
-          ReplicationManager.MoveResult result = future.join();
-          if (result == ReplicationManager.MoveResult.COMPLETED) {
-            try {
-              ContainerInfo container =
-                  containerManager.getContainer(moveSelection.getContainerID());
-              this.sizeMovedPerIteration += container.getUsedBytes();
-              metrics.incrementNumContainerMovesInLatestIteration(1);
-              LOG.info("Container move completed for container {} to target {}",
-                  container.containerID(),
-                  moveSelection.getTargetNode().getUuidString());
-            } catch (ContainerNotFoundException e) {
-              LOG.warn("Could not find Container {} while " +
-                      "checking move results in ContainerBalancer",
-                  moveSelection.getContainerID(), e);
-            }
-          } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug(
-                  "Container move for container {} to target {} failed: {}",
-                  moveSelection.getContainerID(),
-                  moveSelection.getTargetNode().getUuidString(), result);
-            }
-          }
-        }
-      } finally {
-        // Remove completed moves.
-        moveSelectionToFutureMap.remove(moveSelection);
-      }
-    }
-
-    // Handle timeout moves.
-    if (LOG.isDebugEnabled()) {
-      moveSelectionToFutureMap.keySet().forEach(entry -> {
-        LOG.debug("Container move timeout for container {} to target {}",
-            entry.getContainerID().toString(),
-            entry.getTargetNode().getUuidString());
-      });
     }
 
     countDatanodesInvolvedPerIteration =
         sourceToTargetMap.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
-    sizeMovedPerIteration /= OzoneConsts.GB;
-    metrics.incrementDataSizeMovedGBInLatestIteration(sizeMovedPerIteration);
     metrics.incrementNumContainerMoves(
         metrics.getNumContainerMovesInLatestIteration());
-    metrics.incrementDataSizeMovedGB(sizeMovedPerIteration);
+    metrics.incrementNumTimeoutContainerMoves(
+        metrics.getNumTimeoutContainerMovesInLatestIteration());
+    metrics.incrementDataSizeMovedGB(
+        metrics.getDataSizeMovedGBInLatestIteration());
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
             "in this iteration: {}GB.",
-        countDatanodesInvolvedPerIteration, sizeMovedPerIteration);
+        countDatanodesInvolvedPerIteration,
+        metrics.getDataSizeMovedGBInLatestIteration());
   }
 
   /**
@@ -634,25 +588,45 @@ public class ContainerBalancer implements SCMService {
    */
   private boolean moveContainer(DatanodeDetails source,
                                 ContainerMoveSelection moveSelection) {
-    ContainerID container = moveSelection.getContainerID();
+    ContainerID containerID = moveSelection.getContainerID();
     CompletableFuture<ReplicationManager.MoveResult> future;
     try {
+      ContainerInfo containerInfo = containerManager.getContainer(containerID);
       future = replicationManager
-          .move(container, source, moveSelection.getTargetNode());
+          .move(containerID, source, moveSelection.getTargetNode())
+          .whenComplete((result, ex) -> {
+            if (ex != null) {
+              LOG.info("Container move for container {} from source {} to " +
+                      "target {} failed with exceptions",
+                  containerID.toString(),
+                  source.getUuidString(),
+                  moveSelection.getTargetNode().getUuidString(), ex);
+            } else {
+              if (result == ReplicationManager.MoveResult.COMPLETED) {
+                metrics.incrementDataSizeMovedGBInLatestIteration(
+                    containerInfo.getUsedBytes()/OzoneConsts.GB);
+                metrics.incrementNumContainerMovesInLatestIteration(1);
+                LOG.info(
+                    "Container move completed for container {} to target {}",
+                    containerID,
+                    moveSelection.getTargetNode().getUuidString());
+              } else {
+                LOG.debug(
+                    "Container move for container {} to target {} failed: {}",
+                    moveSelection.getContainerID(),
+                    moveSelection.getTargetNode().getUuidString(), result);
+              }
+            }
+          });
     } catch (ContainerNotFoundException e) {
-      LOG.warn("Could not find Container {} for container move", container, e);
+      LOG.warn("Could not find Container {} for container move", containerID, e);
       return false;
     } catch (NodeNotFoundException e) {
-      LOG.warn("Container move failed for container {}", container, e);
+      LOG.warn("Container move failed for container {}", containerID, e);
       return false;
     }
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
-        LOG.info("Container move for container {} from source {} to target {}" +
-                "failed with exceptions",
-            container.toString(),
-            source.getUuidString(),
-            moveSelection.getTargetNode().getUuidString());
         return false;
       } else {
         ReplicationManager.MoveResult result = future.join();
@@ -817,6 +791,7 @@ public class ContainerBalancer implements SCMService {
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
     metrics.resetNumContainerMovesInLatestIteration();
+    metrics.resetNumTimeoutContainerMovesInLatestIteration();
     metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();

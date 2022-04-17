@@ -44,6 +44,10 @@ public final class ContainerBalancerMetrics {
       "in the latest iteration.")
   private MutableCounterLong numContainerMovesInLatestIteration;
 
+  @Metric(about = "Number of timeout container moves performed by " +
+      "Container Balancer in the latest iteration.")
+  private MutableCounterLong numTimeoutContainerMovesInLatestIteration;
+
   @Metric(about = "Number of iterations that Container Balancer has run for.")
   private MutableCounterLong numIterations;
 
@@ -60,6 +64,10 @@ public final class ContainerBalancerMetrics {
   @Metric(about = "Total number of container moves across all iterations of " +
       "Container Balancer.")
   private MutableCounterLong numContainerMoves;
+
+  @Metric(about = "Total number of timeout container moves across " +
+      "all iterations of Container Balancer.")
+  private MutableCounterLong numTimeoutContainerMoves;
 
   @Metric(about = "Total data size in GB moved across all iterations of " +
       "Container Balancer.")
@@ -115,6 +123,25 @@ public final class ContainerBalancerMetrics {
   public void resetNumContainerMovesInLatestIteration() {
     numContainerMovesInLatestIteration.incr(
         -getNumContainerMovesInLatestIteration());
+  }
+
+  /**
+   * Gets the number of timeout container moves performed by
+   * Container Balancer in the latest iteration.
+   * @return number of timeout container moves
+   */
+  public long getNumTimeoutContainerMovesInLatestIteration() {
+    return numTimeoutContainerMovesInLatestIteration.value();
+  }
+
+  public void incrementNumTimeoutContainerMovesInLatestIteration(
+      long valueToAdd) {
+    this.numTimeoutContainerMovesInLatestIteration.incr(valueToAdd);
+  }
+
+  public void resetNumTimeoutContainerMovesInLatestIteration() {
+    numTimeoutContainerMovesInLatestIteration.incr(
+        -getNumTimeoutContainerMovesInLatestIteration());
   }
 
   /**
@@ -185,6 +212,14 @@ public final class ContainerBalancerMetrics {
 
   public void incrementNumContainerMoves(long valueToAdd) {
     numContainerMoves.incr(valueToAdd);
+  }
+
+  public long getNumTimeoutContainerMoves() {
+    return numTimeoutContainerMoves.value();
+  }
+
+  public void incrementNumTimeoutContainerMoves(long valueToAdd) {
+    numTimeoutContainerMoves.incr(valueToAdd);
   }
 
   public long getDataSizeMovedGB() {
