@@ -51,13 +51,11 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
@@ -475,14 +473,13 @@ public class ContainerBalancer implements SCMService {
     } catch (TimeoutException e) {
       long timeoutCounts = moveSelectionToFutureMap.entrySet().stream()
           .filter(entry -> !entry.getValue().isDone())
-          .map(entry -> {
+          .peek(entry -> {
             LOG.warn("Container move canceled for container {} to target {} " +
                 "due to timeout.", entry.getKey().getContainerID(),
                 entry.getKey().getTargetNode().getUuidString());
             entry.getValue().cancel(true);
-            return entry;
           }).count();
-      LOG.warn(timeoutCounts + " futures are canceled.");
+      LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumTimeoutContainerMovesInLatestIteration(timeoutCounts);
     } catch (ExecutionException e) {
       e.printStackTrace();
@@ -604,7 +601,7 @@ public class ContainerBalancer implements SCMService {
             } else {
               if (result == ReplicationManager.MoveResult.COMPLETED) {
                 metrics.incrementDataSizeMovedGBInLatestIteration(
-                    containerInfo.getUsedBytes()/OzoneConsts.GB);
+                    containerInfo.getUsedBytes() / OzoneConsts.GB);
                 metrics.incrementNumContainerMovesInLatestIteration(1);
                 LOG.info(
                     "Container move completed for container {} to target {}",
@@ -619,7 +616,8 @@ public class ContainerBalancer implements SCMService {
             }
           });
     } catch (ContainerNotFoundException e) {
-      LOG.warn("Could not find Container {} for container move", containerID, e);
+      LOG.warn("Could not find Container {} for container move",
+          containerID, e);
       return false;
     } catch (NodeNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
