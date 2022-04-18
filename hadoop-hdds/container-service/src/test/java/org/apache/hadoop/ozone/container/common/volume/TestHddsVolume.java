@@ -42,6 +42,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.Before;
@@ -257,6 +258,8 @@ public class TestHddsVolume {
 
   @Test
   public void testDbStoreCreatedWithoutDbVolumes() throws IOException {
+    ContainerTestUtils.enableSchemaV3(CONF);
+
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
     volume.createWorkingDir(CLUSTER_ID, null);
@@ -278,6 +281,8 @@ public class TestHddsVolume {
 
   @Test
   public void testDbStoreCreatedWithDbVolumes() throws IOException {
+    ContainerTestUtils.enableSchemaV3(CONF);
+
     // create the DbVolumeSet
     MutableVolumeSet dbVolumeSet = createDbVolumeSet();
 
@@ -304,6 +309,8 @@ public class TestHddsVolume {
   @Test
   public void testDbStoreClosedOnBadVolumeWithoutDbVolumes()
       throws IOException {
+    ContainerTestUtils.enableSchemaV3(CONF);
+
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
     volume.createWorkingDir(CLUSTER_ID, null);
@@ -332,6 +339,8 @@ public class TestHddsVolume {
 
   @Test
   public void testDbStoreClosedOnBadVolumeWithDbVolumes() throws IOException {
+    ContainerTestUtils.enableSchemaV3(CONF);
+
     // create the DbVolumeSet
     MutableVolumeSet dbVolumeSet = createDbVolumeSet();
 

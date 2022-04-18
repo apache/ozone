@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -83,8 +83,7 @@ public class VersionEndpointTask implements
               "Reply from SCM: clusterId cannot be null");
 
           // Check DbVolumes
-          if (!VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
-              .equals(OzoneConsts.SCHEMA_V3)) {
+          if (SchemaV3.isFinalizedAndEnabled(configuration)) {
             checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
           }
           // Check HddsVolumes

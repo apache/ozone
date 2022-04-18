@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 import java.io.File;
@@ -154,6 +155,15 @@ public final class VersionedDatanodeFeatures {
       } else {
         return SchemaV2.chooseSchemaVersion();
       }
+    }
+
+    public static boolean isFinalizedAndEnabled(ConfigurationSource conf) {
+      DatanodeConfiguration dcf = conf.getObject(DatanodeConfiguration.class);
+      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V3)
+          && dcf.getContainerSchemaV3Enabled()) {
+        return true;
+      }
+      return false;
     }
   }
 }

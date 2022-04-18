@@ -54,6 +54,8 @@ public class DatanodeConfiguration {
 
   public static final String WAIT_ON_ALL_FOLLOWERS =
       "hdds.datanode.wait.on.all.followers";
+  public static final String CONTAINER_SCHEMA_V3_ENABLED =
+      "hdds.datanode.container.schema.v3.enabled";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -68,6 +70,8 @@ public class DatanodeConfiguration {
 
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
+
+  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -258,6 +262,15 @@ public class DatanodeConfiguration {
     this.waitOnAllFollowers = val;
   }
 
+  @Config(key = "container.schema.v3.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Enable use of container schema v3(one rocksdb per disk)."
+  )
+  private boolean containerSchemaV3Enabled =
+      CONTAINER_SCHEMA_V3_ENABLED_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -399,5 +412,13 @@ public class DatanodeConfiguration {
 
   public int getNumReadThreadPerVolume() {
     return numReadThreadPerVolume;
+  }
+
+  public boolean getContainerSchemaV3Enabled() {
+    return this.containerSchemaV3Enabled;
+  }
+
+  public void setContainerSchemaV3Enabled(boolean containerSchemaV3Enabled) {
+    this.containerSchemaV3Enabled = containerSchemaV3Enabled;
   }
 }

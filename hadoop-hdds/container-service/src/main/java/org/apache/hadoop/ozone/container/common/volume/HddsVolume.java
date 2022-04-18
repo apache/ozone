@@ -27,10 +27,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,8 +114,7 @@ public class HddsVolume extends StorageVolume {
       MutableVolumeSet dbVolumeSet) throws IOException {
     super.createWorkingDir(workingDirName, dbVolumeSet);
 
-    if (VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
-        .equals(OzoneConsts.SCHEMA_V3)) {
+    if (SchemaV3.isFinalizedAndEnabled(getConf())) {
       createDbStore(dbVolumeSet);
     }
   }
@@ -135,8 +133,7 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
-    if (VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
-        .equals(OzoneConsts.SCHEMA_V3)) {
+    if (SchemaV3.isFinalizedAndEnabled(getConf())) {
       closeDbStore();
     }
   }
@@ -147,8 +144,7 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
-    if (VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
-        .equals(OzoneConsts.SCHEMA_V3)) {
+    if (SchemaV3.isFinalizedAndEnabled(getConf())) {
       closeDbStore();
     }
   }

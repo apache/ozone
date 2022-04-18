@@ -20,6 +20,7 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.Before;
@@ -128,6 +129,8 @@ public class TestDbVolume {
 
   @Test
   public void testDbStoreClosedOnBadDbVolume() throws IOException {
+    ContainerTestUtils.enableSchemaV3(CONF);
+
     DbVolume dbVolume = volumeBuilder.build();
     dbVolume.format(CLUSTER_ID);
     dbVolume.createWorkingDir(CLUSTER_ID, null);

@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
@@ -117,6 +118,7 @@ public class TestVolumeSetDiskChecks {
     final int numBadVolumes = 2;
 
     conf = getConfWithDataNodeDirs(numVolumes);
+    ContainerTestUtils.enableSchemaV3(conf);
     StorageVolumeChecker dummyChecker =
         new DummyChecker(conf, new Timer(), numBadVolumes);
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
@@ -158,6 +160,7 @@ public class TestVolumeSetDiskChecks {
     final int numVolumes = 5;
 
     conf = getConfWithDataNodeDirs(numVolumes);
+    ContainerTestUtils.enableSchemaV3(conf);
     StorageVolumeChecker dummyChecker =
         new DummyChecker(conf, new Timer(), numVolumes);
 

@@ -33,6 +33,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -124,5 +125,17 @@ public final class ContainerTestUtils {
             UUID.randomUUID().toString(), UUID.randomUUID().toString());
     kvData.setState(state);
     return new KeyValueContainer(kvData, new OzoneConfiguration());
+  }
+
+  public static void enableSchemaV3(OzoneConfiguration conf) {
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setContainerSchemaV3Enabled(true);
+    conf.setFromObject(dc);
+  }
+
+  public static void disableSchemaV3(OzoneConfiguration conf) {
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setContainerSchemaV3Enabled(false);
+    conf.setFromObject(dc);
   }
 }

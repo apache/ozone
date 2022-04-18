@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -55,6 +56,7 @@ public class TestHddsVolumeUtil {
 
   @Before
   public void setup() throws Exception {
+    ContainerTestUtils.enableSchemaV3(conf);
     // Create hdds volumes for loadAll test.
     File[] hddsVolumeDirs = new File[VOLUMNE_NUM];
     StringBuilder hddsDirs = new StringBuilder();
