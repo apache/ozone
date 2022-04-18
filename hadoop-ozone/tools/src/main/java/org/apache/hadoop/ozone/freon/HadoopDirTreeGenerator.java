@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
     aliases = "dfs-tree-generator",
     description =
         "Create nested directories and create given number of files in each " +
-            "dir in any dfs compatible file system.",
+        "dir in any dfs compatible file system.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
