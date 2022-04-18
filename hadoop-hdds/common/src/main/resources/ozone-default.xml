@@ -54,6 +54,12 @@
     <description>The ipc port number of container.</description>
   </property>
   <property>
+    <name>dfs.container.ec.ipc</name>
+    <value>9860</value>
+    <tag>OZONE, CONTAINER, MANAGEMENT</tag>
+    <description>The ipc port number of ec.</description>
+  </property>
+  <property>
     <name>dfs.container.ipc.random.port</name>
     <value>false</value>
     <tag>OZONE, DEBUG, CONTAINER</tag>

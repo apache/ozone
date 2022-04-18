@@ -47,11 +47,11 @@ public class TestECBlockOutputStreamEntry {
     PipelineID randomId = PipelineID.randomId();
     ReplicationConfig ecReplicationConfig =
         new ECReplicationConfig("RS-3-2-1024k");
-    DatanodeDetails node1 = aNode("127.0.0.1", "localhost", 2001);
-    DatanodeDetails node2 = aNode("127.0.0.1", "localhost", 2002);
-    DatanodeDetails node3 = aNode("127.0.0.1", "localhost", 2003);
-    DatanodeDetails node4 = aNode("127.0.0.1", "localhost", 2004);
-    DatanodeDetails node5 = aNode("127.0.0.1", "localhost", 2005);
+    DatanodeDetails node1 = aNode("127.0.0.1", "localhost", 2001, 3001);
+    DatanodeDetails node2 = aNode("127.0.0.1", "localhost", 2002, 3002);
+    DatanodeDetails node3 = aNode("127.0.0.1", "localhost", 2003, 3003);
+    DatanodeDetails node4 = aNode("127.0.0.1", "localhost", 2004, 3004);
+    DatanodeDetails node5 = aNode("127.0.0.1", "localhost", 2005, 3005);
     List<DatanodeDetails> nodes =
         Arrays.asList(node1, node2, node3, node4, node5);
     Pipeline anECPipeline = Pipeline.newBuilder()
@@ -84,11 +84,11 @@ public class TestECBlockOutputStreamEntry {
     PipelineID randomId = PipelineID.randomId();
     ReplicationConfig ecReplicationConfig =
         new ECReplicationConfig("RS-3-2-1024k");
-    DatanodeDetails node1 = aNode("127.0.0.1", "localhost", 2001);
-    DatanodeDetails node2 = aNode("127.0.0.1", "localhost", 2001);
-    DatanodeDetails node3 = aNode("127.0.0.1", "localhost", 2003);
-    DatanodeDetails node4 = aNode("127.0.0.1", "localhost", 2001);
-    DatanodeDetails node5 = aNode("127.0.0.1", "localhost", 2005);
+    DatanodeDetails node1 = aNode("127.0.0.1", "localhost", 2001, 3001);
+    DatanodeDetails node2 = aNode("127.0.0.1", "localhost", 2001, 3001);
+    DatanodeDetails node3 = aNode("127.0.0.1", "localhost", 2003, 3003);
+    DatanodeDetails node4 = aNode("127.0.0.1", "localhost", 2001, 3001);
+    DatanodeDetails node5 = aNode("127.0.0.1", "localhost", 2005, 3005);
     List<DatanodeDetails> nodes =
         Arrays.asList(node1, node2, node3, node4, node5);
     Pipeline anECPipeline = Pipeline.newBuilder()
@@ -116,13 +116,15 @@ public class TestECBlockOutputStreamEntry {
     assertEquals(2, clients.stream().filter(c -> c.getRefcount() == 1).count());
   }
 
-  private DatanodeDetails aNode(String ip, String hostName, int port) {
+  private DatanodeDetails aNode(String ip, String hostName, int readPort, int writePort) {
     return DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .setIpAddress(ip)
         .setHostName(hostName)
         .addPort(
-            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, port))
+            DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, readPort))
+        .addPort(
+            DatanodeDetails.newPort(DatanodeDetails.Port.Name.EC, writePort))
         .build();
   }
 }
