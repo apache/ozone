@@ -24,11 +24,13 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -58,6 +60,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
   public static SCMHAManager getInstance(boolean isLeader,
       DBTransactionBuffer buffer) {
     return new SCMHAManagerStub(isLeader, buffer);
+  }
+
+  public static SCMHAManager getInstance(boolean isLeader, DBStore dbStore) {
+    return new SCMHAManagerStub(isLeader,
+        new SCMHADBTransactionBufferStub(dbStore));
   }
 
   /**
@@ -104,7 +111,9 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   @Override
   public SCMHADBTransactionBuffer asSCMHADBTransactionBuffer() {
-    return null;
+    Preconditions
+        .checkArgument(transactionBuffer instanceof SCMHADBTransactionBuffer);
+    return (SCMHADBTransactionBuffer) transactionBuffer;
   }
 
   @Override
@@ -200,7 +209,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
         }
         final Object result = handler.getClass()
             .getMethod(request.getOperation(),
-                argumentTypes.toArray(new Class<?>[0]))
+                request.getParameterTypes())
             .invoke(handler, request.getArguments());
 
         return SCMRatisResponse.encode(result);
