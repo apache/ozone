@@ -879,7 +879,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         builder.setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA);
       }
       if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile
-          || cmdType == Type.PutBlock || cmdType == Type.CreateContainer) {
+          || cmdType == Type.PutBlock || cmdType == Type.CreateContainer
+          || cmdType == Type.StreamInit) {
         builder.setContainer2BCSIDMap(container2BCSIDMap);
       }
       CompletableFuture<Message> applyTransactionFuture =
