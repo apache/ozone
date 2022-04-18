@@ -203,10 +203,6 @@ public final class SCMHAManagerStub implements SCMHAManager {
               "No handler found for request type " + request.getType());
         }
 
-        final List<Class<?>> argumentTypes = new ArrayList<>();
-        for (Object args : request.getArguments()) {
-          argumentTypes.add(args.getClass());
-        }
         final Object result = handler.getClass()
             .getMethod(request.getOperation(),
                 request.getParameterTypes())
