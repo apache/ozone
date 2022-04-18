@@ -54,7 +54,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -104,7 +103,6 @@ public class BasicRootedOzoneClientAdapterImpl
   private ReplicationConfig replicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
-  private BucketLayout defaultOFSBucketLayout;
   private OzoneConfiguration config;
 
   /**
@@ -191,11 +189,6 @@ public class BasicRootedOzoneClientAdapterImpl
       this.configuredDnPort = conf.getInt(
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
-
-      // Fetches the bucket layout to be used by OFS.
-      this.defaultOFSBucketLayout = BucketLayout.fromString(
-          conf.get(OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT,
-              OzoneConfigKeys.OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT));
       config = conf;
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
@@ -264,9 +257,7 @@ public class BasicRootedOzoneClientAdapterImpl
           // Create the bucket
           try {
             // Buckets created by OFS should be in FSO layout
-            volume.createBucket(bucketStr,
-                BucketArgs.newBuilder().setBucketLayout(
-                    this.defaultOFSBucketLayout).build());
+            volume.createBucket(bucketStr);
           } catch (OMException newBucEx) {
             // Ignore the case where another client created the bucket
             if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {

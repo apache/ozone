@@ -166,13 +166,16 @@ public class TestRootedOzoneFileSystemWithFSO
     final Path dir1Path = new Path(getBucketPath() + dir1);
     // Add a sub-dir1 to the directory to be moved.
     final Path subDir1 = new Path(dir1Path, "sub_dir1");
-    getFs().mkdirs(subDir1);
-    LOG.info("Created dir1 {}", subDir1);
-
     final Path sourceRoot = new Path(getBucketPath() + root);
-    LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
-    //  rename should fail and return false
-    Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
+    try {
+      getFs().mkdirs(subDir1);
+      LOG.info("Created dir1 {}", subDir1);
+      LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
+      //  rename should fail and return false
+      Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
+    } finally {
+      getFs().delete(sourceRoot, true);
+    }
   }
 
   @Override

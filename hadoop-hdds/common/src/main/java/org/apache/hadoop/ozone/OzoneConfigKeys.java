@@ -443,12 +443,6 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
 
-  public static final String OZONE_CLIENT_TEST_OFS_DEFAULT_BUCKET_LAYOUT =
-      "ozone.client.test.ofs.default.bucket.layout";
-
-  public static final String OZONE_CLIENT_TEST_OFS_BUCKET_LAYOUT_DEFAULT =
-      "FILE_SYSTEM_OPTIMIZED";
-
   public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY =
       "ozone.client.required.om.version.min";
 
