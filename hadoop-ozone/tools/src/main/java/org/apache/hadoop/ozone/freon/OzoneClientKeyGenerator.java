@@ -92,8 +92,10 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
     contentGenerator =
-        new ContentGenerator.Builder().seyKeySize(keySize)
-            .setBufferSize(bufferSize).build();
+        new ContentGenerator.Builder()
+            .seyKeySize(keySize)
+            .setBufferSize(bufferSize)
+            .build();
     metadata = new HashMap<>();
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
@@ -114,7 +116,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     timer.time(() -> {
       try (OutputStream stream = bucket.createKey(key, keySize,
-          ReplicationType.RATIS, factor, metadata)) {
+              ReplicationType.RATIS, factor, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }

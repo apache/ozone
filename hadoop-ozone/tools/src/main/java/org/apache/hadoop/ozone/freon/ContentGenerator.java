@@ -79,9 +79,10 @@ public class ContentGenerator {
           outputStream.write(buffer[i]);
           flushOrSync(outputStream);
         }
-      } else {  /**
-       * Write the required bytes to the output stream.
-       */
+      } else {
+        /**
+         * Write the required bytes to the output stream.
+         */
         for (int i = 0; i < curSize; i += copyBufferSize) {
           outputStream.write(buffer, i, Math.min(copyBufferSize, curSize - i));
           flushOrSync(outputStream);

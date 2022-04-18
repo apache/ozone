@@ -30,7 +30,9 @@ public class TestContentGenerator {
   @Test
   public void writeWrite() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder().seyKeySize(1024).setBufferSize(1024)
+        new ContentGenerator.Builder()
+            .seyKeySize(1024)
+            .setBufferSize(1024)
             .build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     generator.write(output);
@@ -40,8 +42,11 @@ public class TestContentGenerator {
   @Test
   public void writeWithSmallerBuffers() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder().seyKeySize(10000).setBufferSize(1024)
-            .setCopyBufferSize(3).build();
+        new ContentGenerator.Builder()
+            .seyKeySize(10000)
+            .setBufferSize(1024)
+            .setCopyBufferSize(3)
+            .build();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     generator.write(baos);
 
@@ -51,8 +56,11 @@ public class TestContentGenerator {
   @Test
   public void writeWithByteLevelWrite() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder().seyKeySize(1024).setBufferSize(1024)
-            .setCopyBufferSize(1).build();
+        new ContentGenerator.Builder()
+            .seyKeySize(1024)
+            .setBufferSize(1024)
+            .setCopyBufferSize(1)
+            .build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
@@ -62,8 +70,11 @@ public class TestContentGenerator {
   @Test
   public void writeWithSmallBuffer() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder().seyKeySize(1024).setBufferSize(1024)
-            .setCopyBufferSize(10).build();
+        new ContentGenerator.Builder()
+            .seyKeySize(1024)
+            .setBufferSize(1024)
+            .setCopyBufferSize(10)
+            .build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
@@ -73,7 +84,9 @@ public class TestContentGenerator {
   @Test
   public void writeWithDistinctSizes() throws IOException {
     ContentGenerator generator =
-        new ContentGenerator.Builder().seyKeySize(20).setBufferSize(8)
+        new ContentGenerator.Builder()
+            .seyKeySize(20)
+            .setBufferSize(8)
             .setCopyBufferSize(3)
             .build();
     ByteArrayOutputStream output = new ByteArrayOutputStream();

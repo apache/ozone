@@ -112,8 +112,10 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       OzoneConfiguration configuration = createOzoneConfiguration();
       fileSystem = FileSystem.get(URI.create(rootPath), configuration);
       contentGenerator =
-          new ContentGenerator.Builder().seyKeySize(fileSizeInBytes)
-              .setBufferSize(bufferSize).build();
+          new ContentGenerator.Builder()
+              .seyKeySize(fileSizeInBytes)
+              .setBufferSize(bufferSize)
+              .build();
       timer = getMetrics().timer("file-create");
 
       runTests(this::createDir);
@@ -181,7 +183,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("SpanSubDir:{}, depthIndex:{}, spanIndex:{} +", levelSubDir,
-            depthIndex, spanIndex);
+                depthIndex, spanIndex);
       }
       // only non-leaf nodes will be iterated recursively..
       if (depthIndex < depth) {
@@ -191,7 +193,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   }
 
   private String makeDirWithGivenNumberOfFiles(String parent)
-      throws Exception {
+          throws Exception {
     String dir = RandomStringUtils.randomAlphanumeric(length);
     dir = parent.toString().concat("/").concat(dir);
     fileSystem.mkdirs(new Path(dir));
@@ -203,7 +205,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
   private void createFile(String dir, long counter) throws Exception {
     String fileName = dir.concat("/").concat(RandomStringUtils.
-        randomAlphanumeric(length));
+            randomAlphanumeric(length));
     Path file = new Path(fileName);
     if (LOG.isDebugEnabled()) {
       LOG.debug("FilePath:{}", file);
