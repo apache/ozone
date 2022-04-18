@@ -241,9 +241,9 @@ public class ObjectEndpoint extends EndpointBase {
       if (copyHeader != null) {
         getMetrics().incCopyObjectFailure();
       } else {
-        LOG.error("Exception occurred in PutObject", ex.getMessage());
         getMetrics().incCreateKeyFailure();
       }
+      LOG.error("Exception occurred in PutObject", ex.getMessage());
       throw ex;
     } finally {
       if (auditSuccess) {
