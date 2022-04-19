@@ -149,8 +149,8 @@ public final class VersionedDatanodeFeatures {
    * rocksdb instance instead of a per-container instance.
    */
   public static class SchemaV3 {
-    public static String chooseSchemaVersion() {
-      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
+    public static String chooseSchemaVersion(ConfigurationSource conf) {
+      if (isFinalizedAndEnabled(conf)) {
         return OzoneConsts.SCHEMA_V3;
       } else {
         return SchemaV2.chooseSchemaVersion();
