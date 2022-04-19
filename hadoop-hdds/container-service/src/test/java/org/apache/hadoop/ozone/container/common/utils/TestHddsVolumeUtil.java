@@ -33,15 +33,18 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 /**
- * A util class for {@link HddsVolumeUtil}.
+ * Test for {@link HddsVolumeUtil}.
  */
 public class TestHddsVolumeUtil {
   @Rule
@@ -57,6 +60,7 @@ public class TestHddsVolumeUtil {
   @Before
   public void setup() throws Exception {
     ContainerTestUtils.enableSchemaV3(conf);
+
     // Create hdds volumes for loadAll test.
     File[] hddsVolumeDirs = new File[VOLUMNE_NUM];
     StringBuilder hddsDirs = new StringBuilder();
@@ -145,13 +149,89 @@ public class TestHddsVolumeUtil {
     }
   }
 
+  @Test
+  public void testNoDupDbStoreCreatedWithBadDbVolumes()
+      throws IOException {
+    // Initialize all DbVolumes
+    for (DbVolume dbVolume : StorageVolumeUtil.getDbVolumesList(
+        dbVolumeSet.getVolumesList())) {
+      dbVolume.format(clusterId);
+      dbVolume.createWorkingDir(clusterId, null);
+    }
+
+    // Create db instances for all HddsVolumes.
+    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList())) {
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, dbVolumeSet);
+    }
+
+    // Pick a dbVolume and make it fail,
+    // we should pick a dbVolume with db instances on it,
+    // and record the affected HddsVolume storageIDs.
+    int badDbVolumeCount = 0;
+    List<String> affectedHddsVolumeIDs = new ArrayList<>();
+    File badVolumeDir = null;
+    for (DbVolume dbVolume : StorageVolumeUtil.getDbVolumesList(
+        dbVolumeSet.getVolumesList())) {
+      if (!dbVolume.getHddsVolumeIDs().isEmpty()) {
+        affectedHddsVolumeIDs.addAll(dbVolume.getHddsVolumeIDs());
+        badVolumeDir = dbVolume.getStorageDir();
+        failVolume(badVolumeDir);
+        badDbVolumeCount++;
+        break;
+      }
+    }
+    assertEquals(1, badDbVolumeCount);
+    assertFalse(affectedHddsVolumeIDs.isEmpty());
+    assertNotNull(badVolumeDir);
+
+    // Reinitialize all the volumes to simulate a DN restart.
+    reinitVolumes();
+    assertEquals(1, dbVolumeSet.getFailedVolumesList().size());
+    assertEquals(VOLUMNE_NUM - 1, dbVolumeSet.getVolumesList().size());
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, dbVolumeSet, null);
+
+    int affectedVolumeCount = 0;
+
+    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList())) {
+      File storageIdDir = new File(new File(hddsVolume.getStorageDir(),
+          clusterId), hddsVolume.getStorageID());
+
+      // This hddsVolume itself is not failed, so we could still get it here
+      if (affectedHddsVolumeIDs.contains(hddsVolume.getStorageID())) {
+        // Should not create a duplicate db instance
+        assertFalse(storageIdDir.exists());
+        assertNull(hddsVolume.getDbVolume());
+        assertNull(hddsVolume.getDbParentDir());
+        affectedVolumeCount++;
+      } else {
+        // Should not use the hddsVolume itself
+        assertNotNull(hddsVolume.getDbVolume());
+        assertNotNull(hddsVolume.getDbParentDir());
+        assertNotEquals(storageIdDir, hddsVolume.getDbParentDir());
+      }
+    }
+    assertEquals(affectedHddsVolumeIDs.size(), affectedVolumeCount);
+  }
+
   private void reinitVolumes() throws IOException {
     hddsVolumeSet.shutdown();
     dbVolumeSet.shutdown();
 
-    hddsVolumeSet = new MutableVolumeSet(datanodeId, conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
     dbVolumeSet = new MutableVolumeSet(datanodeId, conf, null,
         StorageVolume.VolumeType.DB_VOLUME, null);
+    hddsVolumeSet = new MutableVolumeSet(datanodeId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+  }
+
+  /**
+   * Fail a volume by removing the VERSION file.
+   * @param volumeDir
+   */
+  private void failVolume(File volumeDir) {
+    File versionFile = new File(volumeDir, "VERSION");
+    versionFile.delete();
   }
 }
