@@ -59,6 +59,15 @@ public class ContentGenerator {
    */
   private final boolean hFlush;
 
+  /**
+   * Type of flags.
+   */
+  public enum Flags {
+    hSync,
+    hFlush,
+    None,
+  }
+
   ContentGenerator(Builder objectBuild) {
     this.keySize = objectBuild.keySize;
     this.bufferSize = objectBuild.bufferSize;
@@ -111,6 +120,7 @@ public class ContentGenerator {
     private int copyBufferSize = 1024;
     private boolean hSync = false;
     private boolean hFlush = false;
+    private String flushMode;
 
     public Builder seyKeySize(long keysize) {
       this.keySize = keysize;
@@ -127,20 +137,34 @@ public class ContentGenerator {
       return this;
     }
 
-    public Builder setHsyncData(boolean hsync) {
-      this.hSync = hsync;
-      return this;
-    }
-
-    public Builder setHflushData(boolean hflush) {
-      this.hFlush = hflush;
+    /**
+     * Type of flags permitted
+     * 1. hSync
+     * 2. hFlush
+     * 3. None.
+     */
+    public Builder setFlushMode(String flushmode) {
+      this.flushMode = flushmode;
+      Flags type = Flags.valueOf(flushmode);
+      switch (type) {
+      case hSync:
+        hSync = true;
+        break;
+      case hFlush:
+        hFlush = true;
+        break;
+      case None:
+        break;
+      default:
+        throw new IllegalArgumentException(
+            flushmode + " is not a valid benchmarkType.");
+      }
       return this;
     }
 
     //Return the final constructed builder object
     public ContentGenerator build() {
-      ContentGenerator contentgenerator = new ContentGenerator(this);
-      return contentgenerator;
+      return new ContentGenerator(this);
     }
   }
 
