@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
@@ -124,11 +125,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    *
    * @param limit The maximum number of expired open keys to return.
    * @param expireThreshold The threshold of open key expiration age.
+   * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
    * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
    * @throws IOException
    */
-  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int limit)
-      throws IOException;
+  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int limit,
+      BucketLayout bucketLayout) throws IOException;
 
   /**
    * Returns the metadataManager.
