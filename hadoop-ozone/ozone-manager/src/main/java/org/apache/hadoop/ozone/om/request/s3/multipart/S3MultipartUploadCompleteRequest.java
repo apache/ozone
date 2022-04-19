@@ -25,7 +25,6 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -437,7 +435,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
-      String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex) {
+      String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex)
+      throws IOException {
 
     // Add key entry to file table.
     omMetadataManager.getKeyTable(getBucketLayout())
@@ -542,7 +541,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   private void updateCache(OMMetadataManager omMetadataManager,
       String dbBucketKey, @Nullable OmBucketInfo omBucketInfo,
       String dbOzoneKey, String dbMultipartOpenKey, String dbMultipartKey,
-      OmKeyInfo omKeyInfo, long transactionLogIndex) {
+      OmKeyInfo omKeyInfo, long transactionLogIndex) throws IOException {
     // Update cache.
     // 1. Add key entry to key table.
     // 2. Delete multipartKey entry from openKeyTable and multipartInfo table.
@@ -551,9 +550,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
         transactionLogIndex);
 
-    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-        new CacheKey<>(dbMultipartOpenKey),
-        new CacheValue<>(Optional.absent(), transactionLogIndex));
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .addCacheEntry(
+            new CacheKey<>(dbMultipartOpenKey),
+            new CacheValue<>(Optional.absent(), transactionLogIndex));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(dbMultipartKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
@@ -566,19 +566,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           new CacheKey<>(dbBucketKey),
           new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
     }
-  }
-
-  public static S3MultipartUploadCompleteRequest getInstance(KeyArgs keyArgs,
-      OMRequest omRequest, OzoneManager ozoneManager) throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new S3MultipartUploadCompleteRequestWithFSO(omRequest,
-          bucketLayout);
-    }
-    return new S3MultipartUploadCompleteRequest(omRequest, bucketLayout);
   }
 }
 

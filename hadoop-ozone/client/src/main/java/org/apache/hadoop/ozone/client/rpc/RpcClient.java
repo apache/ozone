@@ -1038,6 +1038,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public void renameKeys(String volumeName, String bucketName,
                          Map<String, String> keyMap) throws IOException {
     verifyVolumeName(volumeName);

@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -203,6 +204,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // exception
       throw new OMException("Bucket not found " + bucketName, BUCKET_NOT_FOUND);
     }
+
+    // Make sure associated bucket's layout matches the one associated with
+    // the request.
+    OMClientRequestUtils.checkClientRequestPrecondition(
+        omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout(),
+        getBucketLayout());
   }
 
   // For keys batch delete and rename only

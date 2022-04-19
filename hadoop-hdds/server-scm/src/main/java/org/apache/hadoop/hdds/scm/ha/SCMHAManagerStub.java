@@ -85,6 +85,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
     ratisServer.start();
   }
 
+  @Override
+  public void stop() throws IOException {
+    ratisServer.stop();
+  }
+
   /**
    * Informs RatisServerStub to behaviour as a leader SCM or a follower SCM.
    */
@@ -119,14 +124,6 @@ public final class SCMHAManagerStub implements SCMHAManager {
   @Override
   public SCMSnapshotProvider getSCMSnapshotProvider() {
     return null;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void shutdown() throws IOException {
-    ratisServer.stop();
   }
 
   @Override
@@ -219,6 +216,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
     @Override
     public void stop() {
+    }
+
+    @Override
+    public boolean isStopped() {
+      return false;
     }
 
     @Override

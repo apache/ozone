@@ -119,6 +119,7 @@ public abstract class EndpointBase {
     try {
       client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
+      getMetrics().incCreateBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {

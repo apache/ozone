@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,12 +132,9 @@ public class BackgroundPipelineCreator implements SCMService {
         .setDaemon(false)
         .setNameFormat(THREAD_NAME + " - %d")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
-          // gracefully shutdown SCM.
-          scmContext.getScm().stop();
-
           String message = "Terminate SCM, encounter uncaught exception"
               + " in RatisPipelineUtilsThread";
-          ExitUtils.terminate(1, message, ex, LOG);
+          scmContext.getScm().shutDown(message);
         })
         .build()
         .newThread(this::run);

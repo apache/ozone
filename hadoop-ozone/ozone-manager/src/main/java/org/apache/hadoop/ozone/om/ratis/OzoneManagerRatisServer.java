@@ -559,7 +559,7 @@ public final class OzoneManagerRatisServer {
   public void stop() {
     try {
       server.close();
-      omStateMachine.stop();
+      omStateMachine.close();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

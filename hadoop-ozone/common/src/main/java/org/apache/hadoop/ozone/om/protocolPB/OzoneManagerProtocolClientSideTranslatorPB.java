@@ -755,6 +755,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Deprecated
   public void renameKeys(OmRenameKeys omRenameKeys) throws IOException {
 
     List<RenameKeysMap> renameKeyList  = new ArrayList<>();
