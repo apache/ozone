@@ -76,14 +76,14 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
 
   List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
       long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+    int nodesRequired = replicationConfig.getRequiredNodes();
     List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
         .filter(dn -> SCMCommonPlacementPolicy
             .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
-        .limit(replicationConfig.getRequiredNodes())
+        .limit(nodesRequired)
         .collect(Collectors.toList());
 
-    int nodesRequired = replicationConfig.getRequiredNodes();
     if (healthyDNsWithSpace.size() < nodesRequired) {
       String msg = String.format("Unable to find enough nodes that meet the " +
               "space requirement of %d bytes for metadata and %d bytes for " +
