@@ -273,4 +273,7 @@ public final class HddsConfigKeys {
           "hdds.container.checksum.verification.enabled";
   public static final boolean
           HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT = true;
+
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
+      "ozone.audit.log.debug.cmd.list.dnaudit";
 }
