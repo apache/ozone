@@ -42,6 +42,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test for {@link HddsVolumeUtil}.
@@ -232,6 +233,6 @@ public class TestHddsVolumeUtil {
    */
   private void failVolume(File volumeDir) {
     File versionFile = new File(volumeDir, "VERSION");
-    versionFile.delete();
+    assertTrue(versionFile.delete());
   }
 }
