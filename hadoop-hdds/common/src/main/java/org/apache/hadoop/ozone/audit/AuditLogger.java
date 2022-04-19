@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 /**
  * Class to define Audit Logger for Ozone.
  */
-public class AuditLogger {
+public final class AuditLogger {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditLogger.class);
 
@@ -53,20 +53,26 @@ public class AuditLogger {
 
   /**
    * Parametrized Constructor to initialize logger.
-   * @param type Audit Logger Type
    */
-  public AuditLogger(AuditLoggerType type) {
-    initializeLogger(type);
+  private AuditLogger() {
   }
 
   /**
    * Initializes the logger with specific type.
    * @param loggerType specified one of the values from enum AuditLoggerType.
    */
-  private void initializeLogger(AuditLoggerType loggerType) {
+  public void initializeLogger(AuditLoggerType loggerType) {
     this.logger = LogManager.getContext(false).getLogger(loggerType.getType());
     this.type = loggerType;
     refreshDebugCmdSet();
+  }
+
+  public static AuditLogger instance() {
+    return AuditLoggerHolder.INSTANCE;
+  }
+
+  private static class AuditLoggerHolder {
+    private static final AuditLogger INSTANCE = new AuditLogger();
   }
 
   @VisibleForTesting

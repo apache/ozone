@@ -66,8 +66,7 @@ public abstract class EndpointBase implements Auditor {
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
-  protected static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.S3GLOGGER);
+  protected static final AuditLogger AUDIT = AuditLogger.instance();
 
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
@@ -90,6 +89,7 @@ public abstract class EndpointBase implements Auditor {
    */
   @PostConstruct
   public void initialization() {
+    AUDIT.initializeLogger(AuditLoggerType.S3GLOGGER);
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
     getClient().getObjectStore()
         .getClientProxy()

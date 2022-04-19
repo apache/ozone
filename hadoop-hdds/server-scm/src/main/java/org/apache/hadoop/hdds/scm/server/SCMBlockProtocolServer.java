@@ -81,8 +81,7 @@ public class SCMBlockProtocolServer implements
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMBlockProtocolServer.class);
 
-  private static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.SCMLOGGER);
+  private static final AuditLogger AUDIT = AuditLogger.instance();
 
   private final StorageContainerManager scm;
   private final OzoneConfiguration conf;
@@ -96,6 +95,7 @@ public class SCMBlockProtocolServer implements
    */
   public SCMBlockProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm) throws IOException {
+    AUDIT.initializeLogger(AuditLoggerType.SCMLOGGER);
     this.scm = scm;
     this.conf = conf;
     final int handlerCount =

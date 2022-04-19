@@ -140,6 +140,7 @@ public abstract class BaseHttpServer {
       httpServer.addServlet("conf", "/conf", HddsConfServlet.class);
 
       httpServer.addServlet("logstream", "/logstream", LogStreamServlet.class);
+      httpServer.addServlet("auditlog", "/auditlog", AuditLogServlet.class);
       prometheusSupport =
           conf.getBoolean(HddsConfigKeys.HDDS_PROMETHEUS_ENABLED, true);
 

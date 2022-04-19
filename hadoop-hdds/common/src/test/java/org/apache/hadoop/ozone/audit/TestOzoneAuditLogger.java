@@ -21,6 +21,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,8 +58,7 @@ public class TestOzoneAuditLogger {
         "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
   }
 
-  private static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.OMLOGGER);
+  private static final AuditLogger AUDIT = AuditLogger.instance();
 
   private static final Map<String, String> PARAMS =
       new DummyEntity().toAuditMap();
@@ -101,6 +101,12 @@ public class TestOzoneAuditLogger {
           .withParams(PARAMS)
           .withResult(SUCCESS)
           .withException(null).build();
+
+
+  @BeforeClass
+  public static void initLogger() {
+    AUDIT.initializeLogger(AuditLoggerType.OMLOGGER);
+  }
 
   @AfterClass
   public static void tearDown() {

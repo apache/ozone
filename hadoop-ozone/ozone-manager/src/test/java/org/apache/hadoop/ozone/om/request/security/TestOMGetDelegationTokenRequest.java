@@ -66,8 +66,8 @@ public class TestOMGetDelegationTokenRequest extends
   public void setupGetDelegationToken() throws IOException {
     secretManager = Mockito.mock(OzoneDelegationTokenSecretManager.class);
     when(ozoneManager.getDelegationTokenMgr()).thenReturn(secretManager);
-    when(ozoneManager.getAuditLogger()).thenReturn(new AuditLogger(
-        AuditLoggerType.OMLOGGER));
+    when(ozoneManager.getAuditLogger()).thenReturn(AuditLogger.instance());
+    AuditLogger.instance().initializeLogger(AuditLoggerType.OMLOGGER);
     when(ozoneManager.getVersionManager()).thenReturn(
         new OMLayoutVersionManager());
 

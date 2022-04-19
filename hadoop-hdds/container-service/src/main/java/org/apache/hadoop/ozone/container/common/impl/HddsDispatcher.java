@@ -77,8 +77,7 @@ import org.slf4j.LoggerFactory;
 public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   static final Logger LOG = LoggerFactory.getLogger(HddsDispatcher.class);
-  private static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.DNLOGGER);
+  private static final AuditLogger AUDIT = AuditLogger.instance();
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource conf;
   private final ContainerSet containerSet;
@@ -100,6 +99,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       VolumeSet volumes, Map<ContainerType, Handler> handlers,
       StateContext context, ContainerMetrics metrics,
       TokenVerifier tokenVerifier) {
+    AUDIT.initializeLogger(AuditLoggerType.DNLOGGER);
     this.conf = config;
     this.containerSet = contSet;
     this.volumeSet = volumes;

@@ -108,8 +108,7 @@ public class SCMClientProtocolServer implements
     StorageContainerLocationProtocol, Auditor {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMClientProtocolServer.class);
-  private static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.SCMLOGGER);
+  private static final AuditLogger AUDIT = AuditLogger.instance();
   private final RPC.Server clientRpcServer;
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
@@ -117,6 +116,7 @@ public class SCMClientProtocolServer implements
 
   public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm) throws IOException {
+    AUDIT.initializeLogger(AuditLoggerType.SCMLOGGER);
     this.scm = scm;
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,

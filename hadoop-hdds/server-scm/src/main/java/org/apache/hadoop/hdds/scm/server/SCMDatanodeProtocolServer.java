@@ -113,8 +113,7 @@ public class SCMDatanodeProtocolServer implements
   private static final Logger LOG = LoggerFactory.getLogger(
       SCMDatanodeProtocolServer.class);
 
-  private static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.SCMLOGGER);
+  private static final AuditLogger AUDIT = AuditLogger.instance();
 
   /**
    * The RPC server that listens to requests from DataNodes.
@@ -136,6 +135,8 @@ public class SCMDatanodeProtocolServer implements
     // passive SCM server can override them.
     Preconditions.checkNotNull(scm, "SCM cannot be null");
     Preconditions.checkNotNull(eventPublisher, "EventPublisher cannot be null");
+
+    AUDIT.initializeLogger(AuditLoggerType.SCMLOGGER);
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;
