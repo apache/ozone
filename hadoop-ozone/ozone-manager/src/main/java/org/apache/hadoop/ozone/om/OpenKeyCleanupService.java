@@ -72,12 +72,12 @@ public class OpenKeyCleanupService extends BackgroundService {
   private final AtomicLong submittedOpenKeyCount;
   private final AtomicLong runCount;
 
-  public OpenKeyCleanupService(OzoneManager ozoneManager, KeyManager keyManager,
-      ConfigurationSource conf, int serviceInterval, long serviceTimeout) {
-    super("OpenKeyCleanupService", serviceInterval, TimeUnit.SECONDS,
-        OPEN_KEY_DELETING_CORE_POOL_SIZE, serviceTimeout);
+  public OpenKeyCleanupService(long interval, TimeUnit unit, long timeout,
+      OzoneManager ozoneManager, ConfigurationSource conf) {
+    super("OpenKeyCleanupService", interval, unit,
+        OPEN_KEY_DELETING_CORE_POOL_SIZE, timeout);
     this.ozoneManager = ozoneManager;
-    this.keyManager = keyManager;
+    this.keyManager = ozoneManager.getKeyManager();
 
     long expireMillis = conf.getTimeDuration(
         OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
