@@ -18,19 +18,13 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 
 import java.io.File;
@@ -38,11 +32,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
 /**
  * A util class for {@link HddsVolume}.
@@ -51,17 +42,6 @@ public final class HddsVolumeUtil {
 
   // Private constructor for Utility class. Unused.
   private HddsVolumeUtil() {
-  }
-
-  private static final String VERSION_FILE   = "VERSION";
-  private static final String STORAGE_ID_PREFIX = "DS-";
-
-  public static File getVersionFile(File rootDir) {
-    return new File(rootDir, VERSION_FILE);
-  }
-
-  public static String generateUuid() {
-    return STORAGE_ID_PREFIX + UUID.randomUUID();
   }
 
   /**
@@ -81,291 +61,40 @@ public final class HddsVolumeUtil {
   }
 
   /**
-   * Returns storageID if it is valid. Throws an exception otherwise.
-   */
-  @VisibleForTesting
-  public static String getStorageID(Properties props, File versionFile)
-      throws InconsistentStorageStateException {
-    return getProperty(props, OzoneConsts.STORAGE_ID, versionFile);
-  }
-
-  /**
-   * Returns clusterID if it is valid. It should match the clusterID from the
-   * Datanode. Throws an exception otherwise.
-   */
-  @VisibleForTesting
-  public static String getClusterID(Properties props, File versionFile,
-      String clusterID) throws InconsistentStorageStateException {
-    String cid = getProperty(props, OzoneConsts.CLUSTER_ID, versionFile);
-
-    if (clusterID == null) {
-      return cid;
-    }
-    if (!clusterID.equals(cid)) {
-      throw new InconsistentStorageStateException("Mismatched " +
-          "ClusterIDs. Version File : " + versionFile + " has clusterID: " +
-          cid + " and Datanode has clusterID: " + clusterID);
-    }
-    return cid;
-  }
-
-  /**
-   * Returns datanodeUuid if it is valid. It should match the UUID of the
-   * Datanode. Throws an exception otherwise.
-   */
-  @VisibleForTesting
-  public static String getDatanodeUUID(Properties props, File versionFile,
-      String datanodeUuid)
-      throws InconsistentStorageStateException {
-    String datanodeID = getProperty(props, OzoneConsts.DATANODE_UUID,
-        versionFile);
-
-    if (datanodeUuid != null && !datanodeUuid.equals(datanodeID)) {
-      throw new InconsistentStorageStateException("Mismatched " +
-          "DatanodeUUIDs. Version File : " + versionFile + " has datanodeUuid: "
-          + datanodeID + " and Datanode has datanodeUuid: " + datanodeUuid);
-    }
-    return datanodeID;
-  }
-
-  /**
-   * Returns creationTime if it is valid. Throws an exception otherwise.
-   */
-  @VisibleForTesting
-  public static long getCreationTime(Properties props, File versionFile)
-      throws InconsistentStorageStateException {
-    String cTimeStr = getProperty(props, OzoneConsts.CTIME, versionFile);
-
-    long cTime = Long.parseLong(cTimeStr);
-    long currentTime = Time.now();
-    if (cTime > currentTime || cTime < 0) {
-      throw new InconsistentStorageStateException("Invalid Creation time in " +
-          "Version File : " + versionFile + " - " + cTime + ". Current system" +
-          " time is " + currentTime);
-    }
-    return cTime;
-  }
-
-  /**
-   * Returns layOutVersion if it is valid. Throws an exception otherwise.
-   */
-  @VisibleForTesting
-  public static int getLayOutVersion(Properties props, File versionFile) throws
-      InconsistentStorageStateException {
-    String lvStr = getProperty(props, OzoneConsts.LAYOUTVERSION, versionFile);
-
-    int lv = Integer.parseInt(lvStr);
-    if (HDDSVolumeLayoutVersion.getLatestVersion().getVersion() != lv) {
-      throw new InconsistentStorageStateException("Invalid layOutVersion. " +
-          "Version file has layOutVersion as " + lv + " and latest Datanode " +
-          "layOutVersion is " +
-          HDDSVolumeLayoutVersion.getLatestVersion().getVersion());
-    }
-    return lv;
-  }
-
-  public static String getProperty(
-      Properties props, String propName, File
-      versionFile
-  )
-      throws InconsistentStorageStateException {
-    String value = props.getProperty(propName);
-    if (StringUtils.isBlank(value)) {
-      throw new InconsistentStorageStateException("Invalid " + propName +
-          ". Version File : " + versionFile + " has null or empty " + propName);
-    }
-    return value;
-  }
-
-  /**
-   * Check Volume is in consistent state or not.
-   * Prior to SCM HA, volumes used the format {@code <volume>/hdds/<scm-id>}.
-   * Post SCM HA, new volumes will use the format {@code <volume>/hdds/<cluster
-   * -id>}.
-   * Existing volumes using SCM ID would have been reformatted to have {@code
-   * <volume>/hdds/<cluster-id>} as a symlink pointing to {@code <volume
-   * >/hdds/<scm-id>}.
-   *
-   * @param hddsVolume
-   * @param clusterId
-   * @param logger
-   * @param dbVolumeSet
-   * @return true - if volume is in consistent state, otherwise false.
-   */
-  public static boolean checkVolume(HddsVolume hddsVolume, String scmId,
-      String clusterId, ConfigurationSource conf, Logger logger,
-      MutableVolumeSet dbVolumeSet) {
-    File hddsRoot = hddsVolume.getHddsRootDir();
-    String volumeRoot = hddsRoot.getPath();
-    File clusterDir = new File(hddsRoot, clusterId);
-
-    try {
-      hddsVolume.format(clusterId);
-    } catch (IOException ex) {
-      logger.error("Error during formatting volume {}.",
-          volumeRoot, ex);
-      return false;
-    }
-
-    File[] hddsFiles = hddsRoot.listFiles();
-
-    if (hddsFiles == null) {
-      // This is the case for IOException, where listFiles returns null.
-      // So, we fail the volume.
-      return false;
-    } else if (hddsFiles.length == 1) {
-      // DN started for first time or this is a newly added volume.
-      // The one file is the version file.
-      // So we create cluster ID directory, or SCM ID directory if
-      // pre-finalized for SCM HA.
-      // Either the SCM ID or cluster ID will be used in naming the
-      // volume's subdirectory, depending on the datanode's layout version.
-      String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
-          scmId, clusterId);
-      File idDir = new File(hddsRoot, id);
-      if (!idDir.mkdir()) {
-        logger.error("Unable to create ID directory {} for datanode.", idDir);
-        return false;
-      }
-
-      if (VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
-          .equals(OzoneConsts.SCHEMA_V3)) {
-        try {
-          formatDbStoreForHddsVolume(hddsVolume, dbVolumeSet, id, conf);
-        } catch (IOException e) {
-          logger.error("Unable to init db instance for volume {}",
-              volumeRoot, e);
-          return false;
-        }
-      }
-      return true;
-    } else if (hddsFiles.length == 2) {
-      // If we are finalized for SCM HA and there is no cluster ID directory,
-      // the volume may have been unhealthy during finalization and been
-      // skipped. Create cluster ID symlink now.
-      // Else, We are still pre-finalized.
-      // The existing directory should be left for backwards compatibility.
-      return VersionedDatanodeFeatures.ScmHA.
-          upgradeVolumeIfNeeded(hddsVolume, clusterId);
-    } else {
-      if (!clusterDir.exists()) {
-        logger.error("Volume {} is in an inconsistent state. {} files found " +
-            "but cluster ID directory {} does not exist.", volumeRoot,
-            hddsFiles.length, clusterDir);
-        return false;
-      }
-      return true;
-    }
-  }
-
-  /**
-   * Randomly pick a DbVolume for HddsVolume and init db instance.
-   * Use the HddsVolume directly if no DbVolume found.
-   * @param hddsVolume
-   * @param dbVolumeSet
-   * @param clusterID
+   * Initialize db instance, rocksdb will load the existing instance
+   * if present and format a new one if not.
+   * @param containerDBPath
    * @param conf
+   * @throws IOException
    */
-  public static void formatDbStoreForHddsVolume(HddsVolume hddsVolume,
-      MutableVolumeSet dbVolumeSet, String clusterID,
+  public static void initPerDiskDBStore(String containerDBPath,
       ConfigurationSource conf) throws IOException {
-    DbVolume chosenDbVolume = null;
-    File dbParentDir;
-
-    if (dbVolumeSet == null || dbVolumeSet.getVolumesList().isEmpty()) {
-      // No extra db volumes specified, just create db under the HddsVolume.
-      dbParentDir = new File(hddsVolume.getStorageDir(), clusterID);
-    } else {
-      // Randomly choose a DbVolume for simplicity.
-      List<DbVolume> dbVolumeList = StorageVolumeUtil.getDbVolumesList(
-          dbVolumeSet.getVolumesList());
-      chosenDbVolume = dbVolumeList.get(
-          ThreadLocalRandom.current().nextInt(dbVolumeList.size()));
-      dbParentDir = new File(chosenDbVolume.getStorageDir(), clusterID);
-    }
-
-    // Init subdir with the storageID of HddsVolume.
-    File storageIdDir = new File(dbParentDir, hddsVolume.getStorageID());
-    if (!storageIdDir.mkdirs() && !storageIdDir.exists()) {
-      throw new IOException("Can't make subdir under "
-          + dbParentDir.getAbsolutePath() + " for volume "
-          + hddsVolume.getStorageID());
-    }
-
-    // Init the db instance for HddsVolume under the subdir above.
-    String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
-        .getAbsolutePath();
-    try {
-      initPerDiskDBStore(containerDBPath, conf);
-    } catch (IOException e) {
-      throw new IOException("Can't init db instance under path "
-          + containerDBPath + " for volume " + hddsVolume.getStorageID());
-    }
-
-    // Set the dbVolume and dbParentDir of the HddsVolume for db path lookup.
-    hddsVolume.setDbVolume(chosenDbVolume);
-    hddsVolume.setDbParentDir(storageIdDir);
+    DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerDBPath,
+        OzoneConsts.SCHEMA_V3, conf, false);
+    BlockUtils.addDB(store, containerDBPath, conf, OzoneConsts.SCHEMA_V3);
   }
 
   /**
    * Load already formatted db instances for all HddsVolumes.
    * @param hddsVolumeSet
    * @param dbVolumeSet
-   * @param conf
    * @param logger
    */
   public static void loadAllHddsVolumeDbStore(MutableVolumeSet hddsVolumeSet,
-      MutableVolumeSet dbVolumeSet, ConfigurationSource conf, Logger logger) {
+      MutableVolumeSet dbVolumeSet, Logger logger) {
     // Scan subdirs under the db volumes and build a one-to-one map
     // between each HddsVolume -> DbVolume.
     mapDbVolumesToDataVolumesIfNeeded(hddsVolumeSet, dbVolumeSet);
 
-    List<HddsVolume> hddsVolumeList = StorageVolumeUtil.getHddsVolumesList(
-        hddsVolumeSet.getVolumesList());
-
-    for (HddsVolume volume : hddsVolumeList) {
-      String clusterID = volume.getClusterID();
-
-      // DN startup for the first time, not registered yet,
-      // so the DbVolume is not formatted.
-      if (clusterID == null) {
-        continue;
-      }
-
-      File clusterIdDir = new File(volume.getDbVolume() == null ?
-          volume.getStorageDir() : volume.getDbVolume().getStorageDir(),
-          clusterID);
-
-      if (!clusterIdDir.exists()) {
-        if (logger != null) {
-          logger.error("HddsVolume {} db instance not formatted, " +
-                  "clusterID {} directory not found",
-              volume.getStorageDir().getAbsolutePath(),
-              clusterIdDir.getAbsolutePath());
-        }
-        continue;
-      }
-
-      File storageIdDir = new File(clusterIdDir, volume.getStorageID());
-      if (!storageIdDir.exists()) {
-        if (logger != null) {
-          logger.error("HddsVolume {} db instance not formatted, " +
-                  "storageID {} directory not found",
-              volume.getStorageDir().getAbsolutePath(),
-              storageIdDir.getAbsolutePath());
-        }
-        continue;
-      }
-      volume.setDbParentDir(storageIdDir);
-
-      String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
-          .getAbsolutePath();
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList())) {
       try {
-        initPerDiskDBStore(containerDBPath, conf);
+        volume.loadDbStore();
       } catch (IOException e) {
+        onFailure(volume);
         if (logger != null) {
-          logger.error("Can't load db instance under path {} for volume {}",
-              containerDBPath, volume.getStorageDir().getAbsolutePath());
+          logger.error("Load db store for HddsVolume {} failed",
+              volume.getStorageDir().getAbsolutePath(), e);
         }
       }
     }
@@ -392,19 +121,5 @@ public final class HddsVolumeUtil {
     hddsVolumes.forEach(hddsVolume ->
         hddsVolume.setDbVolume(globalDbVolumeMap.getOrDefault(
             hddsVolume.getStorageID(), null)));
-  }
-
-  /**
-   * Initialize db instance, rocksdb will load the existing instance
-   * if present and format a new one if not.
-   * @param containerDBPath
-   * @param conf
-   * @throws IOException
-   */
-  private static void initPerDiskDBStore(String containerDBPath,
-      ConfigurationSource conf) throws IOException {
-    DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerDBPath,
-        OzoneConsts.SCHEMA_V3, conf, false);
-    BlockUtils.addDB(store, containerDBPath, conf, OzoneConsts.SCHEMA_V3);
   }
 }

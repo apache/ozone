@@ -17,18 +17,13 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.DbVolume;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -87,34 +82,13 @@ public class VersionEndpointTask implements
           Preconditions.checkNotNull(clusterId,
               "Reply from SCM: clusterId cannot be null");
 
-          formatDbVolumesIfNeeded(scmId, clusterId);
-
-          // Check volumes
-          MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
-          volumeSet.writeLock();
-          try {
-            Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
-
-            // If version file does not exist
-            // create version file and also set scm ID or cluster ID.
-            for (Map.Entry<String, StorageVolume> entry
-                : volumeMap.entrySet()) {
-              StorageVolume volume = entry.getValue();
-              boolean result = HddsVolumeUtil.checkVolume((HddsVolume) volume,
-                  scmId, clusterId, configuration, LOG,
-                  ozoneContainer.getDbVolumeSet());
-              if (!result) {
-                volumeSet.failVolume(volume.getStorageDir().getPath());
-              }
-            }
-            if (volumeSet.getVolumesList().size() == 0) {
-              // All volumes are in inconsistent state
-              throw new DiskOutOfSpaceException(
-                  "All configured Volumes are in Inconsistent State");
-            }
-          } finally {
-            volumeSet.writeUnlock();
+          // Check DbVolumes
+          if (!VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
+              .equals(OzoneConsts.SCHEMA_V3)) {
+            checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
           }
+          // Check HddsVolumes
+          checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
 
           // Start the container services after getting the version information
           ozoneContainer.start(clusterId);
@@ -137,30 +111,31 @@ public class VersionEndpointTask implements
     return rpcEndPoint.getState();
   }
 
-  private void formatDbVolumesIfNeeded(String scmId, String clusterId) {
-    if (!VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion()
-        .equals(OzoneConsts.SCHEMA_V3)) {
+  private void checkVolumeSet(MutableVolumeSet volumeSet,
+      String scmId, String clusterId) throws DiskOutOfSpaceException {
+    if (volumeSet == null) {
       return;
     }
 
-    MutableVolumeSet dbVolumeSet = ozoneContainer.getDbVolumeSet();
-
-    if (dbVolumeSet != null) {
-      dbVolumeSet.writeLock();
-      try {
-        List<DbVolume> dbVolumeList = StorageVolumeUtil
-            .getDbVolumesList(dbVolumeSet.getVolumesList());
-
-        dbVolumeList.parallelStream().forEach(dbVolume -> {
-          String id = VersionedDatanodeFeatures.ScmHA
-              .chooseContainerPathID(configuration, scmId, clusterId);
-          if (!dbVolume.format(id)) {
-            dbVolumeSet.failVolume(dbVolume.getStorageDir().getPath());
-          }
-        });
-      } finally {
-        dbVolumeSet.writeUnlock();
+    volumeSet.writeLock();
+    try {
+      // If version file does not exist
+      // create version file and also set scm ID or cluster ID.
+      for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
+        boolean result = StorageVolumeUtil.checkVolume(volume,
+            scmId, clusterId, configuration, LOG,
+            ozoneContainer.getDbVolumeSet());
+        if (!result) {
+          volumeSet.failVolume(volume.getStorageDir().getPath());
+        }
       }
+      if (volumeSet.getVolumesList().size() == 0) {
+        // All volumes are in inconsistent state
+        throw new DiskOutOfSpaceException(
+            "All configured Volumes are in Inconsistent State");
+      }
+    } finally {
+      volumeSet.writeUnlock();
     }
   }
 }

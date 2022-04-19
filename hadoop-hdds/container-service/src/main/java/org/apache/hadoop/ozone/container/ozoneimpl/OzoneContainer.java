@@ -143,8 +143,7 @@ public class OzoneContainer {
       dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
           new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
               context, VolumeType.DB_VOLUME, volumeChecker);
-      HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet,
-          conf, LOG);
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
     } else {
       dbVolumeSet = null;
     }

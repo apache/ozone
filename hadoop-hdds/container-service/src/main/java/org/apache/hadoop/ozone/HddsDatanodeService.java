@@ -57,7 +57,7 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -319,7 +319,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
       HddsVolume hddsVolume = (HddsVolume) entry.getValue();
-      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, clusterId,
+      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
           clusterId, conf, LOG, null);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());

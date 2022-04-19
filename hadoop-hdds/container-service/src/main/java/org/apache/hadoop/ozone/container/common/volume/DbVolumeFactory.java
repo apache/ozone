@@ -28,26 +28,27 @@ import java.io.IOException;
  */
 public class DbVolumeFactory extends StorageVolumeFactory {
 
-  private String clusterID;
-
   public DbVolumeFactory(ConfigurationSource conf,
       SpaceUsageCheckFactory usageCheckFactory, MutableVolumeSet volumeSet,
-      String clusterID) {
-    super(conf, usageCheckFactory, volumeSet);
-    this.clusterID = clusterID;
+      String datanodeUuid, String clusterID) {
+    super(conf, usageCheckFactory, volumeSet, datanodeUuid, clusterID);
   }
 
   @Override
   StorageVolume createVolume(String locationString, StorageType storageType)
       throws IOException {
-    DbVolume.Builder volumeBuilder =
-        new DbVolume.Builder(locationString)
-            .conf(getConf())
-            .clusterID(clusterID)
-            .usageCheckFactory(getUsageCheckFactory())
-            .storageType(storageType)
-            .volumeSet(getVolumeSet());
-    return volumeBuilder.build();
+    DbVolume.Builder volumeBuilder = new DbVolume.Builder(locationString)
+        .conf(getConf())
+        .datanodeUuid(getDatanodeUuid())
+        .clusterID(getClusterID())
+        .usageCheckFactory(getUsageCheckFactory())
+        .storageType(storageType)
+        .volumeSet(getVolumeSet());
+    DbVolume volume = volumeBuilder.build();
+
+    checkAndSetClusterID(volume.getClusterID());
+
+    return volume;
   }
 
   @Override

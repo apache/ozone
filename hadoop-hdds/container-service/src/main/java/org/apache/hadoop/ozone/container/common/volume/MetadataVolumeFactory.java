@@ -31,7 +31,7 @@ public class MetadataVolumeFactory extends StorageVolumeFactory {
 
   public MetadataVolumeFactory(ConfigurationSource conf,
       SpaceUsageCheckFactory usageCheckFactory, MutableVolumeSet volumeSet) {
-    super(conf, usageCheckFactory, volumeSet);
+    super(conf, usageCheckFactory, volumeSet, null, null);
   }
 
   @Override

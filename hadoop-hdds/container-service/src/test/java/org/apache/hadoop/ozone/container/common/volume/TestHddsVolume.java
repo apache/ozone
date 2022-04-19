@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.volume;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,15 +31,19 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -71,7 +74,7 @@ public class TestHddsVolume {
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    versionFile = HddsVolumeUtil.getVersionFile(rootDir);
+    versionFile = StorageVolumeUtil.getVersionFile(rootDir);
   }
 
   @Test
@@ -98,31 +101,6 @@ public class TestHddsVolume {
         versionFile.exists());
     assertEquals(CLUSTER_ID, volume.getClusterID());
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
-  }
-
-  @Test
-  public void testReadPropertiesFromVersionFile() throws Exception {
-    HddsVolume volume = volumeBuilder.build();
-
-    volume.format(CLUSTER_ID);
-
-    Properties properties = DatanodeVersionFile.readFrom(versionFile);
-
-    String storageID = HddsVolumeUtil.getStorageID(properties, versionFile);
-    String clusterID = HddsVolumeUtil.getClusterID(
-        properties, versionFile, CLUSTER_ID);
-    String datanodeUuid = HddsVolumeUtil.getDatanodeUUID(
-        properties, versionFile, DATANODE_UUID);
-    long cTime = HddsVolumeUtil.getCreationTime(
-        properties, versionFile);
-    int layoutVersion = HddsVolumeUtil.getLayOutVersion(
-        properties, versionFile);
-
-    assertEquals(volume.getStorageID(), storageID);
-    assertEquals(volume.getClusterID(), clusterID);
-    assertEquals(volume.getDatanodeUuid(), datanodeUuid);
-    assertEquals(volume.getCTime(), cTime);
-    assertEquals(volume.getLayoutVersion(), layoutVersion);
   }
 
   @Test
@@ -275,5 +253,124 @@ public class TestHddsVolume {
 
     // Shutdown the volume.
     volume.shutdown();
+  }
+
+  @Test
+  public void testDbStoreCreatedWithoutDbVolumes() throws IOException {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    // No DbVolume chosen and use the HddsVolume itself to hold
+    // a db instance.
+    assertNull(volume.getDbVolume());
+    File storageIdDir = new File(new File(volume.getStorageDir(),
+        CLUSTER_ID), volume.getStorageID());
+    assertEquals(volume.getDbParentDir(), storageIdDir);
+
+    // The db directory should exist
+    File containerDBFile = new File(volume.getDbParentDir(),
+        CONTAINER_DB_NAME);
+    assertTrue(containerDBFile.exists());
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testDbStoreCreatedWithDbVolumes() throws IOException {
+    // create the DbVolumeSet
+    MutableVolumeSet dbVolumeSet = createDbVolumeSet();
+
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, dbVolumeSet);
+
+    // DbVolume chosen.
+    assertNotNull(volume.getDbVolume());
+
+    File storageIdDir = new File(new File(volume.getDbVolume()
+        .getStorageDir(), CLUSTER_ID), volume.getStorageID());
+    // Db parent dir should be set to a subdir under the dbVolume.
+    assertEquals(volume.getDbParentDir(), storageIdDir);
+
+    // The db directory should exist
+    File containerDBFile = new File(volume.getDbParentDir(),
+        CONTAINER_DB_NAME);
+    assertTrue(containerDBFile.exists());
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testDbStoreClosedOnBadVolumeWithoutDbVolumes()
+      throws IOException {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    // No DbVolume chosen and use the HddsVolume itself to hold
+    // a db instance.
+    assertNull(volume.getDbVolume());
+    File storageIdDir = new File(new File(volume.getStorageDir(),
+        CLUSTER_ID), volume.getStorageID());
+    assertEquals(volume.getDbParentDir(), storageIdDir);
+
+    // The db directory should exist
+    File containerDBFile = new File(volume.getDbParentDir(),
+        CONTAINER_DB_NAME);
+    assertTrue(containerDBFile.exists());
+    assertNotNull(DatanodeStoreCache.getInstance().getDB(
+        containerDBFile.getAbsolutePath()));
+
+    // Make it a bad volume
+    volume.failVolume();
+
+    // The db should be removed from cache
+    assertNull(DatanodeStoreCache.getInstance().getDB(
+        containerDBFile.getAbsolutePath()));
+  }
+
+  @Test
+  public void testDbStoreClosedOnBadVolumeWithDbVolumes() throws IOException {
+    // create the DbVolumeSet
+    MutableVolumeSet dbVolumeSet = createDbVolumeSet();
+
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, dbVolumeSet);
+
+    // DbVolume chosen.
+    assertNotNull(volume.getDbVolume());
+
+    File storageIdDir = new File(new File(volume.getDbVolume()
+        .getStorageDir(), CLUSTER_ID), volume.getStorageID());
+    // Db parent dir should be set to a subdir under the dbVolume.
+    assertEquals(volume.getDbParentDir(), storageIdDir);
+
+    // The db directory should exist
+    File containerDBFile = new File(volume.getDbParentDir(),
+        CONTAINER_DB_NAME);
+    assertTrue(containerDBFile.exists());
+    assertNotNull(DatanodeStoreCache.getInstance().getDB(
+        containerDBFile.getAbsolutePath()));
+
+    // Make it a bad volume
+    volume.failVolume();
+
+    // The db should be removed from cache
+    assertNull(DatanodeStoreCache.getInstance().getDB(
+        containerDBFile.getAbsolutePath()));
+  }
+
+  private MutableVolumeSet createDbVolumeSet() throws IOException {
+    File dbVolumeDir = folder.newFolder();
+    CONF.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
+        dbVolumeDir.getAbsolutePath());
+    MutableVolumeSet dbVolumeSet = new MutableVolumeSet(DATANODE_UUID,
+        CLUSTER_ID, CONF, null, StorageVolume.VolumeType.DB_VOLUME,
+        null);
+    dbVolumeSet.getVolumesList().get(0).format(CLUSTER_ID);
+    dbVolumeSet.getVolumesList().get(0).createWorkingDir(CLUSTER_ID, null);
+    return dbVolumeSet;
   }
 }

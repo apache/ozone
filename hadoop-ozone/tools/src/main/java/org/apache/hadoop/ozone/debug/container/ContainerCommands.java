@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -191,7 +190,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
           "Version file " + versionFile + " is missing");
     }
 
-    return HddsVolumeUtil
+    return StorageVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
   }
 

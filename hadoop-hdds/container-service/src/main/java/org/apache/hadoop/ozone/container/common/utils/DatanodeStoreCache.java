@@ -58,7 +58,17 @@ public final class DatanodeStoreCache {
   }
 
   public void removeDB(String containerDBPath) {
-    datanodeStoreMap.remove(containerDBPath);
+    RawDB db = datanodeStoreMap.remove(containerDBPath);
+    if (db == null) {
+      LOG.debug("DB {} already removed", containerDBPath);
+      return;
+    }
+
+    try {
+      db.getStore().stop();
+    } catch (Exception e) {
+      LOG.warn("Stop DatanodeStore: {} failed", containerDBPath, e);
+    }
   }
 
   public void shutdownCache() {

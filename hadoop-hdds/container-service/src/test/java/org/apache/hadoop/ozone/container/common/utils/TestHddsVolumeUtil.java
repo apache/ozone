@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -31,14 +32,12 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * A util class for {@link HddsVolumeUtil}.
@@ -50,19 +49,12 @@ public class TestHddsVolumeUtil {
   private final String datanodeId = UUID.randomUUID().toString();
   private final String clusterId = UUID.randomUUID().toString();
   private final OzoneConfiguration conf = new OzoneConfiguration();
-  private static final int VOLUMNE_NUM = 5;
+  private static final int VOLUMNE_NUM = 3;
   private MutableVolumeSet hddsVolumeSet;
   private MutableVolumeSet dbVolumeSet;
-  private HddsVolume singleHddsVolume;
 
   @Before
   public void setup() throws Exception {
-    // Create a single volume for format test.
-    File hddsVolumeDir = tempDir.newFolder();
-    singleHddsVolume = new HddsVolume.Builder(hddsVolumeDir
-        .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId)
-        .clusterID(clusterId).build();
-
     // Create hdds volumes for loadAll test.
     File[] hddsVolumeDirs = new File[VOLUMNE_NUM];
     StringBuilder hddsDirs = new StringBuilder();
@@ -87,61 +79,25 @@ public class TestHddsVolumeUtil {
         StorageVolume.VolumeType.DB_VOLUME, null);
   }
 
-  @Test
-  public void testFormatDbStoreForHddsVolumeWithoutDbVolumes()
-      throws IOException {
-    HddsVolumeUtil.formatDbStoreForHddsVolume(singleHddsVolume,
-        null, clusterId, conf);
-
-    File storageIdDir = new File(new File(singleHddsVolume.getStorageDir(),
-        clusterId), singleHddsVolume.getStorageID());
-
-    // No dbVolumes given, so use the hddsVolume to store db instance.
-    assertNull(singleHddsVolume.getDbVolume());
-    assertEquals(storageIdDir, singleHddsVolume.getDbParentDir());
-
-    // The db directory should exist.
-    File containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME);
-    assertTrue(containerDBPath.exists());
-  }
-
-  @Test
-  public void testFormatDbStoreForHddsVolumeWithDbVolumes()
-      throws IOException {
-    HddsVolumeUtil.formatDbStoreForHddsVolume(singleHddsVolume,
-        dbVolumeSet, clusterId, conf);
-
-    // A dbVolume is picked.
-    assertNotNull(singleHddsVolume.getDbVolume());
-
-    File storageIdDir = new File(new File(singleHddsVolume.getDbVolume()
-        .getStorageDir(), clusterId), singleHddsVolume.getStorageID());
-    // Db parent dir should be set to a subdir under the dbVolume.
-    assertEquals(singleHddsVolume.getDbParentDir(), storageIdDir);
-
-    // The db directory should exist.
-    File containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME);
-    assertTrue(containerDBPath.exists());
+  @After
+  public void teardown() {
+    hddsVolumeSet.shutdown();
+    dbVolumeSet.shutdown();
   }
 
   @Test
   public void testLoadAllHddsVolumeDbStoreWithoutDbVolumes()
       throws IOException {
-    // Create storageID subdirs under each hddsVolume manually
-    // instead of format a real db instance.
+    // Create db instances for all HddsVolumes.
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
-      File storageIdDir = new File(new File(hddsVolume.getStorageDir(),
-          clusterId), hddsVolume.getStorageID());
-      if (!storageIdDir.mkdirs()) {
-        throw new IOException("Unexpected mkdir failed");
-      }
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, null);
     }
 
     // Reinitialize all the volumes to simulate a DN restart.
     reinitVolumes();
-    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, null,
-        conf, null);
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, null, null);
 
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
@@ -157,51 +113,43 @@ public class TestHddsVolumeUtil {
   @Test
   public void testLoadAllHddsVolumeDbStoreWithDbVolumes()
       throws IOException {
-    // Create storageID subdirs under dbVolumes manually
-    // instead of format a real db instance.
-    // Map hddsVolume[i] -> dbVolume[i]
-    Iterator<HddsVolume> hddsVolumeIter = StorageVolumeUtil.getHddsVolumesList(
-        hddsVolumeSet.getVolumesList()).iterator();
-    Iterator<DbVolume> dbVolumeIter = StorageVolumeUtil.getDbVolumesList(
-        dbVolumeSet.getVolumesList()).iterator();
-    for (int i = 0; i < VOLUMNE_NUM; i++) {
-      HddsVolume hddsVolume = hddsVolumeIter.next();
-      DbVolume dbVolume = dbVolumeIter.next();
-      File storageIdDir = new File(new File(dbVolume.getStorageDir(),
-          clusterId), hddsVolume.getStorageID());
-      if (!storageIdDir.mkdirs()) {
-        throw new IOException("Unexpected mkdir failed");
-      }
+    // Initialize all DbVolumes
+    for (DbVolume dbVolume : StorageVolumeUtil.getDbVolumesList(
+        dbVolumeSet.getVolumesList())) {
+      dbVolume.format(clusterId);
+      dbVolume.createWorkingDir(clusterId, null);
+    }
+
+    // Create db instances for all HddsVolumes.
+    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList())) {
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, dbVolumeSet);
     }
 
     // Reinitialize all the volumes to simulate a DN restart.
     reinitVolumes();
-    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, dbVolumeSet,
-        conf, null);
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, dbVolumeSet, null);
 
-    hddsVolumeIter = StorageVolumeUtil.getHddsVolumesList(
-        hddsVolumeSet.getVolumesList()).iterator();
-    dbVolumeIter = StorageVolumeUtil.getDbVolumesList(
-        dbVolumeSet.getVolumesList()).iterator();
-    for (int i = 0; i < VOLUMNE_NUM; i++) {
-      HddsVolume hddsVolume = hddsVolumeIter.next();
-      DbVolume dbVolume = dbVolumeIter.next();
-
-      // Check volume mapped correctly.
-      assertEquals(dbVolume, hddsVolume.getDbVolume());
-
-      File storageIdDir = new File(new File(dbVolume.getStorageDir(),
+    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList())) {
+      File storageIdDir = new File(new File(hddsVolume.getStorageDir(),
           clusterId), hddsVolume.getStorageID());
-      // Db parent dir should be set to a subdir under the dbVolume.
-      assertEquals(hddsVolume.getDbParentDir(), storageIdDir);
+
+      // Should not use the hddsVolume itself
+      assertNotNull(hddsVolume.getDbVolume());
+      assertNotNull(hddsVolume.getDbParentDir());
+      assertNotEquals(storageIdDir, hddsVolume.getDbParentDir());
     }
   }
 
   private void reinitVolumes() throws IOException {
-    // On DN startup the clusterID is null.
-    hddsVolumeSet = new MutableVolumeSet(datanodeId, null, conf, null,
+    hddsVolumeSet.shutdown();
+    dbVolumeSet.shutdown();
+
+    hddsVolumeSet = new MutableVolumeSet(datanodeId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    dbVolumeSet = new MutableVolumeSet(datanodeId, null, conf, null,
+    dbVolumeSet = new MutableVolumeSet(datanodeId, conf, null,
         StorageVolume.VolumeType.DB_VOLUME, null);
   }
 }

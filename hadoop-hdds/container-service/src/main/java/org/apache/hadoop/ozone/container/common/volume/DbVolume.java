@@ -17,14 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 
 /**
  * DbVolume represents a volume in datanode holding db instances
@@ -43,85 +45,45 @@ public class DbVolume extends StorageVolume {
 
   public static final String DB_VOLUME_DIR = "db";
 
-  private String clusterID;
-
   /**
    * Records all HddsVolumes that put its db instance under this DbVolume.
    */
-  private final List<String> hddsVolumeIDs;
+  private final Set<String> hddsVolumeIDs;
 
   protected DbVolume(Builder b) throws IOException {
     super(b);
-    this.clusterID = b.getClusterID();
-    this.hddsVolumeIDs = new ArrayList<>();
+
+    this.hddsVolumeIDs = new LinkedHashSet<>();
     if (!b.getFailedVolume()) {
+      LOG.info("Creating DbVolume: {} of storage type : {} capacity : {}",
+          getStorageDir(), b.getStorageType(), getVolumeInfo().getCapacity());
       initialize();
     }
   }
 
-  public boolean format(String cid) {
-    Preconditions.checkNotNull(cid, "clusterID cannot be null while " +
-        "formatting db volume");
-    this.clusterID = cid;
-
-    // create clusterID dir /ssd1/db/<CID-clusterID>
-    File volumeRootDir = getStorageDir();
-    File clusterIdDir = new File(volumeRootDir, clusterID);
-    if (!clusterIdDir.mkdirs() && !clusterIdDir.exists()) {
-      LOG.error("Unable to create ID directory {} for db volume {}",
-          clusterIdDir, volumeRootDir);
-      return false;
-    }
-    return true;
+  @Override
+  protected void initialize() throws IOException {
+    super.initialize();
+    scanForHddsVolumeIDs();
   }
 
-  public boolean initialize() {
-    // This should be on a test path, normally we should get
-    // the clusterID from SCM, and it should not be available
-    // while restarting.
-    if (clusterID != null) {
-      return format(clusterID);
-    }
-
-    if (!getStorageDir().exists()) {
-      // Not formatted yet
-      return true;
-    }
-
-    File[] storageDirs = getStorageDir().listFiles(File::isDirectory);
-    if (storageDirs == null) {
-      LOG.error("IO error for the db volume {}, skipped loading",
-          getStorageDir());
-      return false;
-    }
-
-    if (storageDirs.length == 0) {
-      // Not formatted completely
-      return true;
-    }
-
-    if (storageDirs.length > 1) {
-      LOG.error("DB volume {} is in an Inconsistent state", getStorageDir());
-      return false;
-    }
-
-    // scan subdirectories for db instances mapped to HddsVolumes
-    File clusterIdDir = storageDirs[0];
-    File[] subdirs = clusterIdDir.listFiles(File::isDirectory);
-    // Not used yet
-    if (subdirs == null) {
-      return true;
-    }
-
-    for (File subdir : subdirs) {
-      String storageID = subdir.getName();
-      hddsVolumeIDs.add(storageID);
-    }
-
-    return true;
+  @Override
+  public void failVolume() {
+    super.failVolume();
+    closeAllDbStore();
   }
 
-  public List<String> getHddsVolumeIDs() {
+  @Override
+  public void shutdown() {
+    super.shutdown();
+    closeAllDbStore();
+  }
+
+  public void addHddsVolumeID(String id) {
+    hddsVolumeIDs.add(id);
+  }
+
+  public Set<String> getHddsVolumeIDs() {
     return this.hddsVolumeIDs;
   }
 
@@ -129,8 +91,6 @@ public class DbVolume extends StorageVolume {
    * Builder class for DbVolume.
    */
   public static class Builder extends StorageVolume.Builder<Builder> {
-
-    private String clusterID;
 
     public Builder(String volumeRootStr) {
       super(volumeRootStr, DB_VOLUME_DIR);
@@ -141,17 +101,50 @@ public class DbVolume extends StorageVolume {
       return this;
     }
 
-    public Builder clusterID(String cid) {
-      this.clusterID = cid;
-      return this;
-    }
-
     public DbVolume build() throws IOException {
       return new DbVolume(this);
     }
+  }
 
-    public String getClusterID() {
-      return this.clusterID;
+  private void scanForHddsVolumeIDs() throws IOException {
+    // Not formatted yet
+    if (getClusterID() == null) {
+      return;
+    }
+
+    // scan subdirectories for db instances mapped to HddsVolumes
+    File clusterIdDir = new File(getStorageDir(), getClusterID());
+    // Working dir not prepared yet
+    if (!clusterIdDir.exists()) {
+      return;
+    }
+
+    File[] subdirs = clusterIdDir.listFiles(File::isDirectory);
+    if (subdirs == null) {
+      throw new IOException("Failed to do listFiles for " +
+          clusterIdDir.getAbsolutePath());
+    }
+    hddsVolumeIDs.clear();
+
+    for (File subdir : subdirs) {
+      String storageID = subdir.getName();
+      hddsVolumeIDs.add(storageID);
+    }
+  }
+
+  private void closeAllDbStore() {
+    if (getClusterID() == null) {
+      return;
+    }
+
+    File clusterIdDir = new File(getStorageDir(), getClusterID());
+    if (clusterIdDir.exists()) {
+      for (String storageID : hddsVolumeIDs) {
+        File storageIdDir = new File(clusterIdDir, storageID);
+        String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
+            .getAbsolutePath();
+        DatanodeStoreCache.getInstance().removeDB(containerDBPath);
+      }
     }
   }
 }
