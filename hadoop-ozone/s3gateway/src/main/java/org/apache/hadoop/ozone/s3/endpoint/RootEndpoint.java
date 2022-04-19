@@ -21,8 +21,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -48,19 +50,43 @@ public class RootEndpoint extends EndpointBase {
   @GET
   public Response get()
       throws OS3Exception, IOException {
-    ListBucketResponse response = new ListBucketResponse();
+    boolean auditSuccess = true;
+    try {
+      ListBucketResponse response = new ListBucketResponse();
 
-    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(null);
+      Iterator<? extends OzoneBucket> bucketIterator;
+      try {
+        bucketIterator = listS3Buckets(null);
+      } catch (Exception e) {
+        getMetrics().incListS3BucketsFailure();
+        throw e;
+      }
 
-    while (bucketIterator.hasNext()) {
-      OzoneBucket next = bucketIterator.next();
-      BucketMetadata bucketMetadata = new BucketMetadata();
-      bucketMetadata.setName(next.getName());
-      bucketMetadata.setCreationDate(next.getCreationTime());
-      response.addBucket(bucketMetadata);
+      while (bucketIterator.hasNext()) {
+        OzoneBucket next = bucketIterator.next();
+        BucketMetadata bucketMetadata = new BucketMetadata();
+        bucketMetadata.setName(next.getName());
+        bucketMetadata.setCreationDate(next.getCreationTime());
+        response.addBucket(bucketMetadata);
+      }
+
+      getMetrics().incListS3BucketsSuccess();
+      return Response.ok(response).build();
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(S3GAction.LIST_S3_BUCKETS,
+              Collections.emptyMap(), ex)
+      );
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(S3GAction.LIST_S3_BUCKETS,
+                Collections.emptyMap())
+        );
+      }
     }
-
-    return Response.ok(response).build();
   }
 
   @Override

@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -72,6 +72,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -82,6 +83,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREF
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
+import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,8 +124,8 @@ public class ReconStorageContainerManagerFacade
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
-      ReconContainerMetadataManager reconContainerMetadataManager)
-      throws IOException {
+      ReconContainerMetadataManager reconContainerMetadataManager,
+      ReconUtils reconUtils) throws IOException {
     reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -132,14 +134,14 @@ public class ReconStorageContainerManagerFacade
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
-    this.scmStorageConfig = new ReconStorageConfig(conf);
+    this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
-    this.scmhaManager = MockSCMHAManager.getInstance(
+    this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
@@ -310,6 +312,12 @@ public class ReconStorageContainerManagerFacade
     } catch (Exception e) {
       LOG.error("Can't close dbStore ", e);
     }
+  }
+
+  @Override
+  public void shutDown(String message) {
+    stop();
+    ExitUtils.terminate(1, message, LOG);
   }
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {

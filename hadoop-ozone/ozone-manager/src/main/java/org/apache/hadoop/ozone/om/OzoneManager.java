@@ -70,6 +70,7 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -221,7 +222,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
@@ -264,6 +264,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -574,6 +575,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  public boolean isStopped() {
+    return omState == State.STOPPED;
+  }
+
   /**
    * Set the {@link S3Authentication} for the current rpc handler thread.
    */
@@ -793,20 +798,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void close() throws IOException {
     stop();
-  }
-
-  public void shutdown(Exception ex) throws IOException {
-    if (omState != State.STOPPED) {
-      stop();
-      exitManager.exitSystem(1, ex.getLocalizedMessage(), ex, LOG);
-    }
-  }
-
-  public void shutdown(String errorMsg) throws IOException {
-    if (omState != State.STOPPED) {
-      stop();
-      exitManager.exitSystem(1, errorMsg, LOG);
-    }
   }
 
   /**
@@ -1916,6 +1907,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void stop() {
     LOG.info("{}: Stopping Ozone Manager", omNodeDetails.getOMPrintInfo());
+    if (isStopped()) {
+      return;
+    }
     try {
       omState = State.STOPPED;
       // Cancel the metrics timer and set to null.
@@ -1951,10 +1945,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omSnapshotProvider != null) {
         omSnapshotProvider.stop();
       }
-      omState = State.STOPPED;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
+  }
+
+  public void shutDown(String message) {
+    stop();
+    ExitUtils.terminate(1, message, LOG);
   }
 
   /**
@@ -2839,7 +2837,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ServiceInfo.Builder omServiceInfoBuilder = ServiceInfo.newBuilder()
         .setNodeType(HddsProtos.NodeType.OM)
         .setHostname(omRpcAddress.getHostName())
-        .setOmClientProtocolVersion(OZONE_OM_CLIENT_PROTOCOL_VERSION)
+        .setOmVersion(OzoneManagerVersion.CURRENT)
         .addServicePort(ServicePort.newBuilder()
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
@@ -2883,7 +2881,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             // For now assume peer is at the same version.
             // This field needs to be fetched from peer when rolling upgrades
             // are implemented.
-            .setOmClientProtocolVersion(OZONE_OM_CLIENT_PROTOCOL_VERSION)
+            .setOmVersion(OzoneManagerVersion.CURRENT)
             .addServicePort(ServicePort.newBuilder()
                 .setType(ServicePort.Type.RPC)
                 .setValue(peerNode.getRpcPort())
@@ -2922,6 +2920,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // so failure metrics is not handled. In future if there is any need to
     // handle exception in this method, we need to incorporate
     // metrics.incNumGetServiceListFails()
+    AUDIT.logReadSuccess(
+        buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
+            new LinkedHashMap<>()));
     return services;
   }
 
@@ -3755,6 +3756,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .getUpdatesSince(dbUpdatesRequest.getSequenceNumber(), limitCount);
     DBUpdates dbUpdates = new DBUpdates(updatesSince.getData());
     dbUpdates.setCurrentSequenceNumber(updatesSince.getCurrentSequenceNumber());
+    dbUpdates.setLatestSequenceNumber(updatesSince.getLatestSequenceNumber());
     return dbUpdates;
   }
 

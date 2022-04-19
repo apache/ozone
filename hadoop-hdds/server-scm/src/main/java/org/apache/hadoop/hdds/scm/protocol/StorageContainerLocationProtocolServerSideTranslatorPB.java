@@ -407,7 +407,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setDatanodeUsageInfoResponse(getDatanodeUsageInfo(
-                request.getDatanodeUsageInfoRequest()))
+                request.getDatanodeUsageInfoRequest(),
+                request.getVersion()))
             .build();
       case GetContainerCount:
         return ScmContainerLocationResponse.newBuilder()
@@ -421,7 +422,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setCmdType(request.getCmdType())
           .setStatus(Status.OK)
           .setGetContainerReplicasResponse(getContainerReplicas(
-              request.getGetContainerReplicasRequest()))
+              request.getGetContainerReplicasRequest(),
+              request.getVersion()))
           .build();
       default:
         throw new IllegalArgumentException(
@@ -435,9 +437,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public GetContainerReplicasResponseProto getContainerReplicas(
-      GetContainerReplicasRequestProto request) throws IOException {
+      GetContainerReplicasRequestProto request, int clientVersion)
+      throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> replicas
-        = impl.getContainerReplicas(request.getContainerID());
+        = impl.getContainerReplicas(request.getContainerID(), clientVersion);
     return GetContainerReplicasResponseProto.newBuilder()
         .addAllContainerReplica(replicas).build();
   }
@@ -791,11 +794,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           Optional.of(request.getMaxSizeLeavingSourceInGB());
     }
 
-    return StartContainerBalancerResponseProto.newBuilder().
-        setStart(impl.startContainerBalancer(threshold,
-            iterations, maxDatanodesPercentageToInvolvePerIteration,
-            maxSizeToMovePerIterationInGB,
-            maxSizeEnteringTargetInGB, maxSizeLeavingSourceInGB)).build();
+    return impl.startContainerBalancer(threshold, iterations,
+        maxDatanodesPercentageToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(
@@ -864,16 +866,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
       StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto
-      request) throws IOException {
+          request, int clientVersion) throws IOException {
     List<HddsProtos.DatanodeUsageInfoProto> infoList;
 
     // get info by ip or uuid
     if (request.hasUuid() || request.hasIpaddress()) {
       infoList = impl.getDatanodeUsageInfo(request.getIpaddress(),
-          request.getUuid());
+          request.getUuid(), clientVersion);
     } else {  // get most or least used nodes
       infoList = impl.getDatanodeUsageInfo(request.getMostUsed(),
-          request.getCount());
+          request.getCount(), clientVersion);
     }
 
     return DatanodeUsageInfoResponseProto.newBuilder()

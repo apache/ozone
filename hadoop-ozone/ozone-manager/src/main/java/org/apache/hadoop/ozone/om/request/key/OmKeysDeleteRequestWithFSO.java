@@ -1,0 +1,141 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.hadoop.ozone.om.request.key;
+
+import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponseWithFSO;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
+
+/**
+ * Handles DeleteKeys request for recursive bucket deletion.
+ */
+public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmKeysDeleteRequestWithFSO.class);
+
+  public OmKeysDeleteRequestWithFSO(
+      OzoneManagerProtocolProtos.OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
+  }
+
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
+        omDoubleBufferHelper);
+  }
+
+  @Override
+  protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName)
+      throws IOException {
+    OzoneFileStatus keyStatus =
+        getOzoneKeyStatus(omMetadataManager, volumeName, bucketName, keyName);
+    return keyStatus != null ? keyStatus.getKeyInfo() : null;
+  }
+
+  @Override
+  protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
+      OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus) {
+    if (keyStatus.isDirectory()) {
+      dirList.add(omKeyInfo);
+    } else {
+      omKeyInfoList.add(omKeyInfo);
+    }
+  }
+
+  @Override
+  protected OzoneFileStatus getOzoneKeyStatus(
+      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
+      String keyName) throws IOException {
+    OzoneFileStatus keyStatus = OMFileRequest
+        .getOMKeyInfoIfExists(omMetadataManager, volumeName, bucketName,
+            keyName, 0);
+    return keyStatus;
+  }
+
+  @Override
+  protected long markKeysAsDeletedInCache(OzoneManager ozoneManager,
+      long trxnLogIndex,
+      List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+      OMMetadataManager omMetadataManager, long quotaReleased) {
+
+    // Mark all keys which can be deleted, in cache as deleted.
+    for (OmKeyInfo omKeyInfo : omKeyInfoList) {
+      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+          new CacheKey<>(omMetadataManager
+              .getOzonePathKey(omKeyInfo.getParentObjectID(),
+                  omKeyInfo.getFileName())),
+          new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      quotaReleased += sumBlockLengths(omKeyInfo);
+    }
+    // Mark directory keys.
+    for (OmKeyInfo omKeyInfo : dirList) {
+      omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(
+              omMetadataManager.getOzonePathKey(omKeyInfo.getParentObjectID(),
+                  omKeyInfo.getFileName())),
+          new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      quotaReleased += sumBlockLengths(omKeyInfo);
+    }
+    return quotaReleased;
+  }
+
+  @NotNull @Override
+  protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
+      List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+      OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
+      OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
+      boolean deleteStatus, OmBucketInfo omBucketInfo) {
+    OMClientResponse omClientResponse;
+    omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
+        .setDeleteKeysResponse(
+            OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
+                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+        .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
+        .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
+        omBucketInfo.copyObject());
+    return omClientResponse;
+
+  }
+}

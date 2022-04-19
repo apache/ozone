@@ -95,9 +95,9 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
+            volume, bucket, null);
       }
       lockAcquired =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,

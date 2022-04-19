@@ -59,7 +59,7 @@ public interface SCMHAManager {
   /**
    * Stops the HA service.
    */
-  void shutdown() throws IOException;
+  void stop() throws IOException;
 
   /**
    * Adds the SC M instance to the SCM HA group.

@@ -70,9 +70,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -99,9 +101,14 @@ public class TestKeyManagerUnit {
 
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
+
+  @BeforeClass
+  public static void setup() {
+    ExitUtils.disableSystemExit();
+  }
   
   @Before
-  public void setup() throws Exception {
+  public void init() throws Exception {
     configuration = new OzoneConfiguration();
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
@@ -303,7 +310,7 @@ public class TestKeyManagerUnit {
         .setBucketName(bucket)
         .setKeyName(key)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .build();
     OmMultipartInfo omMultipartInfo = omtest.initiateMultipartUpload(key1);
@@ -319,7 +326,7 @@ public class TestKeyManagerUnit {
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
@@ -351,7 +358,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnOne.getUuid())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
@@ -360,7 +367,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineTwo = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnFour.getUuid())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
@@ -408,7 +415,7 @@ public class TestKeyManagerUnit {
         .setModificationTime(Time.now())
         .setDataSize(256000)
         .setReplicationConfig(
-                    new RatisReplicationConfig(ReplicationFactor.THREE))
+                    RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
             .setAcls(Collections.emptyList())
         .build();
     OMRequestTestUtils.addKeyToOM(metadataManager, keyInfo);
@@ -477,8 +484,8 @@ public class TestKeyManagerUnit {
           .setCreationTime(Time.now())
           .setOmKeyLocationInfos(singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setReplicationConfig(
-                      new RatisReplicationConfig(ReplicationFactor.THREE))
+          .setReplicationConfig(RatisReplicationConfig
+              .getInstance(ReplicationFactor.THREE))
           .setKeyName(keyPrefix + i)
           .setObjectID(i)
           .setUpdateID(i)

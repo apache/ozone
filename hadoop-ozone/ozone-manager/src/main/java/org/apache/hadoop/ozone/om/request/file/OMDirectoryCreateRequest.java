@@ -23,7 +23,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -31,7 +30,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -101,10 +99,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     DIRECTORY_ALREADY_EXISTS, // Directory key already exists in DB
 
     FAILURE // The request failed and exception was thrown
-  }
-
-  public OMDirectoryCreateRequest(OMRequest omRequest) {
-    super(omRequest);
   }
 
   public OMDirectoryCreateRequest(OMRequest omRequest,
@@ -372,18 +366,5 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   static long getMaxNumOfRecursiveDirs() {
     return MAX_NUM_OF_RECURSIVE_DIRS;
-  }
-
-  public static OMDirectoryCreateRequest getInstance(
-      KeyArgs keyArgs, OMRequest omRequest, OzoneManager ozoneManager)
-      throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new OMDirectoryCreateRequestWithFSO(omRequest, bucketLayout);
-    }
-    return new OMDirectoryCreateRequest(omRequest, bucketLayout);
   }
 }

@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -259,14 +260,16 @@ public interface OMMetadataManager extends DBStoreHAManager {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns the names of up to {@code count} open keys that are older than
-   * the configured expiration age.
+   * Returns the names of up to {@code count} open keys whose age is
+   * greater than or equal to {@code expireThreshold}.
    *
    * @param count The maximum number of open keys to return.
+   * @param expireThreshold The threshold of open key expire age.
    * @return a list of {@link String} representing names of open expired keys.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(int count) throws IOException;
+  List<String> getExpiredOpenKeys(Duration expireThreshold, int count)
+      throws IOException;
 
   /**
    * Returns the user Table.

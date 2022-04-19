@@ -26,10 +26,21 @@ import java.util.Map;
 public final class AuditMessage implements Message {
 
   private final String message;
+  private final String user;
+  private final String ip;
+  private final String op;
+  private final Map<String, String> params;
+  private final String ret;
   private final Throwable throwable;
 
-  private AuditMessage(String message, Throwable throwable) {
-    this.message = message;
+  private AuditMessage(String user, String ip, String op,
+      Map<String, String> params, String ret, Throwable throwable) {
+    this.user = user;
+    this.ip = ip;
+    this.op = op;
+    this.params = params;
+    this.ret = ret;
+    this.message = formMessage(user, ip, op, params, ret);
     this.throwable = throwable;
   }
 
@@ -51,6 +62,10 @@ public final class AuditMessage implements Message {
   @Override
   public Throwable getThrowable() {
     return throwable;
+  }
+
+  public String getOp() {
+    return op;
   }
 
   /**
@@ -95,9 +110,14 @@ public final class AuditMessage implements Message {
     }
 
     public AuditMessage build() {
-      String message = "user=" + this.user + " | ip=" + this.ip + " | " +
-          "op=" + this.op + " " + this.params + " | " + "ret=" + this.ret;
-      return new AuditMessage(message, throwable);
+      return new AuditMessage(user, ip, op, params, ret, throwable);
     }
+  }
+
+  private String formMessage(String userStr, String ipStr, String opStr,
+      Map<String, String> paramsMap, String retStr) {
+    return "user=" + userStr + " | ip=" + ipStr + " | " + "op=" + opStr
+        + " " + paramsMap + " | " + "ret=" + retStr;
+
   }
 }

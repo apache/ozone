@@ -271,14 +271,21 @@ public final class OmKeyInfo extends WithParentObjectId {
    * version to the all version list.
    *
    * @param newLocationList the list of new blocks to be added.
-   * @param updateTime - if true, updates modification time.
-   * @param keepOldVersions - if false, old blocks won't be kept.
+   * @param updateTime if true, updates modification time.
+   * @param keepOldVersions if false, old blocks won't be kept
+   *                        and the new block versions will always be 0
    * @throws IOException
    */
   public synchronized long addNewVersion(
       List<OmKeyLocationInfo> newLocationList, boolean updateTime,
       boolean keepOldVersions) {
     long latestVersionNum;
+
+    if (!keepOldVersions) {
+      // If old versions are cleared, new block version will always start at 0
+      keyLocationVersions.clear();
+    }
+
     if (keyLocationVersions.size() == 0) {
       // no version exist, these blocks are the very first version.
       keyLocationVersions.add(new OmKeyLocationInfoGroup(0, newLocationList));
@@ -293,11 +300,6 @@ public final class OmKeyInfo extends WithParentObjectId {
       // of new version is included.
       OmKeyLocationInfoGroup newVersion =
           currentLatestVersion.generateNextVersion(newLocationList);
-      if (!keepOldVersions) {
-        // Even though old versions are cleared here, they will be
-        // moved to delete table at the time of key commit
-        keyLocationVersions.clear();
-      }
       keyLocationVersions.add(newVersion);
       latestVersionNum = newVersion.getVersion();
     }

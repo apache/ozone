@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -38,7 +39,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   @Option(names = {"-t", "--threshold"},
       description = "Percentage deviation from average utilization of " +
           "the cluster after which a datanode will be rebalanced (for " +
-          "example, '10' for 10%).")
+          "example, '10' for 10%%).")
   private Optional<Double> threshold;
 
   @Option(names = {"-i", "--iterations"},
@@ -49,7 +50,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   @Option(names = {"-d", "--maxDatanodesPercentageToInvolvePerIteration"},
       description = "Max percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration (for example, " +
-          "'20' for 20%).")
+          "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
   @Option(names = {"-s", "--maxSizeToMovePerIterationInGB"},
@@ -71,15 +72,18 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    boolean result = scmClient.startContainerBalancer(threshold, iterations,
+    StartContainerBalancerResponseProto response = scmClient.
+        startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB);
-    if (result) {
+    if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
-      return;
+    } else {
+      System.out.println("Failed to start Container Balancer.");
+      if (response.hasMessage()) {
+        System.out.printf("Failure reason: %s", response.getMessage());
+      }
     }
-    System.out.println("Container Balancer is already running. " +
-        "Please stop it first.");
   }
 }
