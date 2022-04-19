@@ -119,10 +119,10 @@ public class TestOzoneAuditLogger {
   }
 
   /**
-   * Test to verify default log level is INFO when logging success events.
+   * Test to verify default log level is INFO when logging WRITE success events.
    */
   @Test
-  public void verifyDefaultLogLevelForSuccess() throws IOException {
+  public void verifyDefaultLogLevelForWriteSuccess() throws IOException {
     AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
     String expected =
         "INFO  | OMAudit | ? | " + WRITE_SUCCESS_MSG.getFormattedMessage();
@@ -130,13 +130,36 @@ public class TestOzoneAuditLogger {
   }
 
   /**
-   * Test to verify default log level is ERROR when logging failure events.
+   * Test to verify default log level is ERROR when logging WRITE failure
+   * events.
    */
   @Test
-  public void verifyDefaultLogLevelForFailure() throws IOException {
+  public void verifyDefaultLogLevelForWriteFailure() throws IOException {
     AUDIT.logWriteFailure(WRITE_FAIL_MSG);
     String expected =
         "ERROR | OMAudit | ? | " + WRITE_FAIL_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  /**
+   * Test to verify default log level is INFO when logging READ success events.
+   */
+  @Test
+  public void verifyDefaultLogLevelForReadSuccess() throws IOException {
+    AUDIT.logReadSuccess(READ_SUCCESS_MSG);
+    String expected =
+        "INFO  | OMAudit | ? | " + READ_SUCCESS_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  /**
+   * Test to verify default log level is ERROR when logging READ failure events.
+   */
+  @Test
+  public void verifyDefaultLogLevelForFailure() throws IOException {
+    AUDIT.logReadFailure(READ_FAIL_MSG);
+    String expected =
+        "ERROR | OMAudit | ? | " + READ_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
@@ -148,16 +171,6 @@ public class TestOzoneAuditLogger {
     assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
     assertTrue(message, message.contains(PARAMS.toString()));
     assertTrue(message, message.contains(FAILURE.getStatus()));
-  }
-
-  /**
-   * Test to verify no READ event is logged.
-   */
-  @Test
-  public void notLogReadEvents() throws IOException {
-    AUDIT.logReadSuccess(READ_SUCCESS_MSG);
-    AUDIT.logReadFailure(READ_FAIL_MSG);
-    verifyNoLog();
   }
 
   /**
@@ -173,10 +186,10 @@ public class TestOzoneAuditLogger {
     AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
     verifyNoLog();
   }
+  
   /**
    * Test to verify if multiline entries can be checked.
    */
-
   @Test
   public void messageIncludesMultilineException() throws IOException {
     String exceptionMessage = "Dummy exception message";
