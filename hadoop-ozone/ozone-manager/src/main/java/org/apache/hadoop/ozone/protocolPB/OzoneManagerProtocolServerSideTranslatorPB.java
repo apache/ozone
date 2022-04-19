@@ -136,9 +136,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     try {
       validatedRequest = requestValidations.validateRequest(request);
     } catch (Exception e) {
-      LOG.info("Request failed", e);
       if (e instanceof OMException) {
-        LOG.info("Request fail... creating error response for ", e);
         return createErrorResponse(request, (OMException) e);
       }
       throw new ServiceException(e);

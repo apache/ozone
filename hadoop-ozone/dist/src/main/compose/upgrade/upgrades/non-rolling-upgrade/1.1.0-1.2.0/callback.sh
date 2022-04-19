@@ -54,8 +54,6 @@ with_new_version_pre_finalized() {
 
   generate new1
   validate new1
-
-  check_ec_is_disabled
 }
 
 with_old_version_downgraded() {
@@ -81,6 +79,4 @@ with_new_version_finalized() {
 
   generate new2
   validate new2
-
-  check_ec_is_enabled
 }
