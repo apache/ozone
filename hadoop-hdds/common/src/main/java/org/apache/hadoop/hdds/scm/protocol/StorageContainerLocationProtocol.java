@@ -224,7 +224,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @param state The node health
    * @param clientVersion Client's version number
    * @return List of Datanodes.
-   * @see org.apache.hadoop.ozone.ClientVersions
+   * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
@@ -385,7 +385,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
-   * @see org.apache.hadoop.ozone.ClientVersions
+   * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid, int clientVersion) throws IOException;
@@ -399,7 +399,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
    * @throws IOException
-   * @see org.apache.hadoop.ozone.ClientVersions
+   * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count, int clientVersion) throws IOException;
