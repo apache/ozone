@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -41,7 +42,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
+import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
+import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -258,7 +262,7 @@ public class SCMClientProtocolServer implements
 
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
-          new StandaloneReplicationConfig(ReplicationConfig
+          StandaloneReplicationConfig.getInstance(ReplicationConfig
               .getLegacyFactor(container.getReplicationConfig())),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
@@ -291,8 +295,8 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerId) throws IOException {
+  public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId, int clientVersion) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
 
     Set<ContainerReplica> replicas = getScm().getContainerManager()
@@ -302,7 +306,7 @@ public class SCMClientProtocolServer implements
           HddsProtos.SCMContainerReplicaProto.newBuilder()
               .setContainerID(containerId)
               .setState(r.getState().toString())
-              .setDatanodeDetails(r.getDatanodeDetails().getProtoBufMessage())
+              .setDatanodeDetails(r.getDatanodeDetails().toProto(clientVersion))
               .setBytesUsed(r.getBytesUsed())
               .setPlaceOfBirth(r.getOriginDatanodeId().toString())
               .setKeyCount(r.getKeyCount())
@@ -775,7 +779,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public boolean startContainerBalancer(
+  public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
@@ -830,16 +834,24 @@ public class SCMClientProtocolServer implements
       cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
     }
 
-
-    boolean isStartedSuccessfully = scm.getContainerBalancer().start(cbc);
-    if (isStartedSuccessfully) {
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.START_CONTAINER_BALANCER, null));
-    } else {
-      AUDIT.logWriteFailure(buildAuditMessageForSuccess(
-          SCMAction.START_CONTAINER_BALANCER, null));
+    ContainerBalancer containerBalancer = scm.getContainerBalancer();
+    containerBalancer.setConfig(cbc);
+    try {
+      containerBalancer.startBalancer();
+    } catch (IllegalContainerBalancerStateException |
+        InvalidContainerBalancerConfigurationException e) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.START_CONTAINER_BALANCER, null, e));
+      return StartContainerBalancerResponseProto.newBuilder()
+          .setStart(false)
+          .setMessage(e.getMessage())
+          .build();
     }
-    return isStartedSuccessfully;
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        SCMAction.START_CONTAINER_BALANCER, null));
+    return StartContainerBalancerResponseProto.newBuilder()
+        .setStart(true)
+        .build();
   }
 
   @Override
@@ -847,7 +859,7 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRemoteUser());
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_CONTAINER_BALANCER, null));
-    scm.getContainerBalancer().stop();
+    scm.getContainerBalancer().stopBalancer();
   }
 
   @Override
@@ -869,7 +881,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
+      String ipaddress, String uuid, int clientVersion) throws IOException {
 
     // check admin authorisation
     try {
@@ -894,7 +906,7 @@ public class SCMClientProtocolServer implements
     // get datanode usage info
     List<HddsProtos.DatanodeUsageInfoProto> infoList = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
-      infoList.add(getUsageInfoFromDatanodeDetails(node));
+      infoList.add(getUsageInfoFromDatanodeDetails(node, clientVersion));
     }
 
     return infoList;
@@ -907,7 +919,7 @@ public class SCMClientProtocolServer implements
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
-      DatanodeDetails node) {
+      DatanodeDetails node, int clientVersion) {
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
 
     long capacity = stat.getCapacity().get();
@@ -918,7 +930,7 @@ public class SCMClientProtocolServer implements
         .setCapacity(capacity)
         .setUsed(used)
         .setRemaining(remaining)
-        .setNode(node.toProto(node.getCurrentVersion()))
+        .setNode(node.toProto(clientVersion))
         .build();
   }
 
@@ -936,7 +948,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count)
+      boolean mostUsed, int count, int clientVersion)
       throws IOException, IllegalArgumentException {
 
     // check admin authorisation
@@ -963,7 +975,7 @@ public class SCMClientProtocolServer implements
 
     // return count number of DatanodeUsageInfoProto
     return datanodeUsageInfoList.stream()
-        .map(DatanodeUsageInfo::toProto)
+        .map(each -> each.toProto(clientVersion))
         .limit(count)
         .collect(Collectors.toList());
   }

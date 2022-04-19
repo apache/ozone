@@ -27,8 +27,8 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconPipelineProvider;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -85,10 +86,10 @@ public class TestReconPipelineManager {
     conf.set(OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    scmStorageConfig = new ReconStorageConfig(conf);
+    scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
-    scmhaManager = MockSCMHAManager.getInstance(
-        true, new MockSCMHADBTransactionBuffer(store));
+    scmhaManager = SCMHAManagerStub.getInstance(
+        true, new SCMHADBTransactionBufferStub(store));
     scmContext = SCMContext.emptyContext();
   }
 
@@ -108,7 +109,7 @@ public class TestReconPipelineManager {
     // Valid pipeline in Allocated state.
     Pipeline validPipeline = Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setId(pipelinesFromScm.get(0).getId())
         .setNodes(pipelinesFromScm.get(0).getNodes())
         .setState(Pipeline.PipelineState.ALLOCATED)
@@ -118,7 +119,7 @@ public class TestReconPipelineManager {
     // Invalid pipeline.
     Pipeline invalidPipeline = Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.singletonList(randomDatanodeDetails()))
         .setState(Pipeline.PipelineState.CLOSED)

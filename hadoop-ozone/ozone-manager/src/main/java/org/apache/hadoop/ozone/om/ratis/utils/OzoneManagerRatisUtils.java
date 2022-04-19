@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
-import org.apache.hadoop.ozone.om.request.OMKeyRequestFactory;
+import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetOwnerRequest;
@@ -45,6 +45,8 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
+import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
@@ -125,6 +127,9 @@ public final class OzoneManagerRatisUtils {
     Type cmdType = omRequest.getCmdType();
     OzoneManagerProtocolProtos.KeyArgs keyArgs;
     BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    String volumeName = "";
+    String bucketName = "";
+
     switch (cmdType) {
     case CreateVolume:
       return new OMVolumeCreateRequest(omRequest);
@@ -180,6 +185,10 @@ public final class OzoneManagerRatisUtils {
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
+    case PurgeKeys:
+      return new OMKeyPurgeRequest(omRequest);
+    case PurgePaths:
+      return new OMPathsPurgeRequestWithFSO(omRequest);
     case CreateTenant:
       return new OMTenantCreateRequest(omRequest);
     case DeleteTenant:
@@ -193,29 +202,85 @@ public final class OzoneManagerRatisUtils {
     case TenantRevokeAdmin:
       return new OMTenantRevokeAdminRequest(omRequest);
 
-    /**
-     * Following key requests will be created in {@link OMKeyRequestFactory}.
+    /*
+     * Key requests that can have multiple variants based on the bucket layout
+     * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
      */
     case CreateDirectory:
+      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CreateFile:
+      keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CreateKey:
+      keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case AllocateBlock:
+      keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CommitKey:
+      keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case DeleteKey:
+      keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case DeleteKeys:
+      OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
+          omRequest.getDeleteKeysRequest()
+              .getDeleteKeys();
+      volumeName = deleteKeyArgs.getVolumeName();
+      bucketName = deleteKeyArgs.getBucketName();
+      break;
     case RenameKey:
+      keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case RenameKeys:
-    case PurgeKeys:
-    case PurgePaths:
+      OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs =
+          omRequest.getRenameKeysRequest().getRenameKeysArgs();
+      volumeName = renameKeysArgs.getVolumeName();
+      bucketName = renameKeysArgs.getBucketName();
+      break;
     case InitiateMultiPartUpload:
+      keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CommitMultiPartUpload:
+      keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case AbortMultiPartUpload:
+      keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CompleteMultiPartUpload:
-      return OMKeyRequestFactory.createRequest(omRequest, ozoneManager);
+      keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);
     }
+
+    return BucketLayoutAwareOMKeyRequestFactory.createRequest(
+        volumeName, bucketName, omRequest, ozoneManager.getMetadataManager());
   }
 
   private static OMClientRequest getOMAclRequest(OMRequest omRequest,

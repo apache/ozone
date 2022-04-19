@@ -1178,6 +1178,7 @@ message ServiceListResponse {
 message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
+    optional uint64 latestSequenceNumber = 3;
 }
 
 message FinalizeUpgradeRequest {
@@ -1254,7 +1255,7 @@ message ServiceInfo {
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
-    optional string OMProtocolVersion = 5;
+    optional int32 OMVersion = 5 [default = 0];
 }
 
 message MultipartInfoInitiateRequest {

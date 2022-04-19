@@ -296,6 +296,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           dbUpdatesWrapper.getData().get(i)));
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
+    builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
     return builder.build();
   }
 
@@ -663,6 +664,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setRefreshPipeline(true)
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
+        .setHeadOp(keyArgs.getHeadOp())
         .build();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),

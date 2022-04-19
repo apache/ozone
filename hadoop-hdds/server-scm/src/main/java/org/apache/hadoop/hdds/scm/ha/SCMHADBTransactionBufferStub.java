@@ -27,16 +27,16 @@ import java.io.IOException;
 
 // TODO: Move this class to test package after fixing Recon
 /**
- * Mock SCMHADBTransactionBuffer implementation for testing.
+ * SCMHADBTransactionBuffer implementation for Recon and testing.
  */
-public class MockSCMHADBTransactionBuffer implements SCMHADBTransactionBuffer {
+public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   private DBStore dbStore;
   private BatchOperation currentBatchOperation;
 
-  public MockSCMHADBTransactionBuffer() {
+  public SCMHADBTransactionBufferStub() {
   }
 
-  public MockSCMHADBTransactionBuffer(DBStore store) {
+  public SCMHADBTransactionBufferStub(DBStore store) {
     this.dbStore = store;
   }
 

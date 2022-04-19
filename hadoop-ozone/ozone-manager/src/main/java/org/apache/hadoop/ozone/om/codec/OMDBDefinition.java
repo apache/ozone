@@ -182,11 +182,11 @@ public class OMDBDefinition implements DBDefinition {
 
   public static final DBColumnFamilyDefinition<String, String>
       META_TABLE = new DBColumnFamilyDefinition<>(
-      OmMetadataManagerImpl.META_TABLE,
-      String.class,
-      new StringCodec(),
-      String.class,
-      new StringCodec());
+          OmMetadataManagerImpl.META_TABLE,
+          String.class,
+          new StringCodec(),
+          String.class,
+          new StringCodec());
 
   // Tables for multi-tenancy
 

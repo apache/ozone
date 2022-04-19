@@ -174,7 +174,7 @@ public class ObjectStore {
       //  (instead of using accessId) to communicate with KMS.
       LOG.debug("Updating S3Auth.userPrincipal to {}", resp.getUserPrincipal());
       s3Auth.setUserPrincipal(resp.getUserPrincipal());
-      proxy.setTheadLocalS3Auth(s3Auth);
+      proxy.setThreadLocalS3Auth(s3Auth);
     }
 
     OmVolumeArgs volume = resp.getOmVolumeArgs();

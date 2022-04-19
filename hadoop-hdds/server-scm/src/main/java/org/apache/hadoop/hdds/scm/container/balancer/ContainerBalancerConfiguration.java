@@ -97,9 +97,8 @@ public final class ContainerBalancerConfiguration {
   private long moveTimeout = Duration.ofMinutes(30).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "70m", tags = {
-      ConfigTag.BALANCER}, description = "The interval period between each " +
-      "iteration of Container Balancer.")
+      defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
+      "The interval period between each iteration of Container Balancer.")
   private long balancingInterval = Duration.ofMinutes(70).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
@@ -122,6 +121,15 @@ public final class ContainerBalancerConfiguration {
           "selecting a target for a source. " +
           "This configuration is false by default.")
   private boolean networkTopologyEnable = false;
+
+  @Config(key = "trigger.du.before.move.enable", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "whether to send command to all the healthy and " +
+          "in-service data nodes to run du immediately before starting" +
+          "a balance iteration. note that running du is very time " +
+          "consuming , especially when the disk usage rate of a " +
+          "data node is very high")
+  private boolean triggerDuEnable = false;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -190,6 +198,15 @@ public final class ContainerBalancerConfiguration {
    */
   public Boolean getNetworkTopologyEnable() {
     return networkTopologyEnable;
+  }
+
+  /**
+   * Get the triggerDuEnable value for Container Balancer.
+   *
+   * @return the boolean value of triggerDuEnable
+   */
+  public Boolean getTriggerDuEnable() {
+    return triggerDuEnable;
   }
 
   /**

@@ -170,7 +170,7 @@ public class TestStorageContainerManagerHA {
     is.close();
     final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setKeyName(keyName)
         .setRefreshPipeline(true).build();
@@ -226,7 +226,7 @@ public class TestStorageContainerManagerHA {
     conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
         scm1.getSCMNodeId());
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf1));
-    scm1.getScmHAManager().shutdown();
+    scm1.getScmHAManager().stop();
     Assert.assertTrue(
         StorageContainerManager.scmInit(conf1, scm1.getClusterId()));
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
