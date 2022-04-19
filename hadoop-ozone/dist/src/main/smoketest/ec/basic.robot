@@ -18,23 +18,10 @@ Documentation       Test EC shell commands
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
+Resource            lib.resource
 Suite Setup         Prepare For Tests
 
-*** Variables ***
-${SCM}       scm
-
-*** Keywords ***
-
-Prepare For Tests
-    ${random} =         Generate Random String  5  [NUMBERS]
-    Set Suite Variable  ${prefix}  ${random}
-    Execute             dd if=/dev/urandom of=/tmp/1mb bs=1048576 count=1
-    Execute             dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2
-    Execute             dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3
-    Execute             dd if=/dev/urandom of=/tmp/100mb bs=1048576 count=100
-
 *** Test Cases ***
-
 Test Bucket Creation
     ${result} =     Execute             ozone sh volume create /${prefix}vol1
                     Should not contain  ${result}       Failed

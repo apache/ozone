@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -127,6 +128,17 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     try {
       switch (request.getCmdType()) {
       case AllocateScmBlock:
+        if (scm.getLayoutVersionManager().needsFinalization() &&
+            !scm.getLayoutVersionManager()
+                .isAllowed(HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)
+        ) {
+          if (request.getAllocateScmBlockRequest().hasEcReplicationConfig()) {
+            throw new SCMException("Cluster is not finalized yet, it is"
+                + " not enabled to create blocks with Erasure Coded"
+                + " replication type.",
+                SCMException.ResultCodes.INTERNAL_ERROR);
+          }
+        }
         response.setAllocateScmBlockResponse(allocateScmBlock(
             request.getAllocateScmBlockRequest(), request.getVersion()));
         break;
