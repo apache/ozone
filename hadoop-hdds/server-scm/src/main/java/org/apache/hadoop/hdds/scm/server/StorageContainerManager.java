@@ -141,6 +141,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1412,7 +1413,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void stop() {
     try {
       LOG.info("Stopping Container Balancer service.");
-      containerBalancer.stop();
+      containerBalancer.stopBalancer();
     } catch (Exception e) {
       LOG.error("Failed to stop Container Balancer service.");
     }
@@ -1511,7 +1512,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     try {
       LOG.info("Stopping SCM HA services.");
-      scmHAManager.shutdown();
+      scmHAManager.stop();
     } catch (Exception ex) {
       LOG.error("SCM HA Manager stop failed", ex);
     }
@@ -1531,6 +1532,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmSafeModeManager.stop();
+  }
+
+  @Override
+  public void shutDown(String message) {
+    stop();
+    ExitUtils.terminate(1, message, LOG);
   }
 
   /**
