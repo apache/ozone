@@ -30,7 +30,7 @@ mvn -B -fn org.apache.rat:apache-rat-plugin:0.13:check
 
 cd "$DIR/../../.." || exit 1
 
-grep -r --include=rat.txt "!????" hadoop-hdds hadoop-ozone | tee "$REPORT_FILE"
+grep -r --include=rat.txt "!????" dev-support/annotations hadoop-hdds hadoop-ozone | tee "$REPORT_FILE"
 
 wc -l "$REPORT_FILE" | awk '{print $1}'> "$REPORT_DIR/failures"
 
