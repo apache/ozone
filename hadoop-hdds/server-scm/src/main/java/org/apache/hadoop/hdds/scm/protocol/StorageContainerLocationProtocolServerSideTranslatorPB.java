@@ -321,7 +321,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   private void
-  disallowECReplicationConfigInGetExistContainerWithPipelineBatchResp(
+      disallowECReplicationConfigInGetExistContainerWithPipelineBatchResp(
       ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasGetExistContainerWithPipelinesInBatchResponse()) {
       return;
