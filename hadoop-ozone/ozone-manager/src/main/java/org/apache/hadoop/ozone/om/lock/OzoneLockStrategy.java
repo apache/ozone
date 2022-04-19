@@ -22,7 +22,12 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import java.io.IOException;
 
 /**
- * Common interface for lock strategies.
+ * This is a common strategy interface for all concrete lock strategies. The
+ * interface declares methods (for acquiring/releasing a read/write lock) the
+ * context (here OzoneManager class) uses to execute a lock strategy. The
+ * concrete lock strategies (which implement different variations of the
+ * methods defined in the interface) allow us in changing the behavior of the
+ * locking mechanism at runtime.
  */
 public interface OzoneLockStrategy {
   boolean acquireWriteLock(OMMetadataManager omMetadataManager,
