@@ -76,10 +76,11 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
 
   List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
       long metadataSizeRequired, long dataSizeRequired) throws SCMException {
-    List<DatanodeDetails> healthyDNs = pickNodesNotUsed(replicationConfig);
+    List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
         .filter(dn -> SCMCommonPlacementPolicy
             .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
+        .limit(replicationConfig.getRequiredNodes())
         .collect(Collectors.toList());
 
     int nodesRequired = replicationConfig.getRequiredNodes();
@@ -99,6 +100,13 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
 
   List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig)
       throws SCMException {
+    return pickAllNodesNotUsed(replicationConfig).stream()
+        .limit(replicationConfig.getRequiredNodes())
+        .collect(Collectors.toList());
+  }
+
+  List<DatanodeDetails> pickAllNodesNotUsed(
+      REPLICATION_CONFIG replicationConfig) throws SCMException {
     Set<DatanodeDetails> dnsUsed = new HashSet<>();
     stateManager.getPipelines(replicationConfig).stream().filter(
         p -> p.getPipelineState().equals(Pipeline.PipelineState.OPEN) ||
@@ -111,7 +119,6 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
         .getNodes(NodeStatus.inServiceHealthy())
         .parallelStream()
         .filter(dn -> !dnsUsed.contains(dn))
-        .limit(replicationConfig.getRequiredNodes())
         .collect(Collectors.toList());
     if (dns.size() < replicationConfig.getRequiredNodes()) {
       String e = String
