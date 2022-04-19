@@ -101,6 +101,7 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
@@ -212,51 +213,57 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .processRequest(request, this::processRequest, request.getCmdType(),
             request.getTraceID());
     if (checkResponseForECRepConfig) {
-      switch (response.getCmdType()) {
-      case GetContainer:
-        disallowECReplicationConfigInGetContainerResponse(response);
-        break;
-      case ListContainer:
-        disallowECReplicationConfigInListContainerResponse(response);
-        break;
-      case GetContainerWithPipeline:
-        disallowECReplicationConfigInGetContainerWithPipelineResponse(response);
-        break;
-      case GetContainerWithPipelineBatch:
-        disallowECReplicationConfigInGetContainerWithPipelineBatchResponse(
-            response);
-        break;
-      case GetExistContainerWithPipelinesInBatch:
-        disallowECReplicationConfigInGetExistContainerWithPipelineBatchResponse(
-            response);
-        break;
-      case ListPipelines:
-        disallowECReplicationConfigInListPipelinesResponse(response);
-        break;
-      case GetPipeline:
-        disallowECReplicationConfigInGetPipelineResponse(response);
-        break;
-      default:
+      try {
+        switch (response.getCmdType()) {
+        case GetContainer:
+          disallowECReplicationConfigInGetContainerResponse(response);
+          break;
+        case ListContainer:
+          disallowECReplicationConfigInListContainerResponse(response);
+          break;
+        case GetContainerWithPipeline:
+          disallowECReplicationConfigInGetContainerWithPipelineResponse(
+              response);
+          break;
+        case GetContainerWithPipelineBatch:
+          disallowECReplicationConfigInGetContainerWithPipelineBatchResponse(
+              response);
+          break;
+        case GetExistContainerWithPipelinesInBatch:
+          disallowECReplicationConfigInGetExistContainerWithPipelineBatchResp(
+              response);
+          break;
+        case ListPipelines:
+          disallowECReplicationConfigInListPipelinesResponse(response);
+          break;
+        case GetPipeline:
+          disallowECReplicationConfigInGetPipelineResponse(response);
+          break;
+        default:
+        }
+      } catch (SCMException e) {
+        throw new ServiceException(e);
       }
     }
     return response;
   }
 
   private void disallowECReplicationConfigInListContainerResponse(
-      ScmContainerLocationResponse response) throws ServiceException {
+      ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasScmListContainerResponse()) {
       return;
     }
     for (HddsProtos.ContainerInfoProto containerInfo :
         response.getScmListContainerResponse().getContainersList()) {
       if (containerInfo.hasEcReplicationConfig()) {
-        throw new ServiceException(ERROR_LIST_CONTAINS_EC_REPLICATION_CONFIG);
+        throw new SCMException(ERROR_LIST_CONTAINS_EC_REPLICATION_CONFIG,
+            SCMException.ResultCodes.INTERNAL_ERROR);
       }
     }
   }
 
   private void disallowECReplicationConfigInGetContainerResponse(
-      ScmContainerLocationResponse response) throws ServiceException {
+      ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasGetContainerResponse()) {
       return;
     }
@@ -265,12 +272,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
     if (response.getGetContainerResponse().getContainerInfo()
         .hasEcReplicationConfig()) {
-      throw new ServiceException(ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG);
+      throw new SCMException(ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG,
+          SCMException.ResultCodes.INTERNAL_ERROR);
     }
   }
 
   private void disallowECReplicationConfigInGetContainerWithPipelineResponse(
-      ScmContainerLocationResponse response) throws ServiceException {
+      ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasGetContainerWithPipelineResponse()) {
       return;
     }
@@ -284,8 +292,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           response.getGetContainerWithPipelineResponse()
               .getContainerWithPipeline().getContainerInfo();
       if (containerInfo.hasEcReplicationConfig()) {
-        throw new ServiceException(
-            ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG);
+        throw new SCMException(ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG,
+            SCMException.ResultCodes.INTERNAL_ERROR);
       }
     }
     if (response.getGetContainerWithPipelineResponse()
@@ -294,15 +302,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           response.getGetContainerWithPipelineResponse()
               .getContainerWithPipeline().getPipeline();
       if (pipeline.hasEcReplicationConfig()) {
-        throw new ServiceException(
-            ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG);
+        throw new SCMException(ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG,
+            SCMException.ResultCodes.INTERNAL_ERROR);
       }
     }
   }
 
   private void
       disallowECReplicationConfigInGetContainerWithPipelineBatchResponse(
-      ScmContainerLocationResponse response) throws ServiceException {
+      ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasGetContainerWithPipelineBatchResponse()) {
       return;
     }
@@ -313,8 +321,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   private void
-      disallowECReplicationConfigInGetExistContainerWithPipelineBatchResponse(
-      ScmContainerLocationResponse response) throws ServiceException {
+  disallowECReplicationConfigInGetExistContainerWithPipelineBatchResp(
+      ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasGetExistContainerWithPipelinesInBatchResponse()) {
       return;
     }
@@ -326,49 +334,53 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   private void checkForECReplicationConfigIn(
       List<HddsProtos.ContainerWithPipeline> cwps)
-      throws ServiceException {
+      throws SCMException {
     for (HddsProtos.ContainerWithPipeline cwp : cwps) {
       if (cwp.hasContainerInfo()) {
         if (cwp.getContainerInfo().hasEcReplicationConfig()) {
-          throw new ServiceException(ERROR_LIST_CONTAINS_EC_REPLICATION_CONFIG);
+          throw new SCMException(ERROR_LIST_CONTAINS_EC_REPLICATION_CONFIG,
+              SCMException.ResultCodes.INTERNAL_ERROR);
         }
       }
       if (cwp.hasPipeline()) {
         if (cwp.getPipeline().hasEcReplicationConfig()) {
-          throw new ServiceException(ERROR_LIST_CONTAINS_EC_REPLICATION_CONFIG);
+          throw new SCMException(ERROR_LIST_CONTAINS_EC_REPLICATION_CONFIG,
+              SCMException.ResultCodes.INTERNAL_ERROR);
         }
       }
     }
   }
 
   private void disallowECReplicationConfigInListPipelinesResponse(
-      ScmContainerLocationResponse response) throws ServiceException {
+      ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasListPipelineResponse()) {
       return;
     }
     for (HddsProtos.Pipeline pipeline :
         response.getListPipelineResponse().getPipelinesList()) {
       if (pipeline.hasEcReplicationConfig()) {
-        throw new ServiceException("The returned list of pipelines contains"
+        throw new SCMException("The returned list of pipelines contains"
             + " pipelines with Erasure Coded replication type, which the"
             + " client won't be able to understand."
             + " Please upgrade the client to a version that supports Erasure"
-            + " Coded data, and retry!");
+            + " Coded data, and retry!",
+            SCMException.ResultCodes.INTERNAL_ERROR);
       }
     }
   }
 
   private void disallowECReplicationConfigInGetPipelineResponse(
-      ScmContainerLocationResponse response) throws ServiceException {
+      ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasGetPipelineResponse()) {
       return;
     }
     if (response.getPipelineResponse().getPipeline().hasEcReplicationConfig()) {
-      throw new ServiceException("The returned pipeline data contains"
+      throw new SCMException("The returned pipeline data contains"
           + " Erasure Coded replication information, which the client won't"
           + " be able to understand."
           + " Please upgrade the client to a version that supports Erasure"
-          + " Coded data, and retry!");
+          + " Coded data, and retry!",
+          SCMException.ResultCodes.INTERNAL_ERROR);
     }
   }
 
@@ -447,14 +459,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .build();
       case AllocatePipeline:
         if (scm.getLayoutVersionManager().needsFinalization() &&
-            scm.getLayoutVersionManager().getMetadataLayoutVersion() <
-                HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion()
+            !scm.getLayoutVersionManager().isAllowed(
+                HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)
         ) {
           if (request.getPipelineRequest().getReplicationType() ==
               HddsProtos.ReplicationType.EC) {
-            throw new ServiceException("Cluster is not finalized yet, it is"
+            throw new SCMException("Cluster is not finalized yet, it is"
                 + " not enabled to create pipelines with Erasure Coded"
-                + " replication type.");
+                + " replication type.",
+                SCMException.ResultCodes.INTERNAL_ERROR);
           }
         }
         return ScmContainerLocationResponse.newBuilder()
