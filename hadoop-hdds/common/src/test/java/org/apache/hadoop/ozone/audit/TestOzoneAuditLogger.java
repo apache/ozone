@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.StringContains.containsString;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.hamcrest.Matcher;
 import org.hamcrest.collection.IsIterableContainingInOrder;
@@ -173,16 +174,6 @@ public class TestOzoneAuditLogger {
   }
 
   /**
-   * Test to verify no READ event is logged.
-   */
-  @Test
-  public void notLogReadEvents() throws IOException {
-    AUDIT.logReadSuccess(READ_SUCCESS_MSG);
-    AUDIT.logReadFailure(READ_FAIL_MSG);
-    verifyNoLog();
-  }
-
-  /**
    * Test to verify no WRITE event is logged.
    */
   @Test
@@ -246,6 +237,13 @@ public class TestOzoneAuditLogger {
     //empty the file
     lines.clear();
     FileUtils.writeLines(file, lines, false);
+  }
+
+  private void verifyNoLog() throws IOException {
+    File file = new File("audit.log");
+    List<String> lines = FileUtils.readLines(file, (String)null);
+    // When no log entry is expected, the log file must be empty
+    assertEquals(0, lines.size());
   }
 
   private static class TestException extends Exception {
