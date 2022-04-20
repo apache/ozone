@@ -56,8 +56,10 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -148,6 +150,22 @@ public class TestRootedOzoneFileSystem {
     IOUtils.closeQuietly(fs);
   }
 
+  @Before
+  public void createVolumeAndBucket() throws IOException {
+    // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
+    OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    volumeName = bucket.getVolumeName();
+    volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
+    bucketName = bucket.getName();
+    bucketPath = new Path(volumePath, bucketName);
+  }
+
+  @After
+  public void cleanup() throws IOException {
+    fs.delete(volumePath, true);
+  }
+
   public static FileSystem getFs() {
     return fs;
   }
@@ -218,14 +236,6 @@ public class TestRootedOzoneFileSystem {
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = cluster.getClient().getObjectStore();
-
-    // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
-    volumeName = bucket.getVolumeName();
-    volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
-    bucketName = bucket.getName();
-    bucketPath = new Path(volumePath, bucketName);
 
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
