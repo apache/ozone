@@ -271,7 +271,7 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
       openKeyCleanupService = new OpenKeyCleanupService(serviceInterval,
-          TimeUnit.SECONDS, serviceTimeout, ozoneManager, configuration);
+          TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager, configuration);
       openKeyCleanupService.start();
     }
   }

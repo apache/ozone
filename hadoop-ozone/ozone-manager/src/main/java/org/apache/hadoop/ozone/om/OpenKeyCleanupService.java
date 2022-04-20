@@ -53,11 +53,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * success for keys, then clean up those keys.
  */
 public class OpenKeyCleanupService extends BackgroundService {
-
   private static final Logger LOG =
       LoggerFactory.getLogger(OpenKeyCleanupService.class);
 
-  // Use only a single thread for open key deletion. Multiple threads would read
+  // Use only a single thread for OpenKeyCleanup. Multiple threads would read
   // from the same table and can send deletion requests for same key multiple
   // times.
   private static final int OPEN_KEY_DELETING_CORE_POOL_SIZE = 1;
@@ -99,8 +98,8 @@ public class OpenKeyCleanupService extends BackgroundService {
    * @return Long, run count.
    */
   @VisibleForTesting
-  public AtomicLong getRunCount() {
-    return runCount;
+  public long getRunCount() {
+    return runCount.get();
   }
 
   /**
@@ -109,11 +108,11 @@ public class OpenKeyCleanupService extends BackgroundService {
    * being submitted for deletion and the actual delete operation, they will
    * not be deleted.
    *
-   * @return Long count.
+   * @return long count.
    */
   @VisibleForTesting
-  public AtomicLong getSubmittedOpenKeyCount() {
-    return submittedOpenKeyCount;
+  public long getSubmittedOpenKeyCount() {
+    return submittedOpenKeyCount.get();
   }
 
   @Override
@@ -179,6 +178,7 @@ public class OpenKeyCleanupService extends BackgroundService {
       DeleteOpenKeysRequest request =
           DeleteOpenKeysRequest.newBuilder()
               .addAllOpenKeysPerBucket(openKeyBuckets)
+              .setBucketLayout(bucketLayout.toProto())
               .build();
 
       OMRequest omRequest = OMRequest.newBuilder()
