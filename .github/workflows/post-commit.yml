@@ -293,7 +293,10 @@ jobs:
             maven-repo-
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
-        continue-on-error: ${{ matrix.profile == 'flaky' }}
+        if: matrix.profile != 'flaky'
+      - name: Execute flaky tests
+        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600
+        if: matrix.profile == 'flaky'
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
         if: always()
