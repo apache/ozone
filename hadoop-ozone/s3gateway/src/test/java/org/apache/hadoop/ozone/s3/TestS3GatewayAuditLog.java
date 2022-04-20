@@ -101,7 +101,7 @@ public class TestS3GatewayAuditLog {
   public void testHeadBucket() throws Exception {
     bucketEndpoint.head(bucketName);
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_BUCKET {bucket=bucket} | ret=SUCCESS";
+        "op=HEAD_BUCKET {} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -126,7 +126,7 @@ public class TestS3GatewayAuditLog {
 
     keyEndpoint.head(bucketName, "key1");
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_KEY {bucket=bucket, keyPath=key1} | ret=SUCCESS";
+        "op=HEAD_KEY {} | ret=SUCCESS";
     verifyLog(expected);
 
   }

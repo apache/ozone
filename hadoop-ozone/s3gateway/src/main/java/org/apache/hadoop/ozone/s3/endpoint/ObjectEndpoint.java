@@ -106,7 +106,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.genAuditParam;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
 import org.apache.http.HttpStatus;
@@ -165,15 +164,6 @@ public class ObjectEndpoint extends EndpointBase {
 
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "path", keyPath,
-        "Content-Length", String.valueOf(length),
-        "partNumber", String.valueOf(partNumber)
-    );
-    if (partNumber != 0) {
-      auditParams.put("uploadId", uploadID);
-    }
 
     OzoneOutputStream output = null;
 
@@ -230,7 +220,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       if (copyHeader != null) {
         getMetrics().incCopyObjectFailure();
       } else {
@@ -252,12 +242,12 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(s3GAction, auditParams));
+            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       }
       if (output != null) {
         output.close();
@@ -285,13 +275,6 @@ public class ObjectEndpoint extends EndpointBase {
 
     S3GAction s3GAction = S3GAction.GET_KEY;
     boolean auditSuccess = true;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "path", keyPath,
-        "uploadId", uploadId,
-        "max-parts", String.valueOf(maxParts),
-        "part-number-marker", partNumberMarker
-    );
 
     try {
       if (uploadId != null) {
@@ -373,7 +356,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex)
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
       );
       if (uploadId != null) {
         getMetrics().incListPartsFailure();
@@ -390,13 +373,13 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex)
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(s3GAction, auditParams)
+            buildAuditMessageForSuccess(s3GAction, getAuditParameters())
         );
       }
     }
@@ -425,10 +408,6 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("path") String keyPath) throws IOException, OS3Exception {
 
     S3GAction s3GAction = S3GAction.HEAD_KEY;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "keyPath", keyPath
-    );
 
     OzoneKey key;
     try {
@@ -436,7 +415,7 @@ public class ObjectEndpoint extends EndpointBase {
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incHeadKeyFailure();
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
@@ -448,7 +427,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
     } catch (Exception ex) {
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
 
@@ -458,7 +437,8 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
     getMetrics().incHeadKeySuccess();
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
+        getAuditParameters()));
     return response.build();
   }
 
@@ -506,11 +486,6 @@ public class ObjectEndpoint extends EndpointBase {
       IOException, OS3Exception {
 
     S3GAction s3GAction = S3GAction.DELETE_KEY;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "path", keyPath,
-        "uploadId", uploadId
-    );
 
     try {
       if (uploadId != null && !uploadId.equals("")) {
@@ -522,7 +497,7 @@ public class ObjectEndpoint extends EndpointBase {
       bucket.deleteKey(keyPath);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       if (uploadId != null && !uploadId.equals("")) {
         getMetrics().incAbortMultiPartUploadFailure();
       } else {
@@ -545,11 +520,12 @@ public class ObjectEndpoint extends EndpointBase {
       }
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
     getMetrics().incDeleteKeySuccess();
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
+        getAuditParameters()));
     return Response
         .status(Status.NO_CONTENT)
         .build();
@@ -569,10 +545,6 @@ public class ObjectEndpoint extends EndpointBase {
   )
       throws IOException, OS3Exception {
     S3GAction s3GAction = S3GAction.INIT_MULTIPART_UPLOAD;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucket,
-        "path", key
-    );
 
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
@@ -598,13 +570,13 @@ public class ObjectEndpoint extends EndpointBase {
       multipartUploadInitiateResponse.setUploadID(multipartInfo.getUploadID());
 
       AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, auditParams));
+          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incInitMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incInitMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
@@ -614,7 +586,7 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
   }
@@ -630,11 +602,6 @@ public class ObjectEndpoint extends EndpointBase {
       CompleteMultipartUploadRequest multipartUploadRequest)
       throws IOException, OS3Exception {
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucket,
-        "path", key,
-        "uploadId", uploadID
-    );
     OzoneBucket ozoneBucket = getBucket(bucket);
     // Using LinkedHashMap to preserve ordering of parts list.
     Map<Integer, String> partsMap = new LinkedHashMap<>();
@@ -661,13 +628,13 @@ public class ObjectEndpoint extends EndpointBase {
       // Location also setting as bucket name.
       completeMultipartUploadResponse.setLocation(bucket);
       AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, auditParams));
+          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incCompleteMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incCompleteMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.INVALID_PART) {
         throw newError(S3ErrorTable.INVALID_PART, key, ex);
@@ -697,7 +664,7 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
   }
