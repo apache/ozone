@@ -59,28 +59,24 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(OmBucketReadWriteFileOps.class);
 
-  @Option(names = {"-P", "--root-path", "--rootPath"},
-      description = "Root path. Full name --rootPath will be " +
-          "removed in later versions.",
+  @Option(names = {"-P", "--root-path"},
+      description = "Root path",
       defaultValue = "o3fs://bucket1.vol1/dir1/dir2")
   private String rootPath;
 
-  @Option(names = {"-r", "--file-count-for-read", "--fileCountForRead"},
-      description = "Number of files to be written in the read directory. " +
-          "Full name --fileCountForRead will be removed in later versions.",
+  @Option(names = {"-r", "--file-count-for-read"},
+      description = "Number of files to be written in the read directory.",
       defaultValue = "100")
   private int fileCountForRead;
 
-  @Option(names = {"-w", "--file-count-for-write", "--fileCountForWrite"},
-      description = "Number of files to be written in the write directory. " +
-          "Full name --fileCountForWrite will be removed in later versions.",
+  @Option(names = {"-w", "--file-count-for-write"},
+      description = "Number of files to be written in the write directory.",
       defaultValue = "10")
   private int fileCountForWrite;
 
-  @Option(names = {"-g", "--file-size", "--fileSize"},
+  @Option(names = {"-g", "--file-size"},
       description = "Generated data size (in bytes) of each file to be " +
-          "written in each directory. Full name --fileSize will be removed " +
-          "in later versions.",
+          "written in each directory.",
       defaultValue = "256")
   private long fileSizeInBytes;
 
@@ -89,39 +85,32 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
       defaultValue = "64")
   private int bufferSize;
 
-  @Option(names = {"-l", "--name-len", "--nameLen"},
-      description =
-          "Length of the random name of directory you want to create. Full " +
-              "name --nameLen will be removed in later versions.",
+  @Option(names = {"-l", "--name-len"},
+      description = "Length of the random name of directory you want to " +
+          "create.",
       defaultValue = "10")
   private int length;
 
-  @Option(names = {"-c", "--total-thread-count", "--totalThreadCount"},
-      description = "Total number of threads to be executed. Full name " +
-          "--totalThreadCount will be removed in later versions.",
+  @Option(names = {"-c", "--total-thread-count"},
+      description = "Total number of threads to be executed.",
       defaultValue = "100")
   private int totalThreadCount;
 
-  @Option(names = {"-T", "--read-thread-percentage", "--readThreadPercentage"},
+  @Option(names = {"-T", "--read-thread-percentage"},
       description = "Percentage of the total number of threads to be " +
           "allocated for read operations. The remaining percentage of " +
-          "threads will be allocated for write operations. Full name " +
-          "--readThreadPercentage will be removed in later versions.",
+          "threads will be allocated for write operations.",
       defaultValue = "90")
   private int readThreadPercentage;
 
-  @Option(names = {"-R", "--num-of-read-operations", "--numOfReadOperations"},
-      description = "Number of read operations to be performed by each " +
-          "thread. Full name --numOfReadOperations will be removed in later " +
-          "versions.",
+  @Option(names = {"-R", "--num-of-read-operations"},
+      description = "Number of read operations to be performed by each thread.",
       defaultValue = "50")
   private int numOfReadOperations;
 
-  @Option(names = {"-W", "--num-of-write-operations",
-      "--numOfWriteOperations"},
+  @Option(names = {"-W", "--num-of-write-operations"},
       description = "Number of write operations to be performed by each " +
-          "thread. Full name --numOfWriteOperations will be removed in later " +
-          "versions.",
+          "thread.",
       defaultValue = "10")
   private int numOfWriteOperations;
 
