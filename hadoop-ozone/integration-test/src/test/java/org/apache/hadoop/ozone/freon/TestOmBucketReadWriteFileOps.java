@@ -45,21 +45,21 @@ import java.io.IOException;
 import java.net.URI;
 
 /**
- * Test for OmBucketReadWriteOps.
+ * Test for OmBucketReadWriteFileOps.
  */
-public class TestOmBucketReadWriteOps {
+public class TestOmBucketReadWriteFileOps {
 
   private String path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestOmBucketReadWriteOps.class);
+      LoggerFactory.getLogger(TestOmBucketReadWriteFileOps.class);
 
   @Before
   public void setup() {
     path = GenericTestUtils
-        .getTempPath(TestOmBucketReadWriteOps.class.getSimpleName());
+        .getTempPath(TestOmBucketReadWriteFileOps.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
     File baseDir = new File(path);
@@ -97,7 +97,7 @@ public class TestOmBucketReadWriteOps {
   }
 
   @Test
-  public void testOmBucketReadWriteOps() throws Exception {
+  public void testOmBucketReadWriteFileOps() throws Exception {
     try {
       startCluster();
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
@@ -149,7 +149,7 @@ public class TestOmBucketReadWriteOps {
             parameterBuilder.volumeName + parameterBuilder.prefixFilePath;
     String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
-        new String[]{"-conf", confPath, "obrwo", "-P", rootPath,
+        new String[]{"-conf", confPath, "obrwf", "-P", rootPath,
             "-r", String.valueOf(parameterBuilder.fileCountForRead),
             "-w", String.valueOf(parameterBuilder.fileCountForWrite),
             "-g", String.valueOf(parameterBuilder.fileSizeInBytes),

@@ -43,21 +43,21 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 
 /**
- * Synthetic read/write operations workload generator tool.
+ * Synthetic read/write file operations workload generator tool.
  */
-@Command(name = "obrwo",
-    aliases = "om-bucket-read-write-ops",
+@Command(name = "obrwf",
+    aliases = "om-bucket-read-write-file-ops",
     description = "Creates files, performs respective read/write " +
         "operations to measure lock performance.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 
-public class OmBucketReadWriteOps extends BaseFreonGenerator
+public class OmBucketReadWriteFileOps extends BaseFreonGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmBucketReadWriteOps.class);
+      LoggerFactory.getLogger(OmBucketReadWriteFileOps.class);
 
   @Option(names = {"-P", "--root-path", "--rootPath"},
       description = "Root path. Full name --rootPath will be " +
