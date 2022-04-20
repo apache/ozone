@@ -47,7 +47,6 @@ public class TestGrpcOzoneManagerServer {
     OzoneConfiguration conf = new OzoneConfiguration();
     ozoneManager = Mockito.mock(OzoneManager.class);
     omServerProtocol = ozoneManager.getOmServerProtocol();
-    Exception ex = null;
 
     server = new GrpcOzoneManagerServer(conf,
         omServerProtocol,
@@ -56,12 +55,8 @@ public class TestGrpcOzoneManagerServer {
 
     try {
       server.start();
-    } catch (Exception e) {
-      ex = new Exception(e);
-      e.printStackTrace();
     } finally {
       server.stop();
-      Assert.assertNull(ex);
     }
   }
 

@@ -455,6 +455,8 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT =
       OzoneManagerVersion.S3G_PERSISTENT_CONNECTIONS.name();
 
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
+      "ozone.audit.log.debug.cmd.list.omaudit";
   /**
    * There is no need to instantiate this class.
    */

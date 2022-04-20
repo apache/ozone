@@ -253,6 +253,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -572,6 +573,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  public boolean isStopped() {
+    return omState == State.STOPPED;
+  }
+
   /**
    * Set the {@link S3Authentication} for the current rpc handler thread.
    */
@@ -789,20 +794,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void close() throws IOException {
     stop();
-  }
-
-  public void shutdown(Exception ex) throws IOException {
-    if (omState != State.STOPPED) {
-      stop();
-      exitManager.exitSystem(1, ex.getLocalizedMessage(), ex, LOG);
-    }
-  }
-
-  public void shutdown(String errorMsg) throws IOException {
-    if (omState != State.STOPPED) {
-      stop();
-      exitManager.exitSystem(1, errorMsg, LOG);
-    }
   }
 
   /**
@@ -1940,6 +1931,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void stop() {
     LOG.info("{}: Stopping Ozone Manager", omNodeDetails.getOMPrintInfo());
+    if (isStopped()) {
+      return;
+    }
     try {
       omState = State.STOPPED;
       // Cancel the metrics timer and set to null.
@@ -1981,10 +1975,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omSnapshotProvider != null) {
         omSnapshotProvider.stop();
       }
-      omState = State.STOPPED;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
+  }
+
+  public void shutDown(String message) {
+    stop();
+    ExitUtils.terminate(1, message, LOG);
   }
 
   /**

@@ -14,25 +14,41 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
 package org.apache.hadoop.ozone.audit;
 
 /**
- * Enumeration for defining types of Audit Loggers in Ozone.
+ * Enum to define Audit Action types for S3Gateway.
  */
-public enum AuditLoggerType {
-  DNLOGGER("DNAudit"),
-  OMLOGGER("OMAudit"),
-  SCMLOGGER("SCMAudit"),
-  S3GLOGGER("S3GAudit");
+public enum S3GAction implements AuditAction {
 
-  private String type;
+  //BucketEndpoint
+  GET_BUCKET,
+  CREATE_BUCKET,
+  HEAD_BUCKET,
+  DELETE_BUCKET,
+  GET_ACL,
+  PUT_ACL,
+  LIST_MULTIPART_UPLOAD,
+  MULTI_DELETE,
 
-  public String getType() {
-    return type;
+  //RootEndpoint
+  LIST_S3_BUCKETS,
+
+  //ObjectEndpoint
+  CREATE_MULTIPART_KEY,
+  COPY_OBJECT,
+  CREATE_KEY,
+  LIST_PARTS,
+  GET_KEY,
+  HEAD_KEY,
+  INIT_MULTIPART_UPLOAD,
+  COMPLETE_MULTIPART_UPLOAD,
+  ABORT_MULTIPART_UPLOAD,
+  DELETE_KEY;
+
+  @Override
+  public String getAction() {
+    return this.toString();
   }
 
-  AuditLoggerType(String type) {
-    this.type = type;
-  }
 }
