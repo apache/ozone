@@ -383,14 +383,21 @@ public final class ChunkUtils {
    * Checks if the block file length is equal to the chunk offset.
    *
    */
-  public static void validateChunkSize(File chunkFile, ChunkInfo chunkInfo)
+  public static void validateChunkSize(FileChannel fileChannel,
+      ChunkInfo chunkInfo, String fileName)
       throws StorageContainerException {
     long offset = chunkInfo.getOffset();
-    long len = chunkFile.length();
-    if (chunkFile.length() != offset) {
+    long fileLen;
+    try {
+      fileLen = fileChannel.size();
+    } catch (IOException e) {
+      throw new StorageContainerException("IO error encountered while " +
+          "getting the file size for " + fileName, CHUNK_FILE_INCONSISTENCY);
+    }
+    if (fileLen != offset) {
       throw new StorageContainerException(
-          "Chunk file offset " + offset + " does not match blockFile length " +
-          len, CHUNK_FILE_INCONSISTENCY);
+          "Chunk offset " + offset + " does not match length " +
+          fileLen + "of blockFile " + fileName, CHUNK_FILE_INCONSISTENCY);
     }
   }
 }
