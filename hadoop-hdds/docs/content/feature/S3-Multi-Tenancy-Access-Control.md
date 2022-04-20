@@ -38,6 +38,7 @@ Ranger admin is responsible for manually adding new policies to grant or deny an
 
 It is recommended to add new policies instead of editing the default tenant policies created by Ozone. **DO NOT** remove the **Policy Label** on those default tenant policies, or else the Ozone Manager might fail to sync with Ranger for those policies.
 
+
 ### Ranger Roles
 
 These new Ranger policies would have the corresponding **Ranger roles** added in their **Allow Conditions**.
@@ -66,3 +67,27 @@ The Ranger Sync thread does the following:
 2. Checks if default tenant roles are out-of-sync (could be caused by OM crash during user assign/revoke operation). Overwrites them if this is the case.
 3. Performs all Ranger update (write) operations queued by Ozone tenant commands from the last sync, if any.
    - This implies there will be a delay before Ranger policies and roles are updated for any tenant write operations (tenant create/delete, tenant user assign/revoke/assignadmin/revokeadmin, etc.). 
+
+
+## Adding new bucket policies when sharing a bucket
+
+By default, only the bucket owners have full access to the buckets they created. Other regular users won't be able to access the content of buckets they don't own.
+
+So in order to share a bucket with other users without relaxing the default bucket policy (e.g. allow all tenant users LIST and READ access to all buckets),
+a cluster admin or tenant admin will needs to manually create a new Ozone policy in Ranger for that bucket.  
+
+Further, if a cluster admin or tenant admin wants the bucket owner (who is a regular tenant user without any superuser privileges) to be able to edit that bucket's policy,
+when manually creating a new Ozone policy in Ranger for that bucket,
+an admin will need to explicitly grant the bucket owner user ALL permission on the bucket AND tick the bucket owner user's "Delegated Admin" checkbox for that policy.
+
+Note:
+1. An actual user name (e.g. `hive`) need to be specified here. The flexible `{OWNER}` tag will not work with Ranger's "Delegated Admin" checkbox. For more Technical details:
+  - The `{OWNER}` tag is only meaningful when Ozone Manager (OM) is performing a permission check. And in that permission check process OM fills in what this `{OWNER}` tag actually stands for. 
+    - For example, `{OWNER}` will become user `hive` during a bucket list permission check in OM, assuming `hive` is the bucket owner;
+      - Bonus: because of OM's hierarchical permission check, right before the bucket permission check, `{OWNER}` will become user `om` during a volume read permission check before this bucket permission check, assuming `om` is the bucket's parent volume's owner.
+2. Do not confuse the "Delegated Admin" checkbox in Ranger Web UI with tenant delegated admin. They are conceptually similar (have extra privilege), but different.
+  - With Ranger policies' "Delegated Admin" checkbox in a policy rule. That **user**, or users in that **group**, or users in that **role** will be able to edit that policy as long as the user can log in to Ranger Web UI.
+  - Tenant delegated admin has the permission to assign and revoke tenant admins from a tenant.
+
+With this new Ranger policy, as long as the bucket owners can log in to the Ranger Web UI,
+they could edit the bucket policies on their own, for example, to share the bucket with others without an administrator's manual intervention.
