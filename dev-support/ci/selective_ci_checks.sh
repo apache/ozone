@@ -83,6 +83,7 @@ function get_changed_files() {
 
 function set_outputs_run_everything_and_exit() {
     BASIC_CHECKS="author bats checkstyle docs findbugs rat unit"
+    compile_needed=true
     compose_tests_needed=true
     dependency_check_needed=true
     integration_tests_needed=true
@@ -311,6 +312,23 @@ function check_needs_build() {
     start_end::group_end
 }
 
+function check_needs_compile() {
+    start_end::group_start "Check if compile is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/build.sh"
+        "src/..../java"
+        "src/..../proto"
+        "pom.xml"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        compile_needed=true
+    fi
+
+    start_end::group_end
+}
+
 function check_needs_author() {
     start_end::group_start "Check if author is needed"
     local pattern_array=(
@@ -506,6 +524,7 @@ function set_outputs() {
     fi
 
     initialization::ga_output needs-build "${build_needed:-false}"
+    initialization::ga_output needs-compile "${compile_needed:-false}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
@@ -544,6 +563,7 @@ get_count_robot_files
 get_count_misc_files
 
 check_needs_build
+check_needs_compile
 
 # calculate basic checks to run
 BASIC_CHECKS="rat"

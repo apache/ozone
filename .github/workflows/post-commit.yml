@@ -34,6 +34,7 @@ jobs:
       basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
       needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
+      needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
       needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
@@ -63,7 +64,7 @@ jobs:
             # Run all checks
             dev-support/ci/selective_ci_checks.sh
           fi
-  compile:
+  build:
     needs:
       - build-info
     runs-on: ubuntu-18.04
@@ -71,7 +72,7 @@ jobs:
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
-        java: [ 8, 11 ]
+        java: [ 8 ]
       fail-fast: false
     steps:
       - name: Checkout project
@@ -101,11 +102,43 @@ jobs:
         run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
       - name: Store binaries for tests
         uses: actions/upload-artifact@v2
-        if: matrix.java == '8'
         with:
           name: ozone-bin
           path: hadoop-ozone/dist/target/ozone*.tar.gz
           retention-days: 1
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
+  compile:
+    needs:
+      - build-info
+    runs-on: ubuntu-18.04
+    timeout-minutes: 30
+    if: needs.build-info.outputs.needs-compile == 'true'
+    strategy:
+      matrix:
+        java: [ 11 ]
+      fail-fast: false
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+      - name: Setup java
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+      - name: Compile Ozone using Java ${{ matrix.java }}
+        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -162,7 +195,7 @@ jobs:
   dependency:
     needs:
       - build-info
-      - compile
+      - build
     runs-on: ubuntu-18.04
     timeout-minutes: 5
     if: needs.build-info.outputs.needs-dependency-check == 'true'
@@ -191,7 +224,7 @@ jobs:
   acceptance:
     needs:
       - build-info
-      - compile
+      - build
     runs-on: ubuntu-18.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
@@ -237,7 +270,7 @@ jobs:
   kubernetes:
     needs:
       - build-info
-      - compile
+      - build
     runs-on: ubuntu-18.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
