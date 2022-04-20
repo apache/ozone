@@ -24,6 +24,7 @@ import com.google.protobuf.GeneratedMessage;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -65,6 +66,7 @@ import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys
@@ -172,6 +174,7 @@ public class HeartbeatEndpointTask
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
+      addQueuedCommandCounts(requestBuilder);
       SCMHeartbeatRequestProto request = requestBuilder.build();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Sending heartbeat message :: {}", request.toString());
@@ -264,6 +267,24 @@ public class HeartbeatEndpointTask
           .build();
       requestBuilder.setPipelineActions(pap);
     }
+  }
+
+  /**
+   * Adds the count of all queued commands to the heartbeat.
+   * @param requestBuilder Builder to which the details will be added.
+   */
+  private void addQueuedCommandCounts(
+      SCMHeartbeatRequestProto.Builder requestBuilder) {
+    Map<SCMCommandProto.Type, Integer> commandCount =
+        context.getParent().getQueuedCommandCount();
+    CommandQueueReportProto.Builder reportProto =
+        CommandQueueReportProto.newBuilder();
+    for (Map.Entry<SCMCommandProto.Type, Integer> entry
+        : commandCount.entrySet()) {
+      reportProto.addCommand(entry.getKey())
+          .addCount(entry.getValue());
+    }
+    requestBuilder.setQueuedCommandReport(reportProto.build());
   }
 
   /**

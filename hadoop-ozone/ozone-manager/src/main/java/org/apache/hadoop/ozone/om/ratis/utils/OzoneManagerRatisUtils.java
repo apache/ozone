@@ -259,7 +259,7 @@ public final class OzoneManagerRatisUtils {
     }
 
     return BucketLayoutAwareOMKeyRequestFactory.createRequest(
-        volumeName, bucketName, omRequest, ozoneManager);
+        volumeName, bucketName, omRequest, ozoneManager.getMetadataManager());
   }
 
   private static OMClientRequest getOMAclRequest(OMRequest omRequest,

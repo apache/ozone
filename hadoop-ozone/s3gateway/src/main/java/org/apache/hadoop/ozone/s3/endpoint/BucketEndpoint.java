@@ -21,6 +21,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -63,6 +65,7 @@ import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -87,7 +90,7 @@ public class BucketEndpoint extends EndpointBase {
    */
   @GET
   @SuppressFBWarnings
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings({"parameternumber", "methodlength"})
   public Response get(
       @PathParam("bucket") String bucketName,
       @QueryParam("delimiter") String delimiter,
@@ -100,33 +103,46 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("uploads") String uploads,
       @QueryParam("acl") String aclMarker,
       @Context HttpHeaders hh) throws OS3Exception, IOException {
-
-    if (aclMarker != null) {
-      S3BucketAcl result = getAcl(bucketName);
-      getMetrics().incGetAclSuccess();
-      return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
-    }
-
-    if (uploads != null) {
-      return listMultipartUploads(bucketName, prefix);
-    }
-
-    if (prefix == null) {
-      prefix = "";
-    }
-
-    OzoneBucket bucket = getBucket(bucketName);
-
+    S3GAction s3GAction = S3GAction.GET_BUCKET;
+    Map<String, String> auditParams = S3Utils.genAuditParam(
+        "bucket", bucketName,
+        "delimiter", delimiter,
+        "encoding-type", encodingType,
+        "marker", marker,
+        "max-keys", String.valueOf(maxKeys),
+        "prefix", prefix,
+        "continuation-token", continueToken,
+        "start-after", startAfter
+    );
     Iterator<? extends OzoneKey> ozoneKeyIterator;
-
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
 
-    // Assign marker to startAfter. for the compatibility of aws api v1
-    if (startAfter == null && marker != null) {
-      startAfter = marker;
-    }
     try {
+      if (aclMarker != null) {
+        s3GAction = S3GAction.GET_ACL;
+        S3BucketAcl result = getAcl(bucketName);
+        getMetrics().incGetAclSuccess();
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(s3GAction, auditParams));
+        return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
+      }
+
+      if (uploads != null) {
+        s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
+        return listMultipartUploads(bucketName, prefix);
+      }
+
+      if (prefix == null) {
+        prefix = "";
+      }
+
+      // Assign marker to startAfter. for the compatibility of aws api v1
+      if (startAfter == null && marker != null) {
+        startAfter = marker;
+      }
+      
+      OzoneBucket bucket = getBucket(bucketName);
       if (startAfter != null && continueToken != null) {
         // If continuation token and start after both are provided, then we
         // ignore start After
@@ -139,12 +155,19 @@ public class BucketEndpoint extends EndpointBase {
         ozoneKeyIterator = bucket.listKeys(prefix);
       }
     } catch (OMException ex) {
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, ex));
       getMetrics().incGetBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
         throw ex;
       }
+    } catch (Exception ex) {
+      getMetrics().incGetBucketFailure();
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+      throw ex;
     }
 
     ListObjectResponse response = new ListObjectResponse();
@@ -215,6 +238,7 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(false);
     }
 
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
     getMetrics().incGetBucketSuccess();
     response.setKeyCount(
         response.getCommonPrefixes().size() + response.getContents().size());
@@ -223,19 +247,30 @@ public class BucketEndpoint extends EndpointBase {
 
   @PUT
   public Response put(@PathParam("bucket") String bucketName,
-      @QueryParam("acl") String aclMarker,
-      @Context HttpHeaders httpHeaders,
-      InputStream body) throws IOException, OS3Exception {
-    if (aclMarker != null) {
-      return putAcl(bucketName, httpHeaders, body);
-    }
+                      @QueryParam("acl") String aclMarker,
+                      @Context HttpHeaders httpHeaders,
+                      InputStream body) throws IOException, OS3Exception {
+    S3GAction s3GAction = S3GAction.CREATE_BUCKET;
+    Map<String, String> auditParams = S3Utils.genAuditParam(
+        "bucket", bucketName,
+        "acl", aclMarker
+    );
+
     try {
+      if (aclMarker != null) {
+        s3GAction = S3GAction.PUT_ACL;
+        return putAcl(bucketName, httpHeaders, body);
+      }
       String location = createS3Bucket(bucketName);
       LOG.info("Location is {}", location);
+      AUDIT.logWriteSuccess(
+          buildAuditMessageForSuccess(s3GAction, auditParams));
       getMetrics().incCreateBucketSuccess();
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
     } catch (OMException exception) {
+      AUDIT.logWriteFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, exception));
       getMetrics().incCreateBucketFailure();
       if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
         throw newError(S3ErrorTable.INVALID_BUCKET_NAME, bucketName, exception);
@@ -243,6 +278,10 @@ public class BucketEndpoint extends EndpointBase {
       LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
           exception);
       throw exception;
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+      throw ex;
     }
   }
 
@@ -250,34 +289,47 @@ public class BucketEndpoint extends EndpointBase {
       @PathParam("bucket") String bucketName,
       @QueryParam("prefix") String prefix)
       throws OS3Exception, IOException {
+    S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
+    Map<String, String> auditParams = S3Utils.genAuditParam(
+        "bucket", bucketName,
+        "prefix", prefix
+    );
 
     OzoneBucket bucket = getBucket(bucketName);
 
-    OzoneMultipartUploadList ozoneMultipartUploadList;
     try {
-      ozoneMultipartUploadList = bucket.listMultipartUploads(prefix);
+      OzoneMultipartUploadList ozoneMultipartUploadList =
+          bucket.listMultipartUploads(prefix);
+
+      ListMultipartUploadsResult result = new ListMultipartUploadsResult();
+      result.setBucket(bucketName);
+
+      ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
+          new ListMultipartUploadsResult.Upload(
+              upload.getKeyName(),
+              upload.getUploadId(),
+              upload.getCreationTime(),
+              S3StorageType.fromReplicationType(upload.getReplicationType(),
+                  upload.getReplicationFactor())
+          )));
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
+      getMetrics().incListMultipartUploadsSuccess();
+      return Response.ok(result).build();
     } catch (OMException exception) {
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, exception));
       getMetrics().incListMultipartUploadsFailure();
       if (exception.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+      throw ex;
     }
-
-    ListMultipartUploadsResult result = new ListMultipartUploadsResult();
-    result.setBucket(bucketName);
-
-    ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
-        new ListMultipartUploadsResult.Upload(
-            upload.getKeyName(),
-            upload.getUploadId(),
-            upload.getCreationTime(),
-            S3StorageType.fromReplicationType(upload.getReplicationType(),
-                upload.getReplicationFactor())
-        )));
-    getMetrics().incListMultipartUploadsSuccess();
-    return Response.ok(result).build();
   }
+
   /**
    * Rest endpoint to check the existence of a bucket.
    * <p>
@@ -287,9 +339,20 @@ public class BucketEndpoint extends EndpointBase {
   @HEAD
   public Response head(@PathParam("bucket") String bucketName)
       throws OS3Exception, IOException {
-    getBucket(bucketName);
-    getMetrics().incHeadBucketSuccess();
-    return Response.ok().build();
+    S3GAction s3GAction = S3GAction.HEAD_BUCKET;
+    Map<String, String> auditParams = S3Utils.genAuditParam(
+        "bucket", bucketName);
+    try {
+      getBucket(bucketName);
+      AUDIT.logReadSuccess(
+          buildAuditMessageForSuccess(s3GAction, auditParams));
+      getMetrics().incHeadBucketSuccess();
+      return Response.ok().build();
+    } catch (Exception e) {
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, e));
+      throw e;
+    }
   }
 
   /**
@@ -301,10 +364,16 @@ public class BucketEndpoint extends EndpointBase {
   @DELETE
   public Response delete(@PathParam("bucket") String bucketName)
       throws IOException, OS3Exception {
+    S3GAction s3GAction = S3GAction.DELETE_BUCKET;
+    Map<String, String> auditParams = S3Utils.genAuditParam(
+        "bucket", bucketName
+    );
 
     try {
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
+      AUDIT.logWriteFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, ex));
       getMetrics().incDeleteBucketFailure();
       if (ex.getResult() == ResultCodes.BUCKET_NOT_EMPTY) {
         throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
@@ -315,8 +384,13 @@ public class BucketEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(
+          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+      throw ex;
     }
 
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
     getMetrics().incDeleteBucketSuccess();
     return Response
         .status(HttpStatus.SC_NO_CONTENT)
@@ -333,8 +407,15 @@ public class BucketEndpoint extends EndpointBase {
   @POST
   @Produces(MediaType.APPLICATION_XML)
   public MultiDeleteResponse multiDelete(@PathParam("bucket") String bucketName,
-      @QueryParam("delete") String delete,
-      MultiDeleteRequest request) throws OS3Exception, IOException {
+                                         @QueryParam("delete") String delete,
+                                         MultiDeleteRequest request)
+      throws OS3Exception, IOException {
+    S3GAction s3GAction = S3GAction.MULTI_DELETE;
+    Map<String, String> auditParams = S3Utils.genAuditParam(
+        "bucket", bucketName,
+        "delete", delete
+    );
+
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     if (request.getObjects() != null) {
@@ -363,6 +444,13 @@ public class BucketEndpoint extends EndpointBase {
                   ex.getMessage()));
         }
       }
+    }
+    if (result.getErrors().size() != 0) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction, auditParams,
+          new Exception("MultiDelete Exception")));
+    } else {
+      AUDIT.logWriteSuccess(
+          buildAuditMessageForSuccess(s3GAction, auditParams));
     }
     return result;
   }
@@ -407,6 +495,9 @@ public class BucketEndpoint extends EndpointBase {
         LOG.error("Failed to get acl of Bucket " + bucketName, ex);
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       }
+    } catch (OS3Exception ex) {
+      getMetrics().incGetAclFailure();
+      throw ex;
     }
   }
 
@@ -416,7 +507,7 @@ public class BucketEndpoint extends EndpointBase {
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
   public Response putAcl(String bucketName, HttpHeaders httpHeaders,
-      InputStream body) throws IOException, OS3Exception {
+                         InputStream body) throws IOException, OS3Exception {
     String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
     String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
     String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);
@@ -434,7 +525,7 @@ public class BucketEndpoint extends EndpointBase {
           && grantWriteACP == null && grantFull == null) {
         S3BucketAcl putBucketAclRequest =
             new PutBucketAclRequestUnmarshaller().readFrom(
-            null, null, null, null, null, body);
+                null, null, null, null, null, body);
         // Handle grants in body
         ozoneAclListOnBucket.addAll(
             S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
@@ -474,7 +565,6 @@ public class BucketEndpoint extends EndpointBase {
               S3Acl.ACLType.FULL_CONTROL.getValue()));
         }
       }
-
       // A put request will reset all previous ACLs on bucket
       bucket.setAcl(ozoneAclListOnBucket);
       // A put request will reset input user/group's permission on volume
@@ -507,24 +597,28 @@ public class BucketEndpoint extends EndpointBase {
       LOG.error("Error in set ACL Request for bucket: {}", bucketName,
           exception);
       throw exception;
+    } catch (OS3Exception ex) {
+      getMetrics().incPutAclFailure();
+      throw ex;
     }
     getMetrics().incPutAclSuccess();
     return Response.status(HttpStatus.SC_OK).build();
   }
 
   /**
-   *  Example: x-amz-grant-write: \
-   *  uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
-   *  id="555566667777".
+   * Example: x-amz-grant-write: \
+   * uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
+   * id="555566667777".
    */
   private List<OzoneAcl> getAndConvertAclOnBucket(String value,
-      String permission) throws OS3Exception {
+                                                  String permission)
+      throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;
     }
     String[] subValues = value.split(",");
-    for (String acl: subValues) {
+    for (String acl : subValues) {
       String[] part = acl.split("=");
       if (part.length != 2) {
         throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
@@ -551,13 +645,14 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   private List<OzoneAcl> getAndConvertAclOnVolume(String value,
-      String permission) throws OS3Exception {
+                                                  String permission)
+      throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;
     }
     String[] subValues = value.split(",");
-    for (String acl: subValues) {
+    for (String acl : subValues) {
       String[] part = acl.split("=");
       if (part.length != 2) {
         throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
