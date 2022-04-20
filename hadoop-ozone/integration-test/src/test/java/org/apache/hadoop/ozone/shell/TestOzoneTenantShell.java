@@ -798,10 +798,11 @@ public class TestOzoneTenantShell {
       return null;
     });
 
-    // Once we make bob an admin of this tenant, set secret should succeed
+    // Once we make bob an admin of this tenant (non-delegated admin permission
+    // is sufficient in this case), set secret should succeed
     executeHA(tenantShell, new String[] {"user", "assign-admin",
         tenantName + "$" + ugiBob.getShortUserName(),
-        "--tenant=" + tenantName, "--delegated=true"});
+        "--tenant=" + tenantName, "--delegated=false"});
     checkOutput(out, "", true);
     checkOutput(err, "Assigned admin", false);
 
@@ -841,5 +842,188 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {"list"});
     checkOutput(out, "", true);
     checkOutput(err, "", true);
+  }
+
+  @Test
+  @SuppressWarnings("methodlength")
+  public void testTenantAdminOperations()
+      throws IOException, InterruptedException {
+
+    final String tenantName = "tenant-test-tenant-admin-ops";
+    final UserGroupInformation ugiAlice = UserGroupInformation
+        .createUserForTesting("alice",  new String[] {"usergroup"});
+    final UserGroupInformation ugiBob = UserGroupInformation
+        .createUserForTesting("bob",  new String[] {"usergroup"});
+
+    // Preparation
+
+    // Create test tenant
+    executeHA(tenantShell, new String[] {"create", tenantName});
+    checkOutput(out, "Created tenant '" + tenantName + "'.\n", true);
+    checkOutput(err, "", true);
+
+    // Assign alice and bob as tenant users
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "alice", "--tenant=" + tenantName});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
+        "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'alice' to '" + tenantName + "'" +
+        " with accessId '" + tenantName + "$alice'.\n", true);
+
+    executeHA(tenantShell, new String[] {
+        "user", "assign", "bob", "--tenant=" + tenantName});
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$bob'\n" +
+        "export AWS_SECRET_ACCESS_KEY='", false);
+    checkOutput(err, "Assigned 'bob' to '" + tenantName + "'" +
+        " with accessId '" + tenantName + "$bob'.\n", true);
+
+    // Make alice a delegated tenant admin
+    executeHA(tenantShell, new String[] {"user", "assign-admin",
+        tenantName + "$" + ugiAlice.getShortUserName(),
+        "--tenant=" + tenantName, "--delegated=true"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Assigned admin", false);
+
+    // Make bob a non-delegated tenant admin
+    executeHA(tenantShell, new String[] {"user", "assign-admin",
+        tenantName + "$" + ugiBob.getShortUserName(),
+        "--tenant=" + tenantName, "--delegated=false"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Assigned admin", false);
+
+    // Start test matrix
+
+    // As a tenant delegated admin, alice can:
+    // - Assign and revoke user accessIds
+    // - Assign and revoke tenant admins
+    // - Set secret
+    ugiAlice.doAs((PrivilegedExceptionAction<Void>) () -> {
+      // Assign carol as a new tenant user
+      executeHA(tenantShell, new String[] {
+          "user", "assign", "carol", "--tenant=" + tenantName});
+      checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$carol'\n"
+          + "export AWS_SECRET_ACCESS_KEY='", false);
+      checkOutput(err, "Assigned 'carol' to '" + tenantName + "' with accessId"
+          + " '" + tenantName + "$carol'.\n", true);
+
+      // Set secret should work
+      executeHA(tenantShell, new String[] {
+          "user", "setsecret", tenantName + "$alice",
+          "--secret=somesecret2", "--export"});
+      checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
+          "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
+      checkOutput(err, "", true);
+
+      // Make carol a tenant delegated tenant admin
+      executeHA(tenantShell, new String[] {"user", "assign-admin",
+          tenantName + "$carol",
+          "--tenant=" + tenantName, "--delegated=true"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Assigned admin", false);
+
+      // Revoke carol's tenant admin privilege
+      executeHA(tenantShell, new String[] {"user", "revoke-admin",
+          tenantName + "$carol"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Revoked admin", false);
+
+      // Make carol a tenant non-delegated tenant admin
+      executeHA(tenantShell, new String[] {"user", "assign-admin",
+          tenantName + "$carol",
+          "--tenant=" + tenantName, "--delegated=false"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Assigned admin", false);
+
+      // Revoke carol's tenant admin privilege
+      executeHA(tenantShell, new String[] {"user", "revoke-admin",
+          tenantName + "$carol"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Revoked admin", false);
+
+      // Revoke carol's accessId from this tenant
+      executeHA(tenantShell, new String[] {
+          "user", "revoke", tenantName + "$carol"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Revoked accessId", false);
+      return null;
+    });
+
+    // As a tenant non-delegated admin, bob can:
+    // - Assign and revoke user accessIds
+    // - Set secret
+    //
+    // But bob can't:
+    // - Assign and revoke tenant admins
+    ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
+      // Assign carol as a new tenant user
+      executeHA(tenantShell, new String[] {
+          "user", "assign", "carol", "--tenant=" + tenantName});
+      checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$carol'\n"
+          + "export AWS_SECRET_ACCESS_KEY='", false);
+      checkOutput(err, "Assigned 'carol' to '" + tenantName + "' with accessId"
+          + " '" + tenantName + "$carol'.\n", true);
+
+      // Set secret should work, even for a non-delegated admin
+      executeHA(tenantShell, new String[] {
+          "user", "setsecret", tenantName + "$alice",
+          "--secret=somesecret2", "--export"});
+      checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
+          "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
+      checkOutput(err, "", true);
+
+      // Attempt to make carol a tenant delegated tenant admin, should fail
+      executeHA(tenantShell, new String[] {"user", "assign-admin",
+          tenantName + "$carol",
+          "--tenant=" + tenantName, "--delegated=true"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Failed to assign admin", false);
+
+      // Attempt to make carol a tenant non-delegated tenant admin, should fail
+      executeHA(tenantShell, new String[] {"user", "assign-admin",
+          tenantName + "$carol",
+          "--tenant=" + tenantName, "--delegated=false"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Failed to assign admin", false);
+
+      // Attempt to revoke tenant admin, should fail at the permission check
+      executeHA(tenantShell, new String[] {"user", "revoke-admin",
+          tenantName + "$carol"});
+      checkOutput(out, "", true);
+      checkOutput(err, "User 'bob' is neither an Ozone admin nor a delegated "
+          + "admin of tenant", false);
+
+      // Revoke carol's accessId from this tenant
+      executeHA(tenantShell, new String[] {
+          "user", "revoke", tenantName + "$carol"});
+      checkOutput(out, "", true);
+      checkOutput(err, "Revoked accessId", false);
+      return null;
+    });
+
+    // Clean up
+    executeHA(tenantShell, new String[] {"user", "revoke-admin",
+        tenantName + "$" + ugiAlice.getShortUserName()});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked admin", false);
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", tenantName + "$" + ugiAlice.getShortUserName()});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {"user", "revoke-admin",
+        tenantName + "$" + ugiBob.getShortUserName()});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked admin", false);
+
+    executeHA(tenantShell, new String[] {
+        "user", "revoke", tenantName + "$" + ugiBob.getShortUserName()});
+    checkOutput(out, "", true);
+    checkOutput(err, "Revoked accessId", false);
+
+    executeHA(tenantShell, new String[] {"delete", tenantName});
+    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
+    checkOutput(err, "", true);
+    deleteVolume(tenantName);
   }
 }

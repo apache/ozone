@@ -201,11 +201,16 @@ public interface OMMultiTenantManager {
   void checkAdmin() throws OMException;
 
   /**
-   * Check if caller is an Ozone cluster admin or tenant (delegated) admin.
+   * Check if caller is a tenant admin of the specified tenant.
+   * Ozone admins will always pass this check.
    * Throws PERMISSION_DENIED if the check failed.
+   * @param tenantId tenant name
+   * @param delegated if set to true, only delegated tenant admins can pass this
+   *                  check; if false, both delegated and non-delegated tenant
+   *                  admins will pass this check.
    * @throws OMException PERMISSION_DENIED
    */
-  void checkTenantAdmin(String tenantId) throws OMException;
+  void checkTenantAdmin(String tenantId, boolean delegated) throws OMException;
 
   /**
    * Check if the tenantId exists in the table, throws TENANT_NOT_FOUND if not.
