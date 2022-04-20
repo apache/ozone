@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -200,10 +201,11 @@ public class OmMultipartKeyInfo extends WithObjectID {
     multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
         list.put(partKeyInfo.getPartNumber(), partKeyInfo));
 
-    final ReplicationConfig replicationConfig = ReplicationConfig
-            .fromProtoTypeAndFactor(
-                    multipartKeyInfo.getType(),
-                    multipartKeyInfo.getFactor());
+    final ReplicationConfig replicationConfig = ReplicationConfig.fromProto(
+        multipartKeyInfo.getType(),
+        multipartKeyInfo.getFactor(),
+        multipartKeyInfo.getEcReplicationConfig()
+    );
 
     return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
         multipartKeyInfo.getCreationTime(), replicationConfig,
@@ -220,10 +222,17 @@ public class OmMultipartKeyInfo extends WithObjectID {
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
         .setType(replicationConfig.getReplicationType())
-        .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentID(parentID);
+
+    if (replicationConfig instanceof ECReplicationConfig) {
+      ECReplicationConfig ecConf = (ECReplicationConfig) replicationConfig;
+      builder.setEcReplicationConfig(ecConf.toProto());
+    } else {
+      builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }

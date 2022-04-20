@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -130,6 +131,10 @@ public final class OmKeyInfo extends WithParentObjectId {
 
   public long getDataSize() {
     return dataSize;
+  }
+
+  public long getReplicatedSize() {
+    return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
   }
 
   public void setDataSize(long size) {
@@ -346,6 +351,10 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.parentObjectID = parentObjectID;
   }
 
+  public void setReplicationConfig(ReplicationConfig repConfig) {
+    this.replicationConfig = repConfig;
+  }
+
   /**
    * Builder of OmKeyInfo.
    */
@@ -552,9 +561,14 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setDataSize(dataSize)
-        .setType(replicationConfig.getReplicationType())
-        .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
-        .setLatestVersion(latestVersion)
+        .setType(replicationConfig.getReplicationType());
+    if (replicationConfig instanceof ECReplicationConfig) {
+      kb.setEcReplicationConfig(
+          ((ECReplicationConfig) replicationConfig).toProto());
+    } else {
+      kb.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+    kb.setLatestVersion(latestVersion)
         .addAllKeyLocationList(keyLocations)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
@@ -594,7 +608,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())
         .setReplicationConfig(ReplicationConfig
-                .fromProtoTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
+            .fromProto(keyInfo.getType(), keyInfo.getFactor(),
+                keyInfo.getEcReplicationConfig()))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)

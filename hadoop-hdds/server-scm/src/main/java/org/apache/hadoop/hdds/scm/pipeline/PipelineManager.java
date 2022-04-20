@@ -23,10 +23,12 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -40,9 +42,17 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       throws IOException;
 
   Pipeline createPipeline(
+      ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes) throws IOException;
+
+
+  Pipeline createPipeline(
       ReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes
   );
+
+  Pipeline createPipelineForRead(
+      ReplicationConfig replicationConfig, Set<ContainerReplica> replicas);
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
@@ -63,6 +73,17 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       Pipeline.PipelineState state,
       Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines
+  );
+
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  int getPipelineCount(
+      ReplicationConfig replicationConfig, Pipeline.PipelineState state
   );
 
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)

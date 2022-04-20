@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -49,8 +48,13 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadCompleteRequest;
@@ -58,6 +62,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -352,10 +357,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       String ozoneKey, TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
       List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
-    HddsProtos.ReplicationType type = partKeyInfoMap.lastEntry().getValue()
-        .getPartKeyInfo().getType();
-    HddsProtos.ReplicationFactor factor =
-        partKeyInfoMap.lastEntry().getValue().getPartKeyInfo().getFactor();
+    OzoneManagerProtocolProtos.KeyInfo partKeyInfo =
+        partKeyInfoMap.lastEntry().getValue().getPartKeyInfo();
 
     OmKeyInfo omKeyInfo = getOmKeyInfoFromKeyTable(ozoneKey, keyName,
             omMetadataManager);
@@ -372,8 +375,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmKeyInfo.Builder builder =
           new OmKeyInfo.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
-          .setReplicationConfig(
-              ReplicationConfig.fromProtoTypeAndFactor(type, factor))
+          .setReplicationConfig(ReplicationConfig.fromProto(
+              partKeyInfo.getType(), partKeyInfo.getFactor(),
+              partKeyInfo.getEcReplicationConfig()))
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setDataSize(dataSize)
@@ -567,5 +571,26 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
     }
   }
-}
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CompleteMultiPartUpload
+  )
+  public static OMRequest
+      disallowCompleteMultiPartUploadWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager().isAllowed(
+        OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getCompleteMultiPartUploadRequest().getKeyArgs()
+          .hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+}

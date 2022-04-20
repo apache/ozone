@@ -24,11 +24,14 @@ import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -134,6 +137,8 @@ public class TestOMKeyRequest {
     when(ozoneManager.isAdmin(any(String.class))).thenReturn(true);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
+    when(ozoneManager.getBucketInfo(anyString(), anyString())).thenReturn(
+        new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     scmClient = Mockito.mock(ScmClient.class);
@@ -163,17 +168,21 @@ public class TestOMKeyRequest {
         .setNodes(new ArrayList<>())
         .build();
 
-    AllocatedBlock allocatedBlock =
-        new AllocatedBlock.Builder()
-            .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID))
-            .setPipeline(pipeline).build();
+    AllocatedBlock.Builder blockBuilder = new AllocatedBlock.Builder()
+        .setPipeline(pipeline);
 
-    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
-
-    allocatedBlocks.add(allocatedBlock);
-
-    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any())).thenReturn(allocatedBlocks);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
+        any(ReplicationConfig.class),
+        anyString(), any(ExcludeList.class))).thenAnswer(invocation -> {
+          int num = invocation.getArgument(1);
+          List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
+          for (int i = 0; i < num; i++) {
+            blockBuilder.setContainerBlockID(
+                new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
+            allocatedBlocks.add(blockBuilder.build());
+          }
+          return allocatedBlocks;
+        });
 
 
     volumeName = UUID.randomUUID().toString();

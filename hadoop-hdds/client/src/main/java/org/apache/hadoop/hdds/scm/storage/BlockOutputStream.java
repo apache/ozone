@@ -119,6 +119,7 @@ public class BlockOutputStream extends OutputStream {
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
+  private int replicationIndex;
 
   /**
    * Creates a new BlockOutputStream.
@@ -147,6 +148,8 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
+
+    replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer();
@@ -208,6 +211,22 @@ public class BlockOutputStream extends OutputStream {
 
   public IOException getIoException() {
     return ioException.get();
+  }
+
+  XceiverClientSpi getXceiverClientSpi() {
+    return this.xceiverClient;
+  }
+
+  BlockData.Builder getContainerBlockData() {
+    return this.containerBlockData;
+  }
+
+  Token<? extends TokenIdentifier> getToken() {
+    return this.token;
+  }
+
+  ExecutorService getResponseExecutor() {
+    return this.responseExecutor;
   }
 
   @Override
@@ -396,7 +415,7 @@ public class BlockOutputStream extends OutputStream {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  private CompletableFuture<ContainerProtos.
+  CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
@@ -568,7 +587,7 @@ public class BlockOutputStream extends OutputStream {
   void waitOnFlushFutures() throws InterruptedException, ExecutionException {
   }
 
-  private void validateResponse(
+  void validateResponse(
       ContainerProtos.ContainerCommandResponseProto responseProto)
       throws IOException {
     try {
@@ -587,7 +606,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  private void setIoException(Exception e) {
+  public void setIoException(Exception e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -623,7 +642,7 @@ public class BlockOutputStream extends OutputStream {
    *
    * @throws IOException if stream is closed
    */
-  private void checkOpen() throws IOException {
+  void checkOpen() throws IOException {
     if (isClosed()) {
       throw new IOException("BlockOutputStream has been closed.");
     } else if (getIoException() != null) {
@@ -643,8 +662,10 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException if there is an I/O error while performing the call
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
+   * @return
    */
-  private void writeChunkToContainer(ChunkBuffer chunk) throws IOException {
+  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(
+      ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -664,31 +685,34 @@ public class BlockOutputStream extends OutputStream {
 
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, token);
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-          asyncReply.getResponse();
-      future.thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          future.completeExceptionally(sce);
-        }
-        return e;
-      }, responseExecutor).exceptionally(e -> {
-        String msg = "Failed to write chunk " + chunkInfo.getChunkName() + " " +
-            "into block " + blockID;
-        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-        CompletionException ce = new CompletionException(msg, e);
-        setIoException(ce);
-        throw ce;
-      });
+          blockID.get(), data, token, replicationIndex);
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          respFuture = asyncReply.getResponse();
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          validateFuture = respFuture.thenApplyAsync(e -> {
+            try {
+              validateResponse(e);
+            } catch (IOException sce) {
+              respFuture.completeExceptionally(sce);
+            }
+            return e;
+          }, responseExecutor).exceptionally(e -> {
+            String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
+                " into block " + blockID;
+            LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+            CompletionException ce = new CompletionException(msg, e);
+            setIoException(ce);
+            throw ce;
+          });
+      containerBlockData.addChunks(chunkInfo);
+      return validateFuture;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    containerBlockData.addChunks(chunkInfo);
+    return null;
   }
 
   @VisibleForTesting
@@ -704,7 +728,7 @@ public class BlockOutputStream extends OutputStream {
    * handle ExecutionException else skip it.
    * @throws IOException
    */
-  private void handleInterruptedException(Exception ex,
+  void handleInterruptedException(Exception ex,
       boolean processExecutionException)
       throws IOException {
     LOG.error("Command execution was interrupted.");

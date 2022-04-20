@@ -125,6 +125,8 @@ message Pipeline {
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
     optional UUID suggestedLeaderID = 9;
+    repeated uint32 memberReplicaIndexes = 10;
+    optional ECReplicationConfig ecReplicationConfig = 11;
     // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
     optional UUID leaderID128 = 100;
 }
@@ -230,8 +232,9 @@ message ContainerInfoProto {
     required string owner = 7;
     optional int64 deleteTransactionId = 8;
     optional int64 sequenceId = 9;
-    required ReplicationFactor replicationFactor  = 10;
+    optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
+    optional ECReplicationConfig ecReplicationConfig = 12;
 }
 
 message ContainerWithPipeline {
@@ -264,11 +267,27 @@ enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
     CHAINED = 3;
+    EC = 4;
+    NONE = -1; // Invalid Type
 }
 
 enum ReplicationFactor {
     ONE = 1;
     THREE = 3;
+    ZERO = 0; // Invalid Factor
+}
+
+message ECReplicationConfig {
+    required int32 data = 1;
+    required int32 parity = 2;
+    required string codec = 3;
+    required int32 ecChunkSize = 4;
+}
+
+message DefaultReplicationConfig {
+    required ReplicationType type = 1;
+    optional ReplicationFactor factor = 2;
+    optional ECReplicationConfig ecReplicationConfig = 3;
 }
 
 enum ScmOps {
@@ -394,6 +413,7 @@ message SCMContainerReplicaProto {
     required int64 sequenceID = 5;
     required int64 keyCount = 6;
     required int64 bytesUsed = 7;
+    optional int64 replicaIndex = 8;
 }
 
 message KeyContainerIDList {

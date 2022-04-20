@@ -188,6 +188,26 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     }
   }
 
+
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  @Override
+  public int getPipelineCount(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state) {
+    lock.readLock().lock();
+    try {
+      return pipelineStateMap.getPipelineCount(replicationConfig, state);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
   @Override
   public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws IOException {

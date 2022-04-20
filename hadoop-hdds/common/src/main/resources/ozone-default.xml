@@ -811,6 +811,20 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.placement.ec.impl</name>
+    <value>
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter
+    </value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      The full name of class which implements
+      org.apache.hadoop.hdds.scm.PlacementPolicy.
+      The class decides which datanode will be used to host the container replica in EC mode. If not set,
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      value.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
@@ -1145,26 +1159,41 @@
   </property>
 
   <property>
-    <name>ozone.replication</name>
+    <name>ozone.server.default.replication</name>
     <value>3</value>
-    <tag>OZONE, CLIENT</tag>
+    <tag>OZONE</tag>
     <description>
       Default replication value. The actual number of replications can be
       specified when writing the key. The default is used if replication
-      is not specified. Supported values: 1 and 3.
+      is not specified when creating key or no default replication set at
+      bucket. Supported values: 1, 3 and EC_3_2.
     </description>
   </property>
 
   <property>
-    <name>ozone.replication.type</name>
+    <name>ozone.server.default.replication.type</name>
     <value>RATIS</value>
-    <tag>OZONE, CLIENT</tag>
+    <tag>OZONE</tag>
     <description>
       Default replication type to be used while writing key into ozone. The
       value can be specified when writing the key, default is used when
-      nothing is specified. Supported values: RATIS, STAND_ALONE and CHAINED.
+      nothing is specified when creating key or no default value set at bucket.
+      Supported values: RATIS, STAND_ALONE, CHAINED and EC.
     </description>
   </property>
+
+  <property>
+    <name>ozone.client.bucket.replication.config.refresh.time.ms</name>
+    <value>30000</value>
+    <tag>OZONE</tag>
+    <description>
+      Default time period to refresh the bucket replication config in o3fs
+      clients. Until the bucket replication config refreshed, client will
+      continue to use existing replication config irrespective of whether bucket
+      replication config updated at OM or not.
+    </description>
+  </property>
+
   <property>
     <name>hdds.container.close.threshold</name>
     <value>0.9f</value>
@@ -3086,6 +3115,18 @@
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.max.ec.stripe.write.retries</name>
+    <value>10</value>
+    <tag>CLIENT</tag>
+    <description>
+      When EC stripe write failed, client will request to allocate new block group and write the failed stripe into new
+      block group. If the same stripe failure continued in newly acquired block group also, then it will retry by
+      requesting to allocate new block group again. This configuration is used to limit these number of retries. By
+      default the number of retries are 10.
     </description>
   </property>
 

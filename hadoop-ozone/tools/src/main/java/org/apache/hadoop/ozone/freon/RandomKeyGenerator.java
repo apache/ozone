@@ -41,8 +41,7 @@ import java.util.function.LongSupplier;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -72,6 +71,7 @@ import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
@@ -177,20 +177,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
   )
   private String jsonDir;
 
-  @Option(
-      names = {"--replication-type", "--replicationType"},
-      description = "Replication type (STAND_ALONE, RATIS). Full name " +
-          "--replicationType will be removed in later versions.",
-      defaultValue = "STAND_ALONE"
-  )
-  private ReplicationType type = ReplicationType.STAND_ALONE;
-
-  @Option(
-      names = "--factor",
-      description = "Replication factor (ONE, THREE)",
-      defaultValue = "ONE"
-  )
-  private ReplicationFactor factor = ReplicationFactor.ONE;
+  @Mixin
+  private FreonReplicationOptions replication;
 
   @Option(
       names = "--om-service-id",
@@ -204,6 +192,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
           "volumes, buckets and keys."
   )
   private boolean cleanObjects = false;
+
+  private ReplicationConfig replicationConfig;
 
   private int threadPoolSize;
 
@@ -248,6 +238,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private ProgressBar progressbar;
 
   RandomKeyGenerator() {
+    // for picocli
   }
 
   @VisibleForTesting
@@ -290,18 +281,19 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    if (ozoneConfiguration != null) {
-      if (!ozoneConfiguration.getBoolean(
-          HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
-          HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA_DEFAULT)) {
-        LOG.info("Override validateWrites to false, because "
-            + HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA + " is set to false.");
-        validateWrites = false;
-      }
-      init(ozoneConfiguration);
-    } else {
-      init(freon.createOzoneConfiguration());
+    if (ozoneConfiguration == null) {
+      ozoneConfiguration = freon.createOzoneConfiguration();
     }
+    if (!ozoneConfiguration.getBoolean(
+        HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
+        HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA_DEFAULT)) {
+      LOG.info("Override validateWrites to false, because "
+          + HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA + " is set to false.");
+      validateWrites = false;
+    }
+    init(ozoneConfiguration);
+
+    replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
 
     keyValueBuffer = StringUtils.string2Bytes(
         RandomStringUtils.randomAscii(bufferSize));
@@ -491,8 +483,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
     out.println("Number of Volumes created: " + numberOfVolumesCreated);
     out.println("Number of Buckets created: " + numberOfBucketsCreated);
     out.println("Number of Keys added: " + numberOfKeysAdded);
-    out.println("Ratis replication factor: " + factor.name());
-    out.println("Ratis replication type: " + type.name());
+    out.println("Replication: " + replicationConfig.getReplication());
+    out.println("Replication type: " + replicationConfig.getReplicationType());
     out.println(
         "Average Time spent in volume creation: " + prettyAverageVolumeTime);
     out.println(
@@ -812,8 +804,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
     try {
       try (AutoCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
         long keyCreateStart = System.nanoTime();
-        try (OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
-            factor, new HashMap<>())) {
+        try (OzoneOutputStream os = bucket.createKey(keyName, keySize,
+            replicationConfig, new HashMap<>())) {
           long keyCreationDuration = System.nanoTime() - keyCreateStart;
           histograms.get(FreonOps.KEY_CREATE.ordinal())
               .update(keyCreationDuration);
@@ -936,7 +928,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     private int numOfThreads;
     private String dataWritten;
     private String execTime;
-    private String replicationFactor;
+    private String replication;
     private String replicationType;
 
     private long keySize;
@@ -969,8 +961,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
       this.keySize = RandomKeyGenerator.this.keySize;
       this.bufferSize = RandomKeyGenerator.this.bufferSize;
       this.jobStartTime = Time.formatTime(RandomKeyGenerator.this.jobStartTime);
-      this.replicationFactor = RandomKeyGenerator.this.factor.name();
-      this.replicationType = RandomKeyGenerator.this.type.name();
+      replicationType = replicationConfig.getReplicationType().name();
+      replication = replicationConfig.getReplication();
 
       long totalBytes =
           (long) numOfVolumes * numOfBuckets * numOfKeys * keySize;
@@ -1107,8 +1099,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
       return execTime;
     }
 
-    public String getReplicationFactor() {
-      return replicationFactor;
+    public String getReplication() {
+      return replication;
     }
 
     public String getReplicationType() {
@@ -1229,52 +1221,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   }
 
   @VisibleForTesting
-  public void setNumOfVolumes(int numOfVolumes) {
-    this.numOfVolumes = numOfVolumes;
-  }
-
-  @VisibleForTesting
-  public void setNumOfBuckets(int numOfBuckets) {
-    this.numOfBuckets = numOfBuckets;
-  }
-
-  @VisibleForTesting
-  public void setNumOfKeys(int numOfKeys) {
-    this.numOfKeys = numOfKeys;
-  }
-
-  @VisibleForTesting
-  public void setNumOfThreads(int numOfThreads) {
-    this.numOfThreads = numOfThreads;
-  }
-
-  @VisibleForTesting
-  public void setKeySize(long keySize) {
-    this.keySize = keySize;
-  }
-
-  @VisibleForTesting
-  public void setType(ReplicationType type) {
-    this.type = type;
-  }
-
-  @VisibleForTesting
-  public void setFactor(ReplicationFactor factor) {
-    this.factor = factor;
-  }
-
-  @VisibleForTesting
-  public void setValidateWrites(boolean validateWrites) {
-    this.validateWrites = validateWrites;
-  }
-
-  @VisibleForTesting
   public int getThreadPoolSize() {
     return threadPoolSize;
-  }
-
-  @VisibleForTesting
-  public void setCleanObjects(boolean cleanObjects) {
-    this.cleanObjects = cleanObjects;
   }
 }
