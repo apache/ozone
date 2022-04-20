@@ -25,6 +25,7 @@ import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -90,6 +91,34 @@ public class TestObjectPut {
 
 
     //THEN
+    OzoneInputStream ozoneInputStream =
+        clientStub.getObjectStore().getS3Bucket(bucketName)
+            .readKey(keyName);
+    String keyContent =
+        IOUtils.toString(ozoneInputStream, UTF_8);
+
+    Assert.assertEquals(200, response.getStatus());
+    Assert.assertEquals(CONTENT, keyContent);
+  }
+
+  @Test
+  public void testPutObjectWithECReplicationConfig()
+      throws IOException, OS3Exception {
+    //GIVEN
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headers);
+    ECReplicationConfig ecReplicationConfig =
+        new ECReplicationConfig("rs-3-2-1024K");
+    clientStub.getObjectStore().getS3Bucket(bucketName)
+        .setReplicationConfig(ecReplicationConfig);
+    Response response = objectEndpoint.put(bucketName, keyName, CONTENT
+        .length(), 1, null, body);
+
+    Assert.assertEquals(ecReplicationConfig,
+        clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName)
+            .getReplicationConfig());
     OzoneInputStream ozoneInputStream =
         clientStub.getObjectStore().getS3Bucket(bucketName)
             .readKey(keyName);
@@ -251,10 +280,10 @@ public class TestObjectPut {
 
     objectEndpoint.put(bucketName, keyName, CONTENT
             .length(), 1, null, body);
-
     OzoneKeyDetails key =
         clientStub.getObjectStore().getS3Bucket(bucketName)
             .getKey(keyName);
+
 
     //default type is set
     Assert.assertEquals(ReplicationType.RATIS, key.getReplicationType());

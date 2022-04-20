@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -53,13 +54,16 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static junit.framework.TestCase.assertEquals;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 
@@ -632,6 +636,158 @@ public class TestContainerReportHandler {
   }
 
   @Test
+  public void openECContainerKeyAndBytesUsedUpdatedToMinimumOfAllReplicas()
+      throws IOException {
+    final ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(
+        nodeManager, containerManager);
+
+    Pipeline pipeline = pipelineManager.createPipeline(repConfig);
+    Map<Integer, DatanodeDetails> dns = new HashMap<>();
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      dns.put(i, nodeIterator.next());
+    }
+    final ContainerReplicaProto.State replicaState
+        = ContainerReplicaProto.State.OPEN;
+    final ContainerInfo containerOne =
+        getECContainer(LifeCycleState.OPEN, pipeline.getId(), repConfig);
+
+    containerStateManager.addContainer(containerOne.getProtobuf());
+    // Container loaded, no replicas reported from DNs. Expect zeros for
+    // usage values.
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Report from data index 2 - should not update stats
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(2), 50L, 60L, 2), publisher);
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Report from replica 1, it should update
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(1), 50L, 60L, 1), publisher);
+    assertEquals(50L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(60L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Parity 1 report a greater value, but as the container is own the stats
+    // should be the min value.
+    // Report from replica 1, it should update
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(4), 80L, 90L, 4), publisher);
+    assertEquals(50L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(60L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Parity 2 reports a lesser value, so the stored values should update
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(5), 40, 30, 5), publisher);
+    assertEquals(40L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(30L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Report from data index 3 - should not update stats even though it has
+    // lesser values
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(2), 10L, 10L, 2), publisher);
+    assertEquals(40L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(30L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+  }
+
+  @Test
+  public void closedECContainerKeyAndBytesUsedUpdatedToMinimumOfAllReplicas()
+      throws IOException {
+    final ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(
+        nodeManager, containerManager);
+
+    Pipeline pipeline = pipelineManager.createPipeline(repConfig);
+    Map<Integer, DatanodeDetails> dns = new HashMap<>();
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      dns.put(i, nodeIterator.next());
+    }
+    final ContainerReplicaProto.State replicaState
+        = ContainerReplicaProto.State.OPEN;
+    final ContainerInfo containerOne =
+        getECContainer(LifeCycleState.CLOSED, pipeline.getId(), repConfig);
+
+    containerStateManager.addContainer(containerOne.getProtobuf());
+    // Container loaded, no replicas reported from DNs. Expect zeros for
+    // usage values.
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Report from data index 2 - should not update stats
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(2), 50L, 60L, 2), publisher);
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(0L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Report from replica 1, it should update
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(1), 50L, 60L, 1), publisher);
+    assertEquals(50L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(60L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Parity 1 report a greater value, as the container is closed the stats
+    // should be the max value.
+    // Report from replica 1, it should update
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(4), 80L, 90L, 4), publisher);
+    assertEquals(80L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(90L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Parity 2 reports a lesser value, so the stored values should not update
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(5), 40, 30, 5), publisher);
+    assertEquals(80L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(90L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+
+    // Report from data index 3 - should not update stats even though it has
+    // greater values
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        dns.get(2), 110L, 120L, 2), publisher);
+    assertEquals(80L, containerManager.getContainer(containerOne.containerID())
+        .getUsedBytes());
+    assertEquals(90L, containerManager.getContainer(containerOne.containerID())
+        .getNumberOfKeys());
+  }
+
+  @Test
   public void testStaleReplicaOfDeletedContainer() throws NodeNotFoundException,
       IOException {
 
@@ -653,7 +809,7 @@ public class TestContainerReportHandler {
     // Expects the replica will be deleted.
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString());
+        datanodeOne.getUuidString(), 0);
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
@@ -668,8 +824,16 @@ public class TestContainerReportHandler {
   private ContainerReportFromDatanode getContainerReportFromDatanode(
       ContainerID containerId, ContainerReplicaProto.State state,
       DatanodeDetails dn, long bytesUsed, long keyCount) {
+    return getContainerReportFromDatanode(containerId, state, dn, bytesUsed,
+        keyCount, 0);
+  }
+
+  private ContainerReportFromDatanode getContainerReportFromDatanode(
+      ContainerID containerId, ContainerReplicaProto.State state,
+      DatanodeDetails dn, long bytesUsed, long keyCount, int replicaIndex) {
     ContainerReportsProto containerReport = getContainerReportsProto(
-        containerId, state, dn.getUuidString(), bytesUsed, keyCount);
+        containerId, state, dn.getUuidString(), bytesUsed, keyCount,
+        replicaIndex);
 
     return new ContainerReportFromDatanode(dn, containerReport);
   }
@@ -678,12 +842,20 @@ public class TestContainerReportHandler {
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        2000000000L, 100000000L);
+        2000000000L, 100000000L, 0);
   }
 
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
-      final String originNodeId, final long usedBytes, final long keyCount) {
+      final String originNodeId, int replicaIndex) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L, replicaIndex);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long usedBytes, final long keyCount,
+      final int replicaIndex) {
     final ContainerReportsProto.Builder crBuilder =
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
@@ -701,6 +873,7 @@ public class TestContainerReportHandler {
             .setWriteBytes(2000000000L)
             .setBlockCommitSequenceId(10000L)
             .setDeleteTransactionId(0)
+            .setReplicaIndex(replicaIndex)
             .build();
     return crBuilder.addReports(replicaProto).build();
   }

@@ -124,6 +124,24 @@ services:
       - ${OZONE_VOLUME}/dn3:/data
       - *ozone-dir
       - *transformation
+  dn4:
+    <<: *datanode
+    networks:
+      net:
+        ipv4_address: 10.9.0.18
+    volumes:
+      - ${OZONE_VOLUME}/dn4:/data
+      - *ozone-dir
+      - *transformation
+  dn5:
+    <<: *datanode
+    networks:
+      net:
+        ipv4_address: 10.9.0.19
+    volumes:
+      - ${OZONE_VOLUME}/dn5:/data
+      - *ozone-dir
+      - *transformation
   recon:
     command: ["ozone","recon"]
     <<: *common-config
@@ -131,7 +149,7 @@ services:
       <<: *replication
     networks:
       net:
-        ipv4_address: 10.9.0.18
+        ipv4_address: 10.9.0.20
     ports:
       - 9888:9888
     volumes:
@@ -145,7 +163,7 @@ services:
       <<: *replication
     networks:
       net:
-        ipv4_address: 10.9.0.19
+        ipv4_address: 10.9.0.21
     ports:
       - 9878:9878
     volumes:

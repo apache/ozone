@@ -150,3 +150,11 @@ check_om_mlv() {
 check_scm_mlv() {
   check_mlv "$1" /data/metadata/scm/current/VERSION "$2"
 }
+
+check_ec_is_disabled() {
+  execute_robot_test scm --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
+}
+
+check_ec_is_enabled() {
+  execute_robot_test scm --include post-finalized-ec-tests ec/upgrade-ec-check.robot
+}

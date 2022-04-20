@@ -28,7 +28,6 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -40,8 +39,10 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Parameters;
 
 /**
@@ -54,17 +55,8 @@ public class PutKeyHandler extends KeyHandler {
   @Parameters(index = "1", arity = "1..1", description = "File to upload")
   private String fileName;
 
-  @Option(names = {"-r", "--replication"},
-      description =
-          "Replication configuration of the new key. (this is replication "
-              + "specific. for RATIS/STANDALONE you can use ONE or THREE) "
-              + "Default is specified in the cluster-wide config.")
-  private String replication;
-
-  @Option(names = {"-t", "--type"},
-      description = "Replication type of the new key. (use RATIS or " +
-          "STAND_ALONE) Default is specified in the cluster-wide config.")
-  private ReplicationType replicationType;
+  @Mixin
+  private ShellReplicationOptions replication;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -84,7 +76,7 @@ public class PutKeyHandler extends KeyHandler {
     }
 
     ReplicationConfig replicationConfig =
-        ReplicationConfig.parse(replicationType, replication, getConf());
+        replication.fromParamsOrConfig(getConf());
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
