@@ -59,6 +59,7 @@ share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_7.jar
+share/ozone/lib/hdds-annotation-processing.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
@@ -184,7 +185,6 @@ share/ozone/lib/opentracing-noop.jar
 share/ozone/lib/opentracing-tracerresolver.jar
 share/ozone/lib/opentracing-util.jar
 share/ozone/lib/osgi-resource-locator.jar
-share/ozone/lib/ozone-annotation-processing.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar

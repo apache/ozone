@@ -14,3 +14,4 @@
 # limitations under the License.
 
 org.apache.hadoop.hdds.conf.ConfigFileGenerator
+org.apache.ozone.annotations.RequestFeatureValidatorProcessor
