@@ -67,6 +67,11 @@ public class TestReplicationAnnotation {
       }
 
       @Override
+      public boolean isStopped() {
+        return false;
+      }
+
+      @Override
       public RaftServer.Division getDivision() {
         return null;
       }

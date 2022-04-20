@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.audit;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -110,11 +113,16 @@ public class TestOzoneAuditLogger {
     }
   }
 
+  @Before
+  public void init() {
+    AUDIT.refreshDebugCmdSet();
+  }
+
   /**
-   * Test to verify default log level is INFO when logging success events.
+   * Test to verify default log level is INFO when logging WRITE success events.
    */
   @Test
-  public void verifyDefaultLogLevelForSuccess() throws IOException {
+  public void verifyDefaultLogLevelForWriteSuccess() throws IOException {
     AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
     String expected =
         "INFO  | OMAudit | ? | " + WRITE_SUCCESS_MSG.getFormattedMessage();
@@ -122,13 +130,36 @@ public class TestOzoneAuditLogger {
   }
 
   /**
-   * Test to verify default log level is ERROR when logging failure events.
+   * Test to verify default log level is ERROR when logging WRITE failure
+   * events.
    */
   @Test
-  public void verifyDefaultLogLevelForFailure() throws IOException {
+  public void verifyDefaultLogLevelForWriteFailure() throws IOException {
     AUDIT.logWriteFailure(WRITE_FAIL_MSG);
     String expected =
         "ERROR | OMAudit | ? | " + WRITE_FAIL_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  /**
+   * Test to verify default log level is INFO when logging READ success events.
+   */
+  @Test
+  public void verifyDefaultLogLevelForReadSuccess() throws IOException {
+    AUDIT.logReadSuccess(READ_SUCCESS_MSG);
+    String expected =
+        "INFO  | OMAudit | ? | " + READ_SUCCESS_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  /**
+   * Test to verify default log level is ERROR when logging READ failure events.
+   */
+  @Test
+  public void verifyDefaultLogLevelForFailure() throws IOException {
+    AUDIT.logReadFailure(READ_FAIL_MSG);
+    String expected =
+        "ERROR | OMAudit | ? | " + READ_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
@@ -143,19 +174,22 @@ public class TestOzoneAuditLogger {
   }
 
   /**
-   * Test to verify no READ event is logged.
+   * Test to verify no WRITE event is logged.
    */
   @Test
-  public void notLogReadEvents() throws IOException {
-    AUDIT.logReadSuccess(READ_SUCCESS_MSG);
-    AUDIT.logReadFailure(READ_FAIL_MSG);
+  public void excludedEventNotLogged() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(AuditLogger.AUDIT_LOG_DEBUG_CMD_LIST_PREFIX +
+            AuditLoggerType.OMLOGGER.getType().toLowerCase(Locale.ROOT),
+        "CREATE_VOLUME");
+    AUDIT.refreshDebugCmdSet(conf);
+    AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
     verifyNoLog();
   }
-
+  
   /**
    * Test to verify if multiline entries can be checked.
    */
-
   @Test
   public void messageIncludesMultilineException() throws IOException {
     String exceptionMessage = "Dummy exception message";

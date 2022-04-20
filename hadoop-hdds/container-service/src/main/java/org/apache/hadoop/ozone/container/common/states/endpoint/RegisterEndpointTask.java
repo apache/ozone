@@ -176,7 +176,11 @@ public final class RegisterEndpointTask implements
             rpcEndPoint.getState().getNextState();
         rpcEndPoint.setState(nextState);
         rpcEndPoint.zeroMissedCount();
-        this.stateContext.configureHeartbeatFrequency();
+        if (rpcEndPoint.isPassive()) {
+          this.stateContext.configureReconHeartbeatFrequency();
+        } else {
+          this.stateContext.configureHeartbeatFrequency();
+        }
       }
     } catch (IOException ex) {
       rpcEndPoint.logIfNeeded(ex);

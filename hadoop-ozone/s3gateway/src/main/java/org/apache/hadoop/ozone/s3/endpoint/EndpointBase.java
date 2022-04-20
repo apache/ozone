@@ -19,12 +19,21 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Context;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.audit.AuditAction;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -39,19 +48,26 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.s3.ClientIpFilter.CLIENT_IP_HEADER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 
 /**
  * Basic helpers for all the REST endpoints.
  */
-public abstract class EndpointBase {
+public abstract class EndpointBase implements Auditor {
 
   @Inject
   private OzoneClient client;
   @Inject
   private S3Auth s3Auth;
+  @Context
+  private ContainerRequestContext context;
+
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
+
+  protected static final AuditLogger AUDIT =
+      new AuditLogger(AuditLoggerType.S3GLOGGER);
 
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
@@ -119,6 +135,7 @@ public abstract class EndpointBase {
     try {
       client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
+      getMetrics().incCreateBucketFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
@@ -191,6 +208,40 @@ public abstract class EndpointBase {
     }
   }
 
+  private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
+      Map<String, String> auditMap) {
+    AuditMessage.Builder builder = new AuditMessage.Builder()
+        .forOperation(op)
+        .withParams(auditMap);
+    if (s3Auth != null &&
+        s3Auth.getAccessID() != null &&
+        !s3Auth.getAccessID().isEmpty()) {
+      builder.setUser(s3Auth.getAccessID());
+    }
+    if (context != null) {
+      builder.atIp(getClientIpAddress());
+    }
+    return builder;
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+      Map<String, String> auditMap) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.SUCCESS);
+    return builder.build();
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForFailure(AuditAction op,
+      Map<String, String> auditMap, Throwable throwable) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.FAILURE)
+        .withException(throwable);
+    return builder.build();
+  }
+
+
   @VisibleForTesting
   public void setClient(OzoneClient ozoneClient) {
     this.client = ozoneClient;
@@ -203,5 +254,9 @@ public abstract class EndpointBase {
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
     return S3GatewayMetrics.create();
+  }
+
+  public String getClientIpAddress() {
+    return context.getHeaderString(CLIENT_IP_HEADER);
   }
 }

@@ -26,6 +26,10 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.interval";
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
+  public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
+      "hdds.recon.heartbeat.interval";
+  public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
+      "60s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -269,4 +273,7 @@ public final class HddsConfigKeys {
           "hdds.container.checksum.verification.enabled";
   public static final boolean
           HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT = true;
+
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
+      "ozone.audit.log.debug.cmd.list.dnaudit";
 }
