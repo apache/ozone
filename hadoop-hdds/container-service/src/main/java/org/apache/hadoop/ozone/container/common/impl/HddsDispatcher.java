@@ -409,6 +409,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         ContainerProtos.ContainerType.KeyValueContainer;
     createRequest.setContainerType(containerType);
 
+    if (containerRequest.hasWriteChunk()) {
+      createRequest.setReplicaIndex(
+          containerRequest.getWriteChunk().getBlockID().getReplicaIndex());
+    }
+
     ContainerCommandRequestProto.Builder requestBuilder =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.CreateContainer)

@@ -18,15 +18,23 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.UUID;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
 
 /**
  * Class to test OmMultipartKeyInfo.
@@ -34,33 +42,97 @@ import java.util.UUID;
 public class TestOmMultipartKeyInfo {
 
   @Test
-  public void testCopyObject() {
-    OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
-        .setUploadID(UUID.randomUUID().toString())
-        .setCreationTime(Time.now())
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.THREE))
+  public void copyObject() {
+    for (ReplicationConfig param : replicationConfigs().collect(toList())) {
+      testCopyObject(param);
+    }
+  }
+
+  //@ParameterizedTest
+  //@MethodSource("replicationConfigs")
+  private void testCopyObject(ReplicationConfig replicationConfig) {
+    // GIVEN
+    OmMultipartKeyInfo subject = createSubject()
+        .setReplicationConfig(replicationConfig)
         .build();
 
-    OmMultipartKeyInfo cloneMultipartKeyInfo = omMultipartKeyInfo.copyObject();
+    // WHEN
+    OmMultipartKeyInfo copy = subject.copyObject();
 
-    Assert.assertEquals(cloneMultipartKeyInfo, omMultipartKeyInfo);
+    // THEN
+    assertNotSame(subject, copy);
+    assertEquals(subject, copy);
+    assertEquals(replicationConfig, copy.getReplicationConfig());
+  }
 
-    // Just setting dummy values for this test.
-    omMultipartKeyInfo.addPartKeyInfo(1,
-        PartKeyInfo.newBuilder().setPartNumber(1).setPartName("/path")
-            .setPartKeyInfo(KeyInfo.newBuilder()
+  @Test
+  public void protoConversion() {
+    for (ReplicationConfig param : replicationConfigs().collect(toList())) {
+      protoConversion(param);
+    }
+  }
+
+  //@ParameterizedTest
+  //@MethodSource("replicationConfigs")
+  private void protoConversion(ReplicationConfig replicationConfig) {
+    // GIVEN
+    OmMultipartKeyInfo subject = createSubject()
+        .setReplicationConfig(replicationConfig)
+        .build();
+
+    // WHEN
+    OzoneManagerProtocolProtos.MultipartKeyInfo proto = subject.getProto();
+    OmMultipartKeyInfo fromProto = OmMultipartKeyInfo.getFromProto(proto);
+
+    // THEN
+    assertEquals(subject, fromProto);
+    assertEquals(replicationConfig, fromProto.getReplicationConfig());
+  }
+
+  private static Stream<ReplicationConfig> replicationConfigs() {
+    return Stream.of(
+        StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        new ECReplicationConfig(3, 2)
+    );
+  }
+
+  @Test
+  public void distinctListOfParts() {
+    // GIVEN
+    OmMultipartKeyInfo subject = createSubject().build();
+    OmMultipartKeyInfo copy = subject.copyObject();
+
+    // WHEN
+    subject.addPartKeyInfo(1, createPart(createKeyInfo()).build());
+
+    // THEN
+    assertEquals(0, copy.getPartKeyInfoMap().size());
+    assertEquals(1, subject.getPartKeyInfoMap().size());
+  }
+
+  private static OmMultipartKeyInfo.Builder createSubject() {
+    return new OmMultipartKeyInfo.Builder()
+        .setUploadID(UUID.randomUUID().toString())
+        .setCreationTime(Time.now());
+  }
+
+  private static PartKeyInfo.Builder createPart(KeyInfo.Builder partKeyInfo) {
+    return PartKeyInfo.newBuilder()
+        .setPartNumber(1)
+        .setPartName("/path")
+        .setPartKeyInfo(partKeyInfo);
+  }
+
+  private static KeyInfo.Builder createKeyInfo() {
+    return KeyInfo.newBuilder()
         .setVolumeName(UUID.randomUUID().toString())
         .setBucketName(UUID.randomUUID().toString())
         .setKeyName(UUID.randomUUID().toString())
-        .setDataSize(100L) // Just set dummy size for testing
+        .setDataSize(100L)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build());
-
-    Assert.assertEquals(0, cloneMultipartKeyInfo.getPartKeyInfoMap().size());
-    Assert.assertEquals(1, omMultipartKeyInfo.getPartKeyInfoMap().size());
-
+        .setType(HddsProtos.ReplicationType.STAND_ALONE);
   }
 }

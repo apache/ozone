@@ -22,14 +22,14 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
 /**
@@ -66,23 +66,20 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       defaultValue = "4096")
   private int bufferSize;
 
-  @Option(names = { "-F", "--factor" },
-      description = "Replication factor (ONE, THREE)",
-      defaultValue = "THREE"
-  )
-  private ReplicationFactor factor = ReplicationFactor.THREE;
-
-  @Option(
-      names = "--om-service-id",
+  @Option(names = "--om-service-id",
       description = "OM Service ID"
   )
-  private String omServiceID = null;
+  private String omServiceID;
+
+  @Mixin
+  private FreonReplicationOptions replication;
 
   private Timer timer;
 
   private OzoneBucket bucket;
   private ContentGenerator contentGenerator;
   private Map<String, String> metadata;
+  private ReplicationConfig replicationConfig;
 
   @Override
   public Void call() throws Exception {
@@ -93,6 +90,8 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
+
+    replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
         ozoneConfiguration)) {
@@ -112,7 +111,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     timer.time(() -> {
       try (OutputStream stream = bucket.createKey(key, keySize,
-              ReplicationType.RATIS, factor, metadata)) {
+          replicationConfig, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }

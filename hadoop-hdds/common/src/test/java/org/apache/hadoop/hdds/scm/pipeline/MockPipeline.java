@@ -19,9 +19,12 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -84,6 +87,33 @@ public final class MockPipeline {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes)
+        .build();
+  }
+
+  public static Pipeline createEcPipeline() {
+    return createEcPipeline(new ECReplicationConfig(3, 2));
+  }
+
+  public static Pipeline createEcPipeline(ECReplicationConfig repConfig) {
+
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    for (int i = 0; i < repConfig.getRequiredNodes(); i++) {
+      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    }
+    Map<DatanodeDetails, Integer> nodeIndexes = new HashMap<>();
+
+    int index = nodes.size() - 1;
+    for (DatanodeDetails dn : nodes) {
+      nodeIndexes.put(dn, index);
+      index--;
+    }
+
+    return Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(repConfig)
+        .setNodes(nodes)
+        .setReplicaIndexes(nodeIndexes)
         .build();
   }
 

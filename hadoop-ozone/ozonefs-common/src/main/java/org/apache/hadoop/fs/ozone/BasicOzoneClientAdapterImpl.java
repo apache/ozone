@@ -21,11 +21,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.HashSet;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
@@ -51,6 +54,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -65,6 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,10 +89,15 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private ObjectStore objectStore;
   private OzoneVolume volume;
   private OzoneBucket bucket;
-  private ReplicationConfig replicationConfig;
+  private ReplicationConfig bucketReplicationConfig;
+  // Client side configured replication config.
+  private ReplicationConfig clientConfiguredReplicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
   private OzoneConfiguration config;
+  private long nextReplicationConfigRefreshTime;
+  private long bucketRepConfigRefreshPeriodMS;
+  private java.time.Clock clock = new MonotonicClock(ZoneOffset.UTC);
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -112,6 +122,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throws IOException {
 
     OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
+    bucketRepConfigRefreshPeriodMS = conf.getLong(
+        OzoneConfigKeys
+            .OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS,
+        OzoneConfigKeys
+            .OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS);
     if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
       // When the host name or service id isn't given
       // but ozone.om.service.ids is defined, declare failure.
@@ -141,7 +156,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.securityEnabled = true;
     }
 
-    replicationConfig = ReplicationConfig.getDefault(conf);
+    clientConfiguredReplicationConfig =
+        OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
     if (OmUtils.isOmHAServiceId(conf, omHost)) {
       // omHost is listed as one of the service ids in the config,
@@ -158,6 +174,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
+    bucketReplicationConfig = this.bucket.getReplicationConfig();
+    nextReplicationConfigRefreshTime =
+        clock.millis() + bucketRepConfigRefreshPeriodMS;
 
     // resolve the bucket layout in case of Link Bucket
     BucketLayout resolvedBucketLayout =
@@ -172,9 +191,20 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     this.config = conf;
   }
 
+  /**
+   * This API returns the value what is configured at client side only. It could
+   * differ from the server side default values. If no replication config
+   * configured at client, it will return 3.
+   */
   @Override
   public short getDefaultReplication() {
-    return (short) replicationConfig.getRequiredNodes();
+    if (clientConfiguredReplicationConfig == null) {
+      // to provide backward compatibility, we are just retuning 3;
+      // However we need to handle with the correct behavior.
+      // TODO: Please see HDDS-5646
+      return (short) ReplicationFactor.THREE.getValue();
+    }
+    return (short) clientConfiguredReplicationConfig.getRequiredNodes();
   }
 
   @Override
@@ -207,21 +237,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
-      OzoneOutputStream ozoneOutputStream = null;
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
-
-        ReplicationConfig customReplicationConfig =
-            ReplicationConfig.adjustReplication(
-                replicationConfig, replication, config
-            );
-        ozoneOutputStream =
-            bucket.createFile(key, 0, customReplicationConfig, overWrite,
-                recursive);
-      } else {
-        ozoneOutputStream =
-            bucket.createFile(key, 0, replicationConfig, overWrite, recursive);
-      }
+      OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
+          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
+              this.clientConfiguredReplicationConfig,
+              getReplicationConfigWithRefreshCheck(), config), overWrite,
+          recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
@@ -232,6 +252,17 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         throw ex;
       }
     }
+  }
+
+  private ReplicationConfig getReplicationConfigWithRefreshCheck()
+      throws IOException {
+    if (clock.millis() > nextReplicationConfigRefreshTime) {
+      this.bucketReplicationConfig =
+          volume.getBucket(bucket.getName()).getReplicationConfig();
+      nextReplicationConfigRefreshTime =
+          clock.millis() + bucketRepConfigRefreshPeriodMS;
+    }
+    return this.bucketReplicationConfig;
   }
 
   @Override
@@ -397,6 +428,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public String getCanonicalServiceName() {
     return objectStore.getCanonicalServiceName();
+  }
+
+  @VisibleForTesting
+  void setClock(Clock monotonicClock) {
+    this.clock = monotonicClock;
   }
 
   /**

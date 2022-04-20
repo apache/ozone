@@ -261,6 +261,7 @@ public final class OzoneConsts {
   public static final String ORIGIN_PIPELINE_ID = "originPipelineId";
   public static final String ORIGIN_NODE_ID = "originNodeId";
   public static final String SCHEMA_VERSION = "schemaVersion";
+  public static final String REPLICA_INDEX = "replicaIndex";
 
   // Supported .container datanode schema versions.
   // Since containers in older schema versions are currently not reformatted to

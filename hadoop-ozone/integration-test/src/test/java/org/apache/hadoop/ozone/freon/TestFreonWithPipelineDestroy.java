@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.freon;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -36,6 +34,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import picocli.CommandLine;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -102,17 +101,19 @@ public class TestFreonWithPipelineDestroy {
     startFreon();
   }
 
-  private void startFreon() throws Exception {
+  private void startFreon() {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster.getConf());
-    randomKeyGenerator.setNumOfVolumes(1);
-    randomKeyGenerator.setNumOfBuckets(1);
-    randomKeyGenerator.setNumOfKeys(1);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
-    randomKeyGenerator.setKeySize(20971520);
-    randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.call();
+    CommandLine cmd = new CommandLine(randomKeyGenerator);
+    cmd.execute("--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "1",
+        "--key-size", "20971520",
+        "--factor", "THREE",
+        "--type", "RATIS",
+        "--validate-writes"
+    );
+
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());

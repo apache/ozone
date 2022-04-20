@@ -45,8 +45,8 @@ Copy from local
                    Execute               ozone fs -copyFromLocal NOTICE.txt ${DEEP_URL}/
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         NOTICE.txt
-    ${result} =    Execute               ozone sh key info ${VOLUME}/${BUCKET}/${DEEP_DIR}/NOTICE.txt | jq -r '.replicationFactor'
-                   Should Be Equal       ${result}         3
+    ${result} =    Execute               ozone sh key info ${VOLUME}/${BUCKET}/${DEEP_DIR}/NOTICE.txt | jq -r '.replicationConfig.replicationFactor'
+                   Should Be Equal       ${result}         THREE
 
 Put
                    Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt

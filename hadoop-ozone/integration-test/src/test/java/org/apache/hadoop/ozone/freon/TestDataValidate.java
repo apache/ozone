@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -27,6 +25,7 @@ import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.Assert;
 import org.junit.Test;
+import picocli.CommandLine;
 
 import java.time.Duration;
 
@@ -64,17 +63,19 @@ public abstract class TestDataValidate {
   }
 
   @Test
-  public void ratisTestLargeKey() throws Exception {
+  public void ratisTestLargeKey() {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
-    randomKeyGenerator.setNumOfVolumes(1);
-    randomKeyGenerator.setNumOfBuckets(1);
-    randomKeyGenerator.setNumOfKeys(1);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
-    randomKeyGenerator.setKeySize(20971520);
-    randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.call();
+        new RandomKeyGenerator(cluster.getConf());
+    CommandLine cmd = new CommandLine(randomKeyGenerator);
+    cmd.execute("--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "1",
+        "--key-size", "20971520",
+        "--factor", "THREE",
+        "--type", "RATIS",
+        "--validate-writes"
+    );
+
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
@@ -82,16 +83,18 @@ public abstract class TestDataValidate {
   }
 
   @Test
-  public void validateWriteTest() throws Exception {
+  public void validateWriteTest() {
     RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
-    randomKeyGenerator.setNumOfVolumes(2);
-    randomKeyGenerator.setNumOfBuckets(5);
-    randomKeyGenerator.setNumOfKeys(10);
-    randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
-    randomKeyGenerator.call();
+        new RandomKeyGenerator(cluster.getConf());
+    CommandLine cmd = new CommandLine(randomKeyGenerator);
+    cmd.execute("--num-of-volumes", "2",
+        "--num-of-buckets", "5",
+        "--num-of-keys", "10",
+        "--factor", "THREE",
+        "--type", "RATIS",
+        "--validate-writes"
+    );
+
     Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
     Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());

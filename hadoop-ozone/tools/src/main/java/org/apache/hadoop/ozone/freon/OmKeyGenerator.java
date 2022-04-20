@@ -20,9 +20,8 @@ import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -33,6 +32,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
@@ -61,11 +61,8 @@ public class OmKeyGenerator extends BaseFreonGenerator
       defaultValue = "bucket1")
   private String bucketName;
 
-  @Option(names = { "-F", "--factor" },
-      description = "Replication factor (ONE, THREE)",
-      defaultValue = "THREE"
-  )
-  private ReplicationFactor factor = ReplicationFactor.THREE;
+  @Mixin
+  private FreonReplicationOptions replication;
 
   @Option(
       names = "--om-service-id",
@@ -76,19 +73,20 @@ public class OmKeyGenerator extends BaseFreonGenerator
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer timer;
+  private ReplicationConfig replicationConfig;
 
   @Override
   public Void call() throws Exception {
     init();
 
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    OzoneConfiguration conf = createOzoneConfiguration();
+    replicationConfig = replication.fromParams(conf).orElse(null);
 
-    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
-        ozoneConfiguration)) {
+    try (OzoneClient rpcClient = createOzoneClient(omServiceID, conf)) {
 
       ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
 
-      ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
+      ozoneManagerClient = createOmClient(conf, omServiceID);
 
       timer = getMetrics().timer("key-create");
 
@@ -107,8 +105,8 @@ public class OmKeyGenerator extends BaseFreonGenerator
     OmKeyArgs keyArgs = new Builder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
-        .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
         .setKeyName(generateObjectName(counter))
+        .setReplicationConfig(replicationConfig)
         .setLocationInfoList(new ArrayList<>())
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))

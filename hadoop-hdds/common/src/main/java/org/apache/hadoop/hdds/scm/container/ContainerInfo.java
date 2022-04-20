@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -114,8 +115,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
     final ReplicationConfig config = ReplicationConfig
-        .fromProtoTypeAndFactor(
-            info.getReplicationType(), info.getReplicationFactor());
+        .fromProto(info.getReplicationType(), info.getReplicationFactor(),
+            info.getEcReplicationConfig());
     builder.setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
         .setState(info.getState())
@@ -159,10 +160,12 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return replicationConfig;
   }
 
+  @JsonIgnore
   public HddsProtos.ReplicationType getReplicationType() {
     return replicationConfig.getReplicationType();
   }
 
+  @JsonIgnore
   public HddsProtos.ReplicationFactor getReplicationFactor() {
     return ReplicationConfig.getLegacyFactor(replicationConfig);
   }
@@ -171,6 +174,28 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return pipelineID;
   }
 
+  /**
+   * Returns the usedBytes for the container. The value returned is derived
+   * from the replicas reported from the datanodes for the container.
+   *
+   * The size of a container can change over time. For an open container we
+   * assume the size of the container will grow, and hence the value will be
+   * the maximum of the values reported from its replicas.
+   *
+   * A closed container can only reduce in size as its blocks are removed. For
+   * a closed container, the value will be the minimum of the values reported
+   * from its replicas.
+   *
+   * An EC container, is made from a group data and parity containers where the
+   * first data and all parity containers should be the same size. The other
+   * data containers can be smaller or the same size. When calculating the EC
+   * container size, we use the min / max of the first data and parity
+   * containers,ignoring the others. For EC containers, this value actually
+   * represents the size of the largest container in the container group, rather
+   * than the total space used by all containers in the group.
+   *
+   * @return bytes used in the container.
+   */
   public long getUsedBytes() {
     return usedBytes;
   }
@@ -232,10 +257,17 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setOwner(getOwner())
-        .setSequenceId(getSequenceId());
+        .setSequenceId(getSequenceId())
+        .setReplicationType(getReplicationType());
 
-    builder.setReplicationFactor(
-        ReplicationConfig.getLegacyFactor(replicationConfig));
+    if (replicationConfig instanceof ECReplicationConfig) {
+      builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)
+          .toProto());
+    } else {
+      builder.setReplicationFactor(
+          ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+
     builder.setReplicationType(replicationConfig.getReplicationType());
 
     if (getPipelineID() != null) {
