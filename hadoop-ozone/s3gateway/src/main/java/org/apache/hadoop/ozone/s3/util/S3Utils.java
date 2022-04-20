@@ -22,10 +22,13 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -44,6 +47,22 @@ public final class S3Utils {
   public static String urlEncode(String str)
       throws UnsupportedEncodingException {
     return URLEncoder.encode(str, UTF_8.name());
+  }
+
+  public static Map<String, String> genAuditParam(String... strs) {
+    if (strs.length % 2 == 1) {
+      throw new IllegalArgumentException("Unexpected number of parameters: "
+          + strs.length);
+    }
+    Map<String, String> auditParams = new TreeMap<>();
+    for (int i = 0; i < strs.length; i++) {
+      if (StringUtils.isEmpty(strs[i]) || StringUtils.isEmpty(strs[i + 1])) {
+        ++i;
+        continue;
+      }
+      auditParams.put(strs[i], strs[++i]);
+    }
+    return auditParams;
   }
 
   private S3Utils() {

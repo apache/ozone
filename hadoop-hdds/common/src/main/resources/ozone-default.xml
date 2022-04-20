@@ -991,6 +991,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.recon.heartbeat.interval</name>
+    <value>60s</value>
+    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <description>
+      The heartbeat interval from a Datanode to Recon.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.heartbeat.log.warn.interval.count</name>
     <value>10</value>
     <tag>OZONE, MANAGEMENT</tag>
@@ -1647,6 +1655,24 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Timeout for ozone grpc client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.unflushed.transaction.max.count</name>
+    <value>10000</value>
+    <tag>OZONE, OM</tag>
+    <description>the unflushed transactions here are those requests that have been
+      applied to OM state machine but not been flushed to OM rocksdb. when OM meets
+      high concurrency-pressure and flushing is not fast enough, too many pending
+      requests will be hold in memory and will lead to long GC of OM, which will slow
+      down flushing further. there are some cases that flushing is slow, for example,
+      1 rocksdb is on a HDD, which has poor IO performance than SSD.
+      2 a big compaction is happening internally in rocksdb and write stall of
+      rocksdb happens.
+      3 long GC, which may caused by other factors.
+      the property is to limit the max count of unflushed transactions, so that the
+      maximum memory occupied by unflushed transactions is limited.
     </description>
   </property>
 
@@ -3101,6 +3127,36 @@
       block group. If the same stripe failure continued in newly acquired block group also, then it will retry by
       requesting to allocate new block group again. This configuration is used to limit these number of retries. By
       default the number of retries are 10.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.audit.log.debug.cmd.list.omaudit</name>
+    <value></value>
+    <tag>OM</tag>
+    <description>
+      A comma separated list of OzoneManager commands that are written to the OzoneManager audit logs only if the audit
+      log level is debug. Ex: "ALLOCATE_BLOCK,ALLOCATE_KEY,COMMIT_KEY".
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.audit.log.debug.cmd.list.scmaudit</name>
+    <value></value>
+    <tag>SCM</tag>
+    <description>
+      A comma separated list of SCM commands that are written to the SCM audit logs only if the audit
+      log level is debug. Ex: "GET_VERSION,REGISTER,SEND_HEARTBEAT".
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.audit.log.debug.cmd.list.dnaudit</name>
+    <value></value>
+    <tag>DN</tag>
+    <description>
+      A comma separated list of Datanode commands that are written to the DN audit logs only if the audit
+      log level is debug. Ex: "CREATE_CONTAINER,READ_CONTAINER,UPDATE_CONTAINER".
     </description>
   </property>
 </configuration>
