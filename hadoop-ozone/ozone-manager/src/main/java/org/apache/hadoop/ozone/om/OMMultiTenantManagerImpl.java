@@ -587,10 +587,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void checkTenantAdmin(String tenantId) throws OMException {
+  public void checkTenantAdmin(String tenantId, boolean delegated)
+      throws OMException {
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    if (!isTenantAdmin(ugi, tenantId, true)) {
+    if (!isTenantAdmin(ugi, tenantId, delegated)) {
       throw new OMException("User '" + ugi.getUserName() +
           "' is neither an Ozone admin nor a delegated admin of tenant '" +
           tenantId + "'.", OMException.ResultCodes.PERMISSION_DENIED);

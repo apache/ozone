@@ -94,11 +94,10 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       assert (!StringUtils.isEmpty(tenantId));
     }
 
-    // Sanity check
     multiTenantManager.checkTenantExistence(tenantId);
 
-    // Caller should be an Ozone admin or this tenant's delegated admin
-    multiTenantManager.checkTenantAdmin(tenantId);
+    // Caller should be an Ozone admin, or a tenant delegated admin
+    multiTenantManager.checkTenantAdmin(tenantId, true);
 
     OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
         .getTenantAccessIdTable().get(accessId);
