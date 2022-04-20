@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -59,20 +60,26 @@ public class RequestValidations {
     return this;
   }
 
-  public OMRequest validateRequest(OMRequest request) throws ServiceException {
+  public OMRequest validateRequest(OMRequest request)
+      throws Exception {
     List<Method> validations = registry.validationsFor(
         conditions(request), request.getCmdType(), PRE_PROCESS);
 
     OMRequest validatedRequest = request.toBuilder().build();
     try {
       for (Method m : validations) {
-        validatedRequest =
-            (OMRequest) m.invoke(null, validatedRequest, context);
         LOG.debug("Running the {} request pre-process validation from {}.{}",
             m.getName(), m.getDeclaringClass().getPackage().getName(),
             m.getDeclaringClass().getSimpleName());
+        validatedRequest =
+            (OMRequest) m.invoke(null, validatedRequest, context);
       }
-    } catch (IllegalAccessException | InvocationTargetException e) {
+    } catch (InvocationTargetException e) {
+      if (e.getCause() instanceof OMException) {
+        throw (OMException) e.getCause();
+      }
+      throw new ServiceException(e);
+    } catch (IllegalAccessException e) {
       throw new ServiceException(e);
     }
     return validatedRequest;
@@ -86,11 +93,11 @@ public class RequestValidations {
     OMResponse validatedResponse = response.toBuilder().build();
     try {
       for (Method m : validations) {
-        validatedResponse =
-            (OMResponse) m.invoke(null, request, response, context);
         LOG.debug("Running the {} request post-process validation from {}.{}",
             m.getName(), m.getDeclaringClass().getPackage().getName(),
             m.getDeclaringClass().getSimpleName());
+        validatedResponse =
+            (OMResponse) m.invoke(null, request, response, context);
       }
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new ServiceException(e);

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -83,7 +83,7 @@ public class OMLayoutFeatureAspect {
           layoutFeature.name(),
           layoutFeature.layoutVersion(),
           lvm.getMetadataLayoutVersion()),
-          NOT_SUPPORTED_OPERATION);
+          NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
   }
 

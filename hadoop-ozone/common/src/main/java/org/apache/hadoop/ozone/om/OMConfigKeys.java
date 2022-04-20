@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
@@ -256,6 +258,16 @@ public final class OMConfigKeys {
       "ozone.om.enable.filesystem.paths";
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
+
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_KEY =
+      "ozone.server.default.replication";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
+
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY =
+      "ozone.server.default.replication.type";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT =
+      ReplicationType.RATIS.toString();
 
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 

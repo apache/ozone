@@ -60,6 +60,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -237,6 +239,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_AL
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -2610,7 +2616,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
       metrics.incNumBucketInfos();
-      return bucketManager.getBucketInfo(volume, bucket);
+      final OmBucketInfo bucketInfo =
+          bucketManager.getBucketInfo(volume, bucket);
+      return bucketInfo;
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;
@@ -3673,6 +3681,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean getEnableFileSystemPaths() {
     return configuration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+  }
+
+  public ReplicationConfig getDefaultReplicationConfig() {
+    final String replication = configuration.getTrimmed(
+        OZONE_SERVER_DEFAULT_REPLICATION_KEY,
+        OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
+    final String type = configuration.getTrimmed(
+        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
+        OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
+    return ReplicationConfig.parse(ReplicationType.valueOf(type),
+        replication, configuration);
   }
 
   public String getOMDefaultBucketLayout() {

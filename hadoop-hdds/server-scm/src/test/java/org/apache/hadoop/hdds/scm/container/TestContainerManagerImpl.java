@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -169,4 +170,13 @@ public class TestContainerManagerImpl {
     Assert.assertEquals(1, containerManager
         .getContainerStateCount(HddsProtos.LifeCycleState.CLOSED));
   }
+
+  @Test
+  public void testAllocateContainersWithECReplicationConfig() throws Exception {
+    final ContainerInfo admin = containerManager
+        .allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    Assert.assertEquals(1, containerManager.getContainers().size());
+    Assert.assertNotNull(containerManager.getContainer(admin.containerID()));
+  }
+
 }

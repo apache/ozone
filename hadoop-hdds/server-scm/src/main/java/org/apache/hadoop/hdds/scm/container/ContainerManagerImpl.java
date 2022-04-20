@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
@@ -261,7 +262,8 @@ public class ContainerManagerImpl implements ContainerManager {
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
     final ContainerID containerID = ContainerID.valueOf(uniqueId);
-    final ContainerInfoProto containerInfo = ContainerInfoProto.newBuilder()
+    final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto
+        .newBuilder()
         .setState(LifeCycleState.OPEN)
         .setPipelineID(pipeline.getId().getProtobuf())
         .setUsedBytes(0)
@@ -270,11 +272,17 @@ public class ContainerManagerImpl implements ContainerManager {
         .setOwner(owner)
         .setContainerID(containerID.getId())
         .setDeleteTransactionId(0)
-        .setReplicationFactor(
-            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
-        .setReplicationType(pipeline.getType())
-        .build();
-    containerStateManager.addContainer(containerInfo);
+        .setReplicationType(pipeline.getType());
+
+    if (pipeline.getReplicationConfig() instanceof ECReplicationConfig) {
+      containerInfoBuilder.setEcReplicationConfig(
+          ((ECReplicationConfig) pipeline.getReplicationConfig()).toProto());
+    } else {
+      containerInfoBuilder.setReplicationFactor(
+          ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+    }
+
+    containerStateManager.addContainer(containerInfoBuilder.build());
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
     return containerStateManager.getContainer(containerID);
   }

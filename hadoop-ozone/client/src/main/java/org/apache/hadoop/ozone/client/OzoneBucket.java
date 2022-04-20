@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -80,7 +81,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Default replication factor to be used while creating keys.
    */
-  private final ReplicationConfig defaultReplication;
+  private ReplicationConfig defaultReplication;
 
   /**
    * Type of storage to be used for this bucket.
@@ -151,7 +152,8 @@ public class OzoneBucket extends WithMetadata {
     this.volumeName = volumeName;
     this.name = bucketName;
 
-    this.defaultReplication = ReplicationConfig.getDefault(conf);
+    // Bucket level replication is not configured by default.
+    this.defaultReplication = null;
 
     this.proxy = proxy;
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
@@ -225,6 +227,32 @@ public class OzoneBucket extends WithMetadata {
     this.bucketLayout = bucketLayout;
   }
 
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket, long usedBytes,
+      long usedNamespace, long quotaInBytes, long quotaInNamespace,
+      BucketLayout bucketLayout, String owner,
+      DefaultReplicationConfig defaultReplicationConfig) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, modificationTime, metadata, encryptionKeyName,
+        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
+        quotaInNamespace, bucketLayout, owner);
+    this.bucketLayout = bucketLayout;
+    if (defaultReplicationConfig != null) {
+      this.defaultReplication =
+          defaultReplicationConfig.getType() == ReplicationType.EC ?
+              defaultReplicationConfig.getEcReplicationConfig() :
+              ReplicationConfig
+                  .fromTypeAndFactor(defaultReplicationConfig.getType(),
+                      defaultReplicationConfig.getFactor());
+    } else {
+      // Bucket level replication is not configured by default.
+      this.defaultReplication = null;
+    }
+  }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
@@ -505,6 +533,17 @@ public class OzoneBucket extends WithMetadata {
         quota.getQuotaInBytes());
     quotaInBytes = quota.getQuotaInBytes();
     quotaInNamespace = quota.getQuotaInNamespace();
+  }
+
+  /**
+   * Sets/Changes the default replication config of this Bucket.
+   *
+   * @param replicationConfig Replication config that can be applied to bucket.
+   * @throws IOException
+   */
+  public void setReplicationConfig(ReplicationConfig replicationConfig)
+      throws IOException {
+    proxy.setReplicationConfig(volumeName, name, replicationConfig);
   }
 
   /**
@@ -1268,5 +1307,9 @@ public class OzoneBucket extends WithMetadata {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  public ReplicationConfig getReplicationConfig() {
+    return this.defaultReplication;
   }
 }

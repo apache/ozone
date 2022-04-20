@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -647,6 +648,15 @@ public final class HddsTestUtils {
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state, PipelineID pipelineID) {
     return getDefaultContainerInfoBuilder(state)
+        .setPipelineID(pipelineID)
+        .build();
+  }
+
+  public static ContainerInfo getECContainer(
+      final HddsProtos.LifeCycleState state, PipelineID pipelineID,
+      ECReplicationConfig replicationConfig) {
+    return getDefaultContainerInfoBuilder(state)
+        .setReplicationConfig(replicationConfig)
         .setPipelineID(pipelineID)
         .build();
   }
