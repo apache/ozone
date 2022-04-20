@@ -24,6 +24,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
 import static org.junit.Assert.assertEquals;
+
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -44,7 +46,7 @@ public class TestRootList {
     // Create HeadBucket and setClient to OzoneClientStub
     rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
-
+    rootEndpoint.setS3GatewayAuditLogger(new S3GatewayAuditLogger());
 
   }
 

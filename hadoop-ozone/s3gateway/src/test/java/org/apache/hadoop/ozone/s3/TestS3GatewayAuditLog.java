@@ -70,19 +70,23 @@ public class TestS3GatewayAuditLog {
   @Before
   public void setup() throws Exception {
 
+    S3GatewayAuditLogger auditLogger = new S3GatewayAuditLogger();
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
+    bucketEndpoint.setS3GatewayAuditLogger(auditLogger);
 
     rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
+    rootEndpoint.setS3GatewayAuditLogger(auditLogger);
 
     keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    keyEndpoint.setS3GatewayAuditLogger(auditLogger);
 
   }
 

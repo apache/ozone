@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
@@ -48,6 +49,7 @@ public class TestBucketPut {
 
   @Before
   public void setup() throws Exception {
+    S3GatewayAuditLogger auditLogger = new S3GatewayAuditLogger();
 
     //Create client stub and object store stub.
     clientStub = new OzoneClientStub();
@@ -55,6 +57,7 @@ public class TestBucketPut {
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
+    bucketEndpoint.setS3GatewayAuditLogger(auditLogger);
   }
 
   @Test

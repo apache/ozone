@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
@@ -62,6 +63,7 @@ public class TestObjectHead {
     keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    keyEndpoint.setS3GatewayAuditLogger(new S3GatewayAuditLogger());
   }
 
   @Test

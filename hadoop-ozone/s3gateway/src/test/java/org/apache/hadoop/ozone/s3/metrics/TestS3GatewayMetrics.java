@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
@@ -67,19 +68,23 @@ public class TestS3GatewayMetrics {
 
   @Before
   public void setup() throws Exception {
+    S3GatewayAuditLogger auditLogger = new S3GatewayAuditLogger();
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
+    bucketEndpoint.setS3GatewayAuditLogger(auditLogger);
 
     rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
+    rootEndpoint.setS3GatewayAuditLogger(auditLogger);
 
     keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    keyEndpoint.setS3GatewayAuditLogger(auditLogger);
 
     headers = Mockito.mock(HttpHeaders.class);
     metrics = bucketEndpoint.getMetrics();

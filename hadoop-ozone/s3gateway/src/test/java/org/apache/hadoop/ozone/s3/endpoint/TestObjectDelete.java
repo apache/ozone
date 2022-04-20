@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.junit.Assert;
@@ -49,6 +50,7 @@ public class TestObjectDelete {
     ObjectEndpoint rest = new ObjectEndpoint();
     rest.setClient(client);
     rest.setOzoneConfiguration(new OzoneConfiguration());
+    rest.setS3GatewayAuditLogger(new S3GatewayAuditLogger());
 
     //WHEN
     rest.delete("b1", "key1", null);

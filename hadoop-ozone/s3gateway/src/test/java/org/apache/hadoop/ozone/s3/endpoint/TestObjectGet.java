@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.apache.commons.io.IOUtils;
@@ -62,6 +63,7 @@ public class TestObjectGet {
     ObjectEndpoint rest = new ObjectEndpoint();
     rest.setClient(client);
     rest.setOzoneConfiguration(new OzoneConfiguration());
+    rest.setS3GatewayAuditLogger(new S3GatewayAuditLogger());
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     rest.setHeaders(headers);
     ByteArrayInputStream body =

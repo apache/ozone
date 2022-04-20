@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.Assert;
 
@@ -51,6 +52,7 @@ public class TestBucketHead {
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
+    bucketEndpoint.setS3GatewayAuditLogger(new S3GatewayAuditLogger());
   }
 
   @Test

@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.apache.commons.io.IOUtils;
@@ -74,6 +75,7 @@ public class TestObjectPut {
     objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(clientStub);
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    objectEndpoint.setS3GatewayAuditLogger(new S3GatewayAuditLogger());
   }
 
   @Test

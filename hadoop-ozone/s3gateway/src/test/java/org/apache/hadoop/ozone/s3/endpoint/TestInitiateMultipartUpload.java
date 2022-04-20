@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -57,6 +58,7 @@ public class TestInitiateMultipartUpload {
     rest.setHeaders(headers);
     rest.setClient(client);
     rest.setOzoneConfiguration(new OzoneConfiguration());
+    rest.setS3GatewayAuditLogger(new S3GatewayAuditLogger());
 
     Response response = rest.initializeMultipartUpload(bucket, key);
 

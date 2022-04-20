@@ -30,8 +30,6 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
-import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -40,6 +38,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.s3.S3GatewayAuditLogger;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -60,13 +59,14 @@ public abstract class EndpointBase implements Auditor {
   private OzoneClient client;
   @Inject
   private S3Auth s3Auth;
+  @Inject
+  private S3GatewayAuditLogger s3GatewayAuditLogger;
+
   @Context
   private ContainerRequestContext context;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
-
-  protected static final AuditLogger AUDIT = AuditLogger.instance();
 
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
@@ -89,7 +89,6 @@ public abstract class EndpointBase implements Auditor {
    */
   @PostConstruct
   public void initialization() {
-    AUDIT.initializeLogger(AuditLoggerType.S3GLOGGER);
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
     getClient().getObjectStore()
         .getClientProxy()
@@ -249,6 +248,11 @@ public abstract class EndpointBase implements Auditor {
 
   public OzoneClient getClient() {
     return client;
+  }
+
+  @VisibleForTesting
+  public void setS3GatewayAuditLogger(S3GatewayAuditLogger logger) {
+    this.s3GatewayAuditLogger = logger;
   }
 
   @VisibleForTesting
