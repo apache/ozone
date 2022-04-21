@@ -555,7 +555,7 @@ public class RpcClient implements ClientProtocol {
     //  accessId. Similar to RpcClient#getDEK
     if (getThreadLocalS3Auth() != null) {
       UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
-          getThreadLocalS3Auth().getAccessID());
+          getThreadLocalS3Auth().getUserPrincipal());
       owner = s3gUGI.getShortUserName();
     } else {
       owner = bucketArgs.getOwner() == null ?
