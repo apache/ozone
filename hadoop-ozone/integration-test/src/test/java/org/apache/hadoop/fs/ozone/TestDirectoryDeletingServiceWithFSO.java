@@ -284,7 +284,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     Assert.assertTrue(dirDeletingService.getRunCount() > 1);
   }
 
-  private void assertSubPathsCount(LongSupplier pathCount, long expectedCount)
+  static void assertSubPathsCount(LongSupplier pathCount, long expectedCount)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pathCount.getAsLong() >= expectedCount,
         1000, 120000);
