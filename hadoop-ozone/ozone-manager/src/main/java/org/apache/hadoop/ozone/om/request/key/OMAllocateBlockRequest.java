@@ -214,7 +214,12 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * openKeyInfo.getReplicationConfig().getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      long hadAllocatedSpace =
+          openKeyInfo.getLatestVersionLocations().getLocationList().size()
+              * ozoneManager.getScmBlockSize()
+              * openKeyInfo.getReplicationConfig().getRequiredNodes();
+      checkBucketQuotaInBytes(omBucketInfo,
+          hadAllocatedSpace + preAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -229,12 +234,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           new CacheKey<>(openKeyName),
           new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
-      OmBucketInfo shortBucketInfo = omBucketInfo.copyObject();
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, shortBucketInfo, getBucketLayout());
+          openKeyInfo, clientID, getBucketLayout());
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);

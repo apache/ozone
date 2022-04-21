@@ -172,20 +172,15 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbFileKey,
                 oldKeyVersionsToDelete, trxnLogIndex);
       }
-
-      long scmBlockSize = ozoneManager.getScmBlockSize();
+      
       int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-      // Block was pre-requested and UsedBytes updated when createKey and
-      // AllocatedBlock. The space occupied by the Key shall be based on
-      // the actual Key size, and the total Block size applied before should
-      // be subtracted.
-      long correctedSpace = omKeyInfo.getReplicatedSize() -
-          allocatedLocationInfoList.size() * scmBlockSize * factor;
+      long correctedSpace = omKeyInfo.getReplicatedSize() * factor;
       // Subtract the size of blocks to be overwritten.
       if (keyToDelete != null) {
         correctedSpace -= keyToDelete.getReplicatedSize();
       }
       omBucketInfo.incrUsedBytes(correctedSpace);
+      omBucketInfo.incrUsedNamespace(1L);
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),

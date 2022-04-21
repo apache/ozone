@@ -50,7 +50,7 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
                                 @Nonnull OmKeyInfo omKeyInfo,
                                 @Nonnull List<OmDirectoryInfo> parentDirInfos,
                                 long openKeySessionID,
-                                @Nonnull OmBucketInfo omBucketInfo) {
+                                OmBucketInfo omBucketInfo) {
     super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
         omBucketInfo);
     this.parentDirInfos = parentDirInfos;
@@ -88,11 +88,6 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
             getOpenKeySessionID());
-
-    // update bucket usedBytes.
-    omMetadataMgr.getBucketTable().putWithBatch(batchOp,
-            omMetadataMgr.getBucketKey(getOmKeyInfo().getVolumeName(),
-                    getOmKeyInfo().getBucketName()), getOmBucketInfo());
   }
 
   @Override

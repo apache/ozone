@@ -144,7 +144,12 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       long preAllocatedSpace = newLocationList.size()
               * ozoneManager.getScmBlockSize()
               * openKeyInfo.getReplicationConfig().getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      long hadAllocatedSpace =
+          openKeyInfo.getLatestVersionLocations().getLocationList().size()
+              * ozoneManager.getScmBlockSize()
+              * openKeyInfo.getReplicationConfig().getRequiredNodes();
+      checkBucketQuotaInBytes(omBucketInfo,
+          hadAllocatedSpace + preAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -157,7 +162,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       // Add to cache.
       addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName,
               openKeyInfo);
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
               .setKeyLocation(blockLocation).build());
@@ -223,6 +227,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
       OmBucketInfo omBucketInfo) {
     return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
-            clientID, omBucketInfo, getBucketLayout());
+            clientID, getBucketLayout());
   }
 }

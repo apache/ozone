@@ -52,7 +52,7 @@ public class OMKeyCreateResponse extends OmKeyResponse {
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo) {
+      long openKeySessionID, OmBucketInfo omBucketInfo) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
@@ -97,11 +97,6 @@ public class OMKeyCreateResponse extends OmKeyResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, openKey, omKeyInfo);
-
-    // update bucket usedBytes.
-    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName()), omBucketInfo);
   }
 
   protected long getOpenKeySessionID() {

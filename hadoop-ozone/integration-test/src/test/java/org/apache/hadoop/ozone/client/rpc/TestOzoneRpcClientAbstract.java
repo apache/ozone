@@ -949,9 +949,9 @@ public abstract class TestOzoneRpcClientAbstract {
     // blocks will succeed，while the later block will fail.
     bucket.setQuota(OzoneQuota.parseQuota(
         4 * blockSize + " B", "100"));
-
     try {
-      OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
+      String keyName = UUID.randomUUID().toString();
+      OzoneOutputStream out = bucket.createKey(keyName,
           valueLength, RATIS, ONE, new HashMap<>());
       for (int i = 0; i <= (4 * blockSize) / value.length(); i++) {
         out.write(value.getBytes(UTF_8));
@@ -961,14 +961,14 @@ public abstract class TestOzoneRpcClientAbstract {
       countException++;
       GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
     }
-    // AllocateBlock failed, bucket usedBytes should be 4 * blockSize
-    Assert.assertEquals(4 * blockSize,
+    // AllocateBlock failed, bucket usedBytes should not update.
+    Assert.assertEquals(0L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     // Reset bucket quota, the original usedBytes needs to remain the same
     bucket.setQuota(OzoneQuota.parseQuota(
         100 + " GB", "100"));
-    Assert.assertEquals(4 * blockSize,
+    Assert.assertEquals(0,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     Assert.assertEquals(3, countException);
@@ -979,7 +979,17 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
         valueLength, RATIS, ONE, new HashMap<>());
     out.close();
-    Assert.assertEquals(4 * blockSize,
+    Assert.assertEquals(0,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    // key write success,bucket usedBytes should update.
+    bucket.setQuota(OzoneQuota.parseQuota(
+        5 * blockSize + " B", "100"));
+    OzoneOutputStream out2 = bucket.createKey(UUID.randomUUID().toString(),
+        valueLength, RATIS, ONE, new HashMap<>());
+    out2.write(value.getBytes(UTF_8));
+    out2.close();
+    Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
   }
 
