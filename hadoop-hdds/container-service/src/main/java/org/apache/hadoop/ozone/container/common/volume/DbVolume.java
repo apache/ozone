@@ -108,7 +108,7 @@ public class DbVolume extends StorageVolume {
 
   private void scanForHddsVolumeIDs() throws IOException {
     // Not formatted yet
-    if (getClusterID() == null) {
+    if (!getStorageState().equals(VolumeState.NORMAL)) {
       return;
     }
 

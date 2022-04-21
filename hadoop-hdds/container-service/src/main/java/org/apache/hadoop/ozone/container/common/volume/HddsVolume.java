@@ -179,16 +179,15 @@ public class HddsVolume extends StorageVolume {
   }
 
   public void loadDbStore() throws IOException {
-    String clusterID = getClusterID();
     // DN startup for the first time, not registered yet,
     // so the DbVolume is not formatted.
-    if (clusterID == null) {
+    if (!getStorageState().equals(VolumeState.NORMAL)) {
       return;
     }
 
     File clusterIdDir = new File(dbVolume == null ?
         getStorageDir() : dbVolume.getStorageDir(),
-        clusterID);
+        getClusterID());
     if (!clusterIdDir.exists()) {
       throw new IOException("Working dir " + clusterIdDir.getAbsolutePath() +
           " not created for HddsVolume: " + getStorageDir().getAbsolutePath());
