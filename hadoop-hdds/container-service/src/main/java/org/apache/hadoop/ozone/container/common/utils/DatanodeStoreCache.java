@@ -67,7 +67,7 @@ public final class DatanodeStoreCache {
     try {
       db.getStore().stop();
     } catch (Exception e) {
-      LOG.warn("Stop DatanodeStore: {} failed", containerDBPath, e);
+      LOG.error("Stop DatanodeStore: {} failed", containerDBPath, e);
     }
   }
 
