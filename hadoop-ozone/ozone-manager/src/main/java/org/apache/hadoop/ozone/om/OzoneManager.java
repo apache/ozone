@@ -3117,10 +3117,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // to the default S3 volume.
     String s3Volume = HddsClientUtils.getDefaultS3VolumeName(configuration);
     S3Authentication s3Auth = getS3Auth();
+    // This is the default user principal if request does not have S3Auth set
     String userPrincipal = Server.getRemoteUser().getShortUserName();
 
     if (s3Auth != null) {
       String accessId = s3Auth.getAccessId();
+      final UserGroupInformation s3gUGI =
+          UserGroupInformation.createRemoteUser(accessId);
+      // The user principal below would be used when the accessId belongs to the
+      // default s3v (does not belong to any tenant). i.e. when optionalTenantId
+      // is not present.
+      userPrincipal = s3gUGI.getShortUserName();
       Optional<String> optionalTenantId =
           multiTenantManager.getTenantForAccessID(accessId);
 
