@@ -3122,6 +3122,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (s3Auth == null) {
       // This is the default user principal if request does not have S3Auth set
       userPrincipal = Server.getRemoteUser().getShortUserName();
+
+      if (LOG.isDebugEnabled()) {
+        // An old S3 gateway talking to a new OM may not attach the auth info.
+        // This old version of s3g will also not have a client that supports
+        // multi-tenancy, so we can direct requests to the default S3 volume.
+        LOG.debug("S3 authentication was not attached to the OM request. " +
+                "Directing requests to the default S3 volume {}.",
+            s3Volume);
+      }
     } else {
       String accessId = s3Auth.getAccessId();
       Optional<String> optionalTenantId =
@@ -3135,6 +3144,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         // user principal returned here should simply be the accessId's short
         // user name (processed by the auth_to_local rule)
         userPrincipal = s3gUGI.getShortUserName();
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("No tenant found for access ID {}. Directing "
+              + "requests to default s3 volume {}.", accessId, s3Volume);
+        }
       } else {
         final String tenantId = optionalTenantId.get();
 
@@ -3169,18 +3183,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 VOLUME_LOCK, s3Volume);
           }
         }
-
-      } else if (LOG.isDebugEnabled()) {
-        LOG.debug("No tenant found for access ID {}. Directing " +
-            "requests to default s3 volume {}.", accessId, s3Volume);
       }
-    } else if (LOG.isDebugEnabled()) {
-      // An old S3 gateway talking to a new OM may not attach the auth info.
-      // This old version of s3g will also not have a client that supports
-      // multi-tenancy, so we can direct requests to the default S3 volume.
-      LOG.debug("S3 authentication was not attached to the OM request. " +
-          "Directing requests to the default S3 volume {}.",
-          s3Volume);
     }
 
     // getVolumeInfo() performs acl checks and checks volume existence.
