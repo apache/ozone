@@ -657,7 +657,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
         .setStatefulServiceConfig(
             scmMetadataStore.getStatefulServiceConfigTable())
-        .setSCMDBTransactionBuffer(scmHAManager.asSCMHADBTransactionBuffer())
+        .setSCMDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
         .setRatisServer(scmHAManager.getRatisServer())
         .build();
   }

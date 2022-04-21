@@ -82,6 +82,7 @@ public class TestStatefulServiceStateManagerImpl {
     String message = "message_string";
     stateManager.saveConfiguration(serviceName,
         ByteString.copyFromUtf8(message));
+    scmhaManager.asSCMHADBTransactionBuffer().flush();
     Assert.assertEquals(ByteString.copyFromUtf8(message),
         stateManager.readConfiguration(serviceName));
   }

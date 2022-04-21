@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
@@ -34,11 +35,11 @@ public final class StatefulServiceStateManagerImpl
 
   // this table maps the service name to the configuration (ByteString)
   private Table<String, ByteString> statefulServiceConfig;
-  private final SCMHADBTransactionBuffer transactionBuffer;
+  private final DBTransactionBuffer transactionBuffer;
 
   private StatefulServiceStateManagerImpl(
       Table<String, ByteString> statefulServiceConfig,
-      SCMHADBTransactionBuffer scmDBTransactionBuffer) {
+      DBTransactionBuffer scmDBTransactionBuffer) {
     this.statefulServiceConfig = statefulServiceConfig;
     this.transactionBuffer = scmDBTransactionBuffer;
   }
@@ -50,8 +51,15 @@ public final class StatefulServiceStateManagerImpl
   public void saveConfiguration(String serviceName, ByteString bytes)
       throws IOException {
     // do we need a write lock here?
+    // do we need the buffer here or should we directly put the key-value?
+    /*
+    Alternative: statefulServiceConfig.put(serviceName, bytes);
+     */
     transactionBuffer.addToBuffer(statefulServiceConfig, serviceName, bytes);
-    transactionBuffer.flush();
+    if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
+      SCMHADBTransactionBuffer buffer = (SCMHADBTransactionBuffer) transactionBuffer;
+      buffer.flush();
+    }
   }
 
   /**
@@ -80,7 +88,7 @@ public final class StatefulServiceStateManagerImpl
    */
   public static class Builder {
     private Table<String, ByteString> statefulServiceConfig;
-    private SCMHADBTransactionBuffer transactionBuffer;
+    private DBTransactionBuffer transactionBuffer;
     private SCMRatisServer scmRatisServer;
 
     public Builder setStatefulServiceConfig(
@@ -90,7 +98,7 @@ public final class StatefulServiceStateManagerImpl
     }
 
     public Builder setSCMDBTransactionBuffer(
-        final SCMHADBTransactionBuffer dbTransactionBuffer) {
+        final DBTransactionBuffer dbTransactionBuffer) {
       this.transactionBuffer = dbTransactionBuffer;
       return this;
     }
