@@ -81,14 +81,14 @@ public class TestStorageVolumeUtil {
         CLUSTER_ID, CONF, null, null);
     assertTrue(res);
 
-    // checkVolume for the 1st time: hddsFiles.length == 1
+    // checkVolume for the 1st time: rootFiles.length == 1
     res = StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID,
         CLUSTER_ID, CONF, null, dbVolumeSet);
     assertTrue(res);
     // createDbStore called as expected
     verify(spyHddsVolume, times(1)).createDbStore(dbVolumeSet);
 
-    // checkVolume for the 2nd time: hddsFiles.length == 2
+    // checkVolume for the 2nd time: rootFiles.length == 2
     res = StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID,
         CLUSTER_ID, CONF, null, dbVolumeSet);
     assertTrue(res);

@@ -236,7 +236,6 @@ public class HddsVolume extends StorageVolume {
       chosenDbVolume = dbVolumeList.get(
           ThreadLocalRandom.current().nextInt(dbVolumeList.size()));
       clusterIdDir = new File(chosenDbVolume.getStorageDir(), getClusterID());
-      chosenDbVolume.addHddsVolumeID(getStorageID());
     }
 
     if (!clusterIdDir.exists()) {
@@ -266,6 +265,9 @@ public class HddsVolume extends StorageVolume {
     // Set the dbVolume and dbParentDir of the HddsVolume for db path lookup.
     dbVolume = chosenDbVolume;
     dbParentDir = storageIdDir;
+    if (chosenDbVolume != null) {
+      chosenDbVolume.addHddsDbStorePath(getStorageID(), containerDBPath);
+    }
   }
 
   private void closeDbStore() {

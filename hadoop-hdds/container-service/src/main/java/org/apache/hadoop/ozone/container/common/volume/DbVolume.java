@@ -23,7 +23,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
@@ -47,13 +48,14 @@ public class DbVolume extends StorageVolume {
 
   /**
    * Records all HddsVolumes that put its db instance under this DbVolume.
+   * Map: HddsVolume.StorageID -> DBStorePath
    */
-  private final Set<String> hddsVolumeIDs;
+  private final Map<String, String> hddsDbStorePathMap;
 
   protected DbVolume(Builder b) throws IOException {
     super(b);
 
-    this.hddsVolumeIDs = new LinkedHashSet<>();
+    this.hddsDbStorePathMap = new HashMap<>();
     if (!b.getFailedVolume()) {
       LOG.info("Creating DbVolume: {} of storage type : {} capacity : {}",
           getStorageDir(), b.getStorageType(), getVolumeInfo().getCapacity());
@@ -64,7 +66,7 @@ public class DbVolume extends StorageVolume {
   @Override
   protected void initialize() throws IOException {
     super.initialize();
-    scanForHddsVolumeIDs();
+    scanForDbStorePaths();
   }
 
   @Override
@@ -79,12 +81,12 @@ public class DbVolume extends StorageVolume {
     closeAllDbStore();
   }
 
-  public void addHddsVolumeID(String id) {
-    hddsVolumeIDs.add(id);
+  public void addHddsDbStorePath(String id, String dbPath) {
+    hddsDbStorePathMap.put(id, dbPath);
   }
 
   public Set<String> getHddsVolumeIDs() {
-    return this.hddsVolumeIDs;
+    return hddsDbStorePathMap.keySet();
   }
 
   /**
@@ -106,7 +108,7 @@ public class DbVolume extends StorageVolume {
     }
   }
 
-  private void scanForHddsVolumeIDs() throws IOException {
+  private void scanForDbStorePaths() throws IOException {
     // Not formatted yet
     if (!getStorageState().equals(VolumeState.NORMAL)) {
       return;
@@ -124,25 +126,26 @@ public class DbVolume extends StorageVolume {
       throw new IOException("Failed to do listFiles for " +
           clusterIdDir.getAbsolutePath());
     }
-    hddsVolumeIDs.clear();
+    hddsDbStorePathMap.clear();
 
     for (File subdir : subdirs) {
       String storageID = subdir.getName();
-      hddsVolumeIDs.add(storageID);
+      File storageIdDir = new File(clusterIdDir, subdir.getName());
+      hddsDbStorePathMap.put(storageID, new File(storageIdDir,
+          CONTAINER_DB_NAME).getAbsolutePath());
     }
   }
 
   private void closeAllDbStore() {
+    // Here we check clusterID directly, because the state
+    // may not be NORMAL, it could be FAILED.
     if (getClusterID() == null) {
       return;
     }
 
     File clusterIdDir = new File(getStorageDir(), getClusterID());
     if (clusterIdDir.exists()) {
-      for (String storageID : hddsVolumeIDs) {
-        File storageIdDir = new File(clusterIdDir, storageID);
-        String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
-            .getAbsolutePath();
+      for (String containerDBPath : hddsDbStorePathMap.values()) {
         DatanodeStoreCache.getInstance().removeDB(containerDBPath);
       }
     }
