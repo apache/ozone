@@ -197,25 +197,25 @@ public final class StorageVolumeUtil {
   public static boolean checkVolume(StorageVolume volume, String scmId,
       String clusterId, ConfigurationSource conf, Logger logger,
       MutableVolumeSet dbVolumeSet) {
-    File hddsRoot = volume.getStorageDir();
-    String volumeRoot = hddsRoot.getPath();
-    File clusterDir = new File(hddsRoot, clusterId);
+    File volumeRoot = volume.getStorageDir();
+    String volumeRootPath = volumeRoot.getPath();
+    File clusterDir = new File(volumeRoot, clusterId);
 
     try {
       volume.format(clusterId);
     } catch (IOException ex) {
       logger.error("Error during formatting volume {}.",
-          volumeRoot, ex);
+          volumeRootPath, ex);
       return false;
     }
 
-    File[] hddsFiles = hddsRoot.listFiles();
+    File[] rootFiles = volumeRoot.listFiles();
 
-    if (hddsFiles == null) {
+    if (rootFiles == null) {
       // This is the case for IOException, where listFiles returns null.
       // So, we fail the volume.
       return false;
-    } else if (hddsFiles.length == 1) {
+    } else if (rootFiles.length == 1) {
       // DN started for first time or this is a newly added volume.
       // The one file is the version file.
       // So we create cluster ID directory, or SCM ID directory if
@@ -228,11 +228,11 @@ public final class StorageVolumeUtil {
         volume.createWorkingDir(id, dbVolumeSet);
       } catch (IOException e) {
         logger.error("Prepare working dir failed for volume {}.",
-            volumeRoot, e);
+            volumeRootPath, e);
         return false;
       }
       return true;
-    } else if (hddsFiles.length == 2) {
+    } else if (rootFiles.length == 2) {
       // If we are finalized for SCM HA and there is no cluster ID directory,
       // the volume may have been unhealthy during finalization and been
       // skipped. Create cluster ID symlink now.
@@ -243,8 +243,8 @@ public final class StorageVolumeUtil {
     } else {
       if (!clusterDir.exists()) {
         logger.error("Volume {} is in an inconsistent state. {} files found " +
-            "but cluster ID directory {} does not exist.", volumeRoot,
-            hddsFiles.length, clusterDir);
+            "but cluster ID directory {} does not exist.", volumeRootPath,
+            rootFiles.length, clusterDir);
         return false;
       }
       return true;
