@@ -133,40 +133,36 @@ public class OMFailoverProxyProvider<T> implements
     this.omProxyInfos = new HashMap<>();
     this.omNodeIDList = new ArrayList<>();
 
-    Collection<String> omServiceIds = Collections.singletonList(omSvcId);
+    Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config,
+        omSvcId);
 
-    for (String serviceId : OmUtils.emptyAsSingletonNull(omServiceIds)) {
-      Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config,
-          serviceId);
+    for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
 
-      for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
+      String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+          omSvcId, nodeId);
+      String rpcAddrStr = OmUtils.getOmRpcAddress(config, rpcAddrKey);
+      if (rpcAddrStr == null) {
+        continue;
+      }
 
-        String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
-            serviceId, nodeId);
-        String rpcAddrStr = OmUtils.getOmRpcAddress(config, rpcAddrKey);
-        if (rpcAddrStr == null) {
-          continue;
+      OMProxyInfo omProxyInfo = new OMProxyInfo(omSvcId, nodeId,
+          rpcAddrStr);
+
+      if (omProxyInfo.getAddress() != null) {
+
+
+        // For a non-HA OM setup, nodeId might be null. If so, we assign it
+        // the default value
+        if (nodeId == null) {
+          nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
         }
-
-        OMProxyInfo omProxyInfo = new OMProxyInfo(serviceId, nodeId,
-            rpcAddrStr);
-
-        if (omProxyInfo.getAddress() != null) {
-
-
-          // For a non-HA OM setup, nodeId might be null. If so, we assign it
-          // the default value
-          if (nodeId == null) {
-            nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
-          }
-          // ProxyInfo will be set during first time call to server.
-          omProxies.put(nodeId, null);
-          omProxyInfos.put(nodeId, omProxyInfo);
-          omNodeIDList.add(nodeId);
-        } else {
-          LOG.error("Failed to create OM proxy for {} at address {}",
-              nodeId, rpcAddrStr);
-        }
+        // ProxyInfo will be set during first time call to server.
+        omProxies.put(nodeId, null);
+        omProxyInfos.put(nodeId, omProxyInfo);
+        omNodeIDList.add(nodeId);
+      } else {
+        LOG.error("Failed to create OM proxy for {} at address {}",
+            nodeId, rpcAddrStr);
       }
     }
 

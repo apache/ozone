@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,8 +43,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.ozone.OzoneConsts.REPLICA_INDEX;
 import static org.apache.hadoop.ozone.container.keyvalue
     .KeyValueContainerData.KEYVALUE_YAML_TAG;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -84,8 +88,12 @@ public final class ContainerDataYaml {
     Writer writer = null;
     FileOutputStream out = null;
     try {
+      boolean withReplicaIndex =
+          containerData instanceof KeyValueContainerData &&
+          ((KeyValueContainerData) containerData).getReplicaIndex() > 0;
+
       // Create Yaml for given container type
-      Yaml yaml = getYamlForContainerType(containerType);
+      Yaml yaml = getYamlForContainerType(containerType, withReplicaIndex);
       // Compute Checksum and update ContainerData
       containerData.computeAndSetChecksum(yaml);
 
@@ -148,7 +156,8 @@ public final class ContainerDataYaml {
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    Representer representer = new ContainerDataRepresenter();
+    Representer representer = new ContainerDataRepresenter(
+        KeyValueContainerData.getYamlFields());
     representer.setPropertyUtils(propertyUtils);
 
     Constructor containerDataConstructor = new ContainerDataConstructor();
@@ -166,39 +175,51 @@ public final class ContainerDataYaml {
    * Given a ContainerType this method returns a Yaml representation of
    * the container properties.
    *
-   * @param containerType type of container
+   * @param containerType    type of container
+   * @param withReplicaIndex in the container yaml
    * @return Yamal representation of container properties
-   *
    * @throws StorageContainerException if the type is unrecognized
    */
-  public static Yaml getYamlForContainerType(ContainerType containerType)
+  public static Yaml getYamlForContainerType(ContainerType containerType,
+      boolean withReplicaIndex)
       throws StorageContainerException {
     PropertyUtils propertyUtils = new PropertyUtils();
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    switch (containerType) {
-    case KeyValueContainer:
-      Representer representer = new ContainerDataRepresenter();
+    if (containerType == ContainerType.KeyValueContainer) {
+      List<String> yamlFields =
+          KeyValueContainerData.getYamlFields();
+      if (withReplicaIndex) {
+        yamlFields = new ArrayList<>(yamlFields);
+        yamlFields.add(REPLICA_INDEX);
+      }
+      Representer representer = new ContainerDataRepresenter(yamlFields);
       representer.setPropertyUtils(propertyUtils);
       representer.addClassTag(
           KeyValueContainerData.class,
-          KeyValueContainerData.KEYVALUE_YAML_TAG);
+          KEYVALUE_YAML_TAG);
 
       Constructor keyValueDataConstructor = new ContainerDataConstructor();
 
       return new Yaml(keyValueDataConstructor, representer);
-    default:
-      throw new StorageContainerException("Unrecognized container Type " +
-          "format " + containerType, ContainerProtos.Result
-          .UNKNOWN_CONTAINER_TYPE);
     }
+    throw new StorageContainerException("Unrecognized container Type " +
+        "format " + containerType, ContainerProtos.Result
+        .UNKNOWN_CONTAINER_TYPE);
   }
 
   /**
    * Representer class to define which fields need to be stored in yaml file.
    */
   private static class ContainerDataRepresenter extends Representer {
+
+    private List<String> yamlFields;
+
+    ContainerDataRepresenter(List<String> yamlFields) {
+      this.yamlFields = yamlFields;
+    }
+
     @Override
     protected Set<Property> getProperties(Class<? extends Object> type) {
       Set<Property> set = super.getProperties(type);
@@ -207,7 +228,7 @@ public final class ContainerDataYaml {
       // When a new Container type is added, we need to add what fields need
       // to be filtered here
       if (type.equals(KeyValueContainerData.class)) {
-        List<String> yamlFields = KeyValueContainerData.getYamlFields();
+
         // filter properties
         for (Property prop : set) {
           String name = prop.getName();
@@ -282,7 +303,11 @@ public final class ContainerDataYaml {
             .setState(ContainerProtos.ContainerDataProto.State.valueOf(state));
         String schemaVersion = (String) nodes.get(OzoneConsts.SCHEMA_VERSION);
         kvData.setSchemaVersion(schemaVersion);
-
+        final Object replicaIndex = nodes.get(REPLICA_INDEX);
+        if (replicaIndex != null) {
+          kvData.setReplicaIndex(
+              ((Long) replicaIndex).intValue());
+        }
         return kvData;
       }
     }

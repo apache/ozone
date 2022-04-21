@@ -28,6 +28,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -143,6 +145,13 @@ public final class TestHelper {
       throws Exception {
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey(keyName, size, type, factor, new HashMap<>());
+  }
+
+  public static OzoneOutputStream createKey(String keyName,
+      ReplicationConfig replicationConfig, long size, ObjectStore objectStore,
+      String volumeName, String bucketName) throws Exception {
+    return objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createKey(keyName, size, replicationConfig, new HashMap<>());
   }
 
   public static void validateData(String keyName, byte[] data,

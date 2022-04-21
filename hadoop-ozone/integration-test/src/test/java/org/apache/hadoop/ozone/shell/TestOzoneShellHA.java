@@ -35,12 +35,19 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -101,8 +108,8 @@ public class TestOzoneShellHA {
   private static String testFilePathString;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
-  private static OzoneShell ozoneShell = null;
-  private static OzoneAdmin ozoneAdminShell = null;
+  private OzoneShell ozoneShell = null;
+  private OzoneAdmin ozoneAdminShell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -134,19 +141,18 @@ public class TestOzoneShellHA {
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
 
-    ozoneShell = new OzoneShell();
-    ozoneAdminShell = new OzoneAdmin();
-
     // Init HA cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
+    final int numDNs = 5;
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
+        .setNumDatanodes(numDNs)
         .build();
     cluster.waitForClusterToBeReady();
   }
@@ -167,6 +173,8 @@ public class TestOzoneShellHA {
 
   @Before
   public void setup() throws UnsupportedEncodingException {
+    ozoneShell = new OzoneShell();
+    ozoneAdminShell = new OzoneAdmin();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
@@ -499,17 +507,17 @@ public class TestOzoneShellHA {
     execute(ozoneAdminShell, args);
 
     // Test case 3: list THREE replica container
-    String factor = "--factor=THREE";
+    String factor = "--replication=THREE";
     args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
-        factor};
+        factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
 
     // Test case 4: list ONE replica container
-    factor = "--factor=ONE";
+    factor = "--replication=ONE";
     args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
-        factor};
+        factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
   }
 
@@ -893,6 +901,120 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testCreateBucketWithECReplicationConfig() throws Exception {
+    final String volumeName = "volume100";
+    getVolume(volumeName);
+    String[] args =
+        new String[] {"bucket", "create", "/volume100/bucket0", "-t", "EC",
+            "-r", "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+    }
+  }
+
+  @Test
+  public void testPutKeyOnBucketWithECReplicationConfig() throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+    getVolume(volumeName);
+    String bucketPath =
+        Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String[] args =
+        new String[] {"bucket", "create", bucketPath, "-t", "EC", "-r",
+            "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "put", bucketPath + Path.SEPARATOR + keyName,
+        testFilePathString};
+    execute(ozoneShell, args);
+
+    OzoneKeyDetails key =
+        cluster.getClient().getObjectStore().getVolume(volumeName)
+            .getBucket(bucketName).getKey(keyName);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+  }
+
+  @Test
+  public void testCreateBucketWithRatisReplicationConfig() throws Exception {
+    final String volumeName = "volume101";
+    getVolume(volumeName);
+    String[] args =
+        new String[] {"bucket", "create", "/volume101/bucket1", "-t", "RATIS",
+            "-r", "3"};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket1");
+    try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
+      Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      Assert.assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
+    }
+  }
+
+  @Test
+  public void testSetECReplicationConfigOnBucket() throws Exception {
+    final String volumeName = "volume110";
+    getVolume(volumeName);
+    String bucketPath = "/volume110/bucket0";
+    String[] args = new String[] {"bucket", "create", bucketPath};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("myNonECKey", 1024)) {
+      Assert.assertFalse(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+
+    args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
+        "EC", "-r", "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+    bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("newECKey", 1024)) {
+      Assert.assertTrue(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+
+    args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
+        "STAND_ALONE", "-r", "ONE"};
+    execute(ozoneShell, args);
+    bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
+      Assert.assertFalse(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+  }
+
+  @Test
+  public void testCreateBucketWithECReplicationConfigWithoutReplicationParam() {
+    getVolume("volume102");
+    String[] args =
+        new String[] {"bucket", "create", "/volume102/bucket2", "-t", "EC"};
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Must throw Exception when missing replication param");
+    } catch (Exception e) {
+      Assert.assertEquals(
+          "Replication can't be null. Replication type passed was : EC",
+          e.getCause().getMessage());
+    }
+  }
+
+  private void getVolume(String volumeName) {
+    String[] args = new String[] {"volume", "create",
+        "o3://" + omServiceId + "/" + volumeName};
+    execute(ozoneShell, args);
+  }
+
   public void testListVolumeBucketKeyShouldPrintValidJsonArray()
       throws UnsupportedEncodingException {
 
