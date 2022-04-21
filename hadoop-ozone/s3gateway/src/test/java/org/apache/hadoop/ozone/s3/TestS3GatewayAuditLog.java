@@ -42,6 +42,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
@@ -66,21 +67,33 @@ public class TestS3GatewayAuditLog {
   private RootEndpoint rootEndpoint;
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
+  private Map<String, String> parametersMap = new HashMap<>();
 
   @Before
   public void setup() throws Exception {
 
+    parametersMap.clear();
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
-    bucketEndpoint = new BucketEndpoint();
+    bucketEndpoint = new BucketEndpoint() {
+      @Override
+      protected Map<String, String> getAuditParameters() {
+        return parametersMap;
+      }
+    };
     bucketEndpoint.setClient(clientStub);
 
     rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
 
-    keyEndpoint = new ObjectEndpoint();
+    keyEndpoint = new ObjectEndpoint() {
+      @Override
+      protected Map<String, String> getAuditParameters() {
+        return parametersMap;
+      }
+    };
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
 
@@ -99,9 +112,11 @@ public class TestS3GatewayAuditLog {
 
   @Test
   public void testHeadBucket() throws Exception {
+    parametersMap.put("bucket", "[bucket]");
+
     bucketEndpoint.head(bucketName);
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_BUCKET {} | ret=SUCCESS";
+        "op=HEAD_BUCKET {bucket=[bucket]} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -123,10 +138,12 @@ public class TestS3GatewayAuditLog {
     out.write(value.getBytes(UTF_8));
     out.close();
 
+    parametersMap.put("bucket", "[bucket]");
+    parametersMap.put("path", "[key1]");
 
     keyEndpoint.head(bucketName, "key1");
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_KEY {} | ret=SUCCESS";
+        "op=HEAD_KEY {bucket=[bucket], path=[key1]} | ret=SUCCESS";
     verifyLog(expected);
 
   }
