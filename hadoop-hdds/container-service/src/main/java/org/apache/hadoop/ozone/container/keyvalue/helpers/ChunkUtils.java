@@ -392,12 +392,13 @@ public final class ChunkUtils {
       fileLen = fileChannel.size();
     } catch (IOException e) {
       throw new StorageContainerException("IO error encountered while " +
-          "getting the file size for " + fileName, CHUNK_FILE_INCONSISTENCY);
+          "getting the file size for " + fileName + " at offset " + offset,
+          CHUNK_FILE_INCONSISTENCY);
     }
     if (fileLen != offset) {
-      throw new StorageContainerException(
-          "Chunk offset " + offset + " does not match length " +
-          fileLen + "of blockFile " + fileName, CHUNK_FILE_INCONSISTENCY);
+      throw new StorageContainerException("Chunk offset " + offset +
+          " does not match length " + fileLen + " of blockFile " + fileName,
+          CHUNK_FILE_INCONSISTENCY);
     }
   }
 }
