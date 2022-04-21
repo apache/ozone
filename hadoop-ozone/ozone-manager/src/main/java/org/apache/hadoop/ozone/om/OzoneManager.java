@@ -3117,21 +3117,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // to the default S3 volume.
     String s3Volume = HddsClientUtils.getDefaultS3VolumeName(configuration);
     S3Authentication s3Auth = getS3Auth();
-    // This is the default user principal if request does not have S3Auth set
-    String userPrincipal = Server.getRemoteUser().getShortUserName();
+    final String userPrincipal;
 
-    if (s3Auth != null) {
+    if (s3Auth == null) {
+      // This is the default user principal if request does not have S3Auth set
+      userPrincipal = Server.getRemoteUser().getShortUserName();
+    } else {
       String accessId = s3Auth.getAccessId();
-      final UserGroupInformation s3gUGI =
-          UserGroupInformation.createRemoteUser(accessId);
-      // The user principal below would be used when the accessId belongs to the
-      // default s3v (does not belong to any tenant). i.e. when optionalTenantId
-      // is not present.
-      userPrincipal = s3gUGI.getShortUserName();
       Optional<String> optionalTenantId =
           multiTenantManager.getTenantForAccessID(accessId);
 
-      if (optionalTenantId.isPresent()) {
+      if (!optionalTenantId.isPresent()) {
+        final UserGroupInformation s3gUGI =
+            UserGroupInformation.createRemoteUser(accessId);
+        // When the accessId belongs to the default s3v (i.e. when the accessId
+        // key pair is generated using the regular `ozone s3 getsecret`), the
+        // user principal returned here should simply be the accessId's short
+        // user name (processed by the auth_to_local rule)
+        userPrincipal = s3gUGI.getShortUserName();
+      } else {
         final String tenantId = optionalTenantId.get();
 
         OmDBTenantState tenantState =
