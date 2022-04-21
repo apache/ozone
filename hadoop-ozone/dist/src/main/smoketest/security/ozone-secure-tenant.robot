@@ -64,6 +64,10 @@ Secure Tenant Create Bucket 1 Success via S3 API
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-buckets
                         Should contain   ${output}         bucket-test1
 
+Secure Tenant Verify Bucket 1 Owner
+    ${result} =         Execute          ozone sh bucket info /tenantone/bucket-test1 | jq -r '.owner'
+                        Should Be Equal  ${result}       testuser
+
 Secure Tenant SetSecret Success with Cluster Admin
     ${output} =         Execute          ozone tenant user setsecret 'tenantone$testuser' --secret=somesecret1 --export
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
