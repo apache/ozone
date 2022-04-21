@@ -2820,11 +2820,11 @@
   </property>
 
   <property>
-    <name>ozone.om.enable.key.path.lock</name>
+    <name>ozone.om.key.path.lock.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
-    <description>If true, the fine-grained KEY_PATH_LOCK functionality is enabled.
-      If false, it is disabled.
+    <description>Defaults to false. If true, the fine-grained KEY_PATH_LOCK
+      functionality is enabled. If false, it is disabled.
     </description>
   </property>
 

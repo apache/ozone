@@ -316,7 +316,7 @@ public final class OMConfigKeys {
    * This configuration shall be enabled to utilize the functionality of the
    * fine-grained KEY_PATH_LOCK.
    */
-  public static final String OZONE_OM_ENABLE_KEY_PATH_LOCK =
-      "ozone.om.enable.key.path.lock";
-  public static final boolean OZONE_OM_ENABLE_KEY_PATH_LOCK_DEFAULT = false;
+  public static final String OZONE_OM_KEY_PATH_LOCK_ENABLED =
+      "ozone.om.key.path.lock.enabled";
+  public static final boolean OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT = false;
 }

@@ -64,11 +64,11 @@ public class TestOzoneLockProvider {
   @Parameterized.BeforeParam
   public static void initParam(boolean setKeyPathLock,
                                boolean setFileSystemPaths) {
-    enableKeyPathLock = setKeyPathLock;
+    keyPathLockEnabled = setKeyPathLock;
     enableFileSystemPaths = setFileSystemPaths;
   }
 
-  private static boolean enableKeyPathLock;
+  private static boolean keyPathLockEnabled;
   private static boolean enableFileSystemPaths;
 
   @Before
@@ -85,16 +85,16 @@ public class TestOzoneLockProvider {
 
   public void testOzoneLockProviderUtil(BucketLayout bucketLayout) {
 
-    LOG.info("enableKeyPathLock: " + enableKeyPathLock);
+    LOG.info("keyPathLockEnabled: " + keyPathLockEnabled);
     LOG.info("enableFileSystemPaths: " + enableFileSystemPaths);
     LOG.info("bucketLayout: " + bucketLayout + "\n");
 
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(enableKeyPathLock, enableFileSystemPaths));
+        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
     ozoneLockStrategy =
         ozoneManager.getOzoneLockProvider().createLockStrategy(bucketLayout);
 
-    if (enableKeyPathLock) {
+    if (keyPathLockEnabled) {
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
         Assert.assertTrue(ozoneLockStrategy instanceof OBSKeyPathLockStrategy);
       } else if (!enableFileSystemPaths &&

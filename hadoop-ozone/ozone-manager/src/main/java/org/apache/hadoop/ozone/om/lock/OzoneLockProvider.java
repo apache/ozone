@@ -25,19 +25,19 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
  */
 public class OzoneLockProvider {
 
-  private boolean enableKeyPathLock;
+  private boolean keyPathLockEnabled;
   private boolean enableFileSystemPaths;
 
-  public OzoneLockProvider(boolean enableKeyPathLock,
+  public OzoneLockProvider(boolean keyPathLockEnabled,
                            boolean enableFileSystemPaths) {
-    this.enableKeyPathLock = enableKeyPathLock;
+    this.keyPathLockEnabled = keyPathLockEnabled;
     this.enableFileSystemPaths = enableFileSystemPaths;
   }
 
   public OzoneLockStrategy createLockStrategy(BucketLayout bucketLayout) {
 
     // TODO: This can be extended to support FSO, LEGACY_FS in the future.
-    if (enableKeyPathLock) {
+    if (keyPathLockEnabled) {
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
         return new OBSKeyPathLockStrategy();
       } else if (!enableFileSystemPaths &&
