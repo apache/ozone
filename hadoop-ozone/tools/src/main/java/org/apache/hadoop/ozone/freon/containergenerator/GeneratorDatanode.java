@@ -52,7 +52,7 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -160,9 +160,9 @@ public class GeneratorDatanode extends BaseGenerator {
           "Version file " + versionFile + " is missing");
     }
 
-    String clusterId =
-        HddsVolumeUtil.getProperty(props, OzoneConsts.CLUSTER_ID, versionFile);
-    datanodeId = HddsVolumeUtil
+    String clusterId = StorageVolumeUtil.getProperty(props,
+        OzoneConsts.CLUSTER_ID, versionFile);
+    datanodeId = StorageVolumeUtil
         .getProperty(props, OzoneConsts.DATANODE_UUID, versionFile);
 
     volumeSet = new MutableVolumeSet(datanodeId, clusterId, config, null,

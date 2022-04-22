@@ -17,18 +17,17 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -78,36 +77,17 @@ public class VersionEndpointTask implements
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
 
-          // Check volumes
-          MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
-          volumeSet.writeLock();
-          try {
-            Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
+          Preconditions.checkNotNull(scmId,
+              "Reply from SCM: scmId cannot be null");
+          Preconditions.checkNotNull(clusterId,
+              "Reply from SCM: clusterId cannot be null");
 
-            Preconditions.checkNotNull(scmId,
-                "Reply from SCM: scmId cannot be null");
-            Preconditions.checkNotNull(clusterId,
-                "Reply from SCM: clusterId cannot be null");
-
-            // If version file does not exist
-            // create version file and also set scm ID or cluster ID.
-            for (Map.Entry<String, StorageVolume> entry
-                : volumeMap.entrySet()) {
-              StorageVolume volume = entry.getValue();
-              boolean result = HddsVolumeUtil.checkVolume((HddsVolume) volume,
-                  scmId, clusterId, configuration, LOG);
-              if (!result) {
-                volumeSet.failVolume(volume.getStorageDir().getPath());
-              }
-            }
-            if (volumeSet.getVolumesList().size() == 0) {
-              // All volumes are in inconsistent state
-              throw new DiskOutOfSpaceException(
-                  "All configured Volumes are in Inconsistent State");
-            }
-          } finally {
-            volumeSet.writeUnlock();
+          // Check DbVolumes
+          if (SchemaV3.isFinalizedAndEnabled(configuration)) {
+            checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
           }
+          // Check HddsVolumes
+          checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
 
           // Start the container services after getting the version information
           ozoneContainer.start(clusterId);
@@ -128,5 +108,33 @@ public class VersionEndpointTask implements
       rpcEndPoint.unlock();
     }
     return rpcEndPoint.getState();
+  }
+
+  private void checkVolumeSet(MutableVolumeSet volumeSet,
+      String scmId, String clusterId) throws DiskOutOfSpaceException {
+    if (volumeSet == null) {
+      return;
+    }
+
+    volumeSet.writeLock();
+    try {
+      // If version file does not exist
+      // create version file and also set scm ID or cluster ID.
+      for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
+        boolean result = StorageVolumeUtil.checkVolume(volume,
+            scmId, clusterId, configuration, LOG,
+            ozoneContainer.getDbVolumeSet());
+        if (!result) {
+          volumeSet.failVolume(volume.getStorageDir().getPath());
+        }
+      }
+      if (volumeSet.getVolumesList().size() == 0) {
+        // All volumes are in inconsistent state
+        throw new DiskOutOfSpaceException(
+            "All configured Volumes are in Inconsistent State");
+      }
+    } finally {
+      volumeSet.writeUnlock();
+    }
   }
 }

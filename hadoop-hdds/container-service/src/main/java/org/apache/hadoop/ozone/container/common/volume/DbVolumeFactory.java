@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.ozone.container.common.volume;
 
 import org.apache.hadoop.fs.StorageType;
@@ -25,27 +24,27 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import java.io.IOException;
 
 /**
- * A factory class for HddsVolume.
+ * A factory class for DbVolume.
  */
-public class HddsVolumeFactory extends StorageVolumeFactory {
+public class DbVolumeFactory extends StorageVolumeFactory {
 
-  public HddsVolumeFactory(ConfigurationSource conf,
+  public DbVolumeFactory(ConfigurationSource conf,
       SpaceUsageCheckFactory usageCheckFactory, MutableVolumeSet volumeSet,
       String datanodeUuid, String clusterID) {
     super(conf, usageCheckFactory, volumeSet, datanodeUuid, clusterID);
   }
 
   @Override
-  public StorageVolume createVolume(String locationString,
-      StorageType storageType) throws IOException {
-    HddsVolume.Builder volumeBuilder = new HddsVolume.Builder(locationString)
+  StorageVolume createVolume(String locationString, StorageType storageType)
+      throws IOException {
+    DbVolume.Builder volumeBuilder = new DbVolume.Builder(locationString)
         .conf(getConf())
         .datanodeUuid(getDatanodeUuid())
         .clusterID(getClusterID())
         .usageCheckFactory(getUsageCheckFactory())
         .storageType(storageType)
         .volumeSet(getVolumeSet());
-    HddsVolume volume = volumeBuilder.build();
+    DbVolume volume = volumeBuilder.build();
 
     checkAndSetClusterID(volume.getClusterID());
 
@@ -53,10 +52,10 @@ public class HddsVolumeFactory extends StorageVolumeFactory {
   }
 
   @Override
-  public StorageVolume createFailedVolume(String locationString)
-      throws IOException {
-    HddsVolume.Builder volumeBuilder = new HddsVolume.Builder(locationString)
-        .failedVolume(true);
+  StorageVolume createFailedVolume(String locationString) throws IOException {
+    DbVolume.Builder volumeBuilder =
+        new DbVolume.Builder(locationString)
+            .failedVolume(true);
     return volumeBuilder.build();
   }
 }
