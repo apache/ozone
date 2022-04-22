@@ -73,7 +73,7 @@ public class OmMultipartUpload {
   }
 
   public static String getDbKey(String volume, String bucket, String key,
-                                String uploadId) {
+      String uploadId) {
     return getDbKey(volume, bucket, key) + OM_KEY_PREFIX + uploadId;
 
   }
