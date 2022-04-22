@@ -62,11 +62,17 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     xmlPropsToSkipCompare.add("ozone.om.decommissioned.nodes" +
         ".EXAMPLEOMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
+    xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
     configurationPropsToSkipCompare
         .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
+    // Currently replication and type configs moved to server side.
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_REPLICATION);
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_REPLICATION_TYPE);
     configurationPropsToSkipCompare
         .add(OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY);
     configurationPropsToSkipCompare

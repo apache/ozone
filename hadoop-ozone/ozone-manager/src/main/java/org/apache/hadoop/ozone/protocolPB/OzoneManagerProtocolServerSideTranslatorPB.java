@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -131,7 +132,15 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   @Override
   public OMResponse submitRequest(RpcController controller,
       OMRequest request) throws ServiceException {
-    OMRequest validatedRequest = requestValidations.validateRequest(request);
+    OMRequest validatedRequest;
+    try {
+      validatedRequest = requestValidations.validateRequest(request);
+    } catch (Exception e) {
+      if (e instanceof OMException) {
+        return createErrorResponse(request, (OMException) e);
+      }
+      throw new ServiceException(e);
+    }
 
     OMResponse response = 
         dispatcher.processRequest(validatedRequest, this::processRequest,

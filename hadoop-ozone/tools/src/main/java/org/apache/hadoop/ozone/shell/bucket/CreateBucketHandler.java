@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -63,6 +65,9 @@ public class CreateBucketHandler extends BucketHandler {
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
       defaultValue = "OBJECT_STORE")
   private AllowedBucketLayouts allowedBucketLayout;
+
+  @CommandLine.Mixin
+  private ShellReplicationOptions replication;
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
@@ -102,6 +107,9 @@ public class CreateBucketHandler extends BucketHandler {
             bekName);
       }
     }
+
+    replication.fromParams(getConf()).ifPresent(config ->
+        bb.setDefaultReplicationConfig(new DefaultReplicationConfig(config)));
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
       bb.setQuotaInBytes(OzoneQuota.parseSpaceQuota(

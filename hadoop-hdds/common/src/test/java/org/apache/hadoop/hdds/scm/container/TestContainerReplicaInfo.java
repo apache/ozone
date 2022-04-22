@@ -55,5 +55,36 @@ public class TestContainerReplicaInfo {
         proto.getDatanodeDetails()), info.getDatanodeDetails());
     Assert.assertEquals(proto.getSequenceID(), info.getSequenceId());
     Assert.assertEquals(proto.getState(), info.getState());
+    // If replicaIndex is not in the proto, then -1 should be returned
+    Assert.assertEquals(-1, info.getReplicaIndex());
+  }
+
+  @Test
+  public void testObjectCreatedFromProtoWithReplicaIndedx() {
+    HddsProtos.SCMContainerReplicaProto proto =
+        HddsProtos.SCMContainerReplicaProto.newBuilder()
+            .setKeyCount(10)
+            .setBytesUsed(12345)
+            .setContainerID(567)
+            .setPlaceOfBirth(UUID.randomUUID().toString())
+            .setSequenceID(5)
+            .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()
+                .getProtoBufMessage())
+            .setState("OPEN")
+            .setReplicaIndex(4)
+            .build();
+
+    ContainerReplicaInfo info = ContainerReplicaInfo.fromProto(proto);
+
+    Assert.assertEquals(proto.getContainerID(), info.getContainerID());
+    Assert.assertEquals(proto.getBytesUsed(), info.getBytesUsed());
+    Assert.assertEquals(proto.getKeyCount(), info.getKeyCount());
+    Assert.assertEquals(proto.getPlaceOfBirth(),
+        info.getPlaceOfBirth().toString());
+    Assert.assertEquals(DatanodeDetails.getFromProtoBuf(
+        proto.getDatanodeDetails()), info.getDatanodeDetails());
+    Assert.assertEquals(proto.getSequenceID(), info.getSequenceId());
+    Assert.assertEquals(proto.getState(), info.getState());
+    Assert.assertEquals(4, info.getReplicaIndex());
   }
 }

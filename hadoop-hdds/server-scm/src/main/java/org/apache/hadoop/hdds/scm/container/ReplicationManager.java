@@ -477,6 +477,13 @@ public class ReplicationManager implements SCMService {
           }
         }
 
+        if (container.getReplicationType() == HddsProtos.ReplicationType.EC) {
+          // TODO We do not support replicating EC containers as yet, so at this
+          //      point, after handing the closing etc states, we just return.
+          //      EC Support will be added later.
+          return;
+        }
+
         /*
          * Before processing the container we have to reconcile the
          * inflightReplication and inflightDeletion actions.

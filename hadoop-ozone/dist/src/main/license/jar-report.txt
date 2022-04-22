@@ -64,6 +64,7 @@ share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
 share/ozone/lib/hdds-container-service.jar
 share/ozone/lib/hdds-docs.jar
+share/ozone/lib/hdds-erasurecode.jar
 share/ozone/lib/hdds-hadoop-dependency-client.jar
 share/ozone/lib/hdds-hadoop-dependency-server.jar
 share/ozone/lib/hdds-interface-admin.jar
