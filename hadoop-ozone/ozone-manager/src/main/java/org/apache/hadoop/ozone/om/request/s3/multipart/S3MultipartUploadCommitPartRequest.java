@@ -229,7 +229,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      long correctedSpace = omKeyInfo.getReplicatedSize() * factor;
+      long correctedSpace = omKeyInfo.getReplicatedSize();
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omResponse.setCommitMultiPartUploadResponse(
