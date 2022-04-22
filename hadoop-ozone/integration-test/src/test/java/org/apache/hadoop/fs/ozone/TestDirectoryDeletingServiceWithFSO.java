@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
@@ -53,6 +52,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.LongSupplier;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -135,7 +135,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     }
   }
 
-  @Flaky("HDDS-6189")
   @Test
   public void testDeleteEmptyDirectory() throws Exception {
     Path root = new Path("/rootDir");
@@ -155,8 +154,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(dirTable, 2);
 
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
     // Delete the appRoot, empty dir
     fs.delete(appRoot, true);
@@ -167,8 +166,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(dirTable, 1);
 
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 1);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
     Assert.assertTrue(dirTable.iterator().hasNext());
     Assert.assertEquals(root.getName(),
@@ -219,8 +218,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 15);
     assertTableRowCount(dirTable, 20);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
     // Delete the appRoot
     fs.delete(appRoot, true);
@@ -232,8 +231,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 0);
     assertTableRowCount(dirTable, 1);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 15);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 19);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 15);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
     Assert.assertTrue(dirDeletingService.getRunCount() > 1);
   }
@@ -266,8 +265,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 5);
     assertTableRowCount(keyTable, 3);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
     // Delete the rootDir, which should delete all keys.
     fs.delete(root, true);
@@ -279,15 +278,16 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 0);
     assertTableRowCount(dirTable, 0);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 3);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 5);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
     Assert.assertTrue(dirDeletingService.getRunCount() > 1);
   }
 
-  private void assertSubPathsCount(long pathCount, long expectedCount)
+  static void assertSubPathsCount(LongSupplier pathCount, long expectedCount)
       throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pathCount >= expectedCount, 1000, 120000);
+    GenericTestUtils.waitFor(() -> pathCount.getAsLong() >= expectedCount,
+        1000, 120000);
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)
@@ -374,8 +374,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(deletedKeyTable, 0);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 0);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 0);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
     // verify whether KeyDeletingService has purged the keys
     long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     Assert.assertEquals(prevDeletedKeyCount + 3, currentDeletedKeyCount);
@@ -392,8 +392,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(deletedKeyTable, 0);
 
-    assertSubPathsCount(dirDeletingService.getMovedFilesCount(), 2);
-    assertSubPathsCount(dirDeletingService.getDeletedDirsCount(), 1);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 2);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 1);
     // verify whether KeyDeletingService has purged the keys
     currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     Assert.assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
