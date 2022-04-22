@@ -59,11 +59,28 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
+  enum AllowedBucketLayouts {
+    FILE_SYSTEM_OPTIMIZED("FILE_SYSTEM_OPTIMIZED"),
+    OBJECT_STORE("OBJECT_STORE"),
+    DEFAULT("");
+
+    // Assigning a value to each enum
+    private final String layout;
+    AllowedBucketLayouts(String layout) {
+      this.layout = layout;
+    }
+
+    // Overriding toString() method to return the value passed to the
+    // constructor.
+    @Override
+    public String toString() {
+      return this.layout;
+    }
+  }
 
   @Option(names = { "--layout", "-l" },
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
-      defaultValue = "OBJECT_STORE")
+      defaultValue = "")
   private AllowedBucketLayouts allowedBucketLayout;
 
   @CommandLine.Mixin
@@ -85,7 +102,7 @@ public class CreateBucketHandler extends BucketHandler {
 
     BucketArgs.Builder bb;
     BucketLayout bucketLayout =
-        BucketLayout.valueOf(allowedBucketLayout.toString());
+        BucketLayout.fromString(allowedBucketLayout.toString());
     bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
         .setVersioning(false).setBucketLayout(bucketLayout)
         .setOwner(ownerName);
