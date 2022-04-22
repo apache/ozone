@@ -495,4 +495,5 @@ service XceiverClientProtocolService {
 service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
+  rpc send(ContainerCommandRequestProto) returns (stream ContainerCommandResponseProto);
 }
