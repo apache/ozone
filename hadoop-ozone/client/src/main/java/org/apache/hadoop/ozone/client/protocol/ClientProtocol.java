@@ -743,6 +743,17 @@ public interface ClientProtocol {
       long quotaInNamespace, long quotaInBytes) throws IOException;
 
   /**
+   * Set Bucket replication configuration.
+   *
+   * @param volumeName        Name of the Volume.
+   * @param bucketName        Name of the Bucket.
+   * @param replicationConfig The replication config to set on bucket.
+   * @throws IOException
+   */
+  void setReplicationConfig(String volumeName, String bucketName,
+      ReplicationConfig replicationConfig) throws IOException;
+
+  /**
    * Returns OzoneKey that contains the application generated/visible
    * metadata for an Ozone Object.
    *
