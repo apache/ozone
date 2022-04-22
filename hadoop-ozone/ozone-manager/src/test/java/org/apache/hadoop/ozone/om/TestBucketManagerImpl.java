@@ -167,7 +167,7 @@ public class TestBucketManagerImpl {
 
   @Test
   public void testCreateAlreadyExistingBucket() throws Exception {
-    thrown.expectMessage("Bucket already exists");
+    thrown.expectMessage("Bucket already exist");
     createSampleVol();
 
     try {

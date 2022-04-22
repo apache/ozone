@@ -195,7 +195,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       //Check if bucket already exists
       if (metadataManager.getBucketTable().isExist(bucketKey)) {
         LOG.debug("bucket: {} already exists ", bucketName);
-        throw new OMException("Bucket already exists", BUCKET_ALREADY_EXISTS);
+        throw new OMException("Bucket already exist", BUCKET_ALREADY_EXISTS);
       }
 
       //Check quotaInBytes to update
