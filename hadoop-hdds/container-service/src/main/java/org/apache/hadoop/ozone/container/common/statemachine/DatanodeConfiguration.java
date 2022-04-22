@@ -45,6 +45,8 @@ public class DatanodeConfiguration {
       "hdds.datanode.failed.data.volumes.tolerated";
   public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.metadata.volumes.tolerated";
+  public static final String FAILED_DB_VOLUMES_TOLERATED_KEY =
+      "hdds.datanode.failed.db.volumes.tolerated";
   public static final String DISK_CHECK_MIN_GAP_KEY =
       "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY =
@@ -52,6 +54,8 @@ public class DatanodeConfiguration {
 
   public static final String WAIT_ON_ALL_FOLLOWERS =
       "hdds.datanode.wait.on.all.followers";
+  public static final String CONTAINER_SCHEMA_V3_ENABLED =
+      "hdds.datanode.container.schema.v3.enabled";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -66,6 +70,8 @@ public class DatanodeConfiguration {
 
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
+
+  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -195,6 +201,17 @@ public class DatanodeConfiguration {
   )
   private int failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
+  @Config(key = "failed.db.volumes.tolerated",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of db volumes that are allowed to fail "
+          + "before a datanode stops offering service. "
+          + "Config this to -1 means unlimited, but we should have "
+          + "at least one good volume left."
+  )
+  private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+
   @Config(key = "disk.check.min.gap",
       defaultValue = "15m",
       type = ConfigType.TIME,
@@ -245,6 +262,15 @@ public class DatanodeConfiguration {
     this.waitOnAllFollowers = val;
   }
 
+  @Config(key = "container.schema.v3.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Enable use of container schema v3(one rocksdb per disk)."
+  )
+  private boolean containerSchemaV3Enabled =
+      CONTAINER_SCHEMA_V3_ENABLED_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -275,6 +301,13 @@ public class DatanodeConfiguration {
               "must be greater than -1 and was set to {}. Defaulting to {}",
           failedMetadataVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
       failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+    }
+
+    if (failedDbVolumesTolerated < -1) {
+      LOG.warn(FAILED_DB_VOLUMES_TOLERATED_KEY +
+              "must be greater than -1 and was set to {}. Defaulting to {}",
+          failedDbVolumesTolerated, FAILED_VOLUMES_TOLERATED_DEFAULT);
+      failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
     if (diskCheckMinGap < 0) {
@@ -325,6 +358,14 @@ public class DatanodeConfiguration {
     this.failedMetadataVolumesTolerated = failedVolumesTolerated;
   }
 
+  public int getFailedDbVolumesTolerated() {
+    return failedDbVolumesTolerated;
+  }
+
+  public void setFailedDbVolumesTolerated(int failedVolumesTolerated) {
+    this.failedDbVolumesTolerated = failedVolumesTolerated;
+  }
+
   public Duration getDiskCheckMinGap() {
     return Duration.ofMillis(diskCheckMinGap);
   }
@@ -371,5 +412,13 @@ public class DatanodeConfiguration {
 
   public int getNumReadThreadPerVolume() {
     return numReadThreadPerVolume;
+  }
+
+  public boolean getContainerSchemaV3Enabled() {
+    return this.containerSchemaV3Enabled;
+  }
+
+  public void setContainerSchemaV3Enabled(boolean containerSchemaV3Enabled) {
+    this.containerSchemaV3Enabled = containerSchemaV3Enabled;
   }
 }
