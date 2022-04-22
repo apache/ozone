@@ -37,38 +37,59 @@ public class OmKeyLocationInfoGroup {
   private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
   private  boolean isMultipartKey;
 
-  public OmKeyLocationInfoGroup(long version,
-                                List<OmKeyLocationInfo> locations) {
-    this(version, locations, false);
-  }
-
-  public OmKeyLocationInfoGroup(long version,
-      List<OmKeyLocationInfo> locations, boolean isMultipartKey) {
-    this.version = version;
-    locationVersionMap = new HashMap<>();
-    for (OmKeyLocationInfo info : locations) {
-      locationVersionMap
-          .computeIfAbsent(info.getCreateVersion(), v -> new ArrayList<>())
-          .add(info);
+  public OmKeyLocationInfoGroup(Builder objBuilder) {
+    this.version = objBuilder.version;
+    if (objBuilder.mapLocations != null) {
+      this.locationVersionMap = objBuilder.mapLocations;
+    } else {
+      locationVersionMap = new HashMap<>();
+      for (OmKeyLocationInfo info : objBuilder.listLocations) {
+        locationVersionMap
+            .computeIfAbsent(info.getCreateVersion(), v -> new ArrayList<>())
+            .add(info);
+      }
     }
     //prevent NPE
-    this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
-    this.isMultipartKey = isMultipartKey;
-
+    this.locationVersionMap.putIfAbsent(objBuilder.version, new ArrayList<>());
+    this.isMultipartKey = objBuilder.isMultipartKey;
   }
 
-  public OmKeyLocationInfoGroup(long version,
-                                Map<Long, List<OmKeyLocationInfo>> locations) {
-    this(version, locations, false);
-  }
+  /**
+   * Builder Class for OmKeyLocationInfoGroup.
+   */
+  public static class Builder {
+    private Map<Long, List<OmKeyLocationInfo>> mapLocations;
+    private boolean isMultipartKey = false;
+    private List<OmKeyLocationInfo> listLocations;
+    private long version;
 
-  public OmKeyLocationInfoGroup(long version,
-      Map<Long, List<OmKeyLocationInfo>> locations, boolean isMultipartKey) {
-    this.version = version;
-    this.locationVersionMap = locations;
-    //prevent NPE
-    this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
-    this.isMultipartKey = isMultipartKey;
+    public Builder setMapLocations(
+        Map<Long, List<OmKeyLocationInfo>> mapLocations) {
+      this.mapLocations = mapLocations;
+      return this;
+    }
+
+    public Builder setListLocations(List<OmKeyLocationInfo> listLocations) {
+      this.listLocations = listLocations;
+      return this;
+    }
+
+    public Builder setIsMultipartKey(boolean isMultipartKey) {
+      if (isMultipartKey) {
+        this.isMultipartKey = true;
+      }
+      return this;
+    }
+
+    public Builder setVersion(long version) {
+      this.version = version;
+      return this;
+    }
+
+    //Return the final constructed builder object
+    public OmKeyLocationInfoGroup build() {
+      return new OmKeyLocationInfoGroup(this);
+    }
   }
 
   public void setMultipartKey(boolean isMpu) {
@@ -127,19 +148,19 @@ public class OmKeyLocationInfoGroup {
         keyLocationList.add(keyInfo.getProtobuf(ignorePipeline, clientVersion));
       }
     }
-    return  builder.addAllKeyLocations(keyLocationList).build();
+    return builder.addAllKeyLocations(keyLocationList).build();
   }
 
   public static OmKeyLocationInfoGroup getFromProtobuf(
       KeyLocationList keyLocationList) {
-    return new OmKeyLocationInfoGroup(
-        keyLocationList.getVersion(),
-        keyLocationList.getKeyLocationsList().stream()
+    return new OmKeyLocationInfoGroup.Builder()
+        .setVersion(keyLocationList.getVersion())
+        .setMapLocations(keyLocationList.getKeyLocationsList().stream()
             .map(OmKeyLocationInfo::getFromProtobuf)
             .collect(Collectors.groupingBy(
-                OmKeyLocationInfo::getCreateVersion)),
-        keyLocationList.getIsMultipartKey()
-    );
+                OmKeyLocationInfo::getCreateVersion)))
+        .setIsMultipartKey(keyLocationList.getIsMultipartKey())
+        .build();
   }
 
   /**
@@ -153,7 +174,9 @@ public class OmKeyLocationInfoGroup {
       List<OmKeyLocationInfo> newLocationList) {
     Map<Long, List<OmKeyLocationInfo>> newMap = new HashMap<>();
     newMap.put(version + 1, new ArrayList<>(newLocationList));
-    return new OmKeyLocationInfoGroup(version + 1, newMap);
+    return new OmKeyLocationInfoGroup.Builder()
+        .setVersion(version + 1)
+        .setMapLocations(newMap).build();
   }
 
   void appendNewBlocks(List<OmKeyLocationInfo> newLocationList) {
@@ -180,7 +203,7 @@ public class OmKeyLocationInfoGroup {
     sb.append("version:").append(version).append(" ");
     sb.append("isMultipartKey:").append(isMultipartKey);
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
-      for (OmKeyLocationInfo kli: kliList) {
+      for (OmKeyLocationInfo kli : kliList) {
         sb.append(kli.getLocalID()).append(" || ");
       }
     }

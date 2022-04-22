@@ -293,7 +293,8 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     if (keyLocationVersions.size() == 0) {
       // no version exist, these blocks are the very first version.
-      keyLocationVersions.add(new OmKeyLocationInfoGroup(0, newLocationList));
+      keyLocationVersions.add(new OmKeyLocationInfoGroup.Builder().setVersion(0)
+          .setListLocations(newLocationList).build());
       latestVersionNum = 0;
     } else {
       // it is important that the new version are always at the tail of the list
@@ -692,9 +693,11 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(
-            new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                keyLocationVersion.getLocationList(),
-                keyLocationVersion.isMultipartKey())));
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(keyLocationVersion.getVersion())
+                .setListLocations(keyLocationVersion.getLocationList())
+                .setIsMultipartKey(keyLocationVersion.isMultipartKey())
+                .build()));
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),

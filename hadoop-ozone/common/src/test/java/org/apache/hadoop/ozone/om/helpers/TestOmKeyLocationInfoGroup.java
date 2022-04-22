@@ -74,6 +74,9 @@ public class TestOmKeyLocationInfoGroup {
     locationInfoList.add(info1);
     locationInfoList.add(info2);
     locationInfoList.add(info3);
-    return new OmKeyLocationInfoGroup(2, locationInfoList);
+    return new OmKeyLocationInfoGroup.Builder()
+        .setVersion(2)
+        .setListLocations(locationInfoList)
+        .build();
   }
 }

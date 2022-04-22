@@ -190,8 +190,10 @@ public class TestOmKeyInfo {
         getPipeline()));
     omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(101L, 100L),
         getPipeline()));
-    return new OmKeyLocationInfoGroup(0, omKeyLocationInfos, isMPU);
-
+    return new OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfos)
+        .setIsMultipartKey(isMPU).build();
   }
 
   Pipeline getPipeline() {
@@ -205,7 +207,7 @@ public class TestOmKeyInfo {
   }
 
   OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
-      Pipeline pipeline) {
+                                         Pipeline pipeline) {
     return new OmKeyLocationInfo.Builder()
         .setBlockID(blockID)
         .setPipeline(pipeline)
