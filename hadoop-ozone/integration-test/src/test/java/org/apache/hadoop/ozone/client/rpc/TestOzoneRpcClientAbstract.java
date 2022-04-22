@@ -1067,25 +1067,24 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     byte[] value = new byte[keyLength];
-    int dataGroupSize = repConfig instanceof ECReplicationConfig ?
-        ((ECReplicationConfig) repConfig).getData() : 1;
-    long preAllocatedBlocks = Math.min(ozoneManager.getPreallocateBlocksMax(),
-        (keyLength - 1) / (blockSize * dataGroupSize) + 1);
-    long preAllocatedSpace = preAllocatedBlocks * blockSize
-        * repConfig.getRequiredNodes();
     long keyQuota = QuotaUtil.getReplicatedSize(keyLength, repConfig);
 
     OzoneOutputStream out = bucket.createKey(keyName, keyLength,
         repConfig, new HashMap<>());
-    Assert.assertEquals(preAllocatedSpace,
+    // Write a new key and do not update Bucket UsedBytes until commit.
+    Assert.assertEquals(0,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
     out.write(value);
     out.close();
+    // After committing the new key, the Bucket UsedBytes must be updated to
+    // keyQuota.
     Assert.assertEquals(keyQuota,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     out = bucket.createKey(keyName, keyLength, repConfig, new HashMap<>());
-    Assert.assertEquals(keyQuota + preAllocatedSpace,
+    // Overwrite an old key. The Bucket UsedBytes are not updated before the
+    // commit. So the Bucket UsedBytes remain unchanged.
+    Assert.assertEquals(keyQuota,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
     out.write(value);
     out.close();

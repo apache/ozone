@@ -216,21 +216,20 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      long correctedSpace = omKeyInfo.getReplicatedSize();
-      // Subtract the size of blocks to be overwritten.
-      if (keyToDelete != null) {
-        correctedSpace -= keyToDelete.getDataSize() *
-            keyToDelete.getReplicationConfig().getRequiredNodes();
-      }
-      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
-
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
       // Update the block length for each block
       omKeyInfo.updateLocationInfoList(locationInfoList, false);
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+
+      long correctedSpace = omKeyInfo.getReplicatedSize();
+      // Subtract the size of blocks to be overwritten.
+      if (keyToDelete != null) {
+        correctedSpace -= keyToDelete.getReplicatedSize();
+      }
+      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

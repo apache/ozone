@@ -161,6 +161,14 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             trxnLogIndex, ozoneManager.isRatisEnabled());
       }
 
+      long correctedSpace = omKeyInfo.getReplicatedSize();
+      // Subtract the size of blocks to be overwritten.
+      if (keyToDelete != null) {
+        correctedSpace -= keyToDelete.getReplicatedSize();
+      }
+      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+
       // Add to cache of open key table and key table.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
               null, fileName, trxnLogIndex);
@@ -172,13 +180,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbFileKey,
                 oldKeyVersionsToDelete, trxnLogIndex);
       }
-      
-      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-      long correctedSpace = omKeyInfo.getReplicatedSize() * factor;
-      // Subtract the size of blocks to be overwritten.
-      if (keyToDelete != null) {
-        correctedSpace -= keyToDelete.getReplicatedSize();
-      }
+
       omBucketInfo.incrUsedBytes(correctedSpace);
       omBucketInfo.incrUsedNamespace(1L);
 
