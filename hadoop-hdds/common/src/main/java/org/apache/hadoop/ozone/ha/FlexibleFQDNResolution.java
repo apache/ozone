@@ -28,7 +28,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT;
 
 /**
- * FQDN related utils.
+ * FQDN related utils. Provides methods related to local host name and
+ * jvm network address cache. This utils is mainly used in kubernetes where
+ * the FQDN [pod_name].[service_name] is not resolvable at the service
+ * starting time.
  */
 public final class FlexibleFQDNResolution {
   private static final Logger LOG =
