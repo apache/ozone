@@ -148,7 +148,7 @@ public class OmKeyLocationInfoGroup {
         keyLocationList.add(keyInfo.getProtobuf(ignorePipeline, clientVersion));
       }
     }
-    return builder.addAllKeyLocations(keyLocationList).build();
+    return  builder.addAllKeyLocations(keyLocationList).build();
   }
 
   public static OmKeyLocationInfoGroup getFromProtobuf(
@@ -203,7 +203,7 @@ public class OmKeyLocationInfoGroup {
     sb.append("version:").append(version).append(" ");
     sb.append("isMultipartKey:").append(isMultipartKey);
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
-      for (OmKeyLocationInfo kli : kliList) {
+      for (OmKeyLocationInfo kli: kliList) {
         sb.append(kli.getLocalID()).append(" || ");
       }
     }

@@ -207,7 +207,7 @@ public class TestOmKeyInfo {
   }
 
   OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
-                                         Pipeline pipeline) {
+      Pipeline pipeline) {
     return new OmKeyLocationInfo.Builder()
         .setBlockID(blockID)
         .setPipeline(pipeline)
