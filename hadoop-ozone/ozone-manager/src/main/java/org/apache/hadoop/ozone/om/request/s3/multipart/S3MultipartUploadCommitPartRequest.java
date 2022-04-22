@@ -226,7 +226,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheKey<>(openKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
