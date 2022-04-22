@@ -154,6 +154,18 @@ public class SCMDBDefinition implements DBDefinition {
           MoveDataNodePair.class,
           new MoveDataNodePairCodec());
 
+  /**
+   * Stores miscellaneous SCM metadata, including upgrade finalization status
+   * and metadata layout version.
+   */
+  public static final DBColumnFamilyDefinition<String, String>
+      META = new DBColumnFamilyDefinition<>(
+      "meta",
+      String.class,
+      new StringCodec(),
+      String.class,
+      new StringCodec());
+
   @Override
   public String getName() {
     return "scm.db";
@@ -168,6 +180,6 @@ public class SCMDBDefinition implements DBDefinition {
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
         VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
-        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE};
+        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE, META};
   }
 }
