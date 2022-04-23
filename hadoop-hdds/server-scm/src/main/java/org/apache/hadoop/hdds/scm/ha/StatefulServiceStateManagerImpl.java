@@ -57,7 +57,8 @@ public final class StatefulServiceStateManagerImpl
      */
     transactionBuffer.addToBuffer(statefulServiceConfig, serviceName, bytes);
     if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
-      SCMHADBTransactionBuffer buffer = (SCMHADBTransactionBuffer) transactionBuffer;
+      SCMHADBTransactionBuffer buffer =
+              (SCMHADBTransactionBuffer) transactionBuffer;
       buffer.flush();
     }
   }
