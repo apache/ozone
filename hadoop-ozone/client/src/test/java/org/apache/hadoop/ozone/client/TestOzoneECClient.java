@@ -965,7 +965,10 @@ public class TestOzoneECClient {
             .build());
       }
       OmKeyLocationInfoGroup omKeyLocationInfoGroup =
-          new OmKeyLocationInfoGroup(0, omKeyLocationInfos);
+          new OmKeyLocationInfoGroup.Builder()
+              .setVersion(0)
+              .setListLocations(omKeyLocationInfos)
+              .build();
       kos.addPreallocateBlocks(omKeyLocationInfoGroup, 0);
 
       // Good writes

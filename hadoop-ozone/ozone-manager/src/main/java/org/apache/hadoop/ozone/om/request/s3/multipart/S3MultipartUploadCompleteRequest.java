@@ -365,7 +365,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     if (omKeyInfo == null) {
       // This is a newly added key, it does not have any versions.
       OmKeyLocationInfoGroup keyLocationInfoGroup = new
-          OmKeyLocationInfoGroup(0, partLocationInfos, true);
+          OmKeyLocationInfoGroup.Builder()
+          .setVersion(0)
+          .setListLocations(partLocationInfos)
+          .setIsMultipartKey(true)
+          .build();
 
       // Get the objectID of the key from OpenKeyTable
       OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,

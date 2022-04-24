@@ -175,7 +175,10 @@ public class TestContainerEndpoint {
     omKeyLocationInfoList.add(omKeyLocationInfo2);
 
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
-        OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+        OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfoList)
+        .build();
 
     //key = key_one, Blocks = [ {CID = 1, LID = 101}, {CID = 2, LID = 102} ]
     writeDataToOm(reconOMMetadataManager,
@@ -189,8 +192,10 @@ public class TestContainerEndpoint {
 
     List<OmKeyLocationInfo> omKeyLocationInfoListNew = new ArrayList<>();
     omKeyLocationInfoListNew.add(omKeyLocationInfo3);
-    infoGroups.add(new OmKeyLocationInfoGroup(0,
-        omKeyLocationInfoListNew));
+    infoGroups.add(new OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfoListNew)
+        .build());
 
     BlockID blockID4 = new BlockID(1, 104);
     OmKeyLocationInfo omKeyLocationInfo4 = getOmKeyLocationInfo(blockID4,
@@ -198,8 +203,10 @@ public class TestContainerEndpoint {
 
     omKeyLocationInfoListNew = new ArrayList<>();
     omKeyLocationInfoListNew.add(omKeyLocationInfo4);
-    infoGroups.add(new OmKeyLocationInfoGroup(1,
-        omKeyLocationInfoListNew));
+    infoGroups.add(new OmKeyLocationInfoGroup.Builder()
+        .setVersion(1)
+        .setListLocations(omKeyLocationInfoListNew)
+        .build());
 
     //key = key_two, Blocks = [ {CID = 1, LID = 103}, {CID = 1, LID = 104} ]
     writeDataToOm(reconOMMetadataManager,
@@ -216,8 +223,10 @@ public class TestContainerEndpoint {
         pipeline);
     omKeyLocationInfoList2.add(omKeyLocationInfo6);
 
-    OmKeyLocationInfoGroup omKeyLocationInfoGroup2 = new
-        OmKeyLocationInfoGroup(0, omKeyLocationInfoList2);
+    OmKeyLocationInfoGroup omKeyLocationInfoGroup2 = new OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfoList2)
+        .build();
 
     //key = key_three, Blocks = [ {CID = 2, LID = 2}, {CID = 2, LID = 3} ]
     writeDataToOm(reconOMMetadataManager,

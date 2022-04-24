@@ -128,7 +128,10 @@ public class TestReplicatedFileChecksumHelper {
         .setBucketName(null)
         .setKeyName(null)
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(new ArrayList<>())
+                .build()))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
@@ -214,7 +217,10 @@ public class TestReplicatedFileChecksumHelper {
         .setBucketName(null)
         .setKeyName(null)
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, omKeyLocationInfoList)))
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(omKeyLocationInfoList)
+                .build()))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)

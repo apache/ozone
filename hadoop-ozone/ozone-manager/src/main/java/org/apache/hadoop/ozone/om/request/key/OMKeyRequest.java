@@ -690,9 +690,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
-            .setKeyName(keyArgs.getKeyName())
-            .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, locations)))
+        .setKeyName(keyArgs.getKeyName())
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(locations)
+                .build()))
             .setCreationTime(keyArgs.getModificationTime())
             .setModificationTime(keyArgs.getModificationTime())
             .setDataSize(size)

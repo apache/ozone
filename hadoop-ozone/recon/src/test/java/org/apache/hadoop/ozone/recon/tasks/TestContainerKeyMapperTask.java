@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -110,7 +111,10 @@ public class TestContainerKeyMapperTask {
     omKeyLocationInfoList.add(omKeyLocationInfo2);
 
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
-        OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+        OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfoList)
+        .build();;
 
     writeDataToOm(reconOMMetadataManager,
         "key_one",
@@ -174,7 +178,10 @@ public class TestContainerKeyMapperTask {
     omKeyLocationInfoList.add(omKeyLocationInfo2);
 
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
-        OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+        OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfoList)
+        .build();
 
     String bucket = "bucketOne";
     String volume = "sampleVol";
@@ -202,8 +209,10 @@ public class TestContainerKeyMapperTask {
     omKeyLocationInfoList = new ArrayList<>();
     omKeyLocationInfoList.add(omKeyLocationInfo3);
     omKeyLocationInfoList.add(omKeyLocationInfo4);
-    omKeyLocationInfoGroup = new OmKeyLocationInfoGroup(0,
-        omKeyLocationInfoList);
+    omKeyLocationInfoGroup = new OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfoList)
+        .build();
 
     String key2 = "key_two";
     writeDataToOm(reconOMMetadataManager, key2, bucket, volume, Collections

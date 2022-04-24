@@ -65,7 +65,10 @@ public class TestRepeatedOmKeyInfoCodec {
       omKeyLocationInfoList.add(keyLocationInfo);
     }
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
-        OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+        OmKeyLocationInfoGroup.Builder()
+        .setVersion(0)
+        .setListLocations(omKeyLocationInfoList)
+        .build();
     return new OmKeyInfo.Builder()
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())

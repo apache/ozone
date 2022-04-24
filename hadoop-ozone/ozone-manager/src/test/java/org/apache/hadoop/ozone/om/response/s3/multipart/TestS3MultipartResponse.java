@@ -106,7 +106,10 @@ public class TestS3MultipartResponse {
         .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(new ArrayList<>())
+                .build()))
         .build();
 
     OMResponse omResponse = OMResponse.newBuilder()
@@ -200,8 +203,11 @@ public class TestS3MultipartResponse {
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
-            .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(new ArrayList<>())
+                .build()))
             .setParentObjectID(parentID)
             .build();
 
@@ -252,17 +258,20 @@ public class TestS3MultipartResponse {
             omMetadataManager.getBucketTable().get(bucketKey);
 
     OmKeyInfo openPartKeyInfoToBeDeleted = new OmKeyInfo.Builder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setKeyName(fileName)
-            .setFileName(fileName)
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
-            .setReplicationConfig(RatisReplicationConfig.getInstance(
-                    HddsProtos.ReplicationFactor.ONE))
-            .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-            .build();
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(fileName)
+        .setFileName(fileName)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE))
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(new ArrayList<>())
+                .build()))
+        .build();
 
     OMResponse omResponse = OMResponse.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CommitMultiPartUpload)

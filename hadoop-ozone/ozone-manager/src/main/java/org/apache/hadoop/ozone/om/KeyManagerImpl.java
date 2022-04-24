@@ -1359,7 +1359,10 @@ public class KeyManagerImpl implements KeyManager {
         .setBucketName(bucketName)
         .setKeyName(dir)
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(new ArrayList<>())
+                .build()))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)

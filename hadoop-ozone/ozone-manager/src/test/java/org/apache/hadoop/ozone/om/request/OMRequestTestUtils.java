@@ -374,7 +374,10 @@ public final class OMRequestTestUtils {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(version, new ArrayList<>())))
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(version)
+                .setListLocations(new ArrayList<>())
+                .build()))
         .setCreationTime(creationTime)
         .setModificationTime(Time.now())
         .setDataSize(1000L)
@@ -977,7 +980,10 @@ public final class OMRequestTestUtils {
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(version, new ArrayList<>())))
+                new OmKeyLocationInfoGroup.Builder()
+                    .setVersion(version)
+                    .setListLocations(new ArrayList<>())
+                    .build()))
             .setCreationTime(creationTime)
             .setModificationTime(Time.now())
             .setDataSize(1000L)

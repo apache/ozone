@@ -724,7 +724,10 @@ public final class OMFileRequest {
     builder.setReplicationConfig(RatisReplicationConfig
         .getInstance(HddsProtos.ReplicationFactor.ONE));
     builder.setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())));
+        new OmKeyLocationInfoGroup.Builder()
+            .setVersion(0)
+            .setListLocations(new ArrayList<>())
+            .build()));
     return builder.build();
   }
 

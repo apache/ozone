@@ -1078,7 +1078,10 @@ public class RpcClient implements ClientProtocol {
         List<OmKeyLocationInfo> keyLocationInfoList = new ArrayList<>();
         keyLocationInfoList.add(keyLocationInfo);
         OmKeyLocationInfoGroup keyLocationInfoGroup
-            = new OmKeyLocationInfoGroup(0, keyLocationInfoList);
+            = new OmKeyLocationInfoGroup.Builder()
+            .setVersion(0)
+            .setListLocations(keyLocationInfoList)
+            .build();
         List<OmKeyLocationInfoGroup> keyLocationInfoGroups = new ArrayList<>();
         keyLocationInfoGroups.add(keyLocationInfoGroup);
 

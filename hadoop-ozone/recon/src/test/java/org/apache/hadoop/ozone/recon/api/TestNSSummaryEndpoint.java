@@ -66,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
 
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
@@ -578,7 +579,10 @@ public class TestNSSummaryEndpoint {
     locationInfoList.add(location3);
 
     OmKeyLocationInfoGroup locationInfoGroup =
-            new OmKeyLocationInfoGroup(0L, locationInfoList);
+        new OmKeyLocationInfoGroup.Builder()
+            .setVersion(0L)
+            .setListLocations(locationInfoList)
+            .build();
 
     // add the multi-block key to Recon's OM
     writeKeyToOm(reconOMMetadataManager,

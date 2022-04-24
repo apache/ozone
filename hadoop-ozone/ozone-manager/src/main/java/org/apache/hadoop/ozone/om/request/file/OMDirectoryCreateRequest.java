@@ -368,7 +368,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             .setBucketName(keyArgs.getBucketName())
             .setKeyName(dirName)
             .setOmKeyLocationInfos(Collections.singletonList(
-                new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+                new OmKeyLocationInfoGroup.Builder()
+                    .setVersion(0)
+                    .setListLocations(new ArrayList<>())
+                    .build()))
             .setCreationTime(keyArgs.getModificationTime())
             .setModificationTime(keyArgs.getModificationTime())
             .setDataSize(0);

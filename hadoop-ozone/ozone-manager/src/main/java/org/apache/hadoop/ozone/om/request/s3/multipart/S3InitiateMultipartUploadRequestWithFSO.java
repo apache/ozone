@@ -179,7 +179,10 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setModificationTime(keyArgs.getModificationTime())
           .setReplicationConfig(replicationConfig)
           .setOmKeyLocationInfos(Collections.singletonList(
-              new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+              new OmKeyLocationInfoGroup.Builder()
+                  .setVersion(0)
+                  .setListLocations(new ArrayList<>())
+                  .build()))
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)

@@ -409,8 +409,10 @@ public class TestKeyManagerUnit {
         .setBucketName("bucketOne")
         .setKeyName("keyOne")
         .setOmKeyLocationInfos(singletonList(
-            new OmKeyLocationInfoGroup(0,
-                singletonList(keyLocationInfo))))
+            new OmKeyLocationInfoGroup.Builder()
+                .setVersion(0)
+                .setListLocations(singletonList(keyLocationInfo))
+                .build()))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(256000)
@@ -483,7 +485,10 @@ public class TestKeyManagerUnit {
           .setBucketName(bucket)
           .setCreationTime(Time.now())
           .setOmKeyLocationInfos(singletonList(
-              new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+              new OmKeyLocationInfoGroup.Builder()
+                  .setVersion(0)
+                  .setListLocations(new ArrayList<>())
+                  .build()))
           .setReplicationConfig(RatisReplicationConfig
               .getInstance(ReplicationFactor.THREE))
           .setKeyName(keyPrefix + i)
@@ -545,10 +550,17 @@ public class TestKeyManagerUnit {
 
         OmKeyInfo keyInfo = new OmKeyInfo.Builder()
             .setOmKeyLocationInfos(Arrays.asList(
-                new OmKeyLocationInfoGroup(0, emptyList()),
-                new OmKeyLocationInfoGroup(1, singletonList(keyLocationInfo))))
+                new OmKeyLocationInfoGroup.Builder()
+                    .setVersion(0)
+                    .setListLocations(emptyList())
+                    .build(),
+                new OmKeyLocationInfoGroup.Builder()
+                    .setVersion(1)
+                    .setListLocations(singletonList(keyLocationInfo))
+                    .build()))
             .build();
         keyInfos[ki++] = keyInfo;
+
       }
     }
 
