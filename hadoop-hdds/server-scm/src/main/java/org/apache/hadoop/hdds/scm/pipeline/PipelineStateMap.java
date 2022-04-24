@@ -53,6 +53,7 @@ class PipelineStateMap {
   private final Map<PipelineID, Pipeline> pipelineMap;
   private final Map<PipelineID, NavigableSet<ContainerID>> pipeline2container;
   private final Map<ReplicationConfig, List<Pipeline>> query2OpenPipelines;
+  private final Map<ReplicationConfig, Long> replicationConfigMap;
 
   PipelineStateMap() {
 
@@ -60,7 +61,7 @@ class PipelineStateMap {
     pipelineMap = new ConcurrentHashMap<>();
     pipeline2container = new ConcurrentHashMap<>();
     query2OpenPipelines = new HashMap<>();
-
+    replicationConfigMap = new ConcurrentHashMap<>();
   }
 
   /**
@@ -88,6 +89,8 @@ class PipelineStateMap {
       query2OpenPipelines.computeIfAbsent(pipeline.getReplicationConfig(),
           any -> new CopyOnWriteArrayList<>()).add(pipeline);
     }
+    replicationConfigMap.compute(pipeline.getReplicationConfig(),
+        (repConfig, count) -> count == null ? 1 : count + 1);
   }
 
   /**
@@ -356,6 +359,8 @@ class PipelineStateMap {
 
     pipelineMap.remove(pipelineID);
     pipeline2container.remove(pipelineID);
+    replicationConfigMap.computeIfPresent(pipeline.getReplicationConfig(),
+        (repConfig, count) -> count == 1 ? null : count - 1);
     return pipeline;
   }
 
@@ -426,4 +431,7 @@ class PipelineStateMap {
     return updatedPipeline;
   }
 
+  public Set<ReplicationConfig> getAllReplicationConfigs() {
+    return replicationConfigMap.keySet();
+  }
 }

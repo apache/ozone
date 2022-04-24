@@ -57,12 +57,14 @@ public class TestPipelineStateMap {
     p = MockPipeline.createPipeline(1);
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
+    assertEquals(1, map.getAllReplicationConfigs().size());
 
     // Ratis pipeline
     map.addPipeline(MockPipeline.createRatisPipeline());
     p = MockPipeline.createRatisPipeline();
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
+    assertEquals(2, map.getAllReplicationConfigs().size());
 
     // EC Pipelines
     map.addPipeline(MockPipeline.createEcPipeline(
@@ -72,6 +74,7 @@ public class TestPipelineStateMap {
     p = MockPipeline.createEcPipeline(new ECReplicationConfig(3, 2));
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
+    assertEquals(3, map.getAllReplicationConfigs().size());
 
     assertEquals(2, map.getPipelineCount(
         StandaloneReplicationConfig.getInstance(ONE),
@@ -93,6 +96,12 @@ public class TestPipelineStateMap {
         Pipeline.PipelineState.CLOSED));
     assertEquals(1, map.getPipelineCount(new ECReplicationConfig(3, 2),
         Pipeline.PipelineState.CLOSED));
+
+    for (Pipeline pipeline : map.getPipelines(new ECReplicationConfig(3, 2))) {
+      map.updatePipelineState(pipeline.getId(), Pipeline.PipelineState.CLOSED);
+      map.removePipeline(pipeline.getId());
+    }
+    assertEquals(2, map.getAllReplicationConfigs().size());
   }
 
 

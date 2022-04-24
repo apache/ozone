@@ -37,6 +37,7 @@ import java.lang.reflect.Proxy;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -330,6 +331,11 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     } finally {
       lock.writeLock().unlock();
     }
+  }
+
+  @Override
+  public Set<ReplicationConfig> getAllReplicationConfigs() {
+    return pipelineStateMap.getAllReplicationConfigs();
   }
 
   // legacy interfaces end

@@ -193,4 +193,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Release write lock.
    */
   void releaseWriteLock();
+
+  Set<ReplicationConfig> getAllReplicationConfigs();
 }

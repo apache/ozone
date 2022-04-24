@@ -76,6 +76,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
   private BackgroundPipelineCreator backgroundPipelineCreator;
+  private BackgroundPipelineScrubber backgroundPipelineScrubber;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -144,7 +145,12 @@ public class PipelineManagerImpl implements PipelineManager {
         new BackgroundPipelineCreator(
             pipelineManager, conf, serviceManager, scmContext);
 
+    BackgroundPipelineScrubber backgroundPipelineScrubber =
+        new BackgroundPipelineScrubber(
+            pipelineManager, conf, serviceManager, scmContext);
+
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
+    pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
 
     return pipelineManager;
   }
@@ -437,7 +443,6 @@ public class PipelineManagerImpl implements PipelineManager {
         removePipeline(p);
       }
     }
-    return;
   }
 
   /**
@@ -591,6 +596,9 @@ public class PipelineManagerImpl implements PipelineManager {
     if (backgroundPipelineCreator != null) {
       backgroundPipelineCreator.stop();
     }
+    if (backgroundPipelineScrubber != null) {
+      backgroundPipelineScrubber.stop();
+    }
 
     if (pmInfoBean != null) {
       MBeans.unregister(this.pmInfoBean);
@@ -637,6 +645,16 @@ public class PipelineManagerImpl implements PipelineManager {
   @VisibleForTesting
   public BackgroundPipelineCreator getBackgroundPipelineCreator() {
     return this.backgroundPipelineCreator;
+  }
+
+  private void setBackgroundPipelineScrubber(
+      BackgroundPipelineScrubber backgroundPipelineScrubber) {
+    this.backgroundPipelineScrubber = backgroundPipelineScrubber;
+  }
+
+  @VisibleForTesting
+  public BackgroundPipelineScrubber getBackgroundPipelineScrubber() {
+    return this.backgroundPipelineScrubber;
   }
 
   @VisibleForTesting
@@ -701,5 +719,10 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void releaseWriteLock() {
     lock.writeLock().unlock();
+  }
+
+  @Override
+  public Set<ReplicationConfig> getAllReplicationConfigs() {
+    return stateManager.getAllReplicationConfigs();
   }
 }

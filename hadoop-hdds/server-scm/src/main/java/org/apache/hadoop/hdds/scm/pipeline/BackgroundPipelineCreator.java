@@ -223,13 +223,6 @@ public class BackgroundPipelineCreator implements SCMService {
         continue;
       }
       list.add(replicationConfig);
-      if (!pipelineManager.getSafeModeStatus()) {
-        try {
-          pipelineManager.scrubPipeline(replicationConfig);
-        } catch (IOException e) {
-          LOG.error("Error while scrubbing pipelines.", e);
-        }
-      }
     }
 
     LoopingIterator it = new LoopingIterator(list);
