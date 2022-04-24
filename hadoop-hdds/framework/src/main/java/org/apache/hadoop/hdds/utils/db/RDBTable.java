@@ -275,7 +275,7 @@ class RDBTable implements Table<byte[], byte[]> {
         prev = it.isValid() ? it.key() : null;
         it.seek(startKey);
       }
-      result = new ArrayList<>(count);
+      result = new ArrayList<>();
       while (it.isValid() && result.size() < count) {
         final byte[] currentKey = it.key();
         final byte[] currentValue = it.value();
