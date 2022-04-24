@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -114,7 +113,7 @@ public class TestContainerKeyMapperTask {
         OmKeyLocationInfoGroup.Builder()
         .setVersion(0)
         .setListLocations(omKeyLocationInfoList)
-        .build();;
+        .build();
 
     writeDataToOm(reconOMMetadataManager,
         "key_one",

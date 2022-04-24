@@ -223,7 +223,8 @@ public class TestContainerEndpoint {
         pipeline);
     omKeyLocationInfoList2.add(omKeyLocationInfo6);
 
-    OmKeyLocationInfoGroup omKeyLocationInfoGroup2 = new OmKeyLocationInfoGroup.Builder()
+    OmKeyLocationInfoGroup omKeyLocationInfoGroup2 =
+        new OmKeyLocationInfoGroup.Builder()
         .setVersion(0)
         .setListLocations(omKeyLocationInfoList2)
         .build();

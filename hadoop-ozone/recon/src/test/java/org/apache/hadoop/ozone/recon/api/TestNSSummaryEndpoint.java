@@ -66,7 +66,6 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
 
-import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
