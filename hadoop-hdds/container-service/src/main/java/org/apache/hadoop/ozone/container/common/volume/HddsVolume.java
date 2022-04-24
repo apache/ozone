@@ -221,8 +221,7 @@ public class HddsVolume extends StorageVolume {
    * Use the HddsVolume directly if no DbVolume found.
    * @param dbVolumeSet
    */
-  public void createDbStore(MutableVolumeSet dbVolumeSet)
-      throws IOException {
+  public void createDbStore(MutableVolumeSet dbVolumeSet) throws IOException {
     DbVolume chosenDbVolume = null;
     File clusterIdDir;
 
