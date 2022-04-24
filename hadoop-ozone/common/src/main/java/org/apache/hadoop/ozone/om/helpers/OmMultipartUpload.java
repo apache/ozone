@@ -147,7 +147,7 @@ public class OmMultipartUpload {
     }
 
     public Builder setUploadID(String uploadid) {
-      this.uploadId = uploadId;
+      this.uploadId = uploadid;
       return this;
     }
 
