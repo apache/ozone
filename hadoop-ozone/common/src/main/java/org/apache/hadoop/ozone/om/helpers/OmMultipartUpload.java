@@ -103,6 +103,14 @@ public class OmMultipartUpload {
     return creationTime;
   }
 
+  public void setCreationTime(Instant creationTime) {
+    this.creationTime = creationTime;
+  }
+
+  public void setReplicationConfig(ReplicationConfig replicationConfig) {
+    this.replicationConfig = replicationConfig;
+  }
+
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
   }
