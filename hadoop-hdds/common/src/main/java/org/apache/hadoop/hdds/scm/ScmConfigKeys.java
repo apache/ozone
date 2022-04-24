@@ -406,7 +406,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
       "ozone.scm.pipeline.scrub.interval";
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
-      "120s";
+      "5m";
 
 
   // Allow SCM to auto create factor ONE ratis pipeline.
