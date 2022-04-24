@@ -317,27 +317,23 @@ public class BlockManagerImpl implements BlockManager {
   public List<BlockData> listBlock(Container container, long startLocalID, int
       count) throws IOException {
     Preconditions.checkNotNull(container, "container cannot be null");
-    Preconditions.checkState(startLocalID >= 0 || startLocalID == -1,
+    Preconditions.checkState(startLocalID >= 0,
         "startLocal ID cannot be negative");
     Preconditions.checkArgument(count > 0,
         "Count must be a positive number.");
     container.readLock();
-    try {
-      List<BlockData> result = null;
-      KeyValueContainerData cData =
-          (KeyValueContainerData) container.getContainerData();
-      try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
-        result = new ArrayList<>();
-        List<? extends Table.KeyValue<String, BlockData>> range =
-            db.getStore().getBlockDataTable()
-                .getSequentialRangeKVs(startLocalID == -1 ? null :
-                        Long.toString(startLocalID), count,
-                    MetadataKeyFilters.getUnprefixedKeyFilter());
-        for (Table.KeyValue<String, BlockData> entry : range) {
-          result.add(entry.getValue());
-        }
-        return result;
+    KeyValueContainerData cData =
+        (KeyValueContainerData) container.getContainerData();
+    try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
+      List<? extends Table.KeyValue<String, BlockData>> range =
+          db.getStore().getBlockDataTable().getSequentialRangeKVs(
+              startLocalID == 0 ? null : Long.toString(startLocalID),
+              count, MetadataKeyFilters.getUnprefixedKeyFilter());
+      List<BlockData> result = new ArrayList<>(range.size());
+      for (Table.KeyValue<String, BlockData> entry : range) {
+        result.add(entry.getValue());
       }
+      return result;
     } finally {
       container.readUnlock();
     }

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
@@ -566,15 +567,12 @@ public class KeyValueHandler extends Handler {
 
     List<ContainerProtos.BlockData> returnData = new ArrayList<>();
     try {
-      int count = request.getListBlock().getCount();
-      long startLocalId = -1;
-      if (request.getListBlock().hasStartLocalID()) {
-        startLocalId = request.getListBlock().getStartLocalID();
-      }
-      List<BlockData> responseData =
-          blockManager.listBlock(kvContainer, startLocalId, count);
-      for (int i = 0; i < responseData.size(); i++) {
-        returnData.add(responseData.get(i).getProtoBufMessage());
+      final ListBlockRequestProto proto = request.getListBlock();
+      List<BlockData> responseData = blockManager.listBlock(kvContainer,
+          proto.hasStartLocalID() ? proto.getStartLocalID() : 0,
+          proto.getCount());
+      for (BlockData blockData : responseData) {
+        returnData.add(blockData.getProtoBufMessage());
       }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
