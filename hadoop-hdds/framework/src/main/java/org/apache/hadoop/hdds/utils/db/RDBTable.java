@@ -21,10 +21,12 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.StringUtils;
 
@@ -240,65 +242,56 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
       int count, MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
+      throws IllegalArgumentException {
     return getRangeKVs(startKey, count, false, filters);
   }
 
   @Override
   public List<ByteArrayKeyValue> getSequentialRangeKVs(byte[] startKey,
       int count, MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
+      throws IllegalArgumentException {
     return getRangeKVs(startKey, count, true, filters);
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
       int count, boolean sequential,
       MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
-    List<ByteArrayKeyValue> result = new ArrayList<>();
+      throws IllegalArgumentException {
+    List<ByteArrayKeyValue> result = Collections.emptyList();
     long start = System.currentTimeMillis();
-    if (count < 0) {
-      throw new IllegalArgumentException(
-            "Invalid count given " + count + ", count must be greater than 0");
-    }
+    Preconditions.checkArgument(count >= 0,
+        "Invalid count given " + count + ", count must be greater than 0");
     try (RocksIterator it = db.newIterator(handle)) {
+      byte[] prev = null;
       if (startKey == null) {
         it.seekToFirst();
       } else {
-        if (get(startKey) == null) {
+        it.seek(startKey);
+        if (!(it.isValid() && Arrays.equals(it.key(), startKey))) {
           // Key not found, return empty list
           return result;
         }
+        it.prev();
+        prev = it.isValid() ? it.key() : null;
         it.seek(startKey);
       }
+      result = new ArrayList<>(count);
       while (it.isValid() && result.size() < count) {
-        byte[] currentKey = it.key();
-        byte[] currentValue = it.value();
-
-        it.prev();
-        final byte[] prevKey = it.isValid() ? it.key() : null;
-
-        it.seek(currentKey);
+        final byte[] currentKey = it.key();
+        final byte[] currentValue = it.value();
+        final byte[] prevKey = prev;
+        prev = currentKey;
         it.next();
         final byte[] nextKey = it.isValid() ? it.key() : null;
 
-        if (filters == null) {
-          result.add(ByteArrayKeyValue
-                  .create(currentKey, currentValue));
-        } else {
-          if (Arrays.stream(filters)
-                  .allMatch(entry -> entry.filterKey(prevKey,
-                          currentKey, nextKey))) {
-            result.add(ByteArrayKeyValue
-                    .create(currentKey, currentValue));
-          } else {
-            if (result.size() > 0 && sequential) {
-              // if the caller asks for a sequential range of results,
-              // and we met a dis-match, abort iteration from here.
-              // if result is empty, we continue to look for the first match.
-              break;
-            }
-          }
+        if (filters == null || Arrays.stream(filters).allMatch(
+            entry -> entry.filterKey(prevKey, currentKey, nextKey))) {
+          result.add(ByteArrayKeyValue.create(currentKey, currentValue));
+        } else if (result.size() > 0 && sequential) {
+          // if the caller asks for a sequential range of results,
+          // and we met a dis-match, abort iteration from here.
+          // if result is empty, we continue to look for the first match.
+          break;
         }
       }
     } finally {
