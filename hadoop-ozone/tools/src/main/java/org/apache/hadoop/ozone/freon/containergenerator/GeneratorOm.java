@@ -226,7 +226,11 @@ public class GeneratorOm extends BaseGenerator implements
         .setOffset(0)
         .build());
 
-    OmKeyLocationInfoGroup infoGroup = new OmKeyLocationInfoGroup(0, omkl);
+    OmKeyLocationInfoGroup infoGroup =
+        new OmKeyLocationInfoGroup.Builder()
+            .setVersion(0)
+            .setListLocations(omkl)
+            .build();
 
     long l4n = l % 1_000;
     long l3n = l / 1_000 % 1_000;
