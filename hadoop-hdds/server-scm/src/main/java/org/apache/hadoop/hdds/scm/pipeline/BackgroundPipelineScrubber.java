@@ -134,15 +134,15 @@ public class BackgroundPipelineScrubber implements SCMService {
 
   @Override
   public void stop() {
-    if (!running.compareAndSet(true, false)) {
-      LOG.info("Pipeline Scrubber Service is not running, skip stop.");
-      return;
+    synchronized (this) {
+      if (!running.compareAndSet(true, false)) {
+        LOG.info("Pipeline Scrubber Service is not running, skip stop.");
+        return;
+      }
+      notifyAll();
     }
     LOG.info("Stopping Pipeline Scrubber Service.");
 
-    synchronized (this) {
-      notifyAll();
-    }
     try {
       scrubThread.join();
       scrubThread = null;
