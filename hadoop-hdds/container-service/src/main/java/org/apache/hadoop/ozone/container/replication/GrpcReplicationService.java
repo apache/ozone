@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,8 +44,12 @@ public class GrpcReplicationService extends
 
   private final ContainerReplicationSource source;
 
-  public GrpcReplicationService(ContainerReplicationSource source) {
+  private final HddsDispatcher dispatcher;
+
+  public GrpcReplicationService(ContainerReplicationSource source,
+      HddsDispatcher dispatcher) {
     this.source = source;
+    this.dispatcher = dispatcher;
   }
 
   @Override
@@ -58,6 +65,13 @@ public class GrpcReplicationService extends
       LOG.error("Error streaming container {}", containerID, e);
       responseObserver.onError(e);
     }
+  }
+
+  @Override
+  public void send(ContainerCommandRequestProto request,
+      StreamObserver<ContainerCommandResponseProto> observer) {
+    observer.onNext(dispatcher.dispatch(request, null));
+    observer.onCompleted();
   }
 
 }

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import org.apache.ratis.thirdparty.io.grpc.Server;
@@ -59,17 +60,21 @@ public class ReplicationServer {
 
   private ContainerController controller;
 
+  private final HddsDispatcher dispatcher;
+
   private int port;
 
   public ReplicationServer(
       ContainerController controller,
       ReplicationConfig replicationConfig,
       SecurityConfig secConf,
-      CertificateClient caClient
+      CertificateClient caClient,
+      HddsDispatcher dispatcher
   ) {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
+    this.dispatcher = dispatcher;
     this.port = replicationConfig.getPort();
     init();
   }
@@ -77,9 +82,11 @@ public class ReplicationServer {
   public void init() {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .addService(ServerInterceptors.intercept(new GrpcReplicationService(
-            new OnDemandContainerReplicationSource(controller)
-        ), new GrpcServerInterceptor()));
+        .addService(ServerInterceptors.intercept(
+            new GrpcReplicationService(
+                new OnDemandContainerReplicationSource(controller),
+                dispatcher),
+            new GrpcServerInterceptor()));
 
     if (secConf.isSecurityEnabled()) {
       try {
