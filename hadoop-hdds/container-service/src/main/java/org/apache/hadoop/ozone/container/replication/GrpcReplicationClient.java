@@ -24,11 +24,19 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -108,6 +116,34 @@ public class GrpcReplicationClient implements AutoCloseable {
         new StreamDownloader(containerId, response, destinationPath));
 
     return response;
+  }
+
+  public CompletableFuture<List<BlockData>> listBlock(
+      long containerId, String datanodeUUID, long start, int count) {
+
+    ListBlockRequestProto request =
+        ListBlockRequestProto.newBuilder()
+            .setStartLocalID(start)
+            .setCount(count)
+            .build();
+
+    ContainerCommandRequestProto command =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.ListBlock)
+            .setContainerID(containerId)
+            .setDatanodeUuid(datanodeUUID)
+            .setListBlock(request)
+            .build();
+
+    CompletableFuture<List<ContainerCommandResponseProto>> future =
+        new CompletableFuture<>();
+
+    client.send(command, new ContainerCommandObserver(containerId, future));
+
+    return future.thenApply(responses -> responses.stream()
+        .filter(r -> r.getCmdType() == Type.ListBlock)
+        .flatMap(r -> r.getListBlock().getBlockDataList().stream())
+        .collect(Collectors.toList()));
   }
 
   private Path getWorkingDirectory() {
@@ -213,5 +249,40 @@ public class GrpcReplicationClient implements AutoCloseable {
             outputPath, containerId, ex);
       }
     }
+  }
+
+  /**
+   * gRPC stream observer to CompletableFuture adapter.
+   */
+  public static class ContainerCommandObserver
+      implements StreamObserver<ContainerCommandResponseProto> {
+
+    private final List<ContainerCommandResponseProto> result;
+    private final CompletableFuture<List<ContainerCommandResponseProto>> future;
+    private final long containerId;
+
+    public ContainerCommandObserver(long containerId,
+        CompletableFuture<List<ContainerCommandResponseProto>> future) {
+      this.future = future;
+      this.containerId = containerId;
+      this.result = new ArrayList<>();
+    }
+
+    @Override
+    public void onNext(ContainerCommandResponseProto response) {
+      result.add(response);
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+      LOG.error("Command to container {} failed", containerId, throwable);
+      future.completeExceptionally(throwable);
+    }
+
+    @Override
+    public void onCompleted() {
+      future.complete(result);
+    }
+
   }
 }
