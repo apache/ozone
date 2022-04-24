@@ -112,7 +112,10 @@ public class TestKeyInputStreamEC {
         .setDataSize(blockLength)
         .setKeyName("someKey")
         .setReplicationConfig(repConf)
-        .addOmKeyLocationInfoGroup(new OmKeyLocationInfoGroup(0, locations))
+        .addOmKeyLocationInfoGroup(new OmKeyLocationInfoGroup.Builder()
+            .setVersion(0)
+            .setListLocations(locations)
+            .build())
         .build();
   }
 }

@@ -368,7 +368,10 @@ public class TestReconWithOzoneManager {
           pipeline);
       omKeyLocationInfoList.add(omKeyLocationInfo1);
       OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
-          OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+          OmKeyLocationInfoGroup.Builder()
+          .setVersion(0)
+          .setListLocations(omKeyLocationInfoList)
+          .build();
       writeDataToOm("key" + i, "bucket" + i, "vol" + i,
           Collections.singletonList(omKeyLocationInfoGroup));
     }
