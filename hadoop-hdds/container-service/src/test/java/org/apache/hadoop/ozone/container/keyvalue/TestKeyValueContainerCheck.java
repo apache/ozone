@@ -71,7 +71,7 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID);
+            containerID, containerData.getVolume());
 
     // first run checks on a Open Container
     boolean valid = kvCheck.fastCheck();
@@ -106,11 +106,10 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID);
+            containerID, containerData.getVolume());
 
-    File metaDir = new File(containerData.getMetadataPath());
     File dbFile = KeyValueContainerLocationUtil
-        .getContainerDBFile(metaDir, containerID);
+        .getContainerDBFile(containerData);
     containerData.setDbFile(dbFile);
     try (DBHandle ignored = BlockUtils.getDB(containerData, conf);
         BlockIterator<BlockData> kvIter =

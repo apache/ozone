@@ -375,6 +375,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void deleteAllWithPrefix(BatchOperation batch, KEY prefix)
+      throws IOException {
+    rawTable.deleteAllWithPrefix(batch, codecRegistry.asRawData(prefix));
+  }
+
+  @Override
   public void cleanupCache(List<Long> epochs) {
     cache.cleanup(epochs);
   }

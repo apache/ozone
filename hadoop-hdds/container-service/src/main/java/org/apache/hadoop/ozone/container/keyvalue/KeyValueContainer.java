@@ -137,10 +137,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
           maxSize);
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+      // Set volume before getContainerDBFile(), because we may need the
+      // volume to deduce the db file.
+      containerData.setVolume(containerVolume);
 
       long containerID = containerData.getContainerID();
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
+      // Set schemaVersion before the dbFile since we have to
+      // choose the dbFile location based on schema version.
+      String schemaVersion = VersionedDatanodeFeatures.SchemaV3
+          .chooseSchemaVersion(config);
+      containerData.setSchemaVersion(schemaVersion);
 
       containerMetaDataPath = KeyValueContainerLocationUtil
           .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
@@ -155,8 +163,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       //Create Metadata path chunks path and metadata db
       File dbFile = getContainerDBFile();
 
-      containerData.setSchemaVersion(
-          VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
       KeyValueContainerUtil.createContainerMetaData(
               containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);
@@ -164,7 +170,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       //Set containerData for the KeyValueContainer.
       containerData.setChunksPath(chunksPath.getPath());
       containerData.setDbFile(dbFile);
-      containerData.setVolume(containerVolume);
 
       // Create .container file
       File containerFile = getContainerFile();
@@ -202,26 +207,24 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    *
    * @param clusterId
    * @param containerVolume
-   * @param hddsVolumeDir
    */
   public void populatePathFields(String clusterId,
-      HddsVolume containerVolume, String hddsVolumeDir) {
+      HddsVolume containerVolume) {
 
     long containerId = containerData.getContainerID();
+    String hddsVolumeDir = containerVolume.getHddsRootDir().getAbsolutePath();
 
     File containerMetaDataPath = KeyValueContainerLocationUtil
         .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerId);
 
     File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
         hddsVolumeDir, clusterId, containerId);
-    File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
-        containerMetaDataPath, containerId);
 
     //Set containerData for the KeyValueContainer.
     containerData.setMetadataPath(containerMetaDataPath.getPath());
     containerData.setChunksPath(chunksPath.getPath());
-    containerData.setDbFile(dbFile);
     containerData.setVolume(containerVolume);
+    containerData.setDbFile(getContainerDBFile());
   }
 
   /**
@@ -331,35 +334,19 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void quasiClose() throws StorageContainerException {
-    // The DB must be synced during close operation
-    flushAndSyncDB();
-
-    writeLock();
-    try {
-      // Second sync should be a very light operation as sync has already
-      // been done outside the lock.
-      flushAndSyncDB();
-      updateContainerData(containerData::quasiCloseContainer);
-      clearPendingPutBlockCache();
-    } finally {
-      writeUnlock();
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      closeWithoutFlush(containerData::quasiCloseContainer);
+    } else {
+      closeWithFlush(containerData::quasiCloseContainer);
     }
   }
 
   @Override
   public void close() throws StorageContainerException {
-    // The DB must be synced during close operation
-    flushAndSyncDB();
-
-    writeLock();
-    try {
-      // Second sync should be a very light operation as sync has already
-      // been done outside the lock.
-      flushAndSyncDB();
-      updateContainerData(containerData::closeContainer);
-      clearPendingPutBlockCache();
-    } finally {
-      writeUnlock();
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      closeWithoutFlush(containerData::closeContainer);
+    } else {
+      closeWithFlush(containerData::closeContainer);
     }
     LOG.info("Container {} is closed with bcsId {}.",
         containerData.getContainerID(),
@@ -372,6 +359,45 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeLock();
     try {
       updateContainerData(() -> containerData.updateDataScanTime(time));
+    } finally {
+      writeUnlock();
+    }
+  }
+
+  /**
+   * For db-per-container schemas, we need to do flush and sync on close.
+   * @param closer
+   * @throws StorageContainerException
+   */
+  private void closeWithFlush(Runnable closer)
+      throws StorageContainerException {
+    // The DB must be synced during close operation
+    flushAndSyncDB();
+
+    writeLock();
+    try {
+      // Second sync should be a very light operation as sync has already
+      // been done outside the lock.
+      flushAndSyncDB();
+      updateContainerData(closer);
+      clearPendingPutBlockCache();
+    } finally {
+      writeUnlock();
+    }
+  }
+
+  /**
+   * For db-per-volume schemas, we don't flush and sync the whole db
+   * on closing of a single container.
+   * @param closer
+   * @throws StorageContainerException
+   */
+  private void closeWithoutFlush(Runnable closer)
+      throws StorageContainerException {
+    writeLock();
+    try {
+      updateContainerData(closer);
+      clearPendingPutBlockCache();
     } finally {
       writeUnlock();
     }
@@ -800,8 +826,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * @return
    */
   public File getContainerDBFile() {
-    return new File(containerData.getMetadataPath(), containerData
-        .getContainerID() + OzoneConsts.DN_CONTAINER_DB);
+    return KeyValueContainerLocationUtil.getContainerDBFile(containerData);
   }
 
   @Override
@@ -809,7 +834,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId);
+            containerId, containerData.getVolume());
     return checker.fastCheck();
   }
 
@@ -830,7 +855,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId);
+            containerId, containerData.getVolume());
 
     return checker.fullCheck(throttler, canceler);
   }

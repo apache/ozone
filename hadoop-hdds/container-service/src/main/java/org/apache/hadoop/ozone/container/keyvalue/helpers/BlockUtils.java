@@ -237,4 +237,21 @@ public final class BlockUtils {
               + containerBCSId + ".", UNKNOWN_BCSID);
     }
   }
+
+  /**
+   * Remove container KV metadata from per-disk db store.
+   * @param containerData
+   * @param conf
+   * @throws IOException
+   */
+  public static void dropAllFromDB(KeyValueContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    try (DBHandle db = getDB(containerData, conf)) {
+      Preconditions.checkState(db.getStore()
+          instanceof DatanodeStoreSchemaThreeImpl);
+
+      ((DatanodeStoreSchemaThreeImpl) db.getStore()).dropAllWithPrefix(
+          containerData.getContainerID());
+    }
+  }
 }
