@@ -668,7 +668,10 @@ public class TestContainerBalancer {
     Assert.assertEquals(ContainerBalancer.IterationResult.ITERATION_COMPLETED,
         containerBalancer.getIterationResult());
     Assert.assertEquals(1,
-        containerBalancer.getMetrics().getNumContainerMovesInLatestIteration());
+        containerBalancer.getMetrics()
+            .getNumContainerMovesCompletedInLatestIteration());
+    Assert.assertTrue(containerBalancer.getMetrics()
+            .getNumContainerMovesTimeoutInLatestIteration() > 1);
     containerBalancer.stop();
 
   }

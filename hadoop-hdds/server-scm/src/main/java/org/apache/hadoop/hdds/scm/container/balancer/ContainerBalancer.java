@@ -480,19 +480,19 @@ public class ContainerBalancer implements SCMService {
             entry.getValue().cancel(true);
           }).count();
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
-      metrics.incrementNumTimeoutContainerMovesInLatestIteration(timeoutCounts);
+      metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
     } catch (ExecutionException e) {
-      e.printStackTrace();
+      LOG.error("Got exception while checkIterationMoveResults", e);
     }
 
     countDatanodesInvolvedPerIteration =
         sourceToTargetMap.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
-    metrics.incrementNumContainerMoves(
-        metrics.getNumContainerMovesInLatestIteration());
-    metrics.incrementNumTimeoutContainerMoves(
-        metrics.getNumTimeoutContainerMovesInLatestIteration());
+    metrics.incrementNumContainerMovesCompleted(
+        metrics.getNumContainerMovesCompletedInLatestIteration());
+    metrics.incrementNumContainerMovesTimeout(
+        metrics.getNumContainerMovesTimeoutInLatestIteration());
     metrics.incrementDataSizeMovedGB(
         metrics.getDataSizeMovedGBInLatestIteration());
     LOG.info("Number of datanodes involved in this iteration: {}. Size moved " +
@@ -594,7 +594,7 @@ public class ContainerBalancer implements SCMService {
           .whenComplete((result, ex) -> {
             if (ex != null) {
               LOG.info("Container move for container {} from source {} to " +
-                      "target {} failed with exceptions",
+                      "target {} failed with exceptions {}",
                   containerID.toString(),
                   source.getUuidString(),
                   moveSelection.getTargetNode().getUuidString(), ex);
@@ -602,13 +602,15 @@ public class ContainerBalancer implements SCMService {
               if (result == ReplicationManager.MoveResult.COMPLETED) {
                 metrics.incrementDataSizeMovedGBInLatestIteration(
                     containerInfo.getUsedBytes() / OzoneConsts.GB);
-                metrics.incrementNumContainerMovesInLatestIteration(1);
-                LOG.info(
-                    "Container move completed for container {} to target {}",
-                    containerID,
-                    moveSelection.getTargetNode().getUuidString());
+                metrics.incrementNumContainerMovesCompletedInLatestIteration(1);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug(
+                      "Container move completed for container {} to target {}",
+                      containerID,
+                      moveSelection.getTargetNode().getUuidString());
+                }
               } else {
-                LOG.debug(
+                LOG.warn(
                     "Container move for container {} to target {} failed: {}",
                     moveSelection.getContainerID(),
                     moveSelection.getTargetNode().getUuidString(), result);
@@ -623,6 +625,7 @@ public class ContainerBalancer implements SCMService {
       LOG.warn("Container move failed for container {}", containerID, e);
       return false;
     }
+
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
         return false;
@@ -788,8 +791,8 @@ public class ContainerBalancer implements SCMService {
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeMovedPerIteration = 0;
     metrics.resetDataSizeMovedGBInLatestIteration();
-    metrics.resetNumContainerMovesInLatestIteration();
-    metrics.resetNumTimeoutContainerMovesInLatestIteration();
+    metrics.resetNumContainerMovesCompletedInLatestIteration();
+    metrics.resetNumContainerMovesTimeoutInLatestIteration();
     metrics.resetNumDatanodesInvolvedInLatestIteration();
     metrics.resetDataSizeUnbalancedGB();
     metrics.resetNumDatanodesUnbalanced();
