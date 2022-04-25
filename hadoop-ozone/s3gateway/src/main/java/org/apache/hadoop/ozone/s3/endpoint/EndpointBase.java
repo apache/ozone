@@ -23,7 +23,9 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -258,5 +260,21 @@ public abstract class EndpointBase implements Auditor {
 
   public String getClientIpAddress() {
     return context.getHeaderString(CLIENT_IP_HEADER);
+  }
+
+  protected Map<String, String> getAuditParameters() {
+    Map<String, String> res = new HashMap<>();
+    if (context != null) {
+      for (Map.Entry<String, List<String>> entry :
+          context.getUriInfo().getPathParameters().entrySet()) {
+        res.put(entry.getKey(), entry.getValue().toString());
+
+      }
+      for (Map.Entry<String, List<String>> entry :
+          context.getUriInfo().getQueryParameters().entrySet()) {
+        res.put(entry.getKey(), entry.getValue().toString());
+      }
+    }
+    return res;
   }
 }
