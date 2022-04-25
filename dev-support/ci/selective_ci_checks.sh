@@ -40,7 +40,7 @@ declare -a pattern_array ignore_array
 
 matched_files=""
 ignore_array=(
-    "/README.md" # exclude root README
+    "^[^/]*.md" # exclude root docs
 )
 
 function check_for_full_tests_needed_label() {
@@ -437,6 +437,8 @@ function get_count_misc_files() {
         "^hadoop-ozone/dev-support/checks"
         "^hadoop-ozone/dist/src/main/license"
         "\.bats$"
+        "\.txt$"
+        "\.md$"
         "findbugsExcludeFile.xml"
     )
     local ignore_array=(
