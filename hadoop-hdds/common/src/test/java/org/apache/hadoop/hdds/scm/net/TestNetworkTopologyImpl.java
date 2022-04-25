@@ -915,6 +915,21 @@ public class TestNetworkTopologyImpl {
     Assert.assertFalse(n1.isAncestor(n2));
   }
 
+  @Test
+  public void testGetLeafOnLeafParent() {
+    InnerNodeImpl root = new InnerNodeImpl("", "", null, 0, 0);
+    InnerNodeImpl r12 = new InnerNodeImpl("r12", "/", root, 1, 0);
+    InnerNodeImpl dc = new InnerNodeImpl("dc", "/r12", r12, 2, 0);
+    NodeImpl n1 = new NodeImpl("n1", "/r12/dc", dc, 2, 0);
+    dc.add(n1);
+
+    List<String> excludedScope = new ArrayList<>();
+    excludedScope.add("/r1");
+    Assert.assertFalse(n1.isUnderScope("/r1"));
+    Assert.assertEquals(n1, dc.getLeaf(0, excludedScope, null, 0));
+
+  }
+
   private static Node createDatanode(String name, String path) {
     return new NodeImpl(name, path, NetConstants.NODE_COST_DEFAULT);
   }

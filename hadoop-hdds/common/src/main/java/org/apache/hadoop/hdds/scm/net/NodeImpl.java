@@ -197,9 +197,14 @@ public class NodeImpl implements Node {
   @Override
   public boolean isAncestor(Node node) {
     return this.getNetworkFullPath().equals(PATH_SEPARATOR_STR) ||
-        NetUtils.addSuffix(node.getNetworkLocation()).startsWith(
-            NetUtils.addSuffix(this.getNetworkFullPath())) ||
+        node.isUnderScope(this.getNetworkFullPath()) ||
         node.getNetworkFullPath().equalsIgnoreCase(this.getNetworkFullPath());
+  }
+
+  @Override
+  public boolean isUnderScope(String scope) {
+    return NetUtils.addSuffix(this.getNetworkLocation()).startsWith(
+        NetUtils.addSuffix(scope));
   }
 
   @Override

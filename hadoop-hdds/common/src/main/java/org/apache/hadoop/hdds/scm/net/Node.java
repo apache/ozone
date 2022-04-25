@@ -98,4 +98,12 @@ public interface Node {
    * @return true if this node is an ancestor of <i>n</i>
    */
   boolean isAncestor(Node n);
+
+  /**
+   * Judge if this node is under a specific scope.
+   *
+   * @param scope the scope
+   * @return true if this node is under a specific scope
+   */
+  boolean isUnderScope(String scope);
 }
