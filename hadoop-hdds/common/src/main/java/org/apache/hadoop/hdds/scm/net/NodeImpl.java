@@ -231,14 +231,4 @@ public class NodeImpl implements Node {
         this.location + this.name :
         this.location + PATH_SEPARATOR_STR + this.name;
   }
-
-  public static void main(String[] args) {
-    NodeImpl n1 = new NodeImpl("rc", "/", 1);
-    NodeImpl n2 = new NodeImpl("10.128.131.12", "/rc1/dc", 1);
-    System.out.println("n1 full path: " + n1.getNetworkFullPath());
-    System.out.println("n2 full path: " + n2.getNetworkFullPath());
-
-    System.out.println(n2.isAncestor(n1));
-    System.out.println(n1.isAncestor(n2));
-  }
 }
