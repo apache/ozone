@@ -203,7 +203,7 @@ public class NodeImpl implements Node {
 
   @Override
   public boolean isUnderScope(String scope) {
-    return NetUtils.addSuffix(this.getNetworkLocation()).startsWith(
+    return NetUtils.addSuffix(this.getNetworkFullPath()).startsWith(
         NetUtils.addSuffix(scope));
   }
 
