@@ -47,9 +47,8 @@ import static org.junit.Assert.assertFalse;
 public class TestKeyValueContainerCheck
     extends TestKeyValueContainerIntegrityChecks {
 
-  public TestKeyValueContainerCheck(ContainerLayoutTestInfo
-      containerLayoutTestInfo) {
-    super(containerLayoutTestInfo);
+  public TestKeyValueContainerCheck(ContainerTestVersionInfo versionInfo) {
+    super(versionInfo);
   }
 
   /**

@@ -106,19 +106,22 @@ public class TestKeyValueContainer {
   private UUID datanodeId;
 
   private final ContainerLayoutVersion layout;
+  private String schemaVersion;
 
   // Use one configuration object across parameterized runs of tests.
   // This preserves the column family options in the container options
   // cache for testContainersShareColumnFamilyOptions.
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
-  public TestKeyValueContainer(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  public TestKeyValueContainer(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, CONF);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Before
@@ -235,13 +238,13 @@ public class TestKeyValueContainer {
             keyValueContainerData.getLayoutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
     HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
-    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    container.populatePathFields(scmId, containerVolume);
     try (FileInputStream fis = new FileInputStream(folderToExport)) {
       container.importContainerData(fis, packer);
     }
@@ -277,12 +280,12 @@ public class TestKeyValueContainer {
             keyValueContainerData.getLayoutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
     container = new KeyValueContainer(containerData, CONF);
 
     containerVolume = volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    container.populatePathFields(scmId, containerVolume);
     try {
       FileInputStream fis = new FileInputStream(folderToExport);
       fis.close();

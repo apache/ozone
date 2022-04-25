@@ -43,10 +43,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -62,6 +60,7 @@ public class TestKeyValueContainerIntegrityChecks {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
 
+  private final ContainerTestVersionInfo versionInfo;
   private final ContainerLayoutTestInfo containerLayoutTestInfo;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
@@ -72,22 +71,27 @@ public class TestKeyValueContainerIntegrityChecks {
   protected static final int CHUNK_LEN = 3 * UNIT_LEN;
   protected static final int CHUNKS_PER_BLOCK = 4;
 
-  public TestKeyValueContainerIntegrityChecks(ContainerLayoutTestInfo
-      containerLayoutTestInfo) {
-    this.containerLayoutTestInfo = containerLayoutTestInfo;
+  public TestKeyValueContainerIntegrityChecks(
+      ContainerTestVersionInfo versionInfo) {
+    this.versionInfo = versionInfo;
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(
+        versionInfo.getSchemaVersion(), conf);
+    if (versionInfo.getLayout()
+        .equals(ContainerLayoutVersion.FILE_PER_BLOCK)) {
+      containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_BLOCK;
+    } else {
+      containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_CHUNK;
+    }
   }
 
-  @Parameterized.Parameters public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        {ContainerLayoutTestInfo.FILE_PER_CHUNK},
-        {ContainerLayoutTestInfo.FILE_PER_BLOCK}
-    });
+  @Parameterized.Parameters public static Iterable<Object[]> data() {
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Before public void setUp() throws Exception {
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
-    conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     containerLayoutTestInfo.updateConfig(conf);

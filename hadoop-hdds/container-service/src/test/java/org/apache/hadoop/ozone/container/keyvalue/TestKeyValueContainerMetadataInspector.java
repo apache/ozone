@@ -44,9 +44,9 @@ public class TestKeyValueContainerMetadataInspector
     extends TestKeyValueContainerIntegrityChecks {
   private static final long CONTAINER_ID = 102;
 
-  public TestKeyValueContainerMetadataInspector(ContainerLayoutTestInfo
-      containerLayoutTestInfo) {
-    super(containerLayoutTestInfo);
+  public TestKeyValueContainerMetadataInspector(
+      ContainerTestVersionInfo versionInfo) {
+    super(versionInfo);
   }
 
   @Test

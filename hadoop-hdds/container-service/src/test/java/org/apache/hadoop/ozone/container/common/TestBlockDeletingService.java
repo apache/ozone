@@ -33,7 +33,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -60,6 +59,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -76,7 +76,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 
-import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 
 import org.junit.AfterClass;
@@ -89,7 +88,6 @@ import org.junit.runners.Parameterized;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -109,45 +107,22 @@ public class TestBlockDeletingService {
   private static String scmId;
   private static String clusterID;
   private static String datanodeUuid;
-  private static MutableConfigurationSource conf;
+  private static OzoneConfiguration conf;
 
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;
   private int blockLimitPerInterval;
   private static VolumeSet volumeSet;
 
-  public TestBlockDeletingService(LayoutInfo layoutInfo) {
-    this.layout = layoutInfo.layout;
-    this.schemaVersion = layoutInfo.schemaVersion;
+  public TestBlockDeletingService(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return LayoutInfo.layoutList.stream().map(each -> new Object[] {each})
-        .collect(toList());
-  }
-
-  /**
-   * Bundles test parameters for TestBlockDeletingService.
-   */
-  public static class LayoutInfo {
-    private final String schemaVersion;
-    private final ContainerLayoutVersion layout;
-
-    public LayoutInfo(String schemaVersion, ContainerLayoutVersion layout) {
-      this.schemaVersion = schemaVersion;
-      this.layout = layout;
-    }
-
-    private static List<LayoutInfo> layoutList = new ArrayList<>();
-    static {
-      for (ContainerLayoutVersion ch :
-          ContainerLayoutVersion.getAllVersions()) {
-        for (String sch : SCHEMA_VERSIONS) {
-          layoutList.add(new LayoutInfo(sch, ch));
-        }
-      }
-    }
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @BeforeClass

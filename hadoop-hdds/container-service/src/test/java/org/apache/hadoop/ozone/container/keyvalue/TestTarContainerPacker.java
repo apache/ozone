@@ -88,14 +88,19 @@ public class TestTarContainerPacker {
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
 
   private final ContainerLayoutVersion layout;
+  private final String schemaVersion;
+  private OzoneConfiguration conf;
 
-  public TestTarContainerPacker(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  public TestTarContainerPacker(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @BeforeClass
@@ -142,8 +147,6 @@ public class TestTarContainerPacker {
   public void pack() throws IOException, CompressorException {
 
     //GIVEN
-    OzoneConfiguration conf = new OzoneConfiguration();
-
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
 
@@ -300,7 +303,6 @@ public class TestTarContainerPacker {
   private KeyValueContainerData unpackContainerData(File containerFile)
       throws IOException {
     try (FileInputStream input = new FileInputStream(containerFile)) {
-      OzoneConfiguration conf = new OzoneConfiguration();
       KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT);
       KeyValueContainer container = new KeyValueContainer(data, conf);
       packer.unpackContainerData(container, input);
