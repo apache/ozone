@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 
 import java.util.List;
 import java.util.function.Function;
@@ -52,7 +52,7 @@ public interface ECBlockInputStreamFactory {
    */
   BlockExtendedInputStream create(boolean missingLocations,
       List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
-      OmKeyLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo, boolean verifyChecksum,
       XceiverClientFactory xceiverFactory,
       Function<BlockID, Pipeline> refreshFunction);
 }
