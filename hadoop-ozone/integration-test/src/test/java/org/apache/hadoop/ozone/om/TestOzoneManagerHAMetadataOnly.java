@@ -46,7 +46,6 @@ import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 
 import javax.management.MBeanInfo;
@@ -185,7 +184,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   /**
    * Test OMFailoverProxyProvider failover on connection exception to OM client.
    */
-  @Flaky("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
