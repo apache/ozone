@@ -68,6 +68,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -114,13 +115,16 @@ public class TestOzoneContainer {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
     commitSpaceMap = new HashMap<String, Long>();
-    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
-        null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(),
+        clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 
   @After
   public void cleanUp() throws Exception {
+    BlockUtils.shutdownCache(conf);
+
     if (volumeSet != null) {
       volumeSet.shutdown();
       volumeSet = null;
@@ -162,8 +166,8 @@ public class TestOzoneContainer {
       Preconditions.checkState(freeBytes >= 0);
       commitSpaceMap.put(getVolumeKey(myVolume),
           Long.valueOf(volCommitBytes + freeBytes));
-      BlockUtils.removeDB(keyValueContainerData, conf);
     }
+    BlockUtils.shutdownCache(conf);
 
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
@@ -247,7 +251,7 @@ public class TestOzoneContainer {
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
     // Format the volumes
     for (HddsVolume volume : volumes) {
-      volume.format(UUID.randomUUID().toString());
+      volume.format(clusterId);
 
       // eat up all available space except size of 1 container
       volume.incCommittedBytes(volume.getAvailable() - containerSize);

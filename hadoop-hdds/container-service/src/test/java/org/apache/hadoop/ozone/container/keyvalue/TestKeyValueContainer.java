@@ -85,6 +85,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -130,6 +131,7 @@ public class TestKeyValueContainer {
     HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
         .getAbsolutePath()).conf(CONF).datanodeUuid(datanodeId
         .toString()).build();
+    StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, CONF, null, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
@@ -183,6 +185,8 @@ public class TestKeyValueContainer {
 
   @Test
   public void testEmptyContainerImportExport() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     createContainer();
     closeContainer();
 
@@ -212,6 +216,8 @@ public class TestKeyValueContainer {
 
   @Test
   public void testContainerImportExport() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();
     long numberOfKeysToWrite = 12;
@@ -355,6 +361,8 @@ public class TestKeyValueContainer {
 
   @Test
   public void concurrentExport() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     createContainer();
     populate(100);
     closeContainer();
@@ -430,8 +438,13 @@ public class TestKeyValueContainer {
 
     assertFalse("Container File still exists",
         keyValueContainer.getContainerFile().exists());
-    assertFalse("Container DB file still exists",
-        keyValueContainer.getContainerDBFile().exists());
+
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      assertTrue(keyValueContainer.getContainerDBFile().exists());
+    } else {
+      assertFalse("Container DB file still exists",
+          keyValueContainer.getContainerDBFile().exists());
+    }
   }
 
   @Test

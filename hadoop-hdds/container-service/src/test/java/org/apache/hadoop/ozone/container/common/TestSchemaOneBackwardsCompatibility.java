@@ -110,7 +110,8 @@ public class TestSchemaOneBackwardsCompatibility {
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
     return Arrays.asList(new Object[][]{
-        {OzoneConsts.SCHEMA_V2}
+        {OzoneConsts.SCHEMA_V2},
+        {OzoneConsts.SCHEMA_V3}
     });
   }
 

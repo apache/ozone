@@ -50,6 +50,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
 import org.junit.After;
+
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -74,6 +76,8 @@ public class TestKeyValueBlockIterator {
   private DBHandle db;
   private final ContainerLayoutVersion layout;
   private String schemaVersion;
+  private String datanodeID = UUID.randomUUID().toString();
+  private String clusterID = UUID.randomUUID().toString();
 
   public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
@@ -92,8 +96,9 @@ public class TestKeyValueBlockIterator {
     testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null,
+    volumeSet = new MutableVolumeSet(datanodeID, clusterID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterID, clusterID, conf);
 
     containerData = new KeyValueContainerData(105L,
             layout,
@@ -101,8 +106,8 @@ public class TestKeyValueBlockIterator {
             UUID.randomUUID().toString());
     // Init the container.
     container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
-            .randomUUID().toString());
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterID);
     db = BlockUtils.getDB(containerData, conf);
   }
 
@@ -111,6 +116,7 @@ public class TestKeyValueBlockIterator {
   public void tearDown() throws Exception {
     db.close();
     db.cleanup();
+    BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }
