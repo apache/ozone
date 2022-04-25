@@ -36,6 +36,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
@@ -56,6 +57,7 @@ import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
+import static org.junit.Assume.assumeFalse;
 
 /**
  * Test the tar/untar for a given container.
@@ -145,6 +147,7 @@ public class TestTarContainerPacker {
 
   @Test
   public void pack() throws IOException, CompressorException {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
 
     //GIVEN
     KeyValueContainerData sourceContainerData =
@@ -229,6 +232,8 @@ public class TestTarContainerPacker {
   @Test
   public void unpackContainerDataWithValidRelativeDbFilePath()
       throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -249,6 +254,8 @@ public class TestTarContainerPacker {
   @Test
   public void unpackContainerDataWithValidRelativeChunkFilePath()
       throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -269,6 +276,8 @@ public class TestTarContainerPacker {
   @Test
   public void unpackContainerDataWithInvalidRelativeDbFilePath()
       throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -286,6 +295,8 @@ public class TestTarContainerPacker {
   @Test
   public void unpackContainerDataWithInvalidRelativeChunkFilePath()
       throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -92,6 +93,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
+import static org.junit.Assume.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -379,6 +381,8 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletion() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
@@ -458,6 +462,8 @@ public class TestBlockDeletingService {
   @Test
   @SuppressWarnings("java:S2699") // waitFor => assertion with timeout
   public void testShutdownService() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
@@ -486,6 +492,8 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletionTimeout() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionLimit(3);
     blockLimitPerInterval = dnConf.getBlockDeletionLimit();
@@ -573,6 +581,8 @@ public class TestBlockDeletingService {
   @Test(timeout = 30000)
   @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     // Properties :
     //  - Number of containers : 2
     //  - Number of blocks per container : 1
@@ -647,6 +657,8 @@ public class TestBlockDeletingService {
 
   @Test(timeout = 30000)
   public void testBlockThrottle() throws Exception {
+    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+
     // Properties :
     //  - Number of containers : 5
     //  - Number of blocks per container : 3
