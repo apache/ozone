@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DATACENTER_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODEGROUP_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.REGION_SCHEMA;
@@ -44,6 +45,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
+
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -903,6 +906,13 @@ public class TestNetworkTopologyImpl {
     chosenNode = newCluster.chooseRandom(NetConstants.ROOT,
         Arrays.asList(node.getNetworkFullPath()), Arrays.asList(node), node, 0);
     assertNull(chosenNode);
+  }
+
+  @Test
+  public void testIsAncestor() {
+    NodeImpl n1 = new NodeImpl("r1", "/", NODE_COST_DEFAULT);
+    NodeImpl n2 = new NodeImpl("dc", "/r12", NODE_COST_DEFAULT);
+    Assert.assertFalse(n1.isAncestor(n2));
   }
 
   private static Node createDatanode(String name, String path) {

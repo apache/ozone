@@ -149,4 +149,28 @@ public final class NetUtils {
     }
     return ancestorList;
   }
+
+  /**
+   * Ensure {@link NetConstants#PATH_SEPARATOR_STR} is added to the suffix of
+   * the path.
+   * @param path path to add suffix
+   * @return the normalised path
+   * If <i>path</i>is empty, then {@link NetConstants#ROOT} is returned
+   */
+  public static String addSuffix(String path) {
+    if (path == null) {
+      return null;
+    }
+
+    int len = path.length();
+    if (len == 0) {
+      return NetConstants.PATH_SEPARATOR_STR;
+    }
+
+    if (path.charAt(len - 1) != NetConstants.PATH_SEPARATOR) {
+      return path + NetConstants.PATH_SEPARATOR_STR;
+    }
+
+    return path;
+  }
 }
