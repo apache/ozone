@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
@@ -258,6 +260,16 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
 
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_KEY =
+      "ozone.server.default.replication";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
+
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY =
+      "ozone.server.default.replication.type";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT =
+      ReplicationType.RATIS.toString();
+
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 
   public static final String OZONE_FS_TRASH_INTERVAL_KEY =
@@ -281,9 +293,11 @@ public final class OMConfigKeys {
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
       "ozone.default.bucket.layout";
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
-      BucketLayout.OBJECT_STORE.name();
+      BucketLayout.LEGACY.name();
   public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
       BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
+  public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
+      BucketLayout.OBJECT_STORE.name();
 
   /**
    * Configuration properties for Directory Deleting Service.
@@ -322,4 +336,16 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_TRANSPORT_CLASS_DEFAULT =
       "org.apache.hadoop.ozone.om.protocolPB"
           + ".Hadoop3OmTransportFactory";
+  public static final String OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT =
+      "ozone.om.unflushed.transaction.max.count";
+  public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT
+      = 10000;
+
+  /**
+   * This configuration shall be enabled to utilize the functionality of the
+   * fine-grained KEY_PATH_LOCK.
+   */
+  public static final String OZONE_OM_KEY_PATH_LOCK_ENABLED =
+      "ozone.om.key.path.lock.enabled";
+  public static final boolean OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT = false;
 }

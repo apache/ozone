@@ -21,6 +21,8 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -39,23 +41,42 @@ import java.util.stream.Stream;
     versionProvider = HddsVersionProvider.class)
 public class ListPipelinesSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"-ffc", "--filterByFactor"},
-      description = "Filter listed pipelines by Factor(ONE/one)",
+  @CommandLine.Option(names = {"-t", "--type"},
+      description = "Filter listed pipelines by replication type, RATIS or EC",
       defaultValue = "")
-  private String factor;
+  private String replicationType;
 
-  @CommandLine.Option(names = {"-fst", "--filterByState"},
-      description = "Filter listed pipelines by State(OPEN/CLOSE)",
+  @CommandLine.Option(
+      names = {"-r", "--replication", "-ffc", "--filterByFactor"},
+      description = "Filter listed pipelines by replication, eg ONE, THREE or "
+      + "for EC rs-3-2-1024k",
+      defaultValue = "")
+  private String replication;
+
+  @CommandLine.Option(names = {"-s", "--state", "-fst", "--filterByState"},
+      description = "Filter listed pipelines by State, eg OPEN, CLOSED",
       defaultValue = "")
   private String state;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     Stream<Pipeline> stream = scmClient.listPipelines().stream();
-    if (!Strings.isNullOrEmpty(factor)) {
+    if (!Strings.isNullOrEmpty(replication)) {
+      if (Strings.isNullOrEmpty(replicationType)) {
+        throw new IOException(
+            "ReplicationType cannot be null if replication is passed");
+      }
+      ReplicationConfig repConfig =
+          ReplicationConfig.parse(ReplicationType.valueOf(replicationType),
+              replication, new OzoneConfiguration());
       stream = stream.filter(
-          p -> ReplicationConfig.getLegacyFactor(p.getReplicationConfig())
-              .toString().compareToIgnoreCase(factor) == 0);
+          p -> p.getReplicationConfig().equals(repConfig));
+    } else if (!Strings.isNullOrEmpty(replicationType)) {
+      stream = stream.filter(
+          p -> p.getReplicationConfig()
+              .getReplicationType()
+              .toString()
+              .compareToIgnoreCase(replicationType) == 0);
     }
     if (!Strings.isNullOrEmpty(state)) {
       stream = stream.filter(p -> p.getPipelineState().toString()

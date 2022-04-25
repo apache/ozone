@@ -92,9 +92,9 @@ public final class S3GatewayMetrics implements MetricsSource {
   }
 
   /**
-   * Create and returns SCMPipelineMetrics instance.
+   * Create and returns S3 Gateway Metrics instance.
    *
-   * @return SCMPipelineMetrics
+   * @return S3GatewayMetrics
    */
   public static synchronized S3GatewayMetrics create() {
     if (instance != null) {
@@ -316,5 +316,53 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   public long getHeadKeySuccess() {
     return headKeySuccess.value();
+  }
+
+  public long getGetBucketSuccess() {
+    return getBucketSuccess.value();
+  }
+
+  public long getGetBucketFailure() {
+    return getBucketFailure.value();
+  }
+
+  public long getCreateBucketSuccess() {
+    return createBucketSuccess.value();
+  }
+
+  public long getCreateBucketFailure() {
+    return createBucketFailure.value();
+  }
+
+  public long getDeleteBucketSuccess() {
+    return deleteBucketSuccess.value();
+  }
+
+  public long getDeleteBucketFailure() {
+    return deleteBucketFailure.value();
+  }
+
+  public long getGetAclSuccess() {
+    return getAclSuccess.value();
+  }
+
+  public long getGetAclFailure() {
+    return getAclFailure.value();
+  }
+
+  public long getPutAclSuccess() {
+    return putAclSuccess.value();
+  }
+
+  public long getPutAclFailure() {
+    return putAclFailure.value();
+  }
+
+  public long getListMultipartUploadsSuccess() {
+    return listMultipartUploadsSuccess.value();
+  }
+
+  public long getListMultipartUploadsFailure() {
+    return listMultipartUploadsFailure.value();
   }
 }

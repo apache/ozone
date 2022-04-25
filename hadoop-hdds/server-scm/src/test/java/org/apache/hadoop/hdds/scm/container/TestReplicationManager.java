@@ -91,6 +91,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.CONTAINER_NUM_KEYS_DEFAULT;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.CONTAINER_USED_BYTES_DEFAULT;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -1860,10 +1862,51 @@ public class TestReplicationManager {
         .getNumDeletionCmdsTimeout());
   }
 
+  /**
+   * A closed empty container with all the replicas also closed and empty
+   * should be deleted.
+   * A container/ replica should be deemed empty when it has 0 keyCount even
+   * if the usedBytes is not 0 (usedBytes should not be used to determine if
+   * the container or replica is empty).
+   */
+  @Test
+  public void testDeleteEmptyContainer() throws Exception {
+    // Create container with usedBytes = 1000 and keyCount = 0
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED, 1000,
+        0);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    // Create a replica with usedBytes != 0 and keyCount = 0
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED, 100, 0);
+
+    assertDeleteScheduled(3);
+  }
+
+  /**
+   * A closed empty container with a non-empty replica should not be deleted.
+   */
+  @Test
+  public void testDeleteEmptyContainerNonEmptyReplica() throws Exception {
+    final ContainerInfo container = createContainer(LifeCycleState.CLOSED, 0,
+        0);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
+    // Create the 3rd replica with non-zero key count and used bytes
+    addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED, 100, 1);
+    assertDeleteScheduled(0);
+  }
+
   private ContainerInfo createContainer(LifeCycleState containerState)
       throws IOException {
+    return createContainer(containerState, CONTAINER_USED_BYTES_DEFAULT,
+        CONTAINER_NUM_KEYS_DEFAULT);
+  }
+
+  private ContainerInfo createContainer(LifeCycleState containerState,
+      long usedBytes, long numKeys) throws IOException {
     final ContainerInfo container = getContainer(containerState);
-    container.setUsedBytes(1234);
+    container.setUsedBytes(usedBytes);
+    container.setNumberOfKeys(numKeys);
     containerStateManager.addContainer(container.getProtobuf());
     return container;
   }
@@ -1891,6 +1934,13 @@ public class TestReplicationManager {
     return addReplicaToDn(container, dn, replicaState);
   }
 
+  private ContainerReplica addReplica(ContainerInfo container,
+      NodeStatus nodeStatus, State replicaState, long usedBytes, long numOfKeys)
+      throws ContainerNotFoundException {
+    DatanodeDetails dn = addNode(nodeStatus);
+    return addReplicaToDn(container, dn, replicaState, usedBytes, numOfKeys);
+  }
+
   private ContainerReplica addReplicaToDn(ContainerInfo container,
                                DatanodeDetails dn, State replicaState)
       throws ContainerNotFoundException {
@@ -1899,8 +1949,24 @@ public class TestReplicationManager {
     // when processing over-replicated containers.
     final UUID originNodeId =
         UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
-    final ContainerReplica replica = getReplicas(
-        container.containerID(), replicaState, 1000L, originNodeId, dn);
+    final ContainerReplica replica = getReplicas(container.containerID(),
+        replicaState, container.getUsedBytes(), container.getNumberOfKeys(),
+        1000L, originNodeId, dn);
+    containerStateManager
+        .updateContainerReplica(container.containerID(), replica);
+    return replica;
+  }
+
+  private ContainerReplica addReplicaToDn(ContainerInfo container,
+      DatanodeDetails dn, State replicaState, long usedBytes, long numOfKeys)
+      throws ContainerNotFoundException {
+    // Using the same originID for all replica in the container set. If each
+    // replica has a unique originID, it causes problems in ReplicationManager
+    // when processing over-replicated containers.
+    final UUID originNodeId =
+        UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
+    final ContainerReplica replica = getReplicas(container.containerID(),
+        replicaState, usedBytes, numOfKeys, 1000L, originNodeId, dn);
     containerStateManager
         .updateContainerReplica(container.containerID(), replica);
     return replica;
