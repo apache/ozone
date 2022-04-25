@@ -104,7 +104,7 @@ public class TestReportSubCommand {
     cmd.execute(scmClient);
 
     ObjectMapper mapper = new ObjectMapper();
-    JsonNode json = mapper.readTree(outContent.toString());
+    JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
 
     Assert.assertTrue(json.get("reportTimeStamp") != null);
     Assert.assertTrue(json.get("stats") != null);
