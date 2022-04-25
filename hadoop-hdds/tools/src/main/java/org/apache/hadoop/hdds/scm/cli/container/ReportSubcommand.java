@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -43,9 +44,20 @@ public class ReportSubcommand extends ScmSubcommand {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     ReplicationManagerReport report = scmClient.getReplicationManagerReport();
+
+    if (json) {
+      output(JsonUtils.toJsonStringWithDefaultPrettyPrinter(report));
+      return;
+    }
+
     outputHeader(report.getReportTimeStamp());
     blankLine();
     outputContainerStats(report);
