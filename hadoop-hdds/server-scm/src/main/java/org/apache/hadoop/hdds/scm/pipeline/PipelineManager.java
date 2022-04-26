@@ -111,8 +111,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void closePipeline(Pipeline pipeline, boolean onTimeout) throws IOException;
 
-  void scrubPipeline(ReplicationConfig replicationConfig)
-      throws IOException;
+  void scrubPipelines() throws IOException;
 
   void startPipelineCreator();
 
@@ -193,6 +192,4 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Release write lock.
    */
   void releaseWriteLock();
-
-  Set<ReplicationConfig> getAllReplicationConfigs();
 }

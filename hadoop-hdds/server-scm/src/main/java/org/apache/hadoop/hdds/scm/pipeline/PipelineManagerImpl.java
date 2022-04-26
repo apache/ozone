@@ -414,15 +414,14 @@ public class PipelineManagerImpl implements PipelineManager {
    * Scrub pipelines.
    */
   @Override
-  public void scrubPipeline(ReplicationConfig config)
-      throws IOException {
+  public void scrubPipelines() throws IOException {
     Instant currentTime = Instant.now();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    List<Pipeline> candidates = stateManager.getPipelines(config);
+    List<Pipeline> candidates = stateManager.getPipelines();
 
     for (Pipeline p : candidates) {
       // scrub pipelines who stay ALLOCATED for too long.
@@ -719,10 +718,5 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void releaseWriteLock() {
     lock.writeLock().unlock();
-  }
-
-  @Override
-  public Set<ReplicationConfig> getAllReplicationConfigs() {
-    return stateManager.getAllReplicationConfigs();
   }
 }

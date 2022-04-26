@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -142,13 +142,11 @@ public class BackgroundPipelineScrubber implements SCMService {
       notifyAll();
     }
     LOG.info("Stopping Pipeline Scrubber Service.");
+  }
 
-    try {
-      scrubThread.join();
-      scrubThread = null;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+  @VisibleForTesting
+  public boolean getRunning() {
+    return running.get();
   }
 
   private void run() {
@@ -161,21 +159,18 @@ public class BackgroundPipelineScrubber implements SCMService {
           wait(intervalInMillis);
         }
       } catch (InterruptedException e) {
-        LOG.warn("{} is interrupted.", THREAD_NAME);
+        LOG.warn("{} is interrupted, exit", THREAD_NAME);
         Thread.currentThread().interrupt();
+        running.set(false);
       }
     }
   }
 
   private void scrubAllPipelines() {
-    for (ReplicationConfig repConfg :
-        pipelineManager.getAllReplicationConfigs()) {
-      try {
-        pipelineManager.scrubPipeline(repConfg);
-      } catch (IOException e) {
-        LOG.error("Error while scrubbing pipelines " +
-            "of replicationConfig {}", repConfg, e);
-      }
+    try {
+      pipelineManager.scrubPipelines();
+    } catch (IOException e) {
+      LOG.error("Unexpected error during pipeline scrubbing", e);
     }
   }
 }

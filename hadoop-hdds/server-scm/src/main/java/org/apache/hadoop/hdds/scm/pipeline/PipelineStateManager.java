@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.Set;
 
 /**
  * Manages the state of pipelines in SCM.
@@ -113,7 +112,4 @@ public interface PipelineStateManager {
 
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
-
-
-  Set<ReplicationConfig> getAllReplicationConfigs();
 }
