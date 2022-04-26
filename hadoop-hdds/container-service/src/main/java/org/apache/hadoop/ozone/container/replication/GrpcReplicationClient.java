@@ -22,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,12 +32,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkVersion;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
@@ -47,6 +52,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
@@ -167,6 +173,37 @@ public class GrpcReplicationClient implements AutoCloseable {
     return future.thenApply(responses -> responses.stream()
         .filter(r -> r.getCmdType() == Type.ReadContainer)
         .map(r -> r.getReadContainer().getContainerData())
+        .collect(Collectors.toList()));
+  }
+
+  public CompletableFuture<List<ByteBuffer>> readChunk(long containerId,
+      String datanodeUUID, DatanodeBlockID blockID, ChunkInfo chunkInfo) {
+
+    ReadChunkRequestProto request =
+        ReadChunkRequestProto.newBuilder()
+            .setBlockID(blockID)
+            .setChunkData(chunkInfo)
+            .setReadChunkVersion(ReadChunkVersion.V1)
+            .build();
+
+    ContainerCommandRequestProto command =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.ReadChunk)
+            .setContainerID(containerId)
+            .setDatanodeUuid(datanodeUUID)
+            .setReadChunk(request)
+            .build();
+
+    CompletableFuture<List<ContainerCommandResponseProto>> future =
+        new CompletableFuture<>();
+
+    client.send(command, new ContainerCommandObserver(containerId, future));
+
+    return future.thenApply(responses -> responses.stream()
+        .filter(r -> r.getCmdType() == Type.ReadChunk)
+        .flatMap(r -> r.getReadChunk().getDataBuffers()
+            .getBuffersList().stream()
+            .map(ByteString::asReadOnlyByteBuffer))
         .collect(Collectors.toList()));
   }
 
