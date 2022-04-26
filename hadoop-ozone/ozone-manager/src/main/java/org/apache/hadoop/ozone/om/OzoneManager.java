@@ -2815,6 +2815,30 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return "" + omRpcAddress.getPort();
   }
 
+  @Override
+  public String getReadLockWaitingTimeMsStat() {
+    return getMetadataManager().getLock().getOMLockMetrics()
+        .getReadLockWaitingTimeMsStat();
+  }
+
+  @Override
+  public String getReadLockHeldTimeMsStat() {
+    return getMetadataManager().getLock().getOMLockMetrics()
+        .getReadLockHeldTimeMsStat();
+  }
+
+  @Override
+  public String getWriteLockWaitingTimeMsStat() {
+    return getMetadataManager().getLock().getOMLockMetrics()
+        .getWriteLockWaitingTimeMsStat();
+  }
+
+  @Override
+  public String getWriteLockHeldTimeMsStat() {
+    return getMetadataManager().getLock().getOMLockMetrics()
+        .getWriteLockHeldTimeMsStat();
+  }
+
   @VisibleForTesting
   public OzoneManagerHttpServer getHttpServer() {
     return httpServer;

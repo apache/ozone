@@ -39,9 +39,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import javax.management.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URI;
 
 /**
@@ -53,6 +55,7 @@ public class TestOmBucketReadWriteFileOps {
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
+  private static MBeanServer mbs;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmBucketReadWriteFileOps.class);
 
@@ -90,6 +93,7 @@ public class TestOmBucketReadWriteFileOps {
     cluster.waitTobeOutOfSafeMode();
 
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    mbs = ManagementFactory.getPlatformMBeanServer();
   }
 
   protected OzoneConfiguration getOzoneConfiguration() {
@@ -141,7 +145,8 @@ public class TestOmBucketReadWriteFileOps {
   }
 
   private void verifyFreonCommand(ParameterBuilder parameterBuilder)
-      throws IOException {
+      throws IOException, ReflectionException, MalformedObjectNameException,
+      AttributeNotFoundException, InstanceNotFoundException, MBeanException {
     store.createVolume(parameterBuilder.volumeName);
     OzoneVolume volume = store.getVolume(parameterBuilder.volumeName);
     volume.createBucket(parameterBuilder.bucketName);
@@ -205,7 +210,13 @@ public class TestOmBucketReadWriteFileOps {
     Assert.assertEquals("Mismatch Count!", expectedCount, actual);
   }
 
-  private void verifyOMLockMetrics(OMLockMetrics omLockMetrics) {
+  private void verifyOMLockMetrics(OMLockMetrics omLockMetrics)
+      throws MalformedObjectNameException, ReflectionException,
+      AttributeNotFoundException, InstanceNotFoundException, MBeanException {
+    ObjectName bean = new ObjectName(
+        "Hadoop:service=OzoneManager," + "name=OzoneManagerInfo," +
+            "component=ServerRuntime");
+
     String readLockWaitingTimeMsStat =
         omLockMetrics.getReadLockWaitingTimeMsStat();
     LOG.info("Read Lock Waiting Time Stat: " + readLockWaitingTimeMsStat);
@@ -216,6 +227,11 @@ public class TestOmBucketReadWriteFileOps {
     Assert.assertTrue("Read Lock Waiting Samples should be positive",
         readWaitingSamples > 0);
 
+    String readLockWaitingTimeMsStatBean =
+        mbs.getAttribute(bean, "ReadLockWaitingTimeMsStat").toString();
+    Assert.assertEquals(readLockWaitingTimeMsStat,
+        readLockWaitingTimeMsStatBean);
+
     String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
     LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
     LOG.info("Longest Read Lock Held Time (ms): " +
@@ -224,6 +240,10 @@ public class TestOmBucketReadWriteFileOps {
         Integer.parseInt(readLockHeldTimeMsStat.split(" ")[2]);
     Assert.assertTrue("Read Lock Held Samples should be positive",
         readHeldSamples > 0);
+
+    String readLockHeldTimeMsStatBean =
+        mbs.getAttribute(bean, "ReadLockHeldTimeMsStat").toString();
+    Assert.assertEquals(readLockHeldTimeMsStat, readLockHeldTimeMsStatBean);
 
     String writeLockWaitingTimeMsStat =
         omLockMetrics.getWriteLockWaitingTimeMsStat();
@@ -235,6 +255,11 @@ public class TestOmBucketReadWriteFileOps {
     Assert.assertTrue("Write Lock Waiting Samples should be positive",
         writeWaitingSamples > 0);
 
+    String writeLockWaitingTimeMsStatBean =
+        mbs.getAttribute(bean, "WriteLockWaitingTimeMsStat").toString();
+    Assert.assertEquals(writeLockWaitingTimeMsStat,
+        writeLockWaitingTimeMsStatBean);
+
     String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
     LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
     LOG.info("Longest Write Lock Held Time (ms): " +
@@ -243,6 +268,10 @@ public class TestOmBucketReadWriteFileOps {
         Integer.parseInt(writeLockHeldTimeMsStat.split(" ")[2]);
     Assert.assertTrue("Write Lock Held Samples should be positive",
         writeHeldSamples > 0);
+
+    String writeLockHeldTimeMsStatBean =
+        mbs.getAttribute(bean, "WriteLockHeldTimeMsStat").toString();
+    Assert.assertEquals(writeLockHeldTimeMsStat, writeLockHeldTimeMsStatBean);
   }
 
   private static class ParameterBuilder {

@@ -25,7 +25,8 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
  * This is the JMX management interface for OM information.
  */
 @InterfaceAudience.Private
-public interface OMMXBean extends ServiceRuntimeInfo {
+public interface OMMXBean extends ServiceRuntimeInfo, OzoneManagerLockMXBean {
 
   String getRpcPort();
+
 }

@@ -30,7 +30,10 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -123,6 +126,9 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
   private int readThreadCount;
   private int writeThreadCount;
 
+  private MBeanServer mbs;
+  private ObjectName bean;
+
   @Override
   public Void call() throws Exception {
     init();
@@ -148,6 +154,11 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
 
     contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
     timer = getMetrics().timer("file-create");
+
+    mbs = ManagementFactory.getPlatformMBeanServer();
+    bean = new ObjectName(
+        "Hadoop:service=OzoneManager," + "name=OzoneManagerInfo," +
+            "component=ServerRuntime");
 
     runTests(this::mainMethod);
     return null;
@@ -188,6 +199,17 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
             FileStatus[] status =
                 fileSystem.listStatus(new Path(readPath));
             readCount += status.length;
+
+            print(
+                Thread.currentThread().getName() + " " + "iteration: " + j +
+                    " ReadLockWaitingTimeMsStat -> " +
+                    mbs.getAttribute(bean, "ReadLockWaitingTimeMsStat")
+                        .toString());
+            print(
+                Thread.currentThread().getName() + " " + "iteration: " + j +
+                    " ReadLockHeldTimeMsStat -> " +
+                    mbs.getAttribute(bean, "ReadLockHeldTimeMsStat")
+                        .toString());
           }
         } catch (IOException e) {
           LOG.warn("Exception while listing status ", e);
@@ -232,6 +254,17 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
           for (int j = 0; j < numOfWriteOperations; j++) {
             createFiles(writePath, fileCountForWrite);
             writeCount++;
+
+            print(
+                Thread.currentThread().getName() + " " + "iteration: " + j +
+                    " WriteLockWaitingTimeMsStat -> " +
+                    mbs.getAttribute(bean, "WriteLockWaitingTimeMsStat")
+                        .toString());
+            print(
+                Thread.currentThread().getName() + " " + "iteration: " + j +
+                    " WriteLockHeldTimeMsStat -> " +
+                    mbs.getAttribute(bean, "WriteLockHeldTimeMsStat")
+                        .toString());
           }
         } catch (IOException e) {
           LOG.warn("Exception while creating file ", e);
