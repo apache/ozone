@@ -52,7 +52,7 @@ public class OMKeyCreateResponse extends OmKeyResponse {
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, OmBucketInfo omBucketInfo) {
+      long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;

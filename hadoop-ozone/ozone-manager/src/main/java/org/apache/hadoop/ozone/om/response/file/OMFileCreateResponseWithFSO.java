@@ -50,7 +50,7 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
                                 @Nonnull OmKeyInfo omKeyInfo,
                                 @Nonnull List<OmDirectoryInfo> parentDirInfos,
                                 long openKeySessionID,
-                                OmBucketInfo omBucketInfo) {
+                                @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
         omBucketInfo);
     this.parentDirInfos = parentDirInfos;

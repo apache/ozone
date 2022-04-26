@@ -229,6 +229,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
+      // TODO: S3MultipartUpload did not check quota and did not add nameSpace,
+      //  we need to fix these issues in HDDS-6650.
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omResponse.setCommitMultiPartUploadResponse(
