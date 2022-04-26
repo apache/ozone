@@ -64,7 +64,6 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMClientRequest.class);
-  protected static final long WAIT_MILISECONDS = 30;
 
   private OMRequest omRequest;
 

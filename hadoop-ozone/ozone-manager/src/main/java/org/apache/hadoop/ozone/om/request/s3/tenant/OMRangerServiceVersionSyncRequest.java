@@ -60,15 +60,7 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
-    final RangerServiceVersionSyncRequest request =
-        getOmRequest().getRangerServiceVersionSyncRequest();
-    final long proposedVersion = request.getRangerServiceVersion();
-
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
-        .setRangerServiceVersionSyncRequest(
-            RangerServiceVersionSyncRequest.newBuilder()
-                .setRangerServiceVersion(proposedVersion))
-        // TODO: Can the three lines below be ignored?
         .setUserInfo(getUserInfo())
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId());
@@ -78,7 +70,6 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
     }
 
     return omRequestBuilder.build();
-
   }
 
   @Override
