@@ -168,8 +168,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // TODO: REMOVE
     if (!ozoneManager.getMultiTenantManager()
         .tryAcquireInProgressMtOp(WAIT_MILISECONDS)) {
-      // TODO: Maybe try ServiceException, to use Hadoop client auto retry,
-      //  which hopefully improves user experience.
+      // TODO: Maybe try ServiceException, to use Hadoop client auto retry.
+      //  That should improve user experience.
       throw new OMException("Only One MultiTenant operation allowed at a " +
           "time", RESOURCE_BUSY);
     }

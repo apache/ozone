@@ -117,7 +117,9 @@ public interface OMMultiTenantManager {
    * @param userPrincipal user name
    * @return access ID in the form of tenantName$username
    */
-  String getDefaultAccessId(String tenantId, String userPrincipal);
+  static String getDefaultAccessId(String tenantId, String userPrincipal) {
+    return tenantId + OzoneConsts.TENANT_ID_USERNAME_DELIMITER + userPrincipal;
+  }
 
   /**
    * Returns true if user is the tenant's admin or Ozone admin, false otherwise.

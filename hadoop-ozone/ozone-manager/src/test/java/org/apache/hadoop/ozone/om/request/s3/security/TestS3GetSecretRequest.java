@@ -382,7 +382,7 @@ public class TestS3GetSecretRequest {
 
     // Additional mock setup needed to pass accessId check
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
-    when(omMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB))
+    when(OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB))
         .thenReturn(ACCESS_ID_BOB);
 
     // Run preExecute

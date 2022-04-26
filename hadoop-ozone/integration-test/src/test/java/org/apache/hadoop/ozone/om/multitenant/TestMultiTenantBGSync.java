@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -453,13 +454,11 @@ public class TestMultiTenantBGSync {
   @Test
   public void testRangerBGSyncsDeletedRolesRecreated()
       throws Exception {
-    BasicUserPrincipal userPrincipal = null;
     simulateOzoneSiteXmlConfig();
     setUpHelper();
     long ozoneVersion = bgSyncSetup();
 
     try {
-
       createRolesAndPoliciesInRanger();
       // now lets delete the role and make sure it gets recreated
       String rolename =
@@ -469,30 +468,19 @@ public class TestMultiTenantBGSync {
       omm.revokeUserFromRole(new BasicUserPrincipal("user2Test"),
           omm.getRole(rolename));
 
-      // TODO: What is user policy?
-//      final String userPolicyGroupName =
-//          "tenant1" + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
-
-      // TODO: Fix this
-//      ozoneManager.getMetadataManager().getTenantPolicyTable()
-//          .put(userPolicyGroupName,
-//              policyIdsCreated.stream().collect(Collectors.joining(",")));
-
-      HashSet<String> users = new HashSet<>();
-      users.add("user1Test");
-      users.add("user2Test");
-      for (String user : users) {
+      HashSet<String> userSet = new HashSet<>();
+      userSet.add("user1Test");
+      userSet.add("user2Test");
+      for (String userPrincipal : userSet) {
         String userAccessId =
-            "tenant1" + TENANT_ID_USERNAME_DELIMITER + user;
+            OMMultiTenantManager.getDefaultAccessId("tenant1", userPrincipal);
 
-        // TODO: Fix this
-//        ozoneManager.getMetadataManager().getTenantRoleTable()
-//            .put(userAccessId, rolename);
-//        OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
-//            .setTenantId("tenant1")
-//            .setKerberosPrincipal(user).build();
-//        ozoneManager.getMetadataManager().getTenantAccessIdTable()
-//            .put(userAccessId, omDBAccessIdInfo);
+        OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
+            .setTenantId("tenant1")
+            .setUserPrincipal(userPrincipal)
+            .build();
+        ozoneManager.getMetadataManager().getTenantAccessIdTable()
+            .put(userAccessId, omDBAccessIdInfo);
       }
 
       long baseVersion = bgSync.getRangerBGSyncCounter();
@@ -523,8 +511,8 @@ public class TestMultiTenantBGSync {
           for (int i = 0; i < verifier.size();  ++i) {
             String user = verifier.get(i).getAsJsonObject().get("name")
                 .getAsString();
-            Assert.assertTrue(users.contains(user));
-            users.remove(user);
+            Assert.assertTrue(userSet.contains(user));
+            userSet.remove(user);
           }
         } catch (Exception e) {
         }

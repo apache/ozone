@@ -358,10 +358,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return null;
   }
 
-  public String getDefaultAccessId(String tenantId, String userPrincipal) {
-    return tenantId + TENANT_ID_USERNAME_DELIMITER + userPrincipal;
-  }
-
   /**
    * {@inheritDoc}
    */
