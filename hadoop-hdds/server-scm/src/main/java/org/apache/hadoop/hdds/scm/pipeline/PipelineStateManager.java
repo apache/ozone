@@ -112,4 +112,5 @@ public interface PipelineStateManager {
 
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
+
 }

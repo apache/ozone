@@ -60,6 +60,7 @@ class PipelineStateMap {
     pipelineMap = new ConcurrentHashMap<>();
     pipeline2container = new ConcurrentHashMap<>();
     query2OpenPipelines = new HashMap<>();
+
   }
 
   /**
@@ -424,4 +425,5 @@ class PipelineStateMap {
     }
     return updatedPipeline;
   }
+
 }
