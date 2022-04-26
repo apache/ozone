@@ -17,14 +17,18 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -85,6 +89,26 @@ public class TestReportSubCommand {
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
+  }
+
+  @Test
+  public void testValidJsonOutput() throws IOException {
+    // More complete testing of the Report JSON output is in
+    // TestReplicationManagerReport.
+    ScmClient scmClient = mock(ScmClient.class);
+    Mockito.when(scmClient.getReplicationManagerReport())
+        .thenAnswer(invocation -> new ReplicationManagerReport());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+    cmd.execute(scmClient);
+
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
+
+    Assert.assertTrue(json.get("reportTimeStamp") != null);
+    Assert.assertTrue(json.get("stats") != null);
+    Assert.assertTrue(json.get("samples") != null);
   }
 
   @Test

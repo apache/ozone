@@ -107,7 +107,7 @@ public class ReplicationManagerReport {
     for (HddsProtos.KeyContainerIDList sample : proto.getStatSampleList()) {
       report.setSample(sample.getKey(), sample.getContainerList()
           .stream()
-          .map(c -> ContainerID.getFromProtobuf(c))
+          .map(ContainerID::getFromProtobuf)
           .collect(Collectors.toList()));
     }
     return report;
@@ -144,6 +144,34 @@ public class ReplicationManagerReport {
    */
   public long getReportTimeStamp() {
     return reportTimeStamp;
+  }
+
+  /**
+   * Return a map of all stats and their value as a long.
+   * @return
+   */
+  public Map<String, Long> getStats() {
+    Map<String, Long> result = new HashMap<>();
+    for (Map.Entry<String, LongAdder> e : stats.entrySet()) {
+      result.put(e.getKey(), e.getValue().longValue());
+    }
+    return result;
+  }
+
+  /**
+   * Return a map of all samples, with the stat as the key and the samples
+   * for the stat as a List of Long.
+   * @return
+   */
+  public Map<String, List<Long>> getSamples() {
+    Map<String, List<Long>> result = new HashMap<>();
+    for (Map.Entry<String, List<ContainerID>> e : containerSample.entrySet()) {
+      result.put(e.getKey(),
+          e.getValue().stream()
+              .map(c -> c.getId())
+              .collect(Collectors.toList()));
+    }
+    return result;
   }
 
   /**
