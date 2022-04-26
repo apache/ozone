@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,8 +59,7 @@ public class BackgroundPipelineScrubber implements SCMService {
   private long lastTimeToBeReadyInMillis = 0;
 
   public BackgroundPipelineScrubber(PipelineManager pipelineManager,
-      ConfigurationSource conf, SCMServiceManager serviceManager,
-      SCMContext scmContext) {
+      ConfigurationSource conf, SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scmContext = scmContext;
@@ -74,8 +72,6 @@ public class BackgroundPipelineScrubber implements SCMService {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    serviceManager.register(this);
 
     start();
   }

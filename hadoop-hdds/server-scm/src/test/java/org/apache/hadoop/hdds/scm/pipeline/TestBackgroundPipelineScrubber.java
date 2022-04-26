@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.junit.After;
 import org.junit.Before;
@@ -30,7 +29,6 @@ import java.io.IOException;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -44,7 +42,6 @@ public class TestBackgroundPipelineScrubber {
   private BackgroundPipelineScrubber scrubber;
   private SCMContext scmContext;
   private PipelineManager pipelineManager;
-  private SCMServiceManager scmServiceManager;
   private OzoneConfiguration conf;
 
   @Before
@@ -53,15 +50,12 @@ public class TestBackgroundPipelineScrubber {
     this.pipelineManager = mock(PipelineManager.class);
     doNothing().when(pipelineManager).scrubPipelines();
 
-    this.scmServiceManager = mock(SCMServiceManager.class);
-    doNothing().when(scmServiceManager).register(any());
-
     // no initial delay after exit safe mode
     this.conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0ms");
 
     this.scrubber = new BackgroundPipelineScrubber(pipelineManager, conf,
-        scmServiceManager, scmContext);
+        scmContext);
   }
 
   @After
