@@ -48,7 +48,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     configurationClasses =
         new Class[] {OzoneConfigKeys.class, ScmConfigKeys.class,
             OMConfigKeys.class, HddsConfigKeys.class,
-            ReconServerConfigKeys.class,
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
