@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
+/**
+ * This is the JMX management interface for OzoneManagerLock information.
+ */
 @InterfaceAudience.Private
 public interface OzoneManagerLockMXBean {
 
