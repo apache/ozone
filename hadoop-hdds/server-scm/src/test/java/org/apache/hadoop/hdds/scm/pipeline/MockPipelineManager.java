@@ -218,8 +218,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void scrubPipeline(ReplicationConfig replicationConfig)
-      throws IOException {
+  public void scrubPipelines() {
 
   }
 
@@ -309,10 +308,5 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void releaseWriteLock() {
 
-  }
-
-  @Override
-  public Set<ReplicationConfig> getAllReplicationConfigs() {
-    return null;
   }
 }
