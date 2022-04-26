@@ -33,7 +33,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -100,6 +100,6 @@ public class TestBackgroundPipelineScrubber {
       assertTrue(scrubber.shouldRun());
       scrubber.notifyAll();
     }
-    verify(pipelineManager, times(1)).scrubPipelines();
+    verify(pipelineManager, timeout(3000).times(1)).scrubPipelines();
   }
 }
