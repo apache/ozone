@@ -255,7 +255,5 @@ public class OMException extends IOException {
 
     VOLUME_IS_REFERENCED,
     TENANT_NOT_EMPTY,
-
-    RESOURCE_BUSY
   }
 }
