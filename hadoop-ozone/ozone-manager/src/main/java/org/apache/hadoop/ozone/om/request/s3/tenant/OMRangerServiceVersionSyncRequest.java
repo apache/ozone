@@ -67,12 +67,6 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
         getOmRequest().getRangerServiceVersionSyncRequest();
     final long proposedVersion = request.getRangerServiceVersion();
 
-    if (!ozoneManager.getMultiTenantManager()
-        .tryAcquireInProgressMtOp(WAIT_MILISECONDS)) {
-      throw new OMException("Only One MultiTenant operation allowed at a " +
-          "time", RESOURCE_BUSY);
-    }
-
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setRangerServiceVersionSyncRequest(
             RangerServiceVersionSyncRequest.newBuilder()
@@ -133,7 +127,6 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }
-      ozoneManager.getMultiTenantManager().resetInProgressMtOpState();
     }
 
     return omClientResponse;

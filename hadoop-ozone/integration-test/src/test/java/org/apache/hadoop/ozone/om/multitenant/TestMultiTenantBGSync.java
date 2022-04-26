@@ -185,8 +185,6 @@ public class TestMultiTenantBGSync {
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     when(ozoneManager.isLeaderReady()).thenReturn(true);
-    when(omMultiTenantManager.tryAcquireInProgressMtOp(1000))
-        .thenReturn(true);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
 

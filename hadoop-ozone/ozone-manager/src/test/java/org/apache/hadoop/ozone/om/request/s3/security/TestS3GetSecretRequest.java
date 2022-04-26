@@ -466,8 +466,6 @@ public class TestS3GetSecretRequest {
 
     // This effectively makes alice an admin.
     when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
-    when(ozoneManager.getMultiTenantManager().tryAcquireInProgressMtOp(30))
-        .thenReturn(true);
 
     // 1. CreateTenantRequest: Create tenant "finance".
     long txLogIndex = 1;

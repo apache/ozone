@@ -165,15 +165,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             .setModificationTime(initialTime)
             .build();
 
-    // TODO: REMOVE
-    if (!ozoneManager.getMultiTenantManager()
-        .tryAcquireInProgressMtOp(WAIT_MILISECONDS)) {
-      // TODO: Maybe try ServiceException, to use Hadoop client auto retry.
-      //  That should improve user experience.
-      throw new OMException("Only One MultiTenant operation allowed at a " +
-          "time", RESOURCE_BUSY);
-    }
-
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
     tenantInContext = ozoneManager.getMultiTenantManager()
@@ -349,8 +340,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      // TODO: REMOVE
-      ozoneManager.getMultiTenantManager().resetInProgressMtOpState();
     }
 
     // Perform audit logging

@@ -122,12 +122,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       delegated = true;
     }
 
-    if (!ozoneManager.getMultiTenantManager()
-        .tryAcquireInProgressMtOp(WAIT_MILISECONDS)) {
-      throw new OMException("Only One MultiTenant operation allowed at a " +
-          "time", RESOURCE_BUSY);
-    }
-
     // Call OMMTM to add user to tenant admin role
     ozoneManager.getMultiTenantManager().assignTenantAdmin(
         request.getAccessId(), delegated);
@@ -243,8 +237,6 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-
-      ozoneManager.getMultiTenantManager().resetInProgressMtOpState();
     }
 
     // Audit
