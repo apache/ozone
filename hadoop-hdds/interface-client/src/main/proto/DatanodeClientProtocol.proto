@@ -186,12 +186,12 @@ message ContainerCommandRequestProto {
 
   optional   PutBlockRequestProto putBlock = 12;
   optional   GetBlockRequestProto getBlock = 13;
-  optional   DeleteBlockRequestProto deleteBlock = 14;
+  optional   DeleteBlockRequestProto deleteBlock = 14 [deprecated = true];
   optional   ListBlockRequestProto listBlock = 15;
 
   optional   ReadChunkRequestProto readChunk = 16;
   optional   WriteChunkRequestProto writeChunk = 17;
-  optional   DeleteChunkRequestProto deleteChunk = 18;
+  optional   DeleteChunkRequestProto deleteChunk = 18 [deprecated = true];
   optional   ListChunkRequestProto listChunk = 19;
 
   optional   PutSmallFileRequestProto putSmallFile = 20;

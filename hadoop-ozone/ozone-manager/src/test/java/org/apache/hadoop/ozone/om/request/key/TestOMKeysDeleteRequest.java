@@ -50,10 +50,14 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     createPreRequisites();
 
     OMKeysDeleteRequest omKeysDeleteRequest =
-        new OMKeysDeleteRequest(omRequest);
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
+    checkDeleteKeysResponse(omKeysDeleteRequest);
+  }
 
+  protected void checkDeleteKeysResponse(
+      OMKeysDeleteRequest omKeysDeleteRequest) throws java.io.IOException {
     OMClientResponse omClientResponse =
-        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 0L,
+        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
@@ -74,7 +78,6 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
           .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
               deleteKey)));
     }
-
   }
 
   @Test
@@ -91,10 +94,14 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
                     .addAllKeys(deleteKeyList).addKeys("dummy"))).build();
 
     OMKeysDeleteRequest omKeysDeleteRequest =
-        new OMKeysDeleteRequest(omRequest);
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
+    checkDeleteKeysResponseForFailure(omKeysDeleteRequest);
+  }
 
+  protected void checkDeleteKeysResponseForFailure(
+      OMKeysDeleteRequest omKeysDeleteRequest) throws java.io.IOException {
     OMClientResponse omClientResponse =
-        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 0L,
+        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 100L,
         ozoneManagerDoubleBufferHelper);
 
     Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
@@ -116,10 +123,9 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     Assert.assertEquals(1,
         unDeletedKeys.getKeysCount());
     Assert.assertEquals("dummy", unDeletedKeys.getKeys(0));
-
   }
 
-  private void createPreRequisites() throws Exception {
+  protected void createPreRequisites() throws Exception {
 
     deleteKeyList = new ArrayList<>();
     // Add volume, bucket and key entries to OM DB.
@@ -152,4 +158,19 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
                 .setDeleteKeys(deleteKeyArgs).build()).build();
   }
 
+  public List<String> getDeleteKeyList() {
+    return deleteKeyList;
+  }
+
+  public void setDeleteKeyList(List<String> deleteKeyList) {
+    this.deleteKeyList = deleteKeyList;
+  }
+
+  public OMRequest getOmRequest() {
+    return omRequest;
+  }
+
+  public void setOmRequest(OMRequest omRequest) {
+    this.omRequest = omRequest;
+  }
 }

@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -201,6 +202,7 @@ public class TestReconWithOzoneManager {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         cluster.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+    OzoneManagerSyncMetrics metrics = impl.getMetrics();
 
     // HTTP call to /api/containers
     String containerResponse = makeHttpCall(containerKeyServiceURL);
@@ -229,6 +231,7 @@ public class TestReconWithOzoneManager {
 
     // verify sequence number after full snapshot
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    Assert.assertEquals(0, metrics.getSequenceNumberLag().value());
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
@@ -264,6 +267,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    Assert.assertEquals(0, metrics.getSequenceNumberLag().value());
 
     long beforeRestartSnapShotTimeStamp = getReconTaskAttributeFromJson(
         taskStatusResponse,
@@ -321,6 +325,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    Assert.assertEquals(0, metrics.getSequenceNumberLag().value());
   }
 
   private long getReconTaskAttributeFromJson(String taskStatusResponse,
@@ -400,7 +405,7 @@ public class TestReconWithOzoneManager {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationConfig(new StandaloneReplicationConfig(
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());

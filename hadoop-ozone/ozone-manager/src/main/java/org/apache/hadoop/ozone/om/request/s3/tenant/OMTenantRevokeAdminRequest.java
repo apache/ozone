@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -76,32 +78,40 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         getOmRequest().getTenantRevokeAdminRequest();
 
     final String accessId = request.getAccessId();
-    String tenantId = request.getTenantName();
+    String tenantId = request.getTenantId();
+    final OMMultiTenantManager multiTenantManager =
+        ozoneManager.getMultiTenantManager();
 
-    // If tenant name is not specified, try figuring it out from accessId.
+    // If tenantId is not specified, infer it from the accessId
     if (StringUtils.isEmpty(tenantId)) {
-      tenantId = OMTenantRequestHelper.getTenantNameFromAccessId(
-          ozoneManager.getMetadataManager(), accessId);
+      Optional<String> optionalTenantId =
+          multiTenantManager.getTenantForAccessID(accessId);
+      if (!optionalTenantId.isPresent()) {
+        throw new OMException("OmDBAccessIdInfo is missing for accessId '" +
+            accessId + "' in DB.", OMException.ResultCodes.METADATA_ERROR);
+      }
+      tenantId = optionalTenantId.get();
+      assert (!StringUtils.isEmpty(tenantId));
     }
 
-    // Caller should be an Ozone admin or this tenant's delegated admin
-    OMTenantRequestHelper.checkTenantAdmin(ozoneManager, tenantId);
+    multiTenantManager.checkTenantExistence(tenantId);
 
-    // TODO: Check tenant existence?
+    // Caller should be an Ozone admin, or a tenant delegated admin
+    multiTenantManager.checkTenantAdmin(tenantId, true);
 
     OmDBAccessIdInfo accessIdInfo = ozoneManager.getMetadataManager()
         .getTenantAccessIdTable().get(accessId);
 
     if (accessIdInfo == null) {
       throw new OMException("accessId '" + accessId + "' not found.",
-          OMException.ResultCodes.ACCESSID_NOT_FOUND);
+          OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
     }
 
     // Check if accessId is assigned to the tenant
     if (!accessIdInfo.getTenantId().equals(tenantId)) {
       throw new OMException("accessId '" + accessId +
           "' must be assigned to tenant '" + tenantId + "' first.",
-          OMException.ResultCodes.INVALID_TENANT_NAME);
+          OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
     // TODO: Call OMMTM to remove user from admin group of the tenant.
@@ -114,7 +124,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
                 // Regenerate request just in case tenantId is not provided
                 //  by the client
                 TenantRevokeAdminRequest.newBuilder()
-                        .setTenantName(tenantId)
+                        .setTenantId(tenantId)
                         .setAccessId(request.getAccessId())
                         .build())
         .setCmdType(getOmRequest().getCmdType())
@@ -133,73 +143,66 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
+    final OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumTenantRevokeAdmins();
+
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     final Map<String, String> auditMap = new HashMap<>();
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    final OMMetadataManager omMetadataManager =
+        ozoneManager.getMetadataManager();
 
     final TenantRevokeAdminRequest request =
         getOmRequest().getTenantRevokeAdminRequest();
     final String accessId = request.getAccessId();
-    final String tenantId = request.getTenantName();
+    final String tenantId = request.getTenantId();
 
-    boolean acquiredVolumeLock = false;  // TODO: use tenant lock instead, maybe
+    boolean acquiredVolumeLock = false;
     IOException exception = null;
 
     String volumeName = null;
 
     try {
-      volumeName = OMTenantRequestHelper.getTenantVolumeName(
-          omMetadataManager, tenantId);
+      volumeName = ozoneManager.getMultiTenantManager()
+          .getTenantVolumeName(tenantId);
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
 
-      final OmDBAccessIdInfo oldAccessIdInfo =
+      final OmDBAccessIdInfo dbAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
 
-      if (oldAccessIdInfo == null) {
+      if (dbAccessIdInfo == null) {
         throw new OMException("OmDBAccessIdInfo entry is missing for accessId '"
-            + accessId + "'.", OMException.ResultCodes.METADATA_ERROR);
+            + accessId + "'", OMException.ResultCodes.METADATA_ERROR);
       }
 
-      assert (oldAccessIdInfo.getTenantId().equals(tenantId));
+      assert (dbAccessIdInfo.getTenantId().equals(tenantId));
 
       // Update tenantAccessIdTable
       final OmDBAccessIdInfo newOmDBAccessIdInfo =
           new OmDBAccessIdInfo.Builder()
-          .setTenantId(oldAccessIdInfo.getTenantId())
-          .setKerberosPrincipal(oldAccessIdInfo.getUserPrincipal())
-          .setIsAdmin(false)
-          .setIsDelegatedAdmin(false)
-          .build();
+              .setTenantId(dbAccessIdInfo.getTenantId())
+              .setUserPrincipal(dbAccessIdInfo.getUserPrincipal())
+              .setIsAdmin(false)
+              .setIsDelegatedAdmin(false)
+              .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
               transactionLogIndex));
 
-      // Update tenantRoleTable?
-//      final String roleName = "role_admin";
-//      omMetadataManager.getTenantRoleTable().addCacheEntry(
-//          new CacheKey<>(accessId),
-//          new CacheValue<>(Optional.of(roleName), transactionLogIndex));
-
       omResponse.setTenantRevokeAdminResponse(
           TenantRevokeAdminResponse.newBuilder()
-              .setSuccess(true).build());
+              .build());
       omClientResponse = new OMTenantRevokeAdminResponse(omResponse.build(),
           accessId, newOmDBAccessIdInfo);
 
     } catch (IOException ex) {
-      // Error handling: do nothing to Authorizer (Ranger) here?
-
       exception = ex;
-      // Set success flag to false
-      omResponse.setTenantRevokeAdminResponse(
-          TenantRevokeAdminResponse.newBuilder()
-              .setSuccess(false).build());
+      // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeAdminResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
@@ -222,11 +225,10 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Revoked admin of accessId '{}' from tenant '{}'",
           accessId, tenantId);
-      // TODO: omMetrics.incNumTenantRevokeAdmin()
     } else {
       LOG.error("Failed to revoke admin of accessId '{}' from tenant '{}': {}",
           accessId, tenantId, exception.getMessage());
-      // TODO: omMetrics.incNumTenantRevokeAdminFails()
+      omMetrics.incNumTenantRevokeAdminFails();
     }
     return omClientResponse;
   }

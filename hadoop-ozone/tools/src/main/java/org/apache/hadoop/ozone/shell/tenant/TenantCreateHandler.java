@@ -28,18 +28,20 @@ import java.io.IOException;
  */
 @CommandLine.Command(name = "create",
     description = "Create a tenant."
-        + " This will also create a new Ozone volume for the tenant.")
+        + " This can create a new Ozone volume for the tenant.")
 public class TenantCreateHandler extends TenantHandler {
 
   @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
   private String tenantId;
+
+  // TODO: HDDS-6340. Add an option to print JSON result
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
     try {
       client.getObjectStore().createTenant(tenantId);
-      // TODO: Add return value and print volume name?
+      // Note: RpcClient#createTenant prints volume name in info level LOG
       out().println("Created tenant '" + tenantId + "'.");
     } catch (IOException e) {
       // Throw exception to make client exit code non-zero

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -35,7 +36,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 
 /**
@@ -53,13 +53,13 @@ public class TestOmKeyInfo {
         .setModificationTime(123L)
         .setDataSize(123L)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .build();
 
-    OmKeyInfo keyAfterSerialization =
-        OmKeyInfo.getFromProtobuf(key.getProtobuf(CURRENT_VERSION));
+    OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
+        key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
     Assert.assertEquals(key, keyAfterSerialization);
   }
@@ -83,7 +83,7 @@ public class TestOmKeyInfo {
         .setModificationTime(Time.now())
         .setDataSize(100L)
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
         .setOmKeyLocationInfos(
@@ -147,7 +147,7 @@ public class TestOmKeyInfo {
   Pipeline getPipeline() {
     return Pipeline.newBuilder()
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.EMPTY_LIST)
         .setState(Pipeline.PipelineState.OPEN)

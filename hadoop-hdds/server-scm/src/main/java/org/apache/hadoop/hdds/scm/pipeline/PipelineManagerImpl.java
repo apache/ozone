@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -169,7 +169,7 @@ public class PipelineManagerImpl implements PipelineManager {
     try {
       Pipeline pipeline = pipelineFactory.create(replicationConfig);
       stateManager.addPipeline(pipeline.getProtobufMessage(
-          ClientVersions.CURRENT_VERSION));
+          ClientVersion.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {

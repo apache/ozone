@@ -47,8 +47,10 @@ public class TenantAssignAdminHandler extends TenantHandler {
   private String tenantId;
 
   @CommandLine.Option(names = {"-d", "--delegated"}, defaultValue = "true",
-      description = "Make delegated admin")
+      description = "Set to true (default) to assign delegated admin")
   private boolean delegated;
+
+  // TODO: HDDS-6340. Add an option to print JSON result
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
@@ -57,7 +59,7 @@ public class TenantAssignAdminHandler extends TenantHandler {
     for (final String accessId : accessIds) {
       try {
         objStore.tenantAssignAdmin(accessId, tenantId, delegated);
-        // TODO: Make tenantAssignAdmin return accessId, tenantName, user later.
+        // TODO: Make tenantAssignAdmin return accessId, tenantId, user later.
         err().println("Assigned admin to '" + accessId +
             (tenantId != null ? "' in tenant '" + tenantId : "") + "'");
       } catch (IOException e) {

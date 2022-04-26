@@ -92,7 +92,7 @@ public class TestSCMContainerManagerMetrics {
         "NumSuccessfulCreateContainers", metrics);
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
@@ -101,7 +101,7 @@ public class TestSCMContainerManagerMetrics {
 
     try {
       containerManager.allocateContainer(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.THREE), OzoneConsts.OZONE);
       fail("testContainerOpsMetrics failed");
     } catch (IOException ex) {

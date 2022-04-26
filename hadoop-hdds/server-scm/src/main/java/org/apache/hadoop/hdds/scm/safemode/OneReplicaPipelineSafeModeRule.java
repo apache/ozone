@@ -164,7 +164,7 @@ public class OneReplicaPipelineSafeModeRule extends
   private void initializeRule(boolean refresh) {
 
     oldPipelineIDSet = pipelineManager.getPipelines(
-        new RatisReplicationConfig(ReplicationFactor.THREE),
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
         Pipeline.PipelineState.OPEN)
         .stream().map(p -> p.getId()).collect(Collectors.toSet());
 

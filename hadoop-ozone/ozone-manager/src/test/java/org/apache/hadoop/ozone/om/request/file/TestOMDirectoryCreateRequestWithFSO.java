@@ -115,7 +115,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = "a/b/c";
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
@@ -139,7 +139,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -242,7 +242,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -294,7 +294,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -357,7 +357,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
@@ -507,7 +507,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
@@ -546,7 +546,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
@@ -582,7 +582,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add volume and bucket entries to DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);

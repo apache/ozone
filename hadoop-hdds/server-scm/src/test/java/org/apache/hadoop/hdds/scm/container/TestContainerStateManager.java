@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -67,7 +67,7 @@ public class TestContainerStateManager {
   @Before
   public void init() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    scmhaManager = MockSCMHAManager.getInstance(true);
+    scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -76,10 +76,10 @@ public class TestContainerStateManager {
     pipelineManager = Mockito.mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
-            .setReplicationConfig(new StandaloneReplicationConfig(
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 ReplicationFactor.THREE))
             .setNodes(new ArrayList<>()).build();
-    when(pipelineManager.createPipeline(new StandaloneReplicationConfig(
+    when(pipelineManager.createPipeline(StandaloneReplicationConfig.getInstance(
         ReplicationFactor.THREE))).thenReturn(pipeline);
     when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
         .thenReturn(true);
@@ -120,7 +120,7 @@ public class TestContainerStateManager {
 
     //WHEN
     Set<ContainerReplica> replicas = containerStateManager
-        .getContainerReplicas(c1.containerID().getProtobuf());
+        .getContainerReplicas(c1.containerID());
 
     //THEN
     Assert.assertEquals(3, replicas.size());
@@ -140,7 +140,7 @@ public class TestContainerStateManager {
 
     //WHEN
     Set<ContainerReplica> replicas = containerStateManager
-        .getContainerReplicas(c1.containerID().getProtobuf());
+        .getContainerReplicas(c1.containerID());
 
     Assert.assertEquals(2, replicas.size());
     Assert.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
@@ -153,7 +153,7 @@ public class TestContainerStateManager {
         .setDatanodeDetails(node)
         .build();
     containerStateManager
-        .updateContainerReplica(cont.containerID().getProtobuf(), replica);
+        .updateContainerReplica(cont.containerID(), replica);
   }
 
   private ContainerInfo allocateContainer() throws IOException {

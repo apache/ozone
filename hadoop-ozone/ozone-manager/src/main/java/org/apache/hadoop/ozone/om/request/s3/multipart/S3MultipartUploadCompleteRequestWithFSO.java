@@ -22,7 +22,9 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -88,7 +90,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
-      String ozoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex) {
+      String ozoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex)
+      throws IOException {
 
     // Add key entry to file table.
     OMFileRequest.addFileTableCacheEntry(omMetadataManager, ozoneKey, omKeyInfo,
@@ -149,11 +152,17 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected OMClientResponse getOmClientResponse(String multipartKey,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> unUsedParts) {
+      List<OmKeyInfo> unUsedParts, OmBucketInfo omBucketInfo,
+      RepeatedOmKeyInfo oldKeyVersionsToDelete) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout());
+        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
 

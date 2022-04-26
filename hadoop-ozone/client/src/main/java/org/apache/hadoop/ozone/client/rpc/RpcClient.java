@@ -66,6 +66,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -89,7 +90,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -115,7 +116,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -144,10 +145,9 @@ import com.google.common.cache.RemovalNotification;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 
-import org.apache.hadoop.util.ComparableVersion;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
 import org.jetbrains.annotations.NotNull;
@@ -218,17 +218,21 @@ public class RpcClient implements ClientProtocol {
       ozoneManagerProtocolClientSideTranslatorPB.setS3AuthCheck(isS3);
       if (isS3) {
         // S3 Auth works differently and needs OM version to be at 2.0.0
-        String omVersion = conf.get(OZONE_OM_CLIENT_PROTOCOL_VERSION_KEY);
-        if (!validateOmVersion(omVersion, serviceInfoEx.getServiceInfoList())) {
+        OzoneManagerVersion minOmVersion = conf.getEnum(
+            OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
+            OzoneManagerVersion.DEFAULT_VERSION);
+        if (!validateOmVersion(
+            minOmVersion, serviceInfoEx.getServiceInfoList())) {
           if (LOG.isDebugEnabled()) {
             for (ServiceInfo s : serviceInfoEx.getServiceInfoList()) {
               LOG.debug("Node {} version {}", s.getHostname(),
-                  s.getProtobuf().getOMProtocolVersion());
+                  s.getProtobuf().getOMVersion());
             }
           }
-          throw new RuntimeException("OmVersion expected "
-              + omVersion
-              + ", not found in ServiceList");
+          throw new RuntimeException(
+              "Minimum OzoneManager version required is: " + minOmVersion
+              + ", in the service list there are not enough Ozone Managers"
+              + " meet the criteria.");
         }
       }
       String caCertPem = null;
@@ -298,20 +302,26 @@ public class RpcClient implements ClientProtocol {
     return xceiverClientManager;
   }
 
-  static boolean validateOmVersion(String expectedVersion,
+  static boolean validateOmVersion(OzoneManagerVersion minimumVersion,
                                    List<ServiceInfo> serviceInfoList) {
-    if (expectedVersion == null || expectedVersion.isEmpty()) {
-      // Empty strings assumes client is fine with any OM version.
+    if (minimumVersion == OzoneManagerVersion.FUTURE_VERSION) {
+      // A FUTURE_VERSION should not be expected ever.
+      throw new IllegalArgumentException("Configuration error, expected "
+          + "OzoneManager version config evaluates to a future version.");
+    }
+    // if expected version is unset or is the default, then any OM would do fine
+    if (minimumVersion == null
+        || minimumVersion == OzoneManagerVersion.DEFAULT_VERSION) {
       return true;
     }
+
     boolean found = false; // At min one OM should be present.
     for (ServiceInfo s: serviceInfoList) {
       if (s.getNodeType() == HddsProtos.NodeType.OM) {
-        ComparableVersion comparableExpectedVersion =
-            new ComparableVersion(expectedVersion);
-        ComparableVersion comparableOMVersion =
-            new ComparableVersion(s.getProtobuf().getOMProtocolVersion());
-        if (comparableOMVersion.compareTo(comparableExpectedVersion) < 0) {
+        OzoneManagerVersion omv =
+            OzoneManagerVersion
+                .fromProtoValue(s.getProtobuf().getOMVersion());
+        if (minimumVersion.compareTo(omv) > 0) {
           return false;
         } else {
           found = true;
@@ -541,8 +551,18 @@ public class RpcClient implements ClientProtocol {
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
 
-    String owner = bucketArgs.getOwner() == null ?
-            ugi.getShortUserName() : bucketArgs.getOwner();
+    final String owner;
+    // If S3 auth exists, set owner name to the short user name derived from the
+    //  accessId. Similar to RpcClient#getDEK
+    if (getThreadLocalS3Auth() != null) {
+      UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
+          getThreadLocalS3Auth().getAccessID());
+      owner = s3gUGI.getShortUserName();
+    } else {
+      owner = bucketArgs.getOwner() == null ?
+          ugi.getShortUserName() : bucketArgs.getOwner();
+    }
+
     Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
         Boolean.FALSE : bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
@@ -792,7 +812,7 @@ public class RpcClient implements ClientProtocol {
    * {@inheritDoc}
    */
   @Override
-  public DeleteTenantInfo deleteTenant(String tenantId) throws IOException {
+  public DeleteTenantState deleteTenant(String tenantId) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(tenantId),
         "tenantId cannot be null or empty.");
     return ozoneManagerClient.deleteTenant(tenantId);
@@ -877,11 +897,11 @@ public class RpcClient implements ClientProtocol {
 
   /**
    * List tenants.
-   * @return TenantInfoList
+   * @return TenantStateList
    * @throws IOException
    */
   @Override
-  public TenantInfoList listTenant() throws IOException {
+  public TenantStateList listTenant() throws IOException {
     return ozoneManagerClient.listTenant();
   }
 
@@ -1227,6 +1247,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public void renameKeys(String volumeName, String bucketName,
                          Map<String, String> keyMap) throws IOException {
     verifyVolumeName(volumeName);
@@ -1831,7 +1852,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void setTheadLocalS3Auth(
+  public void setThreadLocalS3Auth(
       S3Auth ozoneSharedSecretAuth) {
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
   }
@@ -1842,7 +1863,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void clearTheadLocalS3Auth() {
+  public void clearThreadLocalS3Auth() {
     ozoneManagerClient.clearThreadLocalS3Auth();
   }
 

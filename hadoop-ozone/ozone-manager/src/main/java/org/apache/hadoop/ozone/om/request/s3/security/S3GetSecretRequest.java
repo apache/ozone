@@ -184,12 +184,12 @@ public class S3GetSecretRequest extends OMClientRequest {
         assignS3SecretValue = null;
       }
 
-      // Throw ACCESSID_NOT_FOUND to the client if accessId doesn't exist
+      // Throw ACCESS_ID_NOT_FOUND to the client if accessId doesn't exist
       //  when createIfNotExist is false.
       if (awsSecret == null) {
         assert (!createIfNotExist);
         throw new OMException("accessId '" + accessId + "' doesn't exist",
-                OMException.ResultCodes.ACCESSID_NOT_FOUND);
+                OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
       }
 
       // Compose response

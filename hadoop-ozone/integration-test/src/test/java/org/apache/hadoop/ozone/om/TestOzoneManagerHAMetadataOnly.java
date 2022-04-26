@@ -46,8 +46,8 @@ import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.Test;
 
 import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
@@ -185,7 +185,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   /**
    * Test OMFailoverProxyProvider failover on connection exception to OM client.
    */
-  @Ignore("This test randomly failing. Let's enable once its fixed.")
+  @Flaky("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
@@ -234,7 +234,8 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     // Perform a manual failover of the proxy provider to move the
     // currentProxyIndex to a node other than the leader OM.
-    omFailoverProxyProvider.performFailoverToNextProxy();
+    omFailoverProxyProvider.selectNextOmProxy();
+    omFailoverProxyProvider.performFailover(null);
 
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
     Assert.assertNotEquals(leaderOMNodeId, newProxyNodeId);
@@ -305,7 +306,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
           OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 
       // Failover to the OM node that the objectStore points to
-      omFailoverProxyProvider.performFailoverIfRequired(
+      omFailoverProxyProvider.setNextOmProxy(
           ozoneManager.getOMNodeId());
 
       // A read request should result in the proxyProvider failing over to
@@ -318,32 +319,33 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     }
   }
 
-  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
-    String adminName = userName;
     ObjectStore objectStore = getObjectStore();
+
+    String prefix = "vol-" + RandomStringUtils.randomNumeric(10) + "-";
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(userName)
+        .build();
 
     Set<String> expectedVolumes = new TreeSet<>();
     for (int i = 0; i < 100; i++) {
-      String volumeName = "vol" + i;
+      String volumeName = prefix + i;
       expectedVolumes.add(volumeName);
-      VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-          .setOwner(userName)
-          .setAdmin(adminName)
-          .build();
       objectStore.createVolume(volumeName, createVolumeArgs);
     }
 
-    validateVolumesList(userName, expectedVolumes);
+    validateVolumesList(expectedVolumes,
+        objectStore.listVolumesByUser(userName, prefix, ""));
 
     // Stop leader OM, and then validate list volumes for user.
     stopLeaderOM();
     Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
 
-    validateVolumesList(userName, expectedVolumes);
-
+    validateVolumesList(expectedVolumes,
+        objectStore.listVolumesByUser(userName, prefix, ""));
   }
 
   @Test
@@ -460,13 +462,9 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   }
 
-  private void validateVolumesList(String userName,
-      Set<String> expectedVolumes) throws Exception {
-    ObjectStore objectStore = getObjectStore();
-
+  private void validateVolumesList(Set<String> expectedVolumes,
+      Iterator<? extends OzoneVolume> volumeIterator) {
     int expectedCount = 0;
-    Iterator<? extends OzoneVolume> volumeIterator =
-        objectStore.listVolumesByUser(userName, "", "");
 
     while (volumeIterator.hasNext()) {
       OzoneVolume next = volumeIterator.next();

@@ -24,7 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserAccessId;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.s3.S3Handler;
 
@@ -34,7 +34,8 @@ import picocli.CommandLine;
  * Command to list users in a tenant along with corresponding accessId.
  */
 @CommandLine.Command(name = "list",
-    description = "List Tenant Users")
+    aliases = {"ls"},
+    description = "List users in a tenant")
 public class TenantListUsersHandler extends S3Handler {
 
   @CommandLine.Spec
@@ -48,6 +49,8 @@ public class TenantListUsersHandler extends S3Handler {
       description = "Filter users with this prefix.")
   private String prefix;
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) {
     final ObjectStore objStore = client.getObjectStore();
@@ -59,8 +62,8 @@ public class TenantListUsersHandler extends S3Handler {
     try {
       TenantUserList usersInTenant =
           objStore.listUsersInTenant(tenantId, prefix);
-      for (TenantUserAccessId accessIdInfo : usersInTenant.getUserAccessIds()) {
-        out().println("- User '" + accessIdInfo.getUser() +
+      for (UserAccessIdInfo accessIdInfo : usersInTenant.getUserAccessIds()) {
+        out().println("- User '" + accessIdInfo.getUserPrincipal() +
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
       }
     } catch (IOException e) {

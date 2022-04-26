@@ -33,6 +33,14 @@
   },
   {
     "httpRequest": {
+      "path": "/service/roles/roles/name/tenantone-AdminRole"
+    },
+    "httpResponse": {
+      "body": "{id: 222, users: []}"
+    }
+  },
+  {
+    "httpRequest": {
       "path": "/service/roles/roles/222"
     },
     "httpResponse": {

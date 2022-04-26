@@ -83,6 +83,21 @@ public final class OMConfigKeys {
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
 
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.open.key.cleanup.service.interval";
+  public static final String
+      OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT = "24h";
+
+  public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD =
+      "ozone.om.open.key.expire.threshold";
+  public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT =
+      "7d";
+
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.open.key.cleanup.limit.per.task";
+  public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      1000;
+
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
@@ -292,6 +307,11 @@ public final class OMConfigKeys {
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
 
+  public static final String OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT =
+      "ozone.om.unflushed.transaction.max.count";
+  public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT
+      = 10000;
+
   /**
    * Temporary configuration properties for Ranger REST use in multitenancy.
    */
@@ -308,6 +328,9 @@ public final class OMConfigKeys {
       OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
   public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_USER =
       "ozone.om.ranger.https.admin.api.user";
+  // TODO: Note this should be removed once Ranger Java Client is in place.
+  //  And Ranger SPNEGO auth (ranger.spnego.kerberos.principal ?) should be used
+  //  instead. Or keep this solely for dev testing. See HDDS-5836.
   public static final String OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD =
       "ozone.om.ranger.https.admin.api.passwd";
   public static final String OZONE_RANGER_HTTPS_ADDRESS_KEY =

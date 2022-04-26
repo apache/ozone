@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -123,7 +123,7 @@ public class TestBlockManager {
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
     nodeManager = new MockNodeManager(true, 10);
-    scmHAManager = MockSCMHAManager.getInstance(true);
+    scmHAManager = SCMHAManagerStub.getInstance(true);
 
     eventQueue = new EventQueue();
     scmContext = SCMContext.emptyContext();
@@ -182,7 +182,8 @@ public class TestBlockManager {
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, mapping, scmContext);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
-    replicationConfig = new RatisReplicationConfig(ReplicationFactor.THREE);
+    replicationConfig = RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE);
 
     scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
   }

@@ -151,8 +151,7 @@ public class OmKeyLocationInfoGroup {
    */
   OmKeyLocationInfoGroup generateNextVersion(
       List<OmKeyLocationInfo> newLocationList) {
-    Map<Long, List<OmKeyLocationInfo>> newMap =
-        new HashMap<>();
+    Map<Long, List<OmKeyLocationInfo>> newMap = new HashMap<>();
     newMap.put(version + 1, new ArrayList<>(newLocationList));
     return new OmKeyLocationInfoGroup(version + 1, newMap);
   }

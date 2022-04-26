@@ -119,6 +119,7 @@ public class TestKeyValueHandler {
   /**
    * Test that Handler handles different command types correctly.
    */
+  @Test
   public void testHandlerCommandHandling() throws Exception {
     Mockito.reset(handler);
     // Test Create Container Request handling
@@ -136,7 +137,7 @@ public class TestKeyValueHandler {
     DispatcherContext context = new DispatcherContext.Builder().build();
     KeyValueHandler
         .dispatchRequest(handler, createContainerRequest, container, context);
-    Mockito.verify(handler, times(1)).handleCreateContainer(
+    Mockito.verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Read Container Request handling
@@ -195,20 +196,14 @@ public class TestKeyValueHandler {
     Mockito.verify(handler, times(1)).handleGetBlock(
         any(ContainerCommandRequestProto.class), any());
 
-    // Test Delete Block Request handling
-    ContainerCommandRequestProto deleteBlockRequest =
-        getDummyCommandRequestProto(ContainerProtos.Type.DeleteBlock);
-    KeyValueHandler
-        .dispatchRequest(handler, deleteBlockRequest, container, context);
-    Mockito.verify(handler, times(1)).handleDeleteBlock(
-        any(ContainerCommandRequestProto.class), any());
+    // Block Deletion is handled by BlockDeletingService and need not be
+    // tested here.
 
-    // Test List Block Request handling
     ContainerCommandRequestProto listBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
         .dispatchRequest(handler, listBlockRequest, container, context);
-    Mockito.verify(handler, times(2)).handleUnsupportedOp(
+    Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Read Chunk Request handling
@@ -219,13 +214,8 @@ public class TestKeyValueHandler {
     Mockito.verify(handler, times(1)).handleReadChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
-    // Test Delete Chunk Request handling
-    ContainerCommandRequestProto deleteChunkRequest =
-        getDummyCommandRequestProto(ContainerProtos.Type.DeleteChunk);
-    KeyValueHandler
-        .dispatchRequest(handler, deleteChunkRequest, container, context);
-    Mockito.verify(handler, times(1)).handleDeleteChunk(
-        any(ContainerCommandRequestProto.class), any());
+    // Chunk Deletion is handled by BlockDeletingService and need not be
+    // tested here.
 
     // Test Write Chunk Request handling
     ContainerCommandRequestProto writeChunkRequest =
@@ -240,7 +230,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
     KeyValueHandler
         .dispatchRequest(handler, listChunkRequest, container, context);
-    Mockito.verify(handler, times(3)).handleUnsupportedOp(
+    Mockito.verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Put Small File Request handling

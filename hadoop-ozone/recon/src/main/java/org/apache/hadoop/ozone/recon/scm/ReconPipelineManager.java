@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.ClientVersions;
+import org.apache.hadoop.ozone.ClientVersion;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -164,7 +164,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
     acquireWriteLock();
     try {
       getStateManager().addPipeline(
-          pipeline.getProtobufMessage(ClientVersions.CURRENT_VERSION));
+          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
     } finally {
       releaseWriteLock();
     }

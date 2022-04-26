@@ -82,7 +82,7 @@ public final class OzoneClientUtils {
       return null;
     }
     BaseFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-        volume, bucket, keyName, length, rpcClient);
+        volume, bucket, keyName, length, combineMode, rpcClient);
     helper.compute();
     return helper.getFileChecksum();
   }

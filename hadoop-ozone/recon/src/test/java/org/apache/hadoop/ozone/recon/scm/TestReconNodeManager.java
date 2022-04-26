@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -76,7 +77,7 @@ public class TestReconNodeManager {
     conf.set(OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    reconStorageConfig = new ReconStorageConfig(conf);
+    reconStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     versionManager = new HDDSLayoutVersionManager(
         reconStorageConfig.getLayoutVersion());
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
@@ -89,7 +90,8 @@ public class TestReconNodeManager {
 
   @Test
   public void testReconNodeDB() throws IOException, NodeNotFoundException {
-    ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf);
+    ReconStorageConfig scmStorageConfig =
+        new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     Table<UUID, DatanodeDetails> nodeTable =
@@ -174,7 +176,8 @@ public class TestReconNodeManager {
 
   @Test
   public void testUpdateNodeOperationalStateFromScm() throws Exception {
-    ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf);
+    ReconStorageConfig scmStorageConfig =
+        new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     Table<UUID, DatanodeDetails> nodeTable =
@@ -207,7 +210,8 @@ public class TestReconNodeManager {
 
   @Test
   public void testDatanodeUpdate() throws IOException {
-    ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf);
+    ReconStorageConfig scmStorageConfig =
+        new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     Table<UUID, DatanodeDetails> nodeTable =

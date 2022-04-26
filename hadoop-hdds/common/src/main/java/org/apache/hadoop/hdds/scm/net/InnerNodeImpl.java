@@ -138,7 +138,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       return true;
     }
     Node child = childrenMap.values().iterator().next();
-    return child instanceof InnerNode ? false : true;
+    return !(child instanceof InnerNode);
   }
 
   /**

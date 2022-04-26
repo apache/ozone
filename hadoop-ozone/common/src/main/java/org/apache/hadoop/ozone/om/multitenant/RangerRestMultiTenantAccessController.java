@@ -54,7 +54,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.*;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_OM_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_OM_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 
 /**
  * Access controller for multi-tenancy implemented using Ranger's REST API.
@@ -428,204 +437,200 @@ public class RangerRestMultiTenantAccessController
 
   private final JsonDeserializer<Policy> policyDeserializer =
       new JsonDeserializer<Policy>() {
-    @Override
-    public Policy deserialize(JsonElement jsonElement, Type type,
-        JsonDeserializationContext jsonDeserializationContext)
-        throws JsonParseException {
-      JsonObject policyJson = jsonElement.getAsJsonObject();
-      String name = policyJson.get("name").getAsString();
-      Policy policy = new Policy(name);
-      if (policyJson.has("description")) {
-        policy.setDescription(policyJson.get("description").getAsString());
-      }
-      policy.setEnabled(policyJson.get("isEnabled").getAsBoolean());
+        @Override public Policy deserialize(JsonElement jsonElement, Type type,
+            JsonDeserializationContext jsonDeserializationContext)
+            throws JsonParseException {
+          JsonObject policyJson = jsonElement.getAsJsonObject();
+          String name = policyJson.get("name").getAsString();
+          Policy policy = new Policy(name);
+          if (policyJson.has("description")) {
+            policy.setDescription(policyJson.get("description").getAsString());
+          }
+          policy.setEnabled(policyJson.get("isEnabled").getAsBoolean());
 
-      // Read volume, bucket, keys from json.
-      JsonObject resourcesJson = policyJson.get("resources").getAsJsonObject();
-      // All Ozone Ranger policies specify at least a volume.
-      JsonObject jsonVolumeResource =
-          resourcesJson.get("volume").getAsJsonObject();
-      JsonArray volumes = jsonVolumeResource.get("values").getAsJsonArray();
-      volumes.forEach(vol -> policy.addVolumes(vol.getAsString()));
+          // Read volume, bucket, keys from json.
+          JsonObject resourcesJson =
+              policyJson.get("resources").getAsJsonObject();
+          // All Ozone Ranger policies specify at least a volume.
+          JsonObject jsonVolumeResource =
+              resourcesJson.get("volume").getAsJsonObject();
+          JsonArray volumes = jsonVolumeResource.get("values").getAsJsonArray();
+          volumes.forEach(vol -> policy.addVolumes(vol.getAsString()));
 
-      if (resourcesJson.has("bucket")) {
-        JsonObject jsonBucketResource =
-            resourcesJson.get("bucket").getAsJsonObject();
-        JsonArray buckets = jsonBucketResource.get("values").getAsJsonArray();
-        buckets.forEach(bucket -> policy.addBuckets(bucket.getAsString()));
-      }
-
-      if (resourcesJson.has("key")) {
-        JsonObject jsonKeysResource =
-            resourcesJson.get("key").getAsJsonObject();
-        JsonArray keys = jsonKeysResource.get("values").getAsJsonArray();
-        keys.forEach(key -> policy.addKeys(key.getAsString()));
-      }
-
-      // Read Roles and their ACLs.
-      JsonArray policyItemsJson = policyJson.getAsJsonArray("policyItems");
-      for (JsonElement policyItemElement: policyItemsJson) {
-        JsonObject policyItemJson = policyItemElement.getAsJsonObject();
-        JsonArray jsonRoles = policyItemJson.getAsJsonArray("roles");
-        JsonArray jsonAclArray = policyItemJson.getAsJsonArray("accesses");
-
-        for (JsonElement jsonAclElem: jsonAclArray) {
-          JsonObject jsonAcl = jsonAclElem.getAsJsonObject();
-          String aclType = jsonAcl.get("type").getAsString();
-          Acl acl;
-          if (jsonAcl.get("isAllowed").getAsBoolean()) {
-            acl = Acl.allow(stringToAcl.get(aclType));
-          } else {
-            acl = Acl.deny(stringToAcl.get(aclType));
+          if (resourcesJson.has("bucket")) {
+            JsonObject jsonBucketResource =
+                resourcesJson.get("bucket").getAsJsonObject();
+            JsonArray buckets =
+                jsonBucketResource.get("values").getAsJsonArray();
+            buckets.forEach(bucket -> policy.addBuckets(bucket.getAsString()));
           }
 
-          for (JsonElement roleNameJson: jsonRoles) {
-            policy.addRoleAcls(roleNameJson.getAsString(), acl);
+          if (resourcesJson.has("key")) {
+            JsonObject jsonKeysResource =
+                resourcesJson.get("key").getAsJsonObject();
+            JsonArray keys = jsonKeysResource.get("values").getAsJsonArray();
+            keys.forEach(key -> policy.addKeys(key.getAsString()));
           }
+
+          // Read Roles and their ACLs.
+          JsonArray policyItemsJson = policyJson.getAsJsonArray("policyItems");
+          for (JsonElement policyItemElement : policyItemsJson) {
+            JsonObject policyItemJson = policyItemElement.getAsJsonObject();
+            JsonArray jsonRoles = policyItemJson.getAsJsonArray("roles");
+            JsonArray jsonAclArray = policyItemJson.getAsJsonArray("accesses");
+
+            for (JsonElement jsonAclElem : jsonAclArray) {
+              JsonObject jsonAcl = jsonAclElem.getAsJsonObject();
+              String aclType = jsonAcl.get("type").getAsString();
+              Acl acl;
+              if (jsonAcl.get("isAllowed").getAsBoolean()) {
+                acl = Acl.allow(stringToAcl.get(aclType));
+              } else {
+                acl = Acl.deny(stringToAcl.get(aclType));
+              }
+
+              for (JsonElement roleNameJson : jsonRoles) {
+                policy.addRoleAcls(roleNameJson.getAsString(), acl);
+              }
+            }
+          }
+
+          return policy;
         }
-      }
-
-      return policy;
-    }
-  };
+      };
 
   private final JsonDeserializer<Role> roleDeserializer =
       new JsonDeserializer<Role>() {
-    @Override
-    public Role deserialize(JsonElement jsonElement, Type type,
-        JsonDeserializationContext jsonDeserializationContext)
-        throws JsonParseException {
-      JsonObject roleJson = jsonElement.getAsJsonObject();
-      String name = roleJson.get("name").getAsString();
-      Role role = new Role(name);
-      if (roleJson.has("description")) {
-        role.setDescription(roleJson.get("description").getAsString());
-      }
-      for (JsonElement jsonUser: roleJson.get("users").getAsJsonArray()) {
-        String userName =
-            jsonUser.getAsJsonObject().get("name").getAsString();
-        role.addUsers(new BasicUserPrincipal(userName));
-      }
+        @Override public Role deserialize(JsonElement jsonElement, Type type,
+            JsonDeserializationContext jsonDeserializationContext)
+            throws JsonParseException {
+          JsonObject roleJson = jsonElement.getAsJsonObject();
+          String name = roleJson.get("name").getAsString();
+          Role role = new Role(name);
+          if (roleJson.has("description")) {
+            role.setDescription(roleJson.get("description").getAsString());
+          }
+          for (JsonElement jsonUser : roleJson.get("users").getAsJsonArray()) {
+            String userName =
+                jsonUser.getAsJsonObject().get("name").getAsString();
+            role.addUsers(new BasicUserPrincipal(userName));
+          }
 
-      return role;
-    }
-  };
+          return role;
+        }
+      };
 
   private final JsonSerializer<Policy> policySerializer =
       new JsonSerializer<Policy>() {
-    @Override
-    public JsonElement serialize(Policy javaPolicy, Type typeOfSrc,
-        JsonSerializationContext context) {
-      JsonObject jsonPolicy = new JsonObject();
-      jsonPolicy.addProperty("name", javaPolicy.getName());
-      jsonPolicy.addProperty("service", rangerService);
-      jsonPolicy.addProperty("isEnabled", javaPolicy.isEnabled());
-      if (javaPolicy.getDescription().isPresent()) {
-        jsonPolicy.addProperty("description",
-            javaPolicy.getDescription().get());
-      }
+        @Override public JsonElement serialize(Policy javaPolicy,
+            Type typeOfSrc, JsonSerializationContext context) {
+          JsonObject jsonPolicy = new JsonObject();
+          jsonPolicy.addProperty("name", javaPolicy.getName());
+          jsonPolicy.addProperty("service", rangerService);
+          jsonPolicy.addProperty("isEnabled", javaPolicy.isEnabled());
+          if (javaPolicy.getDescription().isPresent()) {
+            jsonPolicy.addProperty("description",
+                javaPolicy.getDescription().get());
+          }
 
-      // All resources under this policy are added to this object.
-      JsonObject jsonResources = new JsonObject();
+          // All resources under this policy are added to this object.
+          JsonObject jsonResources = new JsonObject();
 
-      // Add volumes. Ranger requires at least one volume to be specified.
-      JsonArray jsonVolumeNameArray = new JsonArray();
-      for (String volumeName: javaPolicy.getVolumes()) {
-        jsonVolumeNameArray.add(new JsonPrimitive(volumeName));
-      }
-      JsonObject jsonVolumeResource = new JsonObject();
-      jsonVolumeResource.add("values", jsonVolumeNameArray);
-      jsonVolumeResource.addProperty("isRecursive", false);
-      jsonVolumeResource.addProperty("isExcludes", false);
-      jsonResources.add("volume", jsonVolumeResource);
+          // Add volumes. Ranger requires at least one volume to be specified.
+          JsonArray jsonVolumeNameArray = new JsonArray();
+          for (String volumeName : javaPolicy.getVolumes()) {
+            jsonVolumeNameArray.add(new JsonPrimitive(volumeName));
+          }
+          JsonObject jsonVolumeResource = new JsonObject();
+          jsonVolumeResource.add("values", jsonVolumeNameArray);
+          jsonVolumeResource.addProperty("isRecursive", false);
+          jsonVolumeResource.addProperty("isExcludes", false);
+          jsonResources.add("volume", jsonVolumeResource);
 
-      // Add buckets.
-      JsonArray jsonBucketNameArray = new JsonArray();
-      for (String bucketName: javaPolicy.getBuckets()) {
-        jsonBucketNameArray.add(new JsonPrimitive(bucketName));
-      }
+          // Add buckets.
+          JsonArray jsonBucketNameArray = new JsonArray();
+          for (String bucketName : javaPolicy.getBuckets()) {
+            jsonBucketNameArray.add(new JsonPrimitive(bucketName));
+          }
 
-      if (jsonBucketNameArray.size() > 0) {
-        JsonObject jsonBucketResource = new JsonObject();
-        jsonBucketResource.add("values", jsonBucketNameArray);
-        jsonBucketResource.addProperty("isRecursive", false);
-        jsonBucketResource.addProperty("isExcludes", false);
-        jsonResources.add("bucket", jsonBucketResource);
-      }
+          if (jsonBucketNameArray.size() > 0) {
+            JsonObject jsonBucketResource = new JsonObject();
+            jsonBucketResource.add("values", jsonBucketNameArray);
+            jsonBucketResource.addProperty("isRecursive", false);
+            jsonBucketResource.addProperty("isExcludes", false);
+            jsonResources.add("bucket", jsonBucketResource);
+          }
 
-      // Add keys.
-      JsonArray jsonKeyNameArray = new JsonArray();
-      for (String keyName: javaPolicy.getKeys()) {
-        jsonKeyNameArray.add(new JsonPrimitive(keyName));
-      }
-      if (jsonKeyNameArray.size() > 0) {
-        JsonObject jsonKeyResource = new JsonObject();
-        jsonKeyResource.add("values", jsonKeyNameArray);
-        jsonKeyResource.addProperty("isRecursive", false);
-        jsonKeyResource.addProperty("isExcludes", false);
-        jsonResources.add("key", jsonKeyResource);
-      }
+          // Add keys.
+          JsonArray jsonKeyNameArray = new JsonArray();
+          for (String keyName : javaPolicy.getKeys()) {
+            jsonKeyNameArray.add(new JsonPrimitive(keyName));
+          }
+          if (jsonKeyNameArray.size() > 0) {
+            JsonObject jsonKeyResource = new JsonObject();
+            jsonKeyResource.add("values", jsonKeyNameArray);
+            jsonKeyResource.addProperty("isRecursive", false);
+            jsonKeyResource.addProperty("isExcludes", false);
+            jsonResources.add("key", jsonKeyResource);
+          }
 
-      jsonPolicy.add("resources", jsonResources);
+          jsonPolicy.add("resources", jsonResources);
 
-      // Add roles and their acls to the policy.
-      JsonArray jsonPolicyItemArray = new JsonArray();
+          // Add roles and their acls to the policy.
+          JsonArray jsonPolicyItemArray = new JsonArray();
 
-      // Make a new policy item for each role in the map.
-      Map<String, Collection<Acl>> roleAcls = javaPolicy.getRoleAcls();
-      for (Map.Entry<String, Collection<Acl>> entry: roleAcls.entrySet()) {
-        // Add role to the policy item.
-        String roleName = entry.getKey();
-        JsonObject jsonPolicyItem = new JsonObject();
-        JsonArray jsonRoles = new JsonArray();
-        jsonRoles.add(new JsonPrimitive(roleName));
-        jsonPolicyItem.add("roles", jsonRoles);
+          // Make a new policy item for each role in the map.
+          Map<String, Collection<Acl>> roleAcls = javaPolicy.getRoleAcls();
+          for (Map.Entry<String, Collection<Acl>> entry : roleAcls.entrySet()) {
+            // Add role to the policy item.
+            String roleName = entry.getKey();
+            JsonObject jsonPolicyItem = new JsonObject();
+            JsonArray jsonRoles = new JsonArray();
+            jsonRoles.add(new JsonPrimitive(roleName));
+            jsonPolicyItem.add("roles", jsonRoles);
 
-        // Add acls to the policy item.
-        JsonArray jsonAclArray = new JsonArray();
-        for (Acl acl: entry.getValue()) {
-          JsonObject jsonAcl  = new JsonObject();
-          jsonAcl.addProperty("type",
-              aclToString.get(acl.getAclType()));
-          jsonAcl.addProperty("isAllowed", acl.isAllowed());
-          jsonAclArray.add(jsonAcl);
-          jsonPolicyItem.add("accesses", jsonAclArray);
+            // Add acls to the policy item.
+            JsonArray jsonAclArray = new JsonArray();
+            for (Acl acl : entry.getValue()) {
+              JsonObject jsonAcl = new JsonObject();
+              jsonAcl.addProperty("type", aclToString.get(acl.getAclType()));
+              jsonAcl.addProperty("isAllowed", acl.isAllowed());
+              jsonAclArray.add(jsonAcl);
+              jsonPolicyItem.add("accesses", jsonAclArray);
+            }
+            jsonPolicyItemArray.add(jsonPolicyItem);
+          }
+          jsonPolicy.add("policyItems", jsonPolicyItemArray);
+
+          return jsonPolicy;
         }
-        jsonPolicyItemArray.add(jsonPolicyItem);
-      }
-      jsonPolicy.add("policyItems", jsonPolicyItemArray);
-
-      return jsonPolicy;
-    }
-  };
+      };
 
   private final JsonSerializer<Role> roleSerializer =
       new JsonSerializer<Role>() {
-    @Override
-    public JsonElement serialize(Role javaRole, Type typeOfSrc,
-        JsonSerializationContext context) {
-      JsonObject jsonRole = new JsonObject();
-      jsonRole.addProperty("name", javaRole.getName());
+        @Override public JsonElement serialize(Role javaRole, Type typeOfSrc,
+            JsonSerializationContext context) {
+          JsonObject jsonRole = new JsonObject();
+          jsonRole.addProperty("name", javaRole.getName());
 
-      JsonArray jsonUserArray = new JsonArray();
-      for (BasicUserPrincipal javaUser: javaRole.getUsers()) {
-        jsonUserArray.add(jsonConverter.toJsonTree(javaUser));
-      }
+          JsonArray jsonUserArray = new JsonArray();
+          for (BasicUserPrincipal javaUser : javaRole.getUsers()) {
+            jsonUserArray.add(jsonConverter.toJsonTree(javaUser));
+          }
 
-      jsonRole.add("users", jsonUserArray);
-      return jsonRole;
-    }
-  };
+          jsonRole.add("users", jsonUserArray);
+          return jsonRole;
+        }
+      };
 
   private final JsonSerializer<BasicUserPrincipal> userSerializer =
       new JsonSerializer<BasicUserPrincipal>() {
-    @Override
-    public JsonElement serialize(BasicUserPrincipal user, Type typeOfSrc,
-                                 JsonSerializationContext context) {
-        JsonObject jsonMember = new JsonObject();
-        jsonMember.addProperty("name", user.getName());
-        jsonMember.addProperty("isAdmin", false);
-        return jsonMember;
-    }
-  };
+        @Override public JsonElement serialize(BasicUserPrincipal user,
+            Type typeOfSrc, JsonSerializationContext context) {
+          JsonObject jsonMember = new JsonObject();
+          jsonMember.addProperty("name", user.getName());
+          jsonMember.addProperty("isAdmin", false);
+          return jsonMember;
+        }
+      };
 }

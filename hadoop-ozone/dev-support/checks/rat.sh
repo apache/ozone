@@ -21,7 +21,9 @@ mkdir -p "$REPORT_DIR"
 
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-cd hadoop-hdds || exit 1
+cd dev-support/annotations || exit 1
+mvn -B -fn org.apache.rat:apache-rat-plugin:0.13:check
+cd ../../hadoop-hdds || exit 1
 mvn -B -fn org.apache.rat:apache-rat-plugin:0.13:check
 cd ../hadoop-ozone || exit 1
 mvn -B -fn org.apache.rat:apache-rat-plugin:0.13:check

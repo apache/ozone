@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBKerberosPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -35,8 +35,6 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_GROUP_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE;
 
 /**
  * Response for OMAssignUserToTenantRequest.
@@ -44,35 +42,29 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ROLE_TABLE
 @CleanupTableInfo(cleanupTables = {
     S3_SECRET_TABLE,
     TENANT_ACCESS_ID_TABLE,
-    PRINCIPAL_TO_ACCESS_IDS_TABLE,
-    TENANT_GROUP_TABLE,
-    TENANT_ROLE_TABLE
+    PRINCIPAL_TO_ACCESS_IDS_TABLE
 })
 public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
 
   private S3SecretValue s3SecretValue;
-  private String principal, groupName, roleName, accessId;
+  private String principal, accessId;
   private OmDBAccessIdInfo omDBAccessIdInfo;
-  private OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo;
+  private OmDBUserPrincipalInfo omDBUserPrincipalInfo;
 
   @SuppressWarnings("checkstyle:parameternumber")
   public OMTenantAssignUserAccessIdResponse(@Nonnull OMResponse omResponse,
       @Nonnull S3SecretValue s3SecretValue,
       @Nonnull String principal,
-      @Nonnull String groupName,
-      @Nonnull String roleName,
       @Nonnull String accessId,
       @Nonnull OmDBAccessIdInfo omDBAccessIdInfo,
-      @Nonnull OmDBKerberosPrincipalInfo omDBKerberosPrincipalInfo
+      @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo
   ) {
     super(omResponse);
     this.s3SecretValue = s3SecretValue;
     this.principal = principal;
-    this.groupName = groupName;
-    this.roleName = roleName;
     this.accessId = accessId;
     this.omDBAccessIdInfo = omDBAccessIdInfo;
-    this.omDBKerberosPrincipalInfo = omDBKerberosPrincipalInfo;
+    this.omDBUserPrincipalInfo = omDBUserPrincipalInfo;
   }
 
   /**
@@ -98,11 +90,7 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
     omMetadataManager.getTenantAccessIdTable().putWithBatch(
         batchOperation, accessId, omDBAccessIdInfo);
     omMetadataManager.getPrincipalToAccessIdsTable().putWithBatch(
-        batchOperation, principal, omDBKerberosPrincipalInfo);
-    omMetadataManager.getTenantGroupTable().putWithBatch(
-        batchOperation, accessId, groupName);
-    omMetadataManager.getTenantRoleTable().putWithBatch(
-        batchOperation, accessId, roleName);
+        batchOperation, principal, omDBUserPrincipalInfo);
   }
 
   @VisibleForTesting

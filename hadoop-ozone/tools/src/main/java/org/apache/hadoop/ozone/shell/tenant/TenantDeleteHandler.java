@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -35,11 +35,13 @@ public class TenantDeleteHandler extends TenantHandler {
   @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
   private String tenantId;
 
+  // TODO: HDDS-6340. Add an option to print JSON result
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
     try {
-      final DeleteTenantInfo resp =
+      final DeleteTenantState resp =
           client.getObjectStore().deleteTenant(tenantId);
       out().println("Deleted tenant '" + tenantId + "'.");
       long volumeRefCount = resp.getVolRefCount();

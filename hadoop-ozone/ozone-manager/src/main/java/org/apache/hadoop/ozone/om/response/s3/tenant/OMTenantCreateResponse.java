@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.s3.tenant;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_POLICY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
@@ -40,28 +39,23 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
  */
 @CleanupTableInfo(cleanupTables = {
     TENANT_STATE_TABLE,
-    TENANT_POLICY_TABLE,
     VOLUME_TABLE
 })
 public class OMTenantCreateResponse extends OMClientResponse {
 
   private OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
-
-  private OmDBTenantInfo omTenantInfo;
-  private String userPolicyId;
+  private OmDBTenantState omTenantState;
 
   public OMTenantCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmVolumeArgs omVolumeArgs,
       @Nonnull OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo,
-      @Nonnull OmDBTenantInfo omTenantInfo,
-      @Nonnull String userPolicyId
+      @Nonnull OmDBTenantState omTenantState
   ) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;
-    this.omTenantInfo = omTenantInfo;
-    this.userPolicyId = userPolicyId;
+    this.omTenantState = omTenantState;
   }
 
   /**
@@ -77,14 +71,9 @@ public class OMTenantCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    final String tenantId = omTenantInfo.getTenantId();
+    final String tenantId = omTenantState.getTenantId();
     omMetadataManager.getTenantStateTable().putWithBatch(
-        batchOperation, tenantId, omTenantInfo);
-
-    final String userPolicyGroupName =
-        omTenantInfo.getUserPolicyGroupName();
-    omMetadataManager.getTenantPolicyTable().putWithBatch(
-        batchOperation, userPolicyGroupName, userPolicyId);
+        batchOperation, tenantId, omTenantState);
 
     // From OMVolumeCreateResponse
     String dbVolumeKey =
@@ -99,7 +88,7 @@ public class OMTenantCreateResponse extends OMClientResponse {
   }
 
   @VisibleForTesting
-  public OmDBTenantInfo getOmDBTenantInfo() {
-    return omTenantInfo;
+  public OmDBTenantState getOmDBTenantState() {
+    return omTenantState;
   }
 }

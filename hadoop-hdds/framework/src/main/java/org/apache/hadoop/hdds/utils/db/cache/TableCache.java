@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability.Evolving;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 
 /**
@@ -107,9 +108,8 @@ public interface TableCache<CACHEKEY extends CacheKey,
    */
   CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey);
 
-
   @VisibleForTesting
-  Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
+  NavigableMap<Long, Set<CACHEKEY>> getEpochEntries();
 
   /**
    * Cache completeness.

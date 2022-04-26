@@ -36,7 +36,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_
  */
 @CleanupTableInfo(cleanupTables = {
     TENANT_ACCESS_ID_TABLE
-//    TENANT_ROLE_TABLE
 })
 public class OMTenantAssignAdminResponse extends OMClientResponse {
 

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
@@ -50,7 +51,7 @@ public final class ServiceInfo {
   /**
    * Protocol version for client.
    */
-  private String omClientProtocolVersion;
+  private OzoneManagerVersion omVersion;
 
   /**
    * List of ports the service listens to.
@@ -73,13 +74,13 @@ public final class ServiceInfo {
   private ServiceInfo(NodeType nodeType,
                       String hostname,
                       List<ServicePort> portList,
-                      String omClientProtocolVersion,
+                      OzoneManagerVersion omVersion,
                       OMRoleInfo omRole) {
     Preconditions.checkNotNull(nodeType);
     Preconditions.checkNotNull(hostname);
     this.nodeType = nodeType;
     this.hostname = hostname;
-    this.omClientProtocolVersion = omClientProtocolVersion;
+    this.omVersion = omVersion;
     this.ports = new HashMap<>();
     for (ServicePort port : portList) {
       ports.put(port.getType(), port.getValue());
@@ -163,8 +164,8 @@ public final class ServiceInfo {
     builder.setNodeType(nodeType)
         .setHostname(hostname)
         .addAllServicePorts(servicePorts);
-    if (omClientProtocolVersion != null) {
-      builder.setOMProtocolVersion(omClientProtocolVersion);
+    if (omVersion != null) {
+      builder.setOMVersion(omVersion.toProtoValue());
     }
     if (nodeType == NodeType.OM && omRoleInfo != null) {
       builder.setOmRole(omRoleInfo);
@@ -183,7 +184,7 @@ public final class ServiceInfo {
     return new ServiceInfo(serviceInfo.getNodeType(),
         serviceInfo.getHostname(),
         serviceInfo.getServicePortsList(),
-        serviceInfo.getOMProtocolVersion(),
+        OzoneManagerVersion.fromProtoValue(serviceInfo.getOMVersion()),
         serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null);
   }
 
@@ -204,22 +205,22 @@ public final class ServiceInfo {
     private String host;
     private List<ServicePort> portList = new ArrayList<>();
     private OMRoleInfo omRoleInfo;
-    private String omClientProtocolVersion;
+    private OzoneManagerVersion omVersion;
 
     /**
      * Gets the Om Client Protocol Version.
      * @return om client protocol version as a string.
      */
-    public String getOmClientProtocolVersion() {
-      return omClientProtocolVersion;
+    public OzoneManagerVersion getOmVersion() {
+      return omVersion;
     }
 
     /**
      * Sets the Om Client Protocol Version.
      * @param omClientProtocolVer the client protocol version supported.
      */
-    public Builder setOmClientProtocolVersion(String omClientProtocolVer) {
-      this.omClientProtocolVersion = omClientProtocolVer;
+    public Builder setOmVersion(OzoneManagerVersion omClientProtocolVer) {
+      this.omVersion = omClientProtocolVer;
       return this;
     }
 
@@ -266,7 +267,7 @@ public final class ServiceInfo {
       return new ServiceInfo(node,
           host,
           portList,
-          omClientProtocolVersion,
+          omVersion,
           omRoleInfo);
     }
   }

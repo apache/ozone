@@ -349,6 +349,9 @@ public class OMRangerBGSync implements Runnable, Closeable {
   }
 
   public void processAllPoliciesFromOMDB() throws Exception {
+
+    /* TODO: Refactor this chunk of commented code below,
+        after the removal of TenantPolicyTable
     TableIterator<String, ? extends Table.KeyValue<String, String>>
         policyTableIterator =
         ozoneManager.getMetadataManager().getTenantPolicyTable().iterator();
@@ -370,6 +373,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
         }
       }
     }
+     */
 
     for (String policy: mtRangerPoliciesTobeCreated.keySet()) {
       // TODO : Currently we are not maintaining enough information in OMDB
@@ -399,6 +403,9 @@ public class OMRangerBGSync implements Runnable, Closeable {
     // We have following info in OMDB
     //  tenantRoleTable: accessId -> roles [admin, roleB, ...]
     //  tenantAccessIdTable : accessId -> OmDBAccessIdInfo
+
+    /* TODO: Refactor this chunk of commented code below,
+        after the removal of TenantRoleTable
     TableIterator<String, ? extends Table.KeyValue<String, String>>
         roleTableIterator =
         ozoneManager.getMetadataManager().getTenantRoleTable().iterator();
@@ -419,6 +426,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
         mtOMDBRoles.put(rolename, users);
       }
     }
+     */
   }
 
   public void processAllRolesFromOMDB() throws Exception {

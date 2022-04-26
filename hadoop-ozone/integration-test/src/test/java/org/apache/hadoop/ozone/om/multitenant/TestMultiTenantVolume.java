@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESSID;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -58,10 +58,10 @@ public class TestMultiTenantVolume {
   private static MiniOzoneCluster cluster;
   private static String s3VolumeName;
 
-  private static final String TENANT_NAME = "tenant";
+  private static final String TENANT_ID = "tenant";
   private static final String USER_PRINCIPAL = "username";
   private static final String BUCKET_NAME = "bucket";
-  private static final String ACCESS_ID = UUID.randomUUID().toString();
+  private static final String ACCESS_ID = "tenant$username";
 
   @BeforeClass
   public static void initClusterProvider() throws Exception {
@@ -99,21 +99,21 @@ public class TestMultiTenantVolume {
     expectFailurePreFinalization(
         store::listTenant);
     expectFailurePreFinalization(() ->
-        store.listUsersInTenant(TENANT_NAME, ""));
+        store.listUsersInTenant(TENANT_ID, ""));
     expectFailurePreFinalization(() ->
         store.tenantGetUserInfo(USER_PRINCIPAL));
     expectFailurePreFinalization(() ->
-        store.createTenant(TENANT_NAME));
+        store.createTenant(TENANT_ID));
     expectFailurePreFinalization(() ->
-        store.tenantAssignUserAccessId(USER_PRINCIPAL, TENANT_NAME, ACCESS_ID));
+        store.tenantAssignUserAccessId(USER_PRINCIPAL, TENANT_ID, ACCESS_ID));
     expectFailurePreFinalization(() ->
-        store.tenantAssignAdmin(USER_PRINCIPAL, TENANT_NAME, true));
+        store.tenantAssignAdmin(USER_PRINCIPAL, TENANT_ID, true));
     expectFailurePreFinalization(() ->
-        store.tenantRevokeAdmin(ACCESS_ID, TENANT_NAME));
+        store.tenantRevokeAdmin(ACCESS_ID, TENANT_ID));
     expectFailurePreFinalization(() ->
         store.tenantRevokeUserAccessId(ACCESS_ID));
     expectFailurePreFinalization(() ->
-        store.deleteTenant(TENANT_NAME));
+        store.deleteTenant(TENANT_ID));
 
     // S3 get/set/revoke secret APIs still work before finalization
     final String accessId = "testUser1accessId1";
@@ -182,16 +182,16 @@ public class TestMultiTenantVolume {
 
     ObjectStore store = getStoreForAccessID(ACCESS_ID);
 
-    store.createTenant(TENANT_NAME);
-    store.tenantAssignUserAccessId(USER_PRINCIPAL, TENANT_NAME, ACCESS_ID);
+    store.createTenant(TENANT_ID);
+    store.tenantAssignUserAccessId(USER_PRINCIPAL, TENANT_ID, ACCESS_ID);
 
     // S3 volume pointed to by the store should be for the tenant.
-    Assert.assertEquals(TENANT_NAME, store.getS3Volume().getName());
+    Assert.assertEquals(TENANT_ID, store.getS3Volume().getName());
 
     // Create bucket in the tenant volume.
     store.createS3Bucket(BUCKET_NAME);
     OzoneBucket bucket = store.getS3Bucket(BUCKET_NAME);
-    Assert.assertEquals(TENANT_NAME, bucket.getVolumeName());
+    Assert.assertEquals(TENANT_ID, bucket.getVolumeName());
 
     // A different user should not see bucket, since they will be directed to
     // the s3 volume.
@@ -203,7 +203,7 @@ public class TestMultiTenantVolume {
     assertS3BucketNotFound(store, BUCKET_NAME);
 
     store.tenantRevokeUserAccessId(ACCESS_ID);
-    store.deleteTenant(TENANT_NAME);
+    store.deleteTenant(TENANT_ID);
   }
 
   /**
@@ -240,7 +240,7 @@ public class TestMultiTenantVolume {
     // provided one so we can specify the access ID.
     RpcClient client = new RpcClient(conf, null);
     // userPrincipal is set to be the same as accessId for the test
-    client.setTheadLocalS3Auth(
+    client.setThreadLocalS3Auth(
         new S3Auth("unused1", "unused2", accessID, accessID));
     return new ObjectStore(conf, client);
   }
@@ -257,7 +257,7 @@ public class TestMultiTenantVolume {
             .getOmRangerStateTable()
             .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
     if (version != trialVersion) {
-      throw new OMException(INVALID_ACCESSID);
+      throw new OMException(INVALID_ACCESS_ID);
     }
   }
 }

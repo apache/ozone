@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
-import org.apache.hadoop.ozone.om.helpers.DeleteTenantInfo;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.TenantInfoList;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -607,7 +607,7 @@ public interface OzoneManagerProtocol
    * @return DeleteTenantResponse
    * @throws IOException
    */
-  default DeleteTenantInfo deleteTenant(String tenantId)
+  default DeleteTenantState deleteTenant(String tenantId)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
@@ -616,13 +616,13 @@ public interface OzoneManagerProtocol
   /**
    * Assign user to a tenant.
    * @param username user name to be assigned.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param accessId access ID.
    * @return S3SecretValue
    * @throws IOException
    */
   default S3SecretValue tenantAssignUserAccessId(String username,
-                                                 String tenantName,
+                                                 String tenantId,
                                                  String accessId)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
@@ -644,12 +644,12 @@ public interface OzoneManagerProtocol
   /**
    * Assign admin role to a user identified by an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @param delegated true if making delegated admin.
    * @throws IOException
    */
   default void tenantAssignAdmin(String accessId,
-                                 String tenantName,
+                                 String tenantId,
                                  boolean delegated)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
@@ -659,11 +659,11 @@ public interface OzoneManagerProtocol
   /**
    * Revoke admin role of an accessId in a tenant.
    * @param accessId access ID.
-   * @param tenantName tenant name.
+   * @param tenantId tenant name.
    * @throws IOException
    */
   default void tenantRevokeAdmin(String accessId,
-                                 String tenantName) throws IOException {
+                                 String tenantId) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
   }
@@ -677,15 +677,15 @@ public interface OzoneManagerProtocol
   TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException;
 
-  TenantUserList listUsersInTenant(String tenantName, String prefix)
+  TenantUserList listUsersInTenant(String tenantId, String prefix)
       throws IOException;
 
   /**
    * List tenants.
-   * @return TenantInfoList
+   * @return TenantStateList
    * @throws IOException
    */
-  TenantInfoList listTenant() throws IOException;
+  TenantStateList listTenant() throws IOException;
 
   /**
    * OzoneFS api to get file status for an entry.
