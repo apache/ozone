@@ -95,7 +95,7 @@ public class TestS3GetSecretRequest {
   private static final String TENANT_ID = "finance";
   private static final String USER_BOB = "bob@EXAMPLE.COM";
   private static final String ACCESS_ID_BOB =
-      TENANT_ID + TENANT_ID_USERNAME_DELIMITER + USER_BOB;
+      OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB);
 
   private UserGroupInformation ugiAlice;
 
@@ -382,8 +382,6 @@ public class TestS3GetSecretRequest {
 
     // Additional mock setup needed to pass accessId check
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
-    when(OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB))
-        .thenReturn(ACCESS_ID_BOB);
 
     // Run preExecute
     OMTenantAssignUserAccessIdRequest omTenantAssignUserAccessIdRequest =
