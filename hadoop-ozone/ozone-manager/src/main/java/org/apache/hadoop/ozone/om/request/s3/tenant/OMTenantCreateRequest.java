@@ -164,11 +164,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             .setCreationTime(initialTime)
             .setModificationTime(initialTime)
             .build();
-
+    // TODO: REMOVE
     if (!ozoneManager.getMultiTenantManager()
         .tryAcquireInProgressMtOp(WAIT_MILISECONDS)) {
       throw new OMException("Only One MultiTenant operation allowed at a " +
-          "time", RESOURCE_BUSY);
+          "time", RESOURCE_BUSY);  // TODO: Try ServiceException maybe to enable client auto retry
     }
 
     // If we fail after pre-execute. handleRequestFailure() callback
@@ -346,7 +346,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
-      ozoneManager.getMultiTenantManager().resetInProgressMtOpState();
+      ozoneManager.getMultiTenantManager().resetInProgressMtOpState();  // TODO: REMOVE
     }
 
     // Perform audit logging

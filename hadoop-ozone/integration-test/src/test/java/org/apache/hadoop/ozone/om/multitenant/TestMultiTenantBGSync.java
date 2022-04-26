@@ -415,16 +415,13 @@ public class TestMultiTenantBGSync {
 
     try {
       // TODO: What is user policy?
-//      final String userPolicyGroupName =
-//          "tenant1" + OzoneConsts.DEFAULT_TENANT_USER_POLICY_SUFFIX;
+      final String userPolicyGroupName =
+          OMMultiTenantManager.getDefaultBucketNamespacePolicyName("tenant1");
 
       createRolesAndPoliciesInRanger();
-      // TODO: Fix this
-//      ozoneManager.getMetadataManager().getTenantPolicyTable()
-//          .put(userPolicyGroupName,
-//              policyIdsCreated.stream().collect(Collectors.joining(",")));
 
       while (bgSync.getRangerBGSyncCounter() <= 4) {
+        // TODO: Shorten the wait by setting a lower interval for the test.
         sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
       Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() == ozoneVersion);

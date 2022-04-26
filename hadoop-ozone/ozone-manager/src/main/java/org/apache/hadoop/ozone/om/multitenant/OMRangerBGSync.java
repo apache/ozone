@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_SYNC_INTER
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -33,9 +34,11 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +55,7 @@ import com.google.gson.JsonParser;
 public class OMRangerBGSync implements Runnable, Closeable {
 
   private OzoneManager ozoneManager;
+  private OMMetadataManager metadataManager;
   private OzoneClient ozoneClient;
 
   private static final Logger LOG = LoggerFactory
@@ -135,6 +139,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
   public OMRangerBGSync(OzoneManager om) throws Exception {
     try {
       ozoneManager = om;
+      metadataManager = om.getMetadataManager();
       authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
       authorizer.init(om.getConfiguration());
       ozoneClient =
@@ -157,7 +162,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     return ozoneServiceId;
   }
 
-  public int getRangerSyncInterval() throws Exception {
+  public int getRangerSyncInterval() {
     return rangerSyncInterval;
   }
 
@@ -348,32 +353,34 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
   }
 
+  /**
+   * Helper function to add/remove a policy name to/from mtRangerPolicies lists.
+   */
+  private void mtRangerPoliciesOpHelper(String policyName) {
+    if (mtRangerPoliciesTobeDeleted.containsKey(policyName)) {
+      // This entry is in sync with ranger, remove it from the set
+      // Eventually mtRangerPolicies will only contain entries that
+      // are not in OMDB and should be removed from Ranger.
+      mtRangerPoliciesTobeDeleted.remove(policyName);
+    } else {
+      // We could not find a policy in ranger that should have been there.
+      mtRangerPoliciesTobeCreated.put(policyName, null);
+    }
+  }
+
   public void processAllPoliciesFromOMDB() throws Exception {
 
-    /* TODO: Refactor this chunk of commented code below,
-        after the removal of TenantPolicyTable
-    TableIterator<String, ? extends Table.KeyValue<String, String>>
-        policyTableIterator =
-        ozoneManager.getMetadataManager().getTenantPolicyTable().iterator();
-    while (policyTableIterator.hasNext()) {
-      Table.KeyValue<String, String> keyValue = policyTableIterator.next();
-      // Value in the table is a list of policy Ids separated by ",". Please
-      // also see OMTenantCreateRequest.java
-      String[] omDBPolicies = keyValue.getValue().split(",");
-
-      for (String omDBPolicy: omDBPolicies) {
-        if (mtRangerPoliciesTobeDeleted.containsKey(omDBPolicy)) {
-          // This entry is in sync with ranger, remove it from the set
-          // Eventually mtRangerPolicies will only contain entries that
-          // are not in OMDB and should be removed from Ranger.
-          mtRangerPoliciesTobeDeleted.remove(omDBPolicy);
-        } else {
-          // We could not find a policy in ranger that should have been there.
-          mtRangerPoliciesTobeCreated.put(omDBPolicy, null);
-        }
-      }
+    // Iterate all DB tenant states. For each tenant,
+    // queue or dequeue bucketNamespacePolicyName and bucketPolicyName
+    TableIterator<String, ? extends Table.KeyValue<String, OmDBTenantState>>
+        tenantStateTableIter = metadataManager.getTenantStateTable().iterator();
+    while (tenantStateTableIter.hasNext()) {
+      final Table.KeyValue<String, OmDBTenantState> tableKeyValue =
+          tenantStateTableIter.next();
+      final OmDBTenantState dbTenantState = tableKeyValue.getValue();
+      mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName());
+      mtRangerPoliciesOpHelper(dbTenantState.getBucketPolicyName());
     }
-     */
 
     for (String policy: mtRangerPoliciesTobeCreated.keySet()) {
       // TODO : Currently we are not maintaining enough information in OMDB
@@ -399,34 +406,54 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
   }
 
+  /**
+   * Helper function to add user principal to a role in mtOMDBRoles.
+   */
+  private void addUserToMtOMDBRoles(String roleName, String userPrincipal) {
+    if (!mtOMDBRoles.containsKey(roleName)) {
+      mtOMDBRoles.put(roleName, new HashSet<>(
+          Collections.singletonList(userPrincipal)));
+    } else {
+      final HashSet<String> usersInTheRole = mtOMDBRoles.get(roleName);
+      usersInTheRole.add(userPrincipal);
+      // TODO: Likely unnecessary. Already got reference above. Double check
+//      mtOMDBRoles.put(roleName, usersInTheRole);
+    }
+  }
+
   public void loadAllRolesFromOMDB() throws Exception {
-    // We have following info in OMDB
-    //  tenantRoleTable: accessId -> roles [admin, roleB, ...]
+    // We have the following in OM DB
+    //  tenantStateTable: tenantId -> TenantState (has user and admin role name)
     //  tenantAccessIdTable : accessId -> OmDBAccessIdInfo
 
-    /* TODO: Refactor this chunk of commented code below,
-        after the removal of TenantRoleTable
-    TableIterator<String, ? extends Table.KeyValue<String, String>>
-        roleTableIterator =
-        ozoneManager.getMetadataManager().getTenantRoleTable().iterator();
-    while (roleTableIterator.hasNext()) {
-      Table.KeyValue<String, String> keyValueRoleTable =
-          roleTableIterator.next();
-      String rolename = keyValueRoleTable.getValue();
-      String accessId = keyValueRoleTable.getKey();
-      OmDBAccessIdInfo accessIdInfo  =
-          ozoneManager.getMetadataManager().getTenantAccessIdTable()
-              .get(accessId);
-      if (mtOMDBRoles.containsKey(rolename)) {
-        HashSet<String> users = mtOMDBRoles.get(rolename);
-        users.add(accessIdInfo.getUserPrincipal());
-      } else {
-        HashSet<String> users = new HashSet<>();
-        users.add(accessIdInfo.getUserPrincipal());
-        mtOMDBRoles.put(rolename, users);
+    final Table<String, OmDBTenantState> tenantStateTable =
+        metadataManager.getTenantStateTable();
+
+    // Iterate all DB ExtendedUserAccessIdInfo. For each accessId,
+    // add to userRole. And add to adminRole if isAdmin is set.
+    TableIterator<String, ? extends Table.KeyValue<String, OmDBAccessIdInfo>>
+        tenantAccessIdTableIter =
+        metadataManager.getTenantAccessIdTable().iterator();
+    while (tenantAccessIdTableIter.hasNext()) {
+      final Table.KeyValue<String, OmDBAccessIdInfo> tableKeyValue =
+          tenantAccessIdTableIter.next();
+      final OmDBAccessIdInfo dbAccessIdInfo = tableKeyValue.getValue();
+
+      final String tenantId = dbAccessIdInfo.getTenantId();
+      final String userPrincipal = dbAccessIdInfo.getUserPrincipal();
+
+      final OmDBTenantState dbTenantState = tenantStateTable.get(tenantId);
+      final String userRole = dbTenantState.getUserRoleName();
+
+      // Every tenant user should be in the tenant's userRole
+      addUserToMtOMDBRoles(userRole, userPrincipal);
+
+      // If the accessId has admin flag set, add to adminRole as well
+      if (dbAccessIdInfo.getIsAdmin()) {
+        final String adminRole = dbTenantState.getAdminRoleName();
+        addUserToMtOMDBRoles(adminRole, userPrincipal);
       }
     }
-     */
   }
 
   public void processAllRolesFromOMDB() throws Exception {
