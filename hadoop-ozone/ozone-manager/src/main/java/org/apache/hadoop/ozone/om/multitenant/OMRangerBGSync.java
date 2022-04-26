@@ -24,8 +24,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_SYNC_INTER
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -73,7 +73,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
   private long rangerBGSyncCounter = 0;
   private long currentOzoneServiceVersionInOMDB;
   private long proposedOzoneServiceVersionInOMDB;
-  private static int ozoneServiceId;
+  private final int ozoneServiceId;
 
   private MultiTenantAccessAuthorizerRangerPlugin authorizer;
 
@@ -114,24 +114,20 @@ public class OMRangerBGSync implements Runnable, Closeable {
   // processed all the policies from OMDB, this map will
   // be left with policies that we need to delete.
   // Its a map of Policy ID to policy names
-  private ConcurrentHashMap<String, String> mtRangerPoliciesTobeDeleted =
-      new ConcurrentHashMap<>();
+  private HashMap<String, String> mtRangerPoliciesTobeDeleted = new HashMap<>();
 
   // This map will be used to keep all the policies that are found in
   // OMDB and should have been in Ranger. Currently, we are only printing such
   // policyID. This can result if a tenant is deleted but the system
   // crashed. Its an easy recovery to retry the "tenant delete" operation.
   // Its a map of policy ID to policy names
-  private ConcurrentHashMap<String, String> mtRangerPoliciesTobeCreated =
-      new ConcurrentHashMap<>();
+  private HashMap<String, String> mtRangerPoliciesTobeCreated = new HashMap<>();
 
   // This map will keep all the Multiotenancy related roles from Ranger.
-  private ConcurrentHashMap<String, BGRole> mtRangerRoles =
-      new ConcurrentHashMap<>();
+  private HashMap<String, BGRole> mtRangerRoles = new HashMap<>();
 
   // keep OMDB mapping of Roles -> list of user principals.
-  private ConcurrentHashMap<String, HashSet<String>> mtOMDBRoles =
-      new ConcurrentHashMap<>();
+  private HashMap<String, HashSet<String>> mtOMDBRoles = new HashMap<>();
 
   // Every BG ranger sync cycle we update this
   private long lastRangerPolicyLoadTime;
