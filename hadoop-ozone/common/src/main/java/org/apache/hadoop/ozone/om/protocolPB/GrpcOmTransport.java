@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -84,7 +83,7 @@ public class GrpcOmTransport implements OmTransport {
   private ConfigurationSource conf;
 
   private AtomicReference<String> host;
-  private int maxSize;
+  private final int maxSize;
   private SecurityConfig secConfig;
 
   public static void setCaCerts(List<X509Certificate> x509Certificates) {
@@ -137,7 +136,7 @@ public class GrpcOmTransport implements OmTransport {
       NettyChannelBuilder channelBuilder =
           NettyChannelBuilder.forAddress(hp.getHost(), hp.getPort())
               .usePlaintext()
-              .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+              .maxInboundMessageSize(maxSize);
 
       if (secConfig.isGrpcTlsEnabled()) {
         try {

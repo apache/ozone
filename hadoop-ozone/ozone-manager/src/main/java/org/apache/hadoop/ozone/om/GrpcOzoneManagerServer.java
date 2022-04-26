@@ -22,13 +22,10 @@ import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -46,6 +43,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_GRPC_TLS_PROVIDER_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
 
 /**
  * Separated network server for gRPC transport OzoneManagerService s3g->OM.
@@ -56,6 +55,7 @@ public class GrpcOzoneManagerServer {
 
   private Server server;
   private int port = 8981;
+  private final int maxSize;
 
   public GrpcOzoneManagerServer(OzoneConfiguration config,
                                 OzoneManagerProtocolServerSideTranslatorPB
@@ -63,6 +63,8 @@ public class GrpcOzoneManagerServer {
                                 OzoneDelegationTokenSecretManager
                                     delegationTokenMgr,
                                 CertificateClient caClient) {
+    maxSize = config.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
+        OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
     OptionalInt haPort = HddsUtils.getNumberFromConfigKeys(config,
         ConfUtils.addKeySuffixes(
             OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
@@ -73,7 +75,7 @@ public class GrpcOzoneManagerServer {
       this.port = haPort.getAsInt();
     } else {
       this.port = config.getObject(
-              GrpcOzoneManagerServerConfig.class).
+          GrpcOmTransport.GrpcOmTransportConfig.class).
           getPort();
     }
     
@@ -88,7 +90,7 @@ public class GrpcOzoneManagerServer {
                    OzoneConfiguration omServerConfig,
                    CertificateClient caClient) {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
-        .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+        .maxInboundMessageSize(maxSize)
         .addService(new OzoneManagerServiceGrpc(omTranslator,
             delegationTokenMgr,
             omServerConfig));
@@ -132,29 +134,7 @@ public class GrpcOzoneManagerServer {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
     }
   }
-
   public int getPort() {
     return port;
-  }
-
-  /**
-   * GrpcOzoneManagerServer configuration in Java style configuration class.
-   */
-  @ConfigGroup(prefix = "ozone.om.grpc")
-  public static final class GrpcOzoneManagerServerConfig {
-    @Config(key = "port", defaultValue = "8981",
-        description = "Port used for"
-            + " the GrpcOmTransport OzoneManagerServiceGrpc server",
-        tags = {ConfigTag.MANAGEMENT})
-    private int port;
-
-    public int getPort() {
-      return port;
-    }
-
-    public GrpcOzoneManagerServerConfig setPort(int portParam) {
-      this.port = portParam;
-      return this;
-    }
   }
 }

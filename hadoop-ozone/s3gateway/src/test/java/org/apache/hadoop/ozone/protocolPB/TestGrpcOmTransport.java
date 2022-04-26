@@ -81,8 +81,6 @@ public class TestGrpcOmTransport {
 
     try {
       client.start();
-    } catch (Exception e) {
-      e.printStackTrace();
     } finally {
       client.shutdown();
     }

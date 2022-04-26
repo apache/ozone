@@ -54,8 +54,6 @@ public class TestGrpcOzoneManagerServer {
 
     try {
       server.start();
-    } catch (Exception e) {
-      e.printStackTrace();
     } finally {
       server.stop();
     }
