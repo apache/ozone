@@ -33,9 +33,11 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
@@ -143,6 +145,28 @@ public class GrpcReplicationClient implements AutoCloseable {
     return future.thenApply(responses -> responses.stream()
         .filter(r -> r.getCmdType() == Type.ListBlock)
         .flatMap(r -> r.getListBlock().getBlockDataList().stream())
+        .collect(Collectors.toList()));
+  }
+
+  public CompletableFuture<List<ContainerDataProto>> readContainer(
+      long containerId, String datanodeUUID) {
+
+    ContainerCommandRequestProto command =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.ReadContainer)
+            .setContainerID(containerId)
+            .setDatanodeUuid(datanodeUUID)
+            .setReadContainer(ReadContainerRequestProto.newBuilder().build())
+            .build();
+
+    CompletableFuture<List<ContainerCommandResponseProto>> future =
+        new CompletableFuture<>();
+
+    client.send(command, new ContainerCommandObserver(containerId, future));
+
+    return future.thenApply(responses -> responses.stream()
+        .filter(r -> r.getCmdType() == Type.ReadContainer)
+        .map(r -> r.getReadContainer().getContainerData())
         .collect(Collectors.toList()));
   }
 
