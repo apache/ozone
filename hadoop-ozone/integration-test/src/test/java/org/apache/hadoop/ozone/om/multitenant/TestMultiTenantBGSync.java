@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import static java.lang.Thread.sleep;
-import static org.apache.hadoop.ozone.OzoneConsts.TENANT_ID_USERNAME_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
@@ -103,12 +102,11 @@ public class TestMultiTenantBGSync {
   private MultiTenantAccessAuthorizer omm;
   private OMRangerBGSync bgSync;
 
-  private List<String> usersIdsCreated = new ArrayList<String>();
-  private List<String> policyNamesCreated = new ArrayList<String>();
-  private List<String> roleIdsCreated = new ArrayList<String>();
-  private List<String> policyIdsCreated = new ArrayList<String>();
-  private List<BasicUserPrincipal> usersCreated =
-      new ArrayList<BasicUserPrincipal>();
+  private List<String> usersIdsCreated = new ArrayList<>();
+  private List<String> policyNamesCreated = new ArrayList<>();
+  private List<String> roleIdsCreated = new ArrayList<>();
+  private List<String> policyIdsCreated = new ArrayList<>();
+  private List<BasicUserPrincipal> usersCreated = new ArrayList<>();
 
   private static OzoneConfiguration conf;
   private OzoneManager ozoneManager;
@@ -121,10 +119,6 @@ public class TestMultiTenantBGSync {
 
   // UGI-related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
-  private static final String TENANT_NAME = "finance";
-  private static final String USER_BOB = "bob@EXAMPLE.COM";
-  private static final String ACCESS_ID_BOB =
-      TENANT_NAME + TENANT_ID_USERNAME_DELIMITER + USER_BOB;
 
   private UserGroupInformation ugiAlice;
   private OMMultiTenantManager omMultiTenantManager;
