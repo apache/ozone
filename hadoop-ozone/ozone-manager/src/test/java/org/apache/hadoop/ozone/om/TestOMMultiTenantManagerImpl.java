@@ -27,6 +27,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -90,9 +92,9 @@ public class TestOMMultiTenantManagerImpl {
     Mockito.when(ozoneConfiguration.getTimeDuration(
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
-        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit()))
-        .thenReturn(
-            OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration());
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit(),
+        TimeUnit.SECONDS))
+        .thenReturn(10L);
     Mockito.when(ozoneManager.getConfiguration())
         .thenReturn(ozoneConfiguration);
 
