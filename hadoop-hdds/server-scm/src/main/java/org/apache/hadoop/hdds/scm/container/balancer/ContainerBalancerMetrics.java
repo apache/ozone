@@ -40,9 +40,13 @@ public final class ContainerBalancerMetrics {
       " in the latest iteration.")
   private MutableCounterLong dataSizeMovedGBInLatestIteration;
 
-  @Metric(about = "Number of container moves performed by Container Balancer " +
-      "in the latest iteration.")
-  private MutableCounterLong numContainerMovesInLatestIteration;
+  @Metric(about = "Number of completed container moves performed by " +
+      "Container Balancer in the latest iteration.")
+  private MutableCounterLong numContainerMovesCompletedInLatestIteration;
+
+  @Metric(about = "Number of timeout container moves performed by " +
+      "Container Balancer in the latest iteration.")
+  private MutableCounterLong numContainerMovesTimeoutInLatestIteration;
 
   @Metric(about = "Number of iterations that Container Balancer has run for.")
   private MutableCounterLong numIterations;
@@ -57,9 +61,13 @@ public final class ContainerBalancerMetrics {
   @Metric(about = "Number of unbalanced datanodes.")
   private MutableCounterLong numDatanodesUnbalanced;
 
-  @Metric(about = "Total number of container moves across all iterations of " +
-      "Container Balancer.")
-  private MutableCounterLong numContainerMoves;
+  @Metric(about = "Total number of completed container moves across all " +
+      "iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesCompleted;
+
+  @Metric(about = "Total number of timeout container moves across " +
+      "all iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesTimeout;
 
   @Metric(about = "Total data size in GB moved across all iterations of " +
       "Container Balancer.")
@@ -104,17 +112,37 @@ public final class ContainerBalancerMetrics {
    * latest iteration.
    * @return number of container moves
    */
-  public long getNumContainerMovesInLatestIteration() {
-    return numContainerMovesInLatestIteration.value();
+  public long getNumContainerMovesCompletedInLatestIteration() {
+    return numContainerMovesCompletedInLatestIteration.value();
   }
 
-  public void incrementNumContainerMovesInLatestIteration(long valueToAdd) {
-    this.numContainerMovesInLatestIteration.incr(valueToAdd);
+  public void incrementNumContainerMovesCompletedInLatestIteration(
+      long valueToAdd) {
+    this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
   }
 
-  public void resetNumContainerMovesInLatestIteration() {
-    numContainerMovesInLatestIteration.incr(
-        -getNumContainerMovesInLatestIteration());
+  public void resetNumContainerMovesCompletedInLatestIteration() {
+    numContainerMovesCompletedInLatestIteration.incr(
+        -getNumContainerMovesCompletedInLatestIteration());
+  }
+
+  /**
+   * Gets the number of timeout container moves performed by
+   * Container Balancer in the latest iteration.
+   * @return number of timeout container moves
+   */
+  public long getNumContainerMovesTimeoutInLatestIteration() {
+    return numContainerMovesTimeoutInLatestIteration.value();
+  }
+
+  public void incrementNumContainerMovesTimeoutInLatestIteration(
+      long valueToAdd) {
+    this.numContainerMovesTimeoutInLatestIteration.incr(valueToAdd);
+  }
+
+  public void resetNumContainerMovesTimeoutInLatestIteration() {
+    numContainerMovesTimeoutInLatestIteration.incr(
+        -getNumContainerMovesTimeoutInLatestIteration());
   }
 
   /**
@@ -179,12 +207,20 @@ public final class ContainerBalancerMetrics {
     numDatanodesUnbalanced.incr(-getNumDatanodesUnbalanced());
   }
 
-  public long getNumContainerMoves() {
-    return numContainerMoves.value();
+  public long getNumContainerMovesCompleted() {
+    return numContainerMovesCompleted.value();
   }
 
-  public void incrementNumContainerMoves(long valueToAdd) {
-    numContainerMoves.incr(valueToAdd);
+  public void incrementNumContainerMovesCompleted(long valueToAdd) {
+    numContainerMovesCompleted.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesTimeout() {
+    return numContainerMovesTimeout.value();
+  }
+
+  public void incrementNumContainerMovesTimeout(long valueToAdd) {
+    numContainerMovesTimeout.incr(valueToAdd);
   }
 
   public long getDataSizeMovedGB() {

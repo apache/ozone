@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -129,6 +130,7 @@ public class TestParentAcl {
   // LIST        LIST         READ      (V1 LIST=>READ)
   // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
   @Test
+  @Flaky("HDDS-6335")
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;
