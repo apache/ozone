@@ -177,14 +177,14 @@ public class GrpcReplicationClient implements AutoCloseable {
         .map(r -> r.getReadContainer().getContainerData()));
   }
 
-  public CompletableFuture<List<ByteBuffer>> readChunk(long containerId,
+  public CompletableFuture<Optional<ByteBuffer>> readChunk(long containerId,
       String datanodeUUID, DatanodeBlockID blockID, ChunkInfo chunkInfo) {
 
     ReadChunkRequestProto request =
         ReadChunkRequestProto.newBuilder()
             .setBlockID(blockID)
             .setChunkData(chunkInfo)
-            .setReadChunkVersion(ReadChunkVersion.V1)
+            .setReadChunkVersion(ReadChunkVersion.V0)
             .build();
 
     ContainerCommandRequestProto command =
@@ -202,10 +202,8 @@ public class GrpcReplicationClient implements AutoCloseable {
 
     return future.thenApply(responses -> responses.stream()
         .filter(r -> r.getCmdType() == Type.ReadChunk)
-        .flatMap(r -> r.getReadChunk().getDataBuffers()
-            .getBuffersList().stream()
-            .map(ByteString::asReadOnlyByteBuffer))
-        .collect(Collectors.toList()));
+        .findFirst()
+        .map(r -> r.getReadChunk().getData().asReadOnlyByteBuffer()));
   }
 
   private Path getWorkingDirectory() {
