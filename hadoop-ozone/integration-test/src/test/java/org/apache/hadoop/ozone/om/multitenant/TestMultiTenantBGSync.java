@@ -126,12 +126,12 @@ public class TestMultiTenantBGSync {
 
 
   @BeforeClass
-  public static void init() throws Exception {
+  public static void init() {
     conf = new OzoneConfiguration();
   }
 
   @AfterClass
-  public static void shutdown() throws Exception {
+  public static void shutdown() {
   }
 
   private static void simulateOzoneSiteXmlConfig() {
@@ -141,7 +141,7 @@ public class TestMultiTenantBGSync {
         RANGER_ENDPOINT_USER_PASSWD);
   }
 
-  public void setUpHelper() throws Exception {
+  public void setUpHelper() throws IOException {
     KerberosName.setRuleMechanism(DEFAULT_MECHANISM);
     KerberosName.setRules(
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
@@ -186,7 +186,7 @@ public class TestMultiTenantBGSync {
     omm.init(conf);
   }
 
-  public void tearDownhelper() throws Exception {
+  public void tearDownhelper() {
     omMetrics.unRegister();
     framework().clearInlineMocks();
   }
@@ -222,8 +222,7 @@ public class TestMultiTenantBGSync {
     return tenantVolumeAccessPolicy;
   }
 
-  public void createRolesAndPoliciesInRanger()
-      throws Exception {
+  public void createRolesAndPoliciesInRanger() {
     BasicUserPrincipal userPrincipal = new BasicUserPrincipal("user1Test");
     BasicUserPrincipal userPrincipal2 = new BasicUserPrincipal("user2Test");
     simulateOzoneSiteXmlConfig();
@@ -312,7 +311,7 @@ public class TestMultiTenantBGSync {
   }
 
 
-  long bgSyncSetup() throws Exception {
+  long bgSyncSetup() throws IOException {
     conf.setInt(OMConfigKeys.OZONE_OM_RANGER_SYNC_INTERVAL, 10);
     bgSync = new OMRangerBGSyncService(ozoneManager);
     OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
@@ -333,7 +332,7 @@ public class TestMultiTenantBGSync {
   }
 
   @Test
-  public void testRangerBGSyncRemoveTablesFromRanger() throws Exception {
+  public void testRangerBGSyncRemoveTablesFromRanger() throws IOException {
     simulateOzoneSiteXmlConfig();
     setUpHelper();
     long ozoneVersion = bgSyncSetup();
@@ -382,9 +381,7 @@ public class TestMultiTenantBGSync {
   }
 
   @Test
-  public void testRangerBGSyncsRangerPoliciesBackedByOMDB()
-      throws Exception {
-    BasicUserPrincipal userPrincipal = null;
+  public void testRangerBGSyncsRangerPoliciesBackedByOMDB() throws IOException {
     simulateOzoneSiteXmlConfig();
     setUpHelper();
     long ozoneVersion = bgSyncSetup();
@@ -430,8 +427,7 @@ public class TestMultiTenantBGSync {
   }
 
   @Test
-  public void testRangerBGSyncsDeletedRolesRecreated()
-      throws Exception {
+  public void testRangerBGSyncsDeletedRolesRecreated() throws IOException {
     simulateOzoneSiteXmlConfig();
     setUpHelper();
     long ozoneVersion = bgSyncSetup();

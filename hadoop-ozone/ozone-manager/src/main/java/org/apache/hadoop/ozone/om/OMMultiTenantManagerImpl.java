@@ -98,7 +98,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final ReentrantReadWriteLock tenantCacheLock;
   private final Map<String, CachedTenantState> tenantCache;
   private final Semaphore inProgressMtOp = new Semaphore(1, true);
-  private final OMRangerBGSyncService omRangerBGSyncService;
+  private OMRangerBGSyncService omRangerBGSyncService;
 
   public OMMultiTenantManagerImpl(OzoneManager ozoneManager,
                                   OzoneConfiguration conf)
@@ -118,9 +118,17 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     this.authorizer.init(conf);
     loadUsersFromDB();
     // Initialize the Ranger Sync Thread
-    omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager);
-    // Start the Ranger Sync Thread
-    this.start();
+    try {
+      omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager);
+      // Start the Ranger Sync Thread
+      this.start();
+    } catch (OMException ex) {
+      if (ex.getResult().equals(OMException.ResultCodes.INTERNAL_ERROR)) {
+        LOG.warn("Unable to initialize OM Ranger Sync Service. "
+            + "Please check OM configuration");
+      }
+      omRangerBGSyncService = null;
+    }
   }
 
   /**

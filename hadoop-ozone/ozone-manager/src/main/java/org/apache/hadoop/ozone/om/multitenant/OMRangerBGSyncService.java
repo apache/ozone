@@ -74,9 +74,11 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
   private long rangerBGSyncCounter = 0;
   private long currentOzoneServiceVersionInOMDB;
   private long proposedOzoneServiceVersionInOMDB;
-  private final int ozoneServiceId;
+  private final int rangerOzoneServiceId;
 
   private MultiTenantAccessAuthorizerRangerPlugin authorizer;
+
+  private boolean isServiceInitialized = false;
 
   private boolean isServiceStarted = false;
 
@@ -162,14 +164,21 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
       rangerSyncInterval = this.ozoneManager.getConfiguration().getInt(
               OZONE_OM_RANGER_SYNC_INTERVAL,
               OZONE_OM_RANGER_SYNC_INTERVAL_DEFAULT);
-      ozoneServiceId = authorizer.getOzoneServiceId();
-    } catch (IOException e) {
-      LOG.warn("Failed to Initialize Ranger Background Sync");
-      throw e;
+      rangerOzoneServiceId = authorizer.getRangerOzoneServiceId();
+      isServiceInitialized = true;
+    } catch (IOException ex) {
+      LOG.warn("Failed to Initialize Ranger Background Sync Service: {}",
+          ex.getMessage());
+      throw ex;
     }
   }
 
   public void start() {
+    if (!isServiceInitialized) {
+      LOG.error("Failed to start Ranger Background Sync Service: "
+          + "service is not correctly initialized");
+      return;
+    }
     isServiceStarted = true;
     scheduleNextRangerSync();
   }
@@ -178,8 +187,8 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     isServiceStarted = false;
   }
 
-  public int getOzoneServiceId() throws IOException {
-    return ozoneServiceId;
+  public int getRangerOzoneServiceId() throws IOException {
+    return rangerOzoneServiceId;
   }
 
   public int getRangerSyncInterval() {
@@ -288,8 +297,8 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     }
   }
 
-  public long getRangerServiceVersion() throws Exception {
-    return authorizer.getCurrentOzoneServiceVersion(ozoneServiceId);
+  public long getRangerServiceVersion() throws IOException {
+    return authorizer.getCurrentOzoneServiceVersion(rangerOzoneServiceId);
   }
 
   public void setOmdbRangerServiceVersion(long version) throws IOException {
@@ -337,7 +346,8 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
       throws IOException {
     // TODO: incremental policies API is broken. We are getting all the
     //  multitenant policies using Ranger labels.
-    String allPolicies = authorizer.getAllMultiTenantPolicies(ozoneServiceId);
+    String allPolicies = authorizer.getAllMultiTenantPolicies(
+        rangerOzoneServiceId);
     JsonObject jObject = new JsonParser().parse(allPolicies).getAsJsonObject();
     lastRangerPolicyLoadTime = jObject.get("queryTimeMS").getAsLong();
     JsonArray policyArray = jObject.getAsJsonArray("policies");

@@ -653,6 +653,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
+    // TODO: HDDS-6612. Config to enable or disable Multi-Tenancy feature
     multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
     OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
