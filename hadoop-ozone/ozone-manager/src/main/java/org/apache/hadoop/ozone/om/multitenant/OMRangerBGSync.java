@@ -480,7 +480,8 @@ public class OMRangerBGSync implements Runnable, Closeable {
       final String roleName = entry.getKey();
       boolean pushRoleToRanger = false;
       if (mtRangerRoles.containsKey(roleName)) {
-        HashSet<String> rangerUserList = mtRangerRoles.get(roleName).getUsersSet();
+        final HashSet<String> rangerUserList =
+            mtRangerRoles.get(roleName).getUsersSet();
         final HashSet<String> userSet = entry.getValue();
         for (String userPrincipal : userSet) {
           if (rangerUserList.contains(userPrincipal)) {
