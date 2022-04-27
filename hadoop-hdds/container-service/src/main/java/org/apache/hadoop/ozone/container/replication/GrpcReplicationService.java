@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -71,6 +73,23 @@ public class GrpcReplicationService extends
   public void send(ContainerCommandRequestProto request,
       StreamObserver<ContainerCommandResponseProto> observer) {
     observer.onNext(dispatcher.dispatch(request, null));
+    observer.onCompleted();
+  }
+
+  @Override
+  public void push(WriteChunkRequestProto request,
+      StreamObserver<WriteChunkResponseProto> observer) {
+    long containerID = request.getBlockID().getContainerID();
+    if (request.hasData()) {
+      String chunkName = request.getChunkData().getChunkName();
+      LOG.debug("Received chunk {} of container {}", chunkName, containerID);
+      // TODO: Store chunk data for reconstruction
+      // ByteBuffer data = request.getData().asReadOnlyByteBuffer();
+    } else {
+      LOG.info("Starting to reconstruct container {}", containerID);
+      // TODO: Start to reconstruct container
+    }
+    observer.onNext(WriteChunkResponseProto.newBuilder().build());
     observer.onCompleted();
   }
 

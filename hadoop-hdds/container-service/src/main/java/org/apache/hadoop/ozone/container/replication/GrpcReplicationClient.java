@@ -45,6 +45,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkVersion;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -206,6 +208,22 @@ public class GrpcReplicationClient implements AutoCloseable {
         .map(r -> r.getReadChunk().getData().asReadOnlyByteBuffer()));
   }
 
+  public CompletableFuture<Long> writeChunk(DatanodeBlockID blockID,
+      ChunkInfo chunkInfo, ByteBuffer chunkData) {
+
+    WriteChunkRequestProto request = WriteChunkRequestProto.newBuilder()
+        .setBlockID(blockID)
+        .setChunkData(chunkInfo)
+        .setData(ByteString.copyFrom(chunkData))
+        .build();
+
+    CompletableFuture<Long> future = new CompletableFuture<>();
+
+    client.push(request, new PushChunkObserver(future));
+
+    return future;
+  }
+
   private Path getWorkingDirectory() {
     return workingDirectory;
   }
@@ -345,4 +363,35 @@ public class GrpcReplicationClient implements AutoCloseable {
     }
 
   }
+
+  /**
+   * gRPC stream observer to CompletableFuture adapter.
+   */
+  public static class PushChunkObserver
+      implements StreamObserver<WriteChunkResponseProto> {
+
+    private final CompletableFuture<Long> future;
+    private long count;
+
+    PushChunkObserver(CompletableFuture<Long> future) {
+      this.future = future;
+      this.count = 0;
+    }
+
+    @Override
+    public void onNext(WriteChunkResponseProto response) {
+      count++;
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+      future.completeExceptionally(throwable);
+    }
+
+    @Override
+    public void onCompleted() {
+      future.complete(count);
+    }
+  }
+
 }
