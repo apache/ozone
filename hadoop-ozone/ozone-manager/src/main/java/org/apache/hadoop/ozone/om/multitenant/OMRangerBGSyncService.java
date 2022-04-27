@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import static java.lang.Thread.sleep;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_SYNC_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_SYNC_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -69,7 +69,7 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
    */
   private final ScheduledExecutorService executorService;
   private ScheduledFuture<?> rangerSyncFuture;
-  private final int rangerSyncInterval;
+  private final long rangerSyncInterval;
 
   private long rangerBGSyncCounter = 0;
   private long currentOzoneServiceVersionInOMDB;
@@ -161,9 +161,10 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
       executorService = HadoopExecutors.newScheduledThreadPool(1,
           new ThreadFactoryBuilder().setDaemon(true)
               .setNameFormat("OM Ranger Sync Thread - %d").build());
-      rangerSyncInterval = this.ozoneManager.getConfiguration().getInt(
-              OZONE_OM_RANGER_SYNC_INTERVAL,
-              OZONE_OM_RANGER_SYNC_INTERVAL_DEFAULT);
+      rangerSyncInterval = this.ozoneManager.getConfiguration().getTimeDuration(
+          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
+          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT,
+          TimeUnit.SECONDS);
       rangerOzoneServiceId = authorizer.getRangerOzoneServiceId();
       isServiceInitialized = true;
     } catch (IOException ex) {
@@ -191,7 +192,7 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     return rangerOzoneServiceId;
   }
 
-  public int getRangerSyncInterval() {
+  public long getRangerSyncInterval() {
     return rangerSyncInterval;
   }
 

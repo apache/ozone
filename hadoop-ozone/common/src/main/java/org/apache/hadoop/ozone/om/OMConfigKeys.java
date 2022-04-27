@@ -338,8 +338,8 @@ public final class OMConfigKeys {
   public static final String OZONE_RANGER_SERVICE =
       "ozone.om.ranger.service";
 
-  public static final String OZONE_OM_RANGER_SYNC_INTERVAL
-      = "ozone.om.ranger.sync.interval";
-  public static final int OZONE_OM_RANGER_SYNC_INTERVAL_DEFAULT
-      = 600;
+  public static final String OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL
+      = "ozone.om.multitenancy.ranger.sync.interval";
+  public static final String OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT
+      = "10m";
 }

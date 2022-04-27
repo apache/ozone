@@ -313,7 +313,7 @@ public class TestMultiTenantBGSync {
 
   long bgSyncSetup() throws IOException {
     // TODO: Further lower the interval for the UT?
-    conf.setInt(OMConfigKeys.OZONE_OM_RANGER_SYNC_INTERVAL, 10);
+    conf.set(OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL, "10s");
     bgSync = new OMRangerBGSyncService(ozoneManager);
     OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
     ObjectStore objectStore = Mockito.mock(ObjectStore.class);
