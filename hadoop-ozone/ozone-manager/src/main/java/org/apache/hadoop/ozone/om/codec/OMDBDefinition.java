@@ -217,6 +217,15 @@ public class OMDBDefinition implements DBDefinition {
                     OmDBTenantState.class,
                     new OmDBTenantStateCodec());
 
+  public static final DBColumnFamilyDefinition<String, Long>
+            RANGER_STATE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.RANGER_STATE_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    Long.class,
+                    new LongCodec());
+
   // End tables for S3 multi-tenancy
 
   @Override
@@ -237,7 +246,7 @@ public class OMDBDefinition implements DBDefinition {
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
-        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE};
+        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE, RANGER_STATE_TABLE};
   }
 }
 
