@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -154,7 +155,7 @@ public class GrpcReplicationClient implements AutoCloseable {
         .collect(Collectors.toList()));
   }
 
-  public CompletableFuture<List<ContainerDataProto>> readContainer(
+  public CompletableFuture<Optional<ContainerDataProto>> readContainer(
       long containerId, String datanodeUUID) {
 
     ContainerCommandRequestProto command =
@@ -173,7 +174,7 @@ public class GrpcReplicationClient implements AutoCloseable {
     return future.thenApply(responses -> responses.stream()
         .filter(r -> r.getCmdType() == Type.ReadContainer)
         .map(r -> r.getReadContainer().getContainerData())
-        .collect(Collectors.toList()));
+        .findFirst());
   }
 
   public CompletableFuture<List<ByteBuffer>> readChunk(long containerId,
