@@ -60,6 +60,7 @@ import com.google.gson.JsonParser;
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
  * and applies it to Ranger.
+ * TODO: Make this `extends BackgroundService` instead later
  */
 public class OMRangerBGSyncService implements Runnable, Closeable {
 
@@ -279,7 +280,7 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
       while (!multiTenantManager.tryAcquireInProgressMtOp(WAIT_MILI)) {
         sleep(10);
       }
-      currentOzoneServiceVersionInOMDB = getOmdbRangerServiceVersion();
+      currentOzoneServiceVersionInOMDB = getOMDBRangerServiceVersion();
       proposedOzoneServiceVersionInOMDB = getRangerServiceVersion();
       while (currentOzoneServiceVersionInOMDB !=
           proposedOzoneServiceVersionInOMDB) {
@@ -290,7 +291,8 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
         if (!ozoneManager.isLeaderReady()) {
           return;
         }
-        LOG.warn("Executing Ranger Sync Cycle.");
+        LOG.info("Executing Ranger Sync run {}, attempt {}",
+            runCount.get(), attempt);
 
         executeOmdbToRangerSync(currentOzoneServiceVersionInOMDB);
 
@@ -305,8 +307,9 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
         currentOzoneServiceVersionInOMDB = proposedOzoneServiceVersionInOMDB;
         proposedOzoneServiceVersionInOMDB = getRangerServiceVersion();
       }
-    } catch (Exception e) {
-      LOG.warn("Exception during a Ranger Sync Cycle: {}", e.getMessage());
+    } catch (IOException | InterruptedException e) {
+      LOG.warn("Exception during a Ranger Sync: {}. Stacktrace: {}",
+          e.getMessage(), e.getStackTrace());
     } finally {
       multiTenantManager.resetInProgressMtOpState();
     }
@@ -352,16 +355,9 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     }
   }
 
-  public long getOmdbRangerServiceVersion() {
-    long lastKnownVersion = 0;
-    try {
-      lastKnownVersion =
-          ozoneManager.getMetadataManager().getOmRangerStateTable()
-              .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
-    } catch (Exception ex) {
-      return 0;
-    }
-    return lastKnownVersion;
+  public long getOMDBRangerServiceVersion() throws IOException {
+    return ozoneManager.getMetadataManager().getOmRangerStateTable()
+        .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
   }
 
   private void executeOmdbToRangerSync(long baseVersion) throws IOException {
@@ -388,6 +384,9 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     mtOMDBRoles.clear();
   }
 
+  /**
+   * TODO: Test and make sure invalid JSON response from Ranger won't crash OM.
+   */
   public void loadAllPoliciesRolesFromRanger(long baseVersion)
       throws IOException {
     // TODO: incremental policies API is broken. We are getting all the
@@ -401,7 +400,8 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
       JsonObject newPolicy = policyArray.get(i).getAsJsonObject();
       if (!newPolicy.getAsJsonArray("policyLabels").get(0)
           .getAsString().equals("OzoneMultiTenant")) {
-        LOG.warn("Apache Ranger BG Sync: received non MultiTenant policy");
+        LOG.warn("Apache Ranger BG Sync: received non Multi-Tenant policy: {}",
+            newPolicy.get("name").getAsString());
         continue;
       }
       mtRangerPoliciesTobeDeleted.put(
@@ -596,6 +596,10 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     HashSet<String> omdbUserList = mtOMDBRoles.get(roleName);
     String roleJsonStr = authorizer.getRole(roleName);
     authorizer.assignAllUsers(omdbUserList, roleJsonStr);
+  }
+
+  public ScheduledFuture<?> getRangerSyncFuture() {
+    return rangerSyncFuture;
   }
 
   public long getRangerBGSyncCounter() {

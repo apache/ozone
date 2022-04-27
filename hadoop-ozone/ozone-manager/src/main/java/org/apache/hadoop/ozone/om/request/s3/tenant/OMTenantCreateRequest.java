@@ -329,6 +329,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       exception = ex;
     } finally {
       if (omClientResponse != null) {
+        // TODO: Use this instead
+//        addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+//            ozoneManagerDoubleBufferHelper);
         omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
             .add(omClientResponse, transactionLogIndex));
       }

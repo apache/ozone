@@ -345,7 +345,7 @@ public class TestMultiTenantBGSync {
         // TODO: Trigger the sync rather than busy waiting?
         sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
-      Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() == ozoneVersion);
+      Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() == ozoneVersion);
 
       // Now lets make sure that the ranger policies and roles not backed up
       // by OzoneManager multitenant tables are cleaned up.
@@ -392,7 +392,7 @@ public class TestMultiTenantBGSync {
         // TODO: Trigger the sync rather than busy waiting?
         sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
-      Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() == ozoneVersion);
+      Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() == ozoneVersion);
 
       for (String policy : policyNamesCreated) {
         try {
@@ -461,7 +461,7 @@ public class TestMultiTenantBGSync {
         // TODO: Trigger the sync rather than busy waiting?
         sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
-      Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() >= ozoneVersion);
+      Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() >= ozoneVersion);
 
       for (String policy : policyNamesCreated) {
         AccessPolicy verifier =

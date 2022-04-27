@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMRangerServiceVersionSyncResponse;
-import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest;
@@ -73,47 +72,29 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
   }
 
   @Override
-  public void handleRequestFailure(OzoneManager ozoneManager) {
-  }
-
-  @Override
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
-    OMClientResponse omClientResponse = null;
+    OMClientResponse omClientResponse;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    final RangerServiceVersionSyncRequest request
-        = getOmRequest().getRangerServiceVersionSyncRequest();
+    final RangerServiceVersionSyncRequest request =
+        getOmRequest().getRangerServiceVersionSyncRequest();
     final long proposedVersion = request.getRangerServiceVersion();
 
-    try {
-      omMetadataManager.getOmRangerStateTable().addCacheEntry(
-          new CacheKey<>(OmMetadataManagerImpl
-              .RANGER_OZONE_SERVICE_VERSION_KEY),
-          new CacheValue<>(Optional.of(proposedVersion), transactionLogIndex));
-      omResponse.setRangerServiceVersionSyncResponse(
-          RangerServiceVersionSyncResponse.newBuilder().build()
-      );
+    omMetadataManager.getOmRangerStateTable().addCacheEntry(
+        new CacheKey<>(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY),
+        new CacheValue<>(Optional.of(proposedVersion), transactionLogIndex));
+    omResponse.setRangerServiceVersionSyncResponse(
+        RangerServiceVersionSyncResponse.newBuilder().build());
 
-      omClientResponse = new OMRangerServiceVersionSyncResponse(
-          omResponse.build(), proposedVersion,
-          OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
-
-    } catch (Exception ex) {
-      // Prepare omClientResponse
-      omResponse.setRangerServiceVersionSyncResponse(
-          RangerServiceVersionSyncResponse.newBuilder().build());
-      omClientResponse = new OMTenantCreateResponse(
-          createErrorOMResponse(omResponse, new IOException(ex.getMessage())));
-    } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
-            .add(omClientResponse, transactionLogIndex));
-      }
-    }
+    omClientResponse = new OMRangerServiceVersionSyncResponse(
+        omResponse.build(), proposedVersion,
+        OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
+    addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+        ozoneManagerDoubleBufferHelper);
 
     return omClientResponse;
   }
