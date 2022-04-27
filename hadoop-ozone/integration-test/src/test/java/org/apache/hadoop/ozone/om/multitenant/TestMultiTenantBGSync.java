@@ -232,11 +232,6 @@ public class TestMultiTenantBGSync {
     usersIdsCreated.clear();
     roleIdsCreated.clear();
 
-    int ozoneServiceId =
-        ((MultiTenantAccessAuthorizerRangerPlugin)omm).getOzoneServiceId();
-    long ozoneVersion =
-        ((MultiTenantAccessAuthorizerRangerPlugin)omm)
-            .getCurrentOzoneServiceVersion(ozoneServiceId);
     Assert.assertTrue(policyNamesCreated.size() == 0);
     OzoneTenantRolePrincipal role2Principal =
         OzoneTenantRolePrincipal.getUserRole("tenant1");
@@ -338,9 +333,7 @@ public class TestMultiTenantBGSync {
   }
 
   @Test
-  public void testRangerBGSyncRemoveTablesFromRanger()
-      throws Exception {
-    BasicUserPrincipal userPrincipal = null;
+  public void testRangerBGSyncRemoveTablesFromRanger() throws Exception {
     simulateOzoneSiteXmlConfig();
     setUpHelper();
     long ozoneVersion = bgSyncSetup();
@@ -359,25 +352,18 @@ public class TestMultiTenantBGSync {
       // Now lets make sure that the ranger policies and roles not backed up
       // by OzoneManager multitenant tables are cleaned up.
       for (String policy : policyNamesCreated) {
-        try {
-          AccessPolicy verifier =
-              omm.getAccessPolicyByName(policy);
+        AccessPolicy verifier = omm.getAccessPolicyByName(policy);
 
-          cleanupPoliciesRolesUsers();
-          Assert.fail("Policy Exists :" + verifier);
-        } catch (Exception e) {
-        }
+        cleanupPoliciesRolesUsers();
+        Assert.fail("Policy Exists: " + verifier);
       }
 
       for (String role : roleIdsCreated) {
-        try {
-          String verifier =
-              omm.getRole(new JsonParser().parse(role).getAsJsonObject().get(
-              "name").getAsString());
-          cleanupPoliciesRolesUsers();
-          Assert.fail("Role Exists :" + verifier);
-        } catch (Exception e) {
-        }
+        String verifier =
+            omm.getRole(new JsonParser().parse(role).getAsJsonObject().get(
+            "name").getAsString());
+        cleanupPoliciesRolesUsers();
+        Assert.fail("Role Exists: " + verifier);
       }
 
       cleanupPoliciesRolesUsers();

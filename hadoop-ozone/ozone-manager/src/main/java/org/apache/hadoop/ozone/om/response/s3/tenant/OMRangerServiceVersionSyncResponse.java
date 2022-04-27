@@ -63,8 +63,7 @@ public class OMRangerServiceVersionSyncResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     omMetadataManager.getOmRangerStateTable().putWithBatch(
-        batchOperation, serviceVersionkey,
-        new Long(newServiceVersion));
+        batchOperation, serviceVersionkey, newServiceVersion);
   }
 
   @VisibleForTesting

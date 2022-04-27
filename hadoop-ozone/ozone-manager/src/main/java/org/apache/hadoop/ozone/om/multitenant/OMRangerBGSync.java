@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -77,25 +78,29 @@ public class OMRangerBGSync implements Runnable, Closeable {
 
   private MultiTenantAccessAuthorizerRangerPlugin authorizer;
 
-  class BGRole {
-    private String name;
+  static class BGRole {
+    private final String name;
     private String id;
-    private HashSet<String> users;
+    private final HashSet<String> users;
 
     BGRole(String n) {
       this.name = n;
       users = new HashSet<>();
     }
 
-    public void addId(String i) {
-      this.id = i;
+    public void setId(String id) {
+      this.id = id;
     }
 
-    public void addUsers(String u) {
-      users.add(u);
+    public String getId() {
+      return id;
     }
 
-    public HashSet<String> getUsers() {
+    public void addUserPrincipal(String userPrincipal) {
+      users.add(userPrincipal);
+    }
+
+    public HashSet<String> getUsersSet() {
       return users;
     }
 
@@ -105,22 +110,31 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
 
     @Override
-    public boolean equals(Object obj) {
-      return (this.hashCode() == obj.hashCode());
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      // TODO: What about HashSet users?
+      return this.hashCode() == o.hashCode();
     }
   }
 
   // we will track all the policies in Ranger here. After we have
   // processed all the policies from OMDB, this map will
   // be left with policies that we need to delete.
-  // Its a map of Policy ID to policy names
+  //
+  // Maps from policy name to policy ID in Ranger
   private HashMap<String, String> mtRangerPoliciesTobeDeleted = new HashMap<>();
 
   // This map will be used to keep all the policies that are found in
   // OMDB and should have been in Ranger. Currently, we are only printing such
   // policyID. This can result if a tenant is deleted but the system
   // crashed. Its an easy recovery to retry the "tenant delete" operation.
-  // Its a map of policy ID to policy names
+  //
+  // Maps from policy name to policy ID in Ranger
   private HashMap<String, String> mtRangerPoliciesTobeCreated = new HashMap<>();
 
   // This map will keep all the Multiotenancy related roles from Ranger.
@@ -165,7 +179,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
   @Override
   public void run() {
     try {
-      Thread.sleep(10);
+      Thread.sleep(10);  // TODO: Why the sleep?
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
@@ -316,8 +330,9 @@ public class OMRangerBGSync implements Runnable, Closeable {
         LOG.warn("Apache Ranger BG Sync: received non MultiTenant policy");
         continue;
       }
-      mtRangerPoliciesTobeDeleted.put(newPolicy.get("id").getAsString(),
-          newPolicy.get("name").getAsString());
+      mtRangerPoliciesTobeDeleted.put(
+          newPolicy.get("name").getAsString(),
+          newPolicy.get("id").getAsString());
       JsonArray policyItems = newPolicy
           .getAsJsonArray("policyItems");
       for (int j = 0; j < policyItems.size(); ++j) {
@@ -335,15 +350,16 @@ public class OMRangerBGSync implements Runnable, Closeable {
   }
 
   public void loadAllRolesFromRanger() throws Exception {
-    for (String rolename: mtRangerRoles.keySet()) {
-      String roleDataString = authorizer.getRole(rolename);
-      JsonObject roleObject =
+    for (Map.Entry<String, BGRole> entry: mtRangerRoles.entrySet()) {
+      final String roleName = entry.getKey();
+      final String roleDataString = authorizer.getRole(roleName);
+      final JsonObject roleObject =
           new JsonParser().parse(roleDataString).getAsJsonObject();
-      BGRole role = mtRangerRoles.get(rolename);
-      role.addId(roleObject.get("id").getAsString());
-      JsonArray userArray = roleObject.getAsJsonArray("users");
+      final BGRole role = entry.getValue();
+      role.setId(roleObject.get("id").getAsString());
+      final JsonArray userArray = roleObject.getAsJsonArray("users");
       for (int i = 0; i < userArray.size(); ++i) {
-        role.addUsers(userArray.get(i).getAsJsonObject().get("name")
+        role.addUserPrincipal(userArray.get(i).getAsJsonObject().get("name")
             .getAsString());
       }
     }
@@ -378,24 +394,29 @@ public class OMRangerBGSync implements Runnable, Closeable {
       mtRangerPoliciesOpHelper(dbTenantState.getBucketPolicyName());
     }
 
-    for (String policy: mtRangerPoliciesTobeCreated.keySet()) {
-      // TODO : Currently we are not maintaining enough information in OMDB
-      //  to recreate the policies.
-      LOG.warn("Policies not found in Ranger: " + policy);
+    for (Map.Entry<String, String> entry:
+        mtRangerPoliciesTobeCreated.entrySet()) {
+      final String policyName = entry.getKey();
+      // TODO: Currently we are not maintaining enough information in OMDB
+      //  to recreate the policies as-is.
+      //  Maybe recreate the policy with its initial value?
+      LOG.warn("Policy name not found in Ranger: '{}'. "
+          + "OM can't fix this automatically", policyName);
     }
 
-    for (String policyId: mtRangerPoliciesTobeDeleted.keySet()) {
-      // TODO : Its best to not create these poilicies automatically and the
+    for (Map.Entry<String, String> entry:
+        mtRangerPoliciesTobeDeleted.entrySet()) {
+      // TODO: Its best to not create these policies automatically and the
       //  let the user delete the tenant and recreate the tenant.
-      String policy = mtRangerPoliciesTobeDeleted.get(policyId);
-      AccessPolicy accessPolicy = authorizer.getAccessPolicyByName(policy);
+      String policyName = entry.getKey();
+      AccessPolicy accessPolicy = authorizer.getAccessPolicyByName(policyName);
       if (lastRangerPolicyLoadTime >
           (accessPolicy.getLastUpdateTime() + 3600 * 1000)) {
-        LOG.warn("Deleting policies from Ranger: " + policy);
-        authorizer.deletePolicybyName(policy);
-        for (String deletedrole : accessPolicy.getRoleList()) {
+        LOG.warn("Deleting policies from Ranger: " + policyName);
+        authorizer.deletePolicybyName(policyName);
+        for (String deletedRole : accessPolicy.getRoleList()) {
           authorizer.deleteRole(new JsonParser()
-              .parse(authorizer.getRole(deletedrole))
+              .parse(authorizer.getRole(deletedRole))
               .getAsJsonObject().get("id").getAsString());
         }
       }
@@ -412,7 +433,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     } else {
       final HashSet<String> usersInTheRole = mtOMDBRoles.get(roleName);
       usersInTheRole.add(userPrincipal);
-      // TODO: Likely unnecessary. Already got reference above. Double check
+      // TODO: Most likely unnecessary. Got reference above. Double check
 //      mtOMDBRoles.put(roleName, usersInTheRole);
     }
   }
@@ -455,14 +476,15 @@ public class OMRangerBGSync implements Runnable, Closeable {
   public void processAllRolesFromOMDB() throws Exception {
     // Lets First make sure that all the Roles in OMDB are present in Ranger
     // as well as the corresponding userlist matches matches.
-    for (String roleName: mtOMDBRoles.keySet()) {
+    for (Map.Entry<String, HashSet<String>> entry: mtOMDBRoles.entrySet()) {
+      final String roleName = entry.getKey();
       boolean pushRoleToRanger = false;
       if (mtRangerRoles.containsKey(roleName)) {
-        HashSet<String> rangerUserList = mtRangerRoles.get(roleName).getUsers();
-        for (String username : mtOMDBRoles.get(roleName)) {
-          if (rangerUserList.contains(username)) {
-            rangerUserList.remove(username);
-            continue;
+        HashSet<String> rangerUserList = mtRangerRoles.get(roleName).getUsersSet();
+        final HashSet<String> userSet = entry.getValue();
+        for (String userPrincipal : userSet) {
+          if (rangerUserList.contains(userPrincipal)) {
+            rangerUserList.remove(userPrincipal);
           } else {
             // We found a user in OMDB Role that doesn't exist in Ranger Role.
             // Lets just push the role from OMDB to Ranger.
