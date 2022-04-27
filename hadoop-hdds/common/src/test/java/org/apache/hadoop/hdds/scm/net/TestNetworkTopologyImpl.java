@@ -413,7 +413,7 @@ public class TestNetworkTopologyImpl {
         scope = "~" + path;
         frequency = pickNodesAtRandom(100, scope, null, 0);
         for (Node key : dataNodes) {
-          if (key.getNetworkFullPath().startsWith(path)) {
+          if (key.isDescendant(path)) {
             assertTrue(frequency.get(key) == 0);
           }
         }
@@ -547,8 +547,7 @@ public class TestNetworkTopologyImpl {
             List<Node> ancestorList = NetUtils.getAncestorList(cluster,
                 excludedList, ancestorGen);
             for (Node key : dataNodes) {
-              if (excludedList.contains(key) ||
-                  key.getNetworkFullPath().startsWith(path) ||
+              if (excludedList.contains(key) || key.isDescendant(path) ||
                   (ancestorList.size() > 0 &&
                       ancestorList.stream()
                           .map(a -> (InnerNode) a)
@@ -653,8 +652,7 @@ public class TestNetworkTopologyImpl {
                       excludedList.contains(key)) {
                     continue;
                   } else if (pathList != null &&
-                      pathList.stream().anyMatch(path ->
-                          key.getNetworkFullPath().startsWith(path))) {
+                      pathList.stream().anyMatch(key::isDescendant)) {
                     continue;
                   } else if (key.getNetworkFullPath().equals(
                       affinityNode.getNetworkFullPath())) {

@@ -534,7 +534,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
             " generation  " + ancestorGen);
       }
       // affinity ancestor should has overlap with scope
-      if (affinityAncestor.getNetworkFullPath().startsWith(scope)) {
+      if (affinityAncestor.isDescendant(scope)) {
         finalScope = affinityAncestor.getNetworkFullPath();
       } else if (!scope.startsWith(affinityAncestor.getNetworkFullPath())) {
         return null;
@@ -746,8 +746,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       return 0;
     }
     if (!CollectionUtils.isEmpty(mutableExcludedNodes)) {
-      mutableExcludedNodes.removeIf(
-          next -> !next.getNetworkFullPath().startsWith(scope));
+      mutableExcludedNodes.removeIf(next -> !next.isDescendant(scope));
     }
     List<Node> excludedAncestorList =
         NetUtils.getAncestorList(this, mutableExcludedNodes, ancestorGen);
@@ -780,7 +779,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
       } else {
         for (Node ancestor : excludedAncestorList) {
-          if (ancestor.getNetworkFullPath().startsWith(scope)) {
+          if (ancestor.isDescendant(scope)) {
             excludedCount += ancestor.getNumOfLeaves();
           }
         }

@@ -111,7 +111,7 @@ public final class NetUtils {
 
       // ancestor is covered by excludedScope
       mutableExcludedScopes.stream().forEach(scope -> {
-        if (ancestor.getNetworkFullPath().startsWith(scope)) {
+        if (ancestor.isDescendant(scope)) {
           // remove exclude node if it's covered by excludedScope
           iterator.remove();
         }
