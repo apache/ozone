@@ -44,7 +44,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @param configuration
    * @throws IOException
    */
-  void init(Configuration configuration) throws IOException;;
+  void init(Configuration configuration) throws IOException;
 
   /**
    * Shutdown for the MultiTenantGateKeeper.
@@ -257,4 +257,8 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
   @Override
   boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException;
+
+  long getCurrentOzoneServiceVersion(int ozoneServiceId) throws IOException;
+
+  String getAllMultiTenantPolicies(int ozoneServiceId) throws IOException;
 }

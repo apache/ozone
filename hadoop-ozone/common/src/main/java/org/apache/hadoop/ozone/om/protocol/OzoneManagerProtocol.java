@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.helpers.OmRangerSyncArgs;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -580,17 +579,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
-  /**
-   * Syncs Ranger Service Version.
-   * @param omArgs OmTenantArgs
-   * @throws IOException
-   */
-  default void rangerServiceVersionSync(OmRangerSyncArgs omArgs)
-      throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented, as write requests use a new approach");
-  }
   /**
    * Create a tenant.
    * @param omTenantArgs OmTenantArgs

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -246,17 +244,17 @@ public class TestMultiTenantVolume {
   }
 
   @Test
-  public void testBGSync() throws IOException {
-    final int trialVersion = 10;
+  public void testOMRangerBGSyncRatisSetVersion() throws IOException {
+    final long writtenVersion = 10;
 
-    // Default client not belonging to a tenant should end up in the S3 volume.
-    ObjectStore store = cluster.getClient().getObjectStore();
-    store.rangerServiceVersionSync(trialVersion);
-    long version =
-        cluster.getOzoneManager().getMetadataManager()
-            .getOmRangerStateTable()
-            .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
+    cluster.getOzoneManager().getMultiTenantManager()
+        .getOMRangerBGSyncService()
+        .setOMDBRangerServiceVersion(writtenVersion);
 
-    Assert.assertEquals(trialVersion, version);
+    long readBackVersion = cluster.getOzoneManager().getMetadataManager()
+        .getOmRangerStateTable()
+        .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
+
+    Assert.assertEquals(writtenVersion, readBackVersion);
   }
 }

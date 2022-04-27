@@ -77,7 +77,6 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
   }
 
   @Override
-  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
@@ -89,7 +88,6 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
     final RangerServiceVersionSyncRequest request
         = getOmRequest().getRangerServiceVersionSyncRequest();
     final long proposedVersion = request.getRangerServiceVersion();
-    Exception exception = null;
 
     try {
       omMetadataManager.getOmRangerStateTable().addCacheEntry(

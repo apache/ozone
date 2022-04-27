@@ -30,18 +30,25 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +63,12 @@ import com.google.gson.JsonParser;
  */
 public class OMRangerBGSyncService implements Runnable, Closeable {
 
+  private static ClientId clientId = ClientId.randomId();
+  private final AtomicLong runCount;
+
   private OzoneManager ozoneManager;
   private OMMetadataManager metadataManager;
   private OMMultiTenantManager multiTenantManager;
-  private OzoneClient ozoneClient;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(OMRangerBGSyncService.class);
@@ -76,9 +85,9 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
   private long rangerBGSyncCounter = 0;
   private long currentOzoneServiceVersionInOMDB;
   private long proposedOzoneServiceVersionInOMDB;
-  private final int rangerOzoneServiceId;
+  private int rangerOzoneServiceId;  // TODO: Unused?
 
-  private MultiTenantAccessAuthorizerRangerPlugin authorizer;
+  private MultiTenantAccessAuthorizer authorizer;
 
   private boolean isServiceStarted = false;
 
@@ -150,30 +159,39 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
   // Every BG ranger sync cycle we update this
   private long lastRangerPolicyLoadTime;
 
-  public OMRangerBGSyncService(OzoneManager ozoneManager) throws IOException {
-    try {
-      this.ozoneManager = ozoneManager;
-      metadataManager = ozoneManager.getMetadataManager();
-      authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
-      authorizer.init(ozoneManager.getConfiguration());
-      ozoneClient =
-          OzoneClientFactory.getRpcClient(this.ozoneManager.getConfiguration());
-      executorService = HadoopExecutors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setDaemon(true)
-              .setNameFormat("OM Ranger Sync Thread - %d").build());
-      rangerSyncInterval = this.ozoneManager.getConfiguration().getTimeDuration(
-          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
-          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
-          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit());
-      rangerOzoneServiceId = authorizer.getRangerOzoneServiceId();
-    } catch (IOException ex) {
-      LOG.warn("Failed to Initialize Ranger Background Sync Service: {}",
-          ex.getMessage());
-      throw ex;
+  public OMRangerBGSyncService(OzoneManager ozoneManager,
+      MultiTenantAccessAuthorizer authorizer) throws IOException {
+    this.ozoneManager = ozoneManager;
+    metadataManager = ozoneManager.getMetadataManager();
+    multiTenantManager = ozoneManager.getMultiTenantManager();
+    executorService = HadoopExecutors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("OM Ranger Sync Thread - %d").build());
+    rangerSyncInterval = ozoneManager.getConfiguration().getTimeDuration(
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit());
+    this.runCount = new AtomicLong(0);
+
+    this.authorizer = authorizer;
+
+    if (authorizer != null) {
+      if (authorizer instanceof MultiTenantAccessAuthorizerRangerPlugin) {
+        MultiTenantAccessAuthorizerRangerPlugin rangerAuthorizer =
+            (MultiTenantAccessAuthorizerRangerPlugin) authorizer;
+        rangerOzoneServiceId = rangerAuthorizer.getRangerOzoneServiceId();
+      }
+    } else {
+      LOG.warn("MultiTenantAccessAuthorizer is not set");
     }
   }
 
   public void start() {
+    if (authorizer == null) {
+      LOG.error("Failed to start the background sync service: "
+          + "null authorizer. Please check OM configuration. Aborting");
+      return;
+    }
     isServiceStarted = true;
     scheduleNextRangerSync();
   }
@@ -190,6 +208,9 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     return rangerSyncInterval;
   }
 
+  /**
+   * Returns true if the service run conditions are satisfied, false otherwise.
+   */
   private boolean shouldRun() {
     if (ozoneManager == null) {
       // OzoneManager can be null for testing
@@ -204,6 +225,7 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
   public void run() {
     // Check OM leader and readiness
     if (shouldRun()) {
+      runCount.incrementAndGet();
       try {
         executeOneRangerSyncCycle();
       } catch (Exception e) {
@@ -275,7 +297,7 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
         if (currentOzoneServiceVersionInOMDB !=
             proposedOzoneServiceVersionInOMDB) {
           // Submit Ratis Request to sync the new ozone service version in OMDB
-          setOmdbRangerServiceVersion(proposedOzoneServiceVersionInOMDB);
+          setOMDBRangerServiceVersion(proposedOzoneServiceVersionInOMDB);
         }
         while (!multiTenantManager.tryAcquireInProgressMtOp(WAIT_MILI)) {
           sleep(10);
@@ -294,9 +316,40 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     return authorizer.getCurrentOzoneServiceVersion(rangerOzoneServiceId);
   }
 
-  public void setOmdbRangerServiceVersion(long version) throws IOException {
-    // OMDB update goes through RATIS
-    ozoneClient.getObjectStore().rangerServiceVersionSync(version);
+  private RaftClientRequest newRaftClientRequest(OMRequest omRequest) {
+    return RaftClientRequest.newBuilder()
+        .setClientId(clientId)
+        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
+        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
+        .setCallId(runCount.get())
+        .setMessage(
+            Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)))
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
+  }
+
+  public void setOMDBRangerServiceVersion(long version) {
+    // OM DB update goes through Ratis
+    RangerServiceVersionSyncRequest.Builder versionSyncRequest =
+        RangerServiceVersionSyncRequest.newBuilder()
+            .setRangerServiceVersion(version);
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(Type.RangerServiceVersionSync)
+        .setRangerServiceVersionSyncRequest(versionSyncRequest)
+        .setClientId(clientId.toString())
+        .build();
+
+    // Submit PurgeKeys request to OM
+    try {
+      RaftClientRequest raftClientRequest = newRaftClientRequest(omRequest);
+      ozoneManager.getOmRatisServer().submitRequest(omRequest,
+          raftClientRequest);
+    } catch (ServiceException e) {
+      LOG.error("RangerServiceVersionSync request failed. "
+          + "Will retry at next run.");
+    }
   }
 
   public long getOmdbRangerServiceVersion() {
@@ -543,10 +596,6 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
     HashSet<String> omdbUserList = mtOMDBRoles.get(roleName);
     String roleJsonStr = authorizer.getRole(roleName);
     authorizer.assignAllUsers(omdbUserList, roleJsonStr);
-  }
-
-  public void setOzoneClient(OzoneClient oc) {
-    this.ozoneClient = oc;
   }
 
   public long getRangerBGSyncCounter() {

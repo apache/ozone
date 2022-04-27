@@ -172,4 +172,14 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
       throws OMException {
     return false;
   }
+
+  @Override
+  public long getCurrentOzoneServiceVersion(int ozoneServiceId) {
+    return -1;
+  }
+
+  @Override
+  public String getAllMultiTenantPolicies(int ozoneServiceId) {
+    return null;
+  }
 }

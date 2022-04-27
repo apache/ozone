@@ -314,21 +314,18 @@ public class TestMultiTenantBGSync {
   long bgSyncSetup() throws IOException {
     // TODO: Further lower the interval for the UT?
     conf.set(OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL, "10s");
-    bgSync = new OMRangerBGSyncService(ozoneManager);
+    bgSync = new OMRangerBGSyncService(ozoneManager, omm);
     OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
     ObjectStore objectStore = Mockito.mock(ObjectStore.class);
     when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    bgSync.setOzoneClient(ozoneClient);
-    when(ozoneClient.getObjectStore()).thenReturn(objectStore);
     long ozoneVersion =
         bgSync.getRangerServiceVersion();
-    Mockito.doAnswer(invocationOnMock -> {
-      long v = invocationOnMock.getArgument(0);
-      ozoneManager.getMetadataManager().getOmRangerStateTable()
-          .put(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY,
-              v);
-      return null;
-    }).when(objectStore).rangerServiceVersionSync(ozoneVersion);
+//    Mockito.doAnswer(invocationOnMock -> {
+//      long v = invocationOnMock.getArgument(0);
+//      ozoneManager.getMetadataManager().getOmRangerStateTable()
+//          .put(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY, v);
+//      return null;
+//    }).when(objectStore).rangerServiceVersionSync(ozoneVersion);
     return ozoneVersion;
   }
 

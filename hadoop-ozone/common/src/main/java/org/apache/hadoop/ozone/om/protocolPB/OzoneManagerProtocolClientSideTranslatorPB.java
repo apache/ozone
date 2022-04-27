@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.helpers.OmRangerSyncArgs;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -140,7 +139,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
@@ -990,23 +988,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setRevokeS3SecretRequest(request)
             .build();
     handleError(submitRequest(omRequest));
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void rangerServiceVersionSync(OmRangerSyncArgs omArgs)
-      throws IOException {
-    final RangerServiceVersionSyncRequest request =
-        RangerServiceVersionSyncRequest.newBuilder()
-        .setRangerServiceVersion(omArgs.getNewSyncServiceVersion())
-        .build();
-    final OMRequest omRequest = createOMRequest(Type.RangerServiceVersionSync)
-        .setRangerServiceVersionSyncRequest(request)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
   }
 
   /**

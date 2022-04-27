@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
@@ -108,27 +109,33 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     this.ozoneManager = ozoneManager;
     this.omMetadataManager = ozoneManager.getMetadataManager();
     this.tenantCache = new ConcurrentHashMap<>();
-    boolean devSkipRanger = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER,
-        false);
+    boolean devSkipRanger =
+        conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
     if (devSkipRanger) {
       this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
     } else {
       this.authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
     }
-    this.authorizer.init(conf);
-    loadUsersFromDB();
-    // Initialize the Ranger Sync Thread
     try {
-      omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager);
-      // Start the Ranger Sync Thread
-      this.start();
+      this.authorizer.init(conf);
     } catch (OMException ex) {
-      omRangerBGSyncService = null;
-      if (ex.getResult().equals(OMException.ResultCodes.INTERNAL_ERROR)) {
-        LOG.warn("Unable to initialize OM Ranger Sync Service. "
-            + "Please check OM configuration");
+      if (ex.getResult().equals(INTERNAL_ERROR)) {
+        LOG.error("Failed to initialize {}, falling back to dummy authorizer",
+            authorizer.getClass().getSimpleName());
+        this.authorizer = new MultiTenantAccessAuthorizerDummyPlugin();
+      } else {
+        throw ex;
       }
     }
+    loadUsersFromDB();
+    // Initialize the Ranger Sync Thread
+    omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager, authorizer);
+    // Start the Ranger Sync Thread
+    this.start();
+  }
+
+  public OMRangerBGSyncService getOMRangerBGSyncService() {
+    return omRangerBGSyncService;
   }
 
   /**

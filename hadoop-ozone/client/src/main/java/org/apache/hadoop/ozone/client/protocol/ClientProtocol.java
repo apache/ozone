@@ -597,13 +597,6 @@ public interface ClientProtocol {
   void revokeS3Secret(String kerberosID) throws IOException;
 
   /**
-   * Syncs the RangerService Version for Ozone in OMDB.
-   * @param version
-   * @throws IOException
-   */
-  void rangerServiceVersionSync(long version) throws IOException;
-
-  /**
    * Create a tenant.
    * @param tenantId tenant name.
    * @throws IOException

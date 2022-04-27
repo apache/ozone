@@ -92,8 +92,9 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     conf = new OzoneConfiguration(configuration);
     rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     if (rangerHttpsAddress == null) {
-      LOG.warn("ozone.om.ranger.https-address is not configured! "
-          + "Features dependent on Apache Ranger may not work properly.");
+      throw new OMException("Config ozone.om.ranger.https-address is not set! "
+          + "Multi-Tenancy feature requires Apache Ranger to function properly",
+          OMException.ResultCodes.INTERNAL_ERROR);
     }
     initializeRangerConnection();
   }
@@ -559,21 +560,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return policy;
   }
 
-  private void checkConfig() throws IOException {
-    if (rangerHttpsAddress == null) {
-      throw new OMException("ozone.om.ranger.https-address is not configured. "
-          + "Abort", OMException.ResultCodes.INTERNAL_ERROR);
-    }
-  }
-
   /**
    * Return the service ID for Ozone service in Ranger.
-   *
-   * TODO: Error handling when Ozone service doesn't exist (e.g. not configured)
-   *  in Ranger.
+   * TODO: Error handling when Ozone service doesn't exist in Ranger.
    */
   public int getRangerOzoneServiceId() throws IOException {
-    checkConfig();  // TODO: Add this to other applicable methods as well.
 
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;

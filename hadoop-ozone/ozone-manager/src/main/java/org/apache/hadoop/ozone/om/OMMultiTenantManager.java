@@ -22,6 +22,7 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.auth.BasicUserPrincipal;
@@ -55,6 +56,8 @@ public interface OMMultiTenantManager {
    * Stop background thread(s) in the multi-tenant manager.
    */
   void stop() throws IOException;
+
+  OMRangerBGSyncService getOMRangerBGSyncService();
 
   /**
    * Returns the corresponding OzoneManager instance.
