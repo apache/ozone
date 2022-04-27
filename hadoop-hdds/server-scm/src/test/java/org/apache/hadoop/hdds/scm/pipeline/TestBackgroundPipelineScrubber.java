@@ -92,8 +92,8 @@ public class TestBackgroundPipelineScrubber {
     synchronized (scrubber) {
       scrubber.notifyStatusChanged();
       assertTrue(scrubber.shouldRun());
-      scrubber.notifyAll();
+      scrubber.runImmediately();
     }
-    verify(pipelineManager, timeout(3000).times(1)).scrubPipelines();
+    verify(pipelineManager, timeout(3000).atLeastOnce()).scrubPipelines();
   }
 }
