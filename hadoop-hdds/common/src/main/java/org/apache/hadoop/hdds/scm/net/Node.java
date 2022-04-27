@@ -100,6 +100,24 @@ public interface Node {
   boolean isAncestor(Node n);
 
   /**
+   * Judge if this node is an ancestor of the node representing by the nodePath.
+   * Ancestor includes itself and parents case.
+   *
+   * @param nodePath the node path
+   * @return true if this node is an ancestor of <i>n</i>
+   */
+  boolean isAncestor(String nodePath);
+
+  /**
+   * Judge if this node is a descendant of node <i>n</i>.
+   * Descendant includes itself and all child generations.
+   *
+   * @param n a node
+   * @return true if this node is an descendant of <i>n</i>
+   */
+  boolean isDescendant(Node n);
+
+  /**
    * Judge if this node is a descendant of the node representing by the
    * nodePath.
    * Descendant includes itself and all child generations.

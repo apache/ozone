@@ -196,9 +196,19 @@ public class NodeImpl implements Node {
    */
   @Override
   public boolean isAncestor(Node node) {
+    return isAncestor(node.getNetworkFullPath());
+  }
+
+  @Override
+  public boolean isAncestor(String nodePath) {
     return this.getNetworkFullPath().equals(PATH_SEPARATOR_STR) ||
-        node.isDescendant(this.getNetworkFullPath()) ||
-        node.getNetworkFullPath().equalsIgnoreCase(this.getNetworkFullPath());
+        nodePath.equalsIgnoreCase(this.getNetworkFullPath()) ||
+        NetUtils.addSuffix(nodePath).startsWith(
+            NetUtils.addSuffix(this.getNetworkFullPath()));
+  }
+  @Override
+  public boolean isDescendant(Node node) {
+    return isDescendant(node.getNetworkFullPath());
   }
 
   @Override

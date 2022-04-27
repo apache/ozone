@@ -105,7 +105,7 @@ public final class NetUtils {
       }
       // excludedScope is child of ancestor
       List<String> duplicateList = mutableExcludedScopes.stream()
-          .filter(scope -> scope.startsWith(ancestor.getNetworkFullPath()))
+          .filter(ancestor::isAncestor)
           .collect(Collectors.toList());
       mutableExcludedScopes.removeAll(duplicateList);
 

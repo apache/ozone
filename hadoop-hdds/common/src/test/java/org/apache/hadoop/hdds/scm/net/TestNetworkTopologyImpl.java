@@ -192,6 +192,13 @@ public class TestNetworkTopologyImpl {
     assertEquals(cluster.getNode(""), cluster.getNode("/"));
     assertEquals(null, cluster.getNode("/switch1/node1"));
     assertEquals(null, cluster.getNode("/switch1"));
+
+    if (cluster.getNode("/d1") != null) {
+      List<String> excludedScope = new ArrayList<>();
+      excludedScope.add("/d");
+      Node n = cluster.getNode(0, "/d1", excludedScope, null, null, 0);
+      assertNotNull(n);
+    }
   }
 
   @Test
@@ -908,9 +915,18 @@ public class TestNetworkTopologyImpl {
 
   @Test
   public void testIsAncestor() {
-    NodeImpl n1 = new NodeImpl("r1", "/", NODE_COST_DEFAULT);
-    NodeImpl n2 = new NodeImpl("dc", "/r12", NODE_COST_DEFAULT);
-    Assert.assertFalse(n1.isAncestor(n2));
+    NodeImpl r1 = new NodeImpl("r1", "/", NODE_COST_DEFAULT);
+    NodeImpl r12 = new NodeImpl("r12", "/", NODE_COST_DEFAULT);
+    NodeImpl dc = new NodeImpl("dc", "/r12", NODE_COST_DEFAULT);
+    Assert.assertFalse(r1.isAncestor(dc));
+    Assert.assertFalse(r1.isAncestor("/r12/dc2"));
+    Assert.assertFalse(dc.isDescendant(r1));
+    Assert.assertFalse(dc.isDescendant("/r1"));
+
+    Assert.assertTrue(r12.isAncestor(dc));
+    Assert.assertTrue(r12.isAncestor("/r12/dc2"));
+    Assert.assertTrue(dc.isDescendant(r12));
+    Assert.assertTrue(dc.isDescendant("/r12"));
   }
 
   @Test
@@ -925,7 +941,6 @@ public class TestNetworkTopologyImpl {
     excludedScope.add("/r1");
     Assert.assertFalse(n1.isDescendant("/r1"));
     Assert.assertEquals(n1, dc.getLeaf(0, excludedScope, null, 0));
-
   }
 
   private static Node createDatanode(String name, String path) {

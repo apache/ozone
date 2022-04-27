@@ -542,6 +542,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       // reset ancestor generation since the new scope is identified now
       ancestorGen = 0;
     }
+    Node scopeNode = getNode(finalScope);
 
     // check overlap of excludedScopes and finalScope
     List<String> mutableExcludedScopes = null;
@@ -549,12 +550,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
       mutableExcludedScopes = new ArrayList<>();
       for (String s: excludedScopes) {
         // excludeScope covers finalScope
-        if (finalScope.startsWith(s)) {
+        if (scopeNode.isDescendant(s)) {
           return null;
         }
         // excludeScope and finalScope share nothing case
-        if (s.startsWith(finalScope)) {
-          if (mutableExcludedScopes.stream().noneMatch(s::startsWith)) {
+        if (scopeNode.isAncestor(s)) {
+          if (mutableExcludedScopes.stream().
+              noneMatch(n -> getNode(s).isDescendant(n))) {
             mutableExcludedScopes.add(s);
           }
         }
@@ -581,7 +583,6 @@ public class NetworkTopologyImpl implements NetworkTopology {
         ancestorGen);
 
     // calculate available node count
-    Node scopeNode = getNode(finalScope);
     int availableNodes = getAvailableNodesCount(
         scopeNode.getNetworkFullPath(), mutableExcludedScopes, mutableExNodes,
         ancestorGen);
@@ -751,7 +752,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     List<Node> excludedAncestorList =
         NetUtils.getAncestorList(this, mutableExcludedNodes, ancestorGen);
     for (Node ancestor : excludedAncestorList) {
-      if (scope.startsWith(ancestor.getNetworkFullPath())) {
+      if (ancestor.isAncestor(scope)) {
         return 0;
       }
     }
@@ -761,9 +762,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
       for (String excludedScope: excludedScopes) {
         Node excludedScopeNode = getNode(excludedScope);
         if (excludedScopeNode != null) {
-          if (excludedScope.startsWith(scope)) {
+          if (excludedScopeNode.isDescendant(scope)) {
             excludedCount += excludedScopeNode.getNumOfLeaves();
-          } else if (scope.startsWith(excludedScope)) {
+          } else if (excludedScopeNode.isAncestor(scope)) {
             return 0;
           }
         }
