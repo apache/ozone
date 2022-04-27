@@ -196,6 +196,9 @@ public class NodeImpl implements Node {
    */
   @Override
   public boolean isAncestor(Node node) {
+    if (node == null) {
+      return false;
+    }
     return isAncestor(node.getNetworkFullPath());
   }
 
@@ -208,6 +211,9 @@ public class NodeImpl implements Node {
   }
   @Override
   public boolean isDescendant(Node node) {
+    if (node == null) {
+      return false;
+    }
     return isDescendant(node.getNetworkFullPath());
   }
 
