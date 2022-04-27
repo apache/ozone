@@ -45,12 +45,16 @@ public interface OMMultiTenantManager {
    *
    * @throws IOException
    */
-//  void start() throws IOException;
-//
-//  /**
-//   * Stop multi-tenant manager.
-//   */
-//  void stop() throws Exception;
+
+  /**
+   * Start background thread(s) in the multi-tenant manager.
+   */
+  void start() throws IOException;
+
+  /**
+   * Stop background thread(s) in the multi-tenant manager.
+   */
+  void stop() throws IOException;
 
   /**
    * Returns the corresponding OzoneManager instance.

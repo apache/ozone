@@ -132,7 +132,7 @@ public interface AccessPolicy {
    * @throws Exception
    */
   String deserializePolicyFromJsonString(JsonObject jsonObject)
-      throws Exception;
+      throws IOException;
 
   /**
    * @return AccessPolicyType (Native or otherwise).

@@ -100,7 +100,7 @@ public class TestMultiTenantBGSync {
   private static final String RANGER_ENDPOINT_USER_PASSWD = "";
 
   private MultiTenantAccessAuthorizer omm;
-  private OMRangerBGSync bgSync;
+  private OMRangerBGSyncService bgSync;
 
   private List<String> usersIdsCreated = new ArrayList<>();
   private List<String> policyNamesCreated = new ArrayList<>();
@@ -314,7 +314,7 @@ public class TestMultiTenantBGSync {
 
   long bgSyncSetup() throws Exception {
     conf.setInt(OMConfigKeys.OZONE_OM_RANGER_SYNC_INTERVAL, 10);
-    bgSync = new OMRangerBGSync(ozoneManager);
+    bgSync = new OMRangerBGSyncService(ozoneManager);
     OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
     ObjectStore objectStore = Mockito.mock(ObjectStore.class);
     when(ozoneClient.getObjectStore()).thenReturn(objectStore);

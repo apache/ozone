@@ -82,7 +82,7 @@ public class RangerAccessPolicy implements AccessPolicy {
 
   @Override
   public String deserializePolicyFromJsonString(JsonObject jsonObject)
-      throws Exception {
+      throws IOException {
     setPolicyID(jsonObject.get("id").getAsString());
     try {
       JsonArray policyItems = jsonObject

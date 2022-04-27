@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
+import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizer;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessAuthorizerDummyPlugin;
@@ -97,6 +98,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final ReentrantReadWriteLock tenantCacheLock;
   private final Map<String, CachedTenantState> tenantCache;
   private final Semaphore inProgressMtOp = new Semaphore(1, true);
+  private final OMRangerBGSyncService omRangerBGSyncService;
 
   public OMMultiTenantManagerImpl(OzoneManager ozoneManager,
                                   OzoneConfiguration conf)
@@ -115,19 +117,27 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
     this.authorizer.init(conf);
     loadUsersFromDB();
+    // Initialize the Ranger Sync Thread
+    omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager);
+    // Start the Ranger Sync Thread
+    this.start();
   }
 
+  /**
+   * Start the Ranger policy and role sync thread.
+   */
+  @Override
+  public void start() throws IOException {
+    omRangerBGSyncService.start();
+  }
 
-// start() and stop() lifeycle methods can be added when there is a background
-// work going on.
-//  @Override
-//  public void start() throws IOException {
-//  }
-//
-//  @Override
-//  public void stop() throws Exception {
-//
-//  }
+  /**
+   * Stop the Ranger policy and role sync thread.
+   */
+  @Override
+  public void stop() throws IOException {
+    omRangerBGSyncService.stop();
+  }
 
   @Override
   public OMMetadataManager getOmMetadataManager() {

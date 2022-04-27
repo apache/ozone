@@ -50,17 +50,17 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 /**
- * Background Sync thread that reads Multitnancy state from OMDB
+ * Background Sync thread that reads Multi-Tenancy state from OM DB
  * and applies it to Ranger.
  */
-public class OMRangerBGSync implements Runnable, Closeable {
+public class OMRangerBGSyncService implements Runnable, Closeable {
 
   private OzoneManager ozoneManager;
   private OMMetadataManager metadataManager;
   private OzoneClient ozoneClient;
 
   private static final Logger LOG = LoggerFactory
-      .getLogger(OMRangerBGSync.class);
+      .getLogger(OMRangerBGSyncService.class);
   private static final int WAIT_MILI = 1000;
   private static final int MAX_ATTEMPT = 2;
 
@@ -78,14 +78,16 @@ public class OMRangerBGSync implements Runnable, Closeable {
 
   private MultiTenantAccessAuthorizerRangerPlugin authorizer;
 
+  private boolean isServiceStarted = false;
+
   static class BGRole {
     private final String name;
     private String id;
-    private final HashSet<String> users;
+    private final HashSet<String> userSet;
 
     BGRole(String n) {
       this.name = n;
-      users = new HashSet<>();
+      userSet = new HashSet<>();
     }
 
     public void setId(String id) {
@@ -97,11 +99,11 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
 
     public void addUserPrincipal(String userPrincipal) {
-      users.add(userPrincipal);
+      userSet.add(userPrincipal);
     }
 
-    public HashSet<String> getUsersSet() {
-      return users;
+    public HashSet<String> getUserSet() {
+      return userSet;
     }
 
     @Override
@@ -117,7 +119,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      // TODO: What about HashSet users?
+      // TODO: Do we care about userSet
       return this.hashCode() == o.hashCode();
     }
   }
@@ -146,29 +148,37 @@ public class OMRangerBGSync implements Runnable, Closeable {
   // Every BG ranger sync cycle we update this
   private long lastRangerPolicyLoadTime;
 
-  public OMRangerBGSync(OzoneManager om) throws Exception {
+  public OMRangerBGSyncService(OzoneManager ozoneManager) throws IOException {
     try {
-      ozoneManager = om;
-      metadataManager = om.getMetadataManager();
+      this.ozoneManager = ozoneManager;
+      metadataManager = ozoneManager.getMetadataManager();
       authorizer = new MultiTenantAccessAuthorizerRangerPlugin();
-      authorizer.init(om.getConfiguration());
+      authorizer.init(ozoneManager.getConfiguration());
       ozoneClient =
-          OzoneClientFactory.getRpcClient(ozoneManager.getConfiguration());
+          OzoneClientFactory.getRpcClient(this.ozoneManager.getConfiguration());
       executorService = HadoopExecutors.newScheduledThreadPool(1,
           new ThreadFactoryBuilder().setDaemon(true)
               .setNameFormat("OM Ranger Sync Thread - %d").build());
-      rangerSyncInterval =
-          ozoneManager.getConfiguration().getInt(OZONE_OM_RANGER_SYNC_INTERVAL,
+      rangerSyncInterval = this.ozoneManager.getConfiguration().getInt(
+              OZONE_OM_RANGER_SYNC_INTERVAL,
               OZONE_OM_RANGER_SYNC_INTERVAL_DEFAULT);
-      scheduleNextRangerSync();
       ozoneServiceId = authorizer.getOzoneServiceId();
-    } catch (Exception e) {
+    } catch (IOException e) {
       LOG.warn("Failed to Initialize Ranger Background Sync");
       throw e;
     }
   }
 
-  public int getOzoneServiceId() throws Exception {
+  public void start() {
+    isServiceStarted = true;
+    scheduleNextRangerSync();
+  }
+
+  public void stop() {
+    isServiceStarted = false;
+  }
+
+  public int getOzoneServiceId() throws IOException {
     return ozoneServiceId;
   }
 
@@ -176,22 +186,30 @@ public class OMRangerBGSync implements Runnable, Closeable {
     return rangerSyncInterval;
   }
 
+  private boolean shouldRun() {
+    if (ozoneManager == null) {
+      // OzoneManager can be null for testing
+      return true;
+    }
+    // The service only runs if current OM node is leader and is ready
+    //  and the service is marked as started
+    return isServiceStarted && ozoneManager.isLeaderReady();
+  }
+
   @Override
   public void run() {
-    try {
-      Thread.sleep(10);  // TODO: Why the sleep?
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
-    try {
-      if (ozoneManager.isLeaderReady()) {
+    // Check OM leader and readiness
+    if (shouldRun()) {
+      try {
         executeOneRangerSyncCycle();
+      } catch (Exception e) {
+        LOG.warn("Exception during OM Ranger Sync: {}", e.getMessage());
+      } finally {
+        // Lets Schedule the next cycle now. We do not deliberaty schedule at
+        // fixed interval to account for ranger sync processing time.
+        scheduleNextRangerSync();
       }
-    } catch (Exception e) {
-      LOG.warn("Exception during OM Ranger Background Sync." + e.getMessage());
-    } finally {
-      // Lets Schedule the next cycle now. We do not deliberaty schedule at
-      // fixed interval to account for ranger sync processing time.
+    } else {
       scheduleNextRangerSync();
     }
   }
@@ -210,6 +228,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
 
   @Override
   public void close() {
+    stop();
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -290,7 +309,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     return lastKnownVersion;
   }
 
-  private void executeOmdbToRangerSync(long baseVersion) throws Exception {
+  private void executeOmdbToRangerSync(long baseVersion) throws IOException {
     ++rangerBGSyncCounter;
     cleanupSyncState();
     loadAllPoliciesRolesFromRanger(baseVersion);
@@ -304,7 +323,6 @@ public class OMRangerBGSync implements Runnable, Closeable {
 
     // This should isolate roles that need fixing into a list of
     // roles that need to be replayed back into ranger to get in sync with OMDB.
-    //
     processAllRolesFromOMDB();
   }
 
@@ -316,7 +334,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
   }
 
   public void loadAllPoliciesRolesFromRanger(long baseVersion)
-      throws Exception {
+      throws IOException {
     // TODO: incremental policies API is broken. We are getting all the
     //  multitenant policies using Ranger labels.
     String allPolicies = authorizer.getAllMultiTenantPolicies(ozoneServiceId);
@@ -349,7 +367,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
   }
 
-  public void loadAllRolesFromRanger() throws Exception {
+  public void loadAllRolesFromRanger() throws IOException {
     for (Map.Entry<String, BGRole> entry: mtRangerRoles.entrySet()) {
       final String roleName = entry.getKey();
       final String roleDataString = authorizer.getRole(roleName);
@@ -380,7 +398,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
   }
 
-  public void processAllPoliciesFromOMDB() throws Exception {
+  public void processAllPoliciesFromOMDB() throws IOException {
 
     // Iterate all DB tenant states. For each tenant,
     // queue or dequeue bucketNamespacePolicyName and bucketPolicyName
@@ -438,7 +456,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
   }
 
-  public void loadAllRolesFromOMDB() throws Exception {
+  public void loadAllRolesFromOMDB() throws IOException {
     // We have the following in OM DB
     //  tenantStateTable: tenantId -> TenantState (has user and admin role name)
     //  tenantAccessIdTable : accessId -> OmDBAccessIdInfo
@@ -473,7 +491,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
     }
   }
 
-  public void processAllRolesFromOMDB() throws Exception {
+  public void processAllRolesFromOMDB() throws IOException {
     // Lets First make sure that all the Roles in OMDB are present in Ranger
     // as well as the corresponding userlist matches matches.
     for (Map.Entry<String, HashSet<String>> entry: mtOMDBRoles.entrySet()) {
@@ -481,7 +499,7 @@ public class OMRangerBGSync implements Runnable, Closeable {
       boolean pushRoleToRanger = false;
       if (mtRangerRoles.containsKey(roleName)) {
         final HashSet<String> rangerUserList =
-            mtRangerRoles.get(roleName).getUsersSet();
+            mtRangerRoles.get(roleName).getUserSet();
         final HashSet<String> userSet = entry.getValue();
         for (String userPrincipal : userSet) {
           if (rangerUserList.contains(userPrincipal)) {

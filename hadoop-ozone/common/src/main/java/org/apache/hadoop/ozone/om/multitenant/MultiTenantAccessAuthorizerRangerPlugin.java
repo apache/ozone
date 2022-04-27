@@ -522,7 +522,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public AccessPolicy getAccessPolicyByName(String policyName)
-      throws Exception {
+      throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT +
         policyName;
@@ -555,7 +555,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return policy;
   }
 
-  public int getOzoneServiceId() throws Exception {
+  public int getOzoneServiceId() throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;
     int id = 0;
@@ -600,7 +600,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public String getAllMultiTenantPolicies(int ozoneServiceId)
-      throws Exception {
+      throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT
             + ozoneServiceId + "?policyLabelsPartial=OzoneMultiTenant";
@@ -640,7 +640,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   @Override
-  public void deletePolicybyName(String policyName) throws Exception {
+  public void deletePolicybyName(String policyName) throws IOException {
     AccessPolicy policy = getAccessPolicyByName(policyName);
     String  policyID = policy.getPolicyID();
     LOG.debug("policyID is: {}", policyID);
