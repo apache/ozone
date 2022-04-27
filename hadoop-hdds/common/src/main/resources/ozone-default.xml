@@ -1369,6 +1369,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.scrub.interval</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      SCM schedules a fixed interval job using the configured interval to
+      scrub pipelines.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.creation.auto.factor.one</name>
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
