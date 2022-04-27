@@ -57,7 +57,6 @@ import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
@@ -93,7 +92,7 @@ public class TestMultiTenantBGSync {
   @Rule
   public Timeout timeout = new Timeout(600000);
 
-  private final long TEST_SYNC_INTERVAL_SEC = 10L;
+  private static final long TEST_SYNC_INTERVAL_SEC = 10L;
 
   private TemporaryFolder folder = new TemporaryFolder();
 

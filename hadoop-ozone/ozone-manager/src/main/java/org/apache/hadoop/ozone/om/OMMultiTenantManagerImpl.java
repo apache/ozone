@@ -133,19 +133,23 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
     loadUsersFromDB();
 
-    final TimeUnit rangerSyncIntervalTimeUnit =
-        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit();
+    // Define the internal time unit for this config
+    final TimeUnit internalTimeUnit = TimeUnit.SECONDS;
+    // Get the interval in internal time unit
     long rangerSyncInterval = ozoneManager.getConfiguration().getTimeDuration(
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
-        rangerSyncIntervalTimeUnit);
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit(),
+        internalTimeUnit);
+    // Get the timeout in internal time unit
     long rangerSyncTimeout = ozoneManager.getConfiguration().getTimeDuration(
         OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT,
         OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT.getDuration(),
-        OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT.getUnit());
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT.getUnit(),
+        internalTimeUnit);
     // Initialize the Ranger Sync Thread
     omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager, authorizer,
-        rangerSyncInterval, rangerSyncIntervalTimeUnit, rangerSyncTimeout);
+        rangerSyncInterval, internalTimeUnit, rangerSyncTimeout);
     // Start the Ranger Sync Thread
     this.start();
   }

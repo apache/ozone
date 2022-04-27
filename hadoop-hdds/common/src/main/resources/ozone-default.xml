@@ -3131,4 +3131,14 @@
       Value should be set with a unit suffix (ns,ms,s,m,h,d)
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.multitenancy.ranger.sync.timeout</name>
+    <value>10s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The timeout for each Multi-Tenancy Ranger background sync thread run.
+      If the timeout has been reached, a warning message will be logged.
+    </description>
+  </property>
 </configuration>
