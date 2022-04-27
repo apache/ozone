@@ -18,11 +18,14 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -47,7 +50,6 @@ public class TestOmKeyInfoCodec {
   private static final String KEYNAME =
       "user/root/terasort/10G-input-6/part-m-00037";
 
-
   private OmKeyInfo getKeyInfo(int chunkNum) {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     Pipeline pipeline = HddsTestUtils.getRandomPipeline();
@@ -61,6 +63,12 @@ public class TestOmKeyInfoCodec {
     }
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
         OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+
+    final int lenOfZeroBytes = 32;
+    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
+    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
+    FileChecksum checksum =
+        new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
     return new OmKeyInfo.Builder()
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
@@ -74,6 +82,7 @@ public class TestOmKeyInfoCodec {
         .setDataSize(100)
         .setOmKeyLocationInfos(
             Collections.singletonList(omKeyLocationInfoGroup))
+        .setFileChecksum(checksum)
         .build();
   }
 
@@ -95,6 +104,7 @@ public class TestOmKeyInfoCodec {
           ", Serialized key size without pipeline = " + rawData.length);
       assertNull(key.getLatestVersionLocations().getLocationList().get(0)
           .getPipeline());
+      assertNotNull(key.getFileChecksum());
     } catch (IOException e) {
       fail("Should success");
     }
