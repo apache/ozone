@@ -163,8 +163,8 @@ public class OMRangerBGSyncService implements Runnable, Closeable {
               .setNameFormat("OM Ranger Sync Thread - %d").build());
       rangerSyncInterval = this.ozoneManager.getConfiguration().getTimeDuration(
           OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
-          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT,
-          TimeUnit.SECONDS);
+          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
+          OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit());
       rangerOzoneServiceId = authorizer.getRangerOzoneServiceId();
     } catch (IOException ex) {
       LOG.warn("Failed to Initialize Ranger Background Sync Service: {}",

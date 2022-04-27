@@ -340,6 +340,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL
       = "ozone.om.multitenancy.ranger.sync.interval";
-  public static final String OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT
-      = "10m";
+  public static final TimeDuration
+      OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT
+      = TimeDuration.valueOf(600, TimeUnit.SECONDS);
 }
