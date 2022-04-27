@@ -21,11 +21,14 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -55,7 +58,7 @@ public class TestBackgroundPipelineScrubber {
     conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0ms");
 
     this.scrubber = new BackgroundPipelineScrubber(pipelineManager, conf,
-        scmContext);
+        scmContext, new TestClock(Instant.now(), ZoneOffset.UTC));
   }
 
   @After

@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -43,8 +45,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
+import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.LoggerFactory;
@@ -85,7 +89,8 @@ public class TestHealthyPipelineSafeModeRule {
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
@@ -139,7 +144,8 @@ public class TestHealthyPipelineSafeModeRule {
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -237,7 +243,8 @@ public class TestHealthyPipelineSafeModeRule {
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,

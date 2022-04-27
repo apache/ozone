@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.After;
 import org.junit.Assert;
@@ -59,6 +60,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -128,7 +131,8 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         scmContext,
-        serviceManager);
+        serviceManager,
+        new TestClock(Instant.now(), ZoneOffset.UTC));
   }
 
   private PipelineManagerImpl createPipelineManager(
@@ -139,7 +143,8 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         SCMContext.emptyContext(),
-        serviceManager);
+        serviceManager,
+        new TestClock(Instant.now(), ZoneOffset.UTC));
   }
 
   @Test

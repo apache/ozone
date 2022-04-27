@@ -23,11 +23,11 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
@@ -58,12 +58,14 @@ public class BackgroundPipelineScrubber implements SCMService {
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
   private volatile boolean runImmediately = false;
+  private final Clock clock;
 
   public BackgroundPipelineScrubber(PipelineManager pipelineManager,
-      ConfigurationSource conf, SCMContext scmContext) {
+      ConfigurationSource conf, SCMContext scmContext, Clock clock) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scmContext = scmContext;
+    this.clock = clock;
 
     this.intervalInMillis = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL,
@@ -85,7 +87,7 @@ public class BackgroundPipelineScrubber implements SCMService {
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
           serviceStatus = ServiceStatus.RUNNING;
-          lastTimeToBeReadyInMillis = Time.monotonicNow();
+          lastTimeToBeReadyInMillis = clock.millis();
         }
       } else {
         if (serviceStatus != ServiceStatus.PAUSING) {
@@ -104,7 +106,7 @@ public class BackgroundPipelineScrubber implements SCMService {
     try {
       // If safe mode is off, then this SCMService starts to run with a delay.
       return serviceStatus == ServiceStatus.RUNNING &&
-          Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
+          clock.millis() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
     } finally {
       serviceLock.unlock();
     }
