@@ -87,14 +87,14 @@ public class TestOMMultiTenantManagerImpl {
 
     OzoneConfiguration ozoneConfiguration =
         Mockito.mock(OzoneConfiguration.class);
-    Mockito.when(ozoneManager.getConfiguration())
-        .thenReturn(ozoneConfiguration);
     Mockito.when(ozoneConfiguration.getTimeDuration(
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit()))
         .thenReturn(
             OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration());
+    Mockito.when(ozoneManager.getConfiguration())
+        .thenReturn(ozoneConfiguration);
 
     tenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
     assertEquals(1, tenantManager.getTenantCache().size());

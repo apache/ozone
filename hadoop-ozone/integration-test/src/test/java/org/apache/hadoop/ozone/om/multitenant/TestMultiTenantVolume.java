@@ -245,7 +245,7 @@ public class TestMultiTenantVolume {
 
   @Test
   public void testOMRangerBGSyncRatisSetVersion() throws IOException {
-    final long writtenVersion = 10;
+    final long writtenVersion = 10L;
 
     cluster.getOzoneManager().getMultiTenantManager()
         .getOMRangerBGSyncService()

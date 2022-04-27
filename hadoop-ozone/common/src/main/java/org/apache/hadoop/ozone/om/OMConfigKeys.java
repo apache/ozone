@@ -343,4 +343,9 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT
       = TimeDuration.valueOf(600, TimeUnit.SECONDS);
+  public static final String OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT
+      = "ozone.om.multitenancy.ranger.sync.timeout";
+  public static final TimeDuration
+      OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT
+      = TimeDuration.valueOf(10, TimeUnit.SECONDS);
 }

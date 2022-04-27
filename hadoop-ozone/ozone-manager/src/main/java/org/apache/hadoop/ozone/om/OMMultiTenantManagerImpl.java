@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
@@ -128,8 +132,20 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       }
     }
     loadUsersFromDB();
+
+    final TimeUnit rangerSyncIntervalTimeUnit =
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit();
+    long rangerSyncInterval = ozoneManager.getConfiguration().getTimeDuration(
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
+        rangerSyncIntervalTimeUnit);
+    long rangerSyncTimeout = ozoneManager.getConfiguration().getTimeDuration(
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT,
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT.getDuration(),
+        OZONE_OM_MULTITENANCY_RANGER_SYNC_TIMEOUT_DEFAULT.getUnit());
     // Initialize the Ranger Sync Thread
-    omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager, authorizer);
+    omRangerBGSyncService = new OMRangerBGSyncService(ozoneManager, authorizer,
+        rangerSyncInterval, rangerSyncIntervalTimeUnit, rangerSyncTimeout);
     // Start the Ranger Sync Thread
     this.start();
   }
@@ -151,7 +167,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    */
   @Override
   public void stop() throws IOException {
-    omRangerBGSyncService.stop();
+    omRangerBGSyncService.shutdown();
   }
 
   @Override

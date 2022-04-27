@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RPC;
@@ -92,6 +93,8 @@ public class TestMultiTenantBGSync {
   @Rule
   public Timeout timeout = new Timeout(600000);
 
+  private final long TEST_SYNC_INTERVAL_SEC = 10L;
+
   private TemporaryFolder folder = new TemporaryFolder();
 
   // The following values need to be set before this test can be enabled.
@@ -113,9 +116,6 @@ public class TestMultiTenantBGSync {
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
   private AuditLogger auditLogger;
-  // Set ozoneManagerDoubleBuffer to do nothing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   // UGI-related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
@@ -145,8 +145,8 @@ public class TestMultiTenantBGSync {
     KerberosName.setRuleMechanism(DEFAULT_MECHANISM);
     KerberosName.setRules(
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
-            "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
-            "DEFAULT");
+        "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
+        "DEFAULT");
     ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
     Assert.assertEquals("alice", ugiAlice.getShortUserName());
 
@@ -186,7 +186,7 @@ public class TestMultiTenantBGSync {
     omm.init(conf);
   }
 
-  public void tearDownhelper() {
+  public void tearDownHelper() {
     omMetrics.unRegister();
     framework().clearInlineMocks();
   }
@@ -310,11 +310,9 @@ public class TestMultiTenantBGSync {
     }
   }
 
-
   long bgSyncSetup() throws IOException {
-    // TODO: Further lower the interval for the UT?
-    conf.set(OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL, "10s");
-    bgSync = new OMRangerBGSyncService(ozoneManager, omm);
+    bgSync = new OMRangerBGSyncService(ozoneManager, omm,
+        TEST_SYNC_INTERVAL_SEC, TimeUnit.SECONDS, TEST_SYNC_INTERVAL_SEC / 2);
     OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
     ObjectStore objectStore = Mockito.mock(ObjectStore.class);
     when(ozoneClient.getObjectStore()).thenReturn(objectStore);
@@ -340,12 +338,13 @@ public class TestMultiTenantBGSync {
       // backed up by OzoneManger Multi-Tenant tables.
       createRolesAndPoliciesInRanger();
 
+      bgSync.start();
       // Wait for background sync to go through few cycles.
       while (bgSync.getRangerBGSyncCounter() <= 4) {
         // TODO: Trigger the sync rather than busy waiting?
-        sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
+        sleep(TEST_SYNC_INTERVAL_SEC * 1000);
       }
-      Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() == ozoneVersion);
+      Assert.assertEquals(ozoneVersion, bgSync.getOMDBRangerServiceVersion());
 
       // Now lets make sure that the ranger policies and roles not backed up
       // by OzoneManager multitenant tables are cleaned up.
@@ -369,7 +368,8 @@ public class TestMultiTenantBGSync {
       cleanupPoliciesRolesUsers();
       Assert.fail(e.getMessage());
     } finally {
-      tearDownhelper();
+      bgSync.shutdown();
+      tearDownHelper();
     }
   }
 
@@ -388,9 +388,10 @@ public class TestMultiTenantBGSync {
     try {
       createRolesAndPoliciesInRanger();
 
+      bgSync.start();
       while (bgSync.getRangerBGSyncCounter() <= 4) {
         // TODO: Trigger the sync rather than busy waiting?
-        sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
+        sleep(TEST_SYNC_INTERVAL_SEC * 1000);
       }
       Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() == ozoneVersion);
 
@@ -421,7 +422,8 @@ public class TestMultiTenantBGSync {
       cleanupPoliciesRolesUsers();
       Assert.fail(e.getMessage());
     } finally {
-      tearDownhelper();
+      bgSync.shutdown();
+      tearDownHelper();
     }
   }
 
@@ -457,9 +459,10 @@ public class TestMultiTenantBGSync {
       }
 
       long baseVersion = bgSync.getRangerBGSyncCounter();
+      bgSync.start();
       while (bgSync.getRangerBGSyncCounter() <= baseVersion + 1) {
         // TODO: Trigger the sync rather than busy waiting?
-        sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
+        sleep(TEST_SYNC_INTERVAL_SEC * 1000);
       }
       Assert.assertTrue(bgSync.getOMDBRangerServiceVersion() >= ozoneVersion);
 
@@ -491,7 +494,8 @@ public class TestMultiTenantBGSync {
       cleanupPoliciesRolesUsers();
       Assert.fail(e.getMessage());
     } finally {
-      tearDownhelper();
+      bgSync.shutdown();
+      tearDownHelper();
     }
   }
 }
