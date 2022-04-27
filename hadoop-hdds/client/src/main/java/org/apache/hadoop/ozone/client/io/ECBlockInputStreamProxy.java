@@ -23,8 +23,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +51,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
   private final Function<BlockID, Pipeline> refreshFunction;
-  private final OmKeyLocationInfo blockInfo;
+  private final BlockLocationInfo blockInfo;
   private final ECBlockInputStreamFactory ecBlockInputStreamFactory;
 
   private BlockExtendedInputStream blockReader;
@@ -96,7 +96,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStreamProxy(ECReplicationConfig repConfig,
-      OmKeyLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
       Pipeline> refreshFunction, ECBlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;

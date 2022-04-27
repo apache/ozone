@@ -24,10 +24,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.ozone.client.io.BadDataLocationException;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -93,7 +93,7 @@ public class TestECBlockInputStreamProxy {
   public void testAvailableDataLocations() {
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 1024, dnMap);
     Assert.assertEquals(1, ECBlockInputStreamProxy.availableDataLocations(
         blockInfo.getPipeline(), 1));
@@ -120,7 +120,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
@@ -135,7 +135,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
@@ -150,7 +150,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     dataGenerator = new SplittableRandom(randomSeed);
@@ -172,7 +172,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
@@ -203,7 +203,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     ByteBuffer readBuffer = ByteBuffer.allocate(100);
@@ -231,7 +231,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     ByteBuffer readBuffer = ByteBuffer.allocate(100);
@@ -259,7 +259,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     ByteBuffer readBuffer = ByteBuffer.allocate(100);
@@ -301,7 +301,7 @@ public class TestECBlockInputStreamProxy {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     ByteBuffer readBuffer = ByteBuffer.allocate(100);
@@ -352,7 +352,7 @@ public class TestECBlockInputStreamProxy {
   }
 
   private ECBlockInputStreamProxy createBISProxy(ECReplicationConfig rConfig,
-      OmKeyLocationInfo blockInfo) {
+      BlockLocationInfo blockInfo) {
     return new ECBlockInputStreamProxy(
         rConfig, blockInfo, true, null, null, streamFactory);
   }
@@ -382,7 +382,7 @@ public class TestECBlockInputStreamProxy {
     @Override
     public BlockExtendedInputStream create(boolean missingLocations,
         List<DatanodeDetails> failedDatanodes,
-        ReplicationConfig repConfig, OmKeyLocationInfo blockInfo,
+        ReplicationConfig repConfig, BlockLocationInfo blockInfo,
         boolean verifyChecksum, XceiverClientFactory xceiverFactory,
         Function<BlockID, Pipeline> refreshFunction) {
       this.failedLocations = failedDatanodes;

@@ -18,20 +18,48 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.io.ByteBufferPool;
+import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.security.token.Token;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
- * Interface used by classes which need to obtain BlockStream instances.
+ * Factory class to create various BlockStream instances.
  */
-public interface BlockInputStreamFactory {
+public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
+
+  private ECBlockInputStreamFactory ecBlockStreamFactory;
+
+  public static BlockInputStreamFactory getInstance(
+      ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    return new BlockInputStreamFactoryImpl(byteBufferPool,
+        ecReconstructExecutorSupplier);
+  }
+
+  public BlockInputStreamFactoryImpl() {
+    this(new ElasticByteBufferPool(), Executors::newSingleThreadExecutor);
+  }
+
+  public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    this.ecBlockStreamFactory =
+        ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool,
+            ecReconstructExecutorSupplier);
+  }
 
   /**
    * Create a new BlockInputStream based on the replication Config. If the
@@ -46,10 +74,19 @@ public interface BlockInputStreamFactory {
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
    */
-  BlockExtendedInputStream create(ReplicationConfig repConfig,
-      OmKeyLocationInfo blockInfo, Pipeline pipeline,
+  public BlockExtendedInputStream create(ReplicationConfig repConfig,
+      BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
-       XceiverClientFactory xceiverFactory,
-       Function<BlockID, Pipeline> refreshFunction);
+      XceiverClientFactory xceiverFactory,
+      Function<BlockID, Pipeline> refreshFunction) {
+    if (repConfig.getReplicationType().equals(HddsProtos.ReplicationType.EC)) {
+      return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
+          blockInfo, verifyChecksum, xceiverFactory, refreshFunction,
+          ecBlockStreamFactory);
+    } else {
+      return new BlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
+          pipeline, token, verifyChecksum, xceiverFactory, refreshFunction);
+    }
+  }
 
 }

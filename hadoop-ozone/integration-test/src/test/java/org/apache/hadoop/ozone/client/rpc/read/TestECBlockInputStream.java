@@ -25,12 +25,12 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.client.io.BadDataLocationException;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 import org.junit.Assert;
 import org.junit.Before;
@@ -65,7 +65,7 @@ public class TestECBlockInputStream {
   @Test
   public void testSufficientLocations() {
     // EC-3-2, 5MB block, so all 3 data locations are needed
-    OmKeyLocationInfo keyInfo = ECStreamTestUtil
+    BlockLocationInfo keyInfo = ECStreamTestUtil
         .createKeyInfo(repConfig, 5, 5 * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, new TestBlockInputStreamFactory())) {
@@ -116,7 +116,7 @@ public class TestECBlockInputStream {
   public void testCorrectBlockSizePassedToBlockStreamLessThanCell()
       throws IOException {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, ONEMB - 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
@@ -133,7 +133,7 @@ public class TestECBlockInputStream {
   public void testCorrectBlockSizePassedToBlockStreamTwoCells()
       throws IOException {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, ONEMB + 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
@@ -149,7 +149,7 @@ public class TestECBlockInputStream {
   public void testCorrectBlockSizePassedToBlockStreamThreeCells()
       throws IOException {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 2 * ONEMB + 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
@@ -166,7 +166,7 @@ public class TestECBlockInputStream {
   public void testCorrectBlockSizePassedToBlockStreamThreeFullAndPartialStripe()
       throws IOException {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 10 * ONEMB + 100);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
@@ -183,7 +183,7 @@ public class TestECBlockInputStream {
   public void testCorrectBlockSizePassedToBlockStreamSingleFullCell()
       throws IOException {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, ONEMB);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
@@ -198,7 +198,7 @@ public class TestECBlockInputStream {
   public void testCorrectBlockSizePassedToBlockStreamSeveralFullCells()
       throws IOException {
     ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 9 * ONEMB);
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
@@ -213,7 +213,7 @@ public class TestECBlockInputStream {
 
   @Test
   public void testSimpleRead() throws IOException {
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -236,7 +236,7 @@ public class TestECBlockInputStream {
    */
   @Test
   public void testSimpleReadUnderOneChunk() throws IOException {
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 1, ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -255,7 +255,7 @@ public class TestECBlockInputStream {
 
   @Test
   public void testReadPastEOF() throws IOException {
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 50);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -274,7 +274,7 @@ public class TestECBlockInputStream {
     // EC-3-2, 5MB block, so all 3 data locations are needed
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
         100);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -309,7 +309,7 @@ public class TestECBlockInputStream {
   public void testSeekPastBlockLength() throws IOException {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
         ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 100);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -321,7 +321,7 @@ public class TestECBlockInputStream {
   public void testSeekToLength() throws IOException {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
         ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 100);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -333,7 +333,7 @@ public class TestECBlockInputStream {
   public void testSeekToLengthZeroLengthBlock() throws IOException {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
         ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 0);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -347,7 +347,7 @@ public class TestECBlockInputStream {
   public void testSeekToValidPosition() throws IOException {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
         ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -376,7 +376,7 @@ public class TestECBlockInputStream {
   public void testErrorReadingBlockReportsBadLocation() throws IOException {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
         ONEMB);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
@@ -417,7 +417,7 @@ public class TestECBlockInputStream {
     }
 
     public synchronized BlockExtendedInputStream create(
-        ReplicationConfig repConfig, OmKeyLocationInfo blockInfo,
+        ReplicationConfig repConfig, BlockLocationInfo blockInfo,
         Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
         boolean verifyChecksum, XceiverClientFactory xceiverFactory,
         Function<BlockID, Pipeline> refreshFunction) {
