@@ -109,6 +109,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-erasurecode</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>

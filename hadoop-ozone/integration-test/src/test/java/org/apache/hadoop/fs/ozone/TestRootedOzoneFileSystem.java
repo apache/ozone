@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -1260,6 +1261,7 @@ public class TestRootedOzoneFileSystem {
    * fs.rename(src, dst, options).
    */
   @Test
+  @Flaky({"HDDS-5819", "HDDS-6451"})
   public void testRenameToTrashEnabled() throws IOException {
     // Create a file
     String testKeyName = "testKey2";

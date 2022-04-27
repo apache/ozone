@@ -18,44 +18,21 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
- * Factory class to create various BlockStream instances.
+ * Interface used by factories which create ECBlockInput streams for
+ * reconstruction or non-reconstruction reads.
  */
-public final class ECBlockInputStreamFactoryImpl implements
-    ECBlockInputStreamFactory {
-
-  private final BlockInputStreamFactory inputStreamFactory;
-  private final ByteBufferPool byteBufferPool;
-  private final Supplier<ExecutorService> ecReconstructExecutorSupplier;
-
-  public static ECBlockInputStreamFactory getInstance(
-      BlockInputStreamFactory streamFactory, ByteBufferPool byteBufferPool,
-      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
-    return new ECBlockInputStreamFactoryImpl(streamFactory, byteBufferPool,
-        ecReconstructExecutorSupplier);
-  }
-
-  private ECBlockInputStreamFactoryImpl(BlockInputStreamFactory streamFactory,
-      ByteBufferPool byteBufferPool,
-      Supplier<ExecutorService> ecReconstructExecutorSupplier) {
-    this.byteBufferPool = byteBufferPool;
-    this.inputStreamFactory = streamFactory;
-    this.ecReconstructExecutorSupplier = ecReconstructExecutorSupplier;
-  }
+public interface ECBlockInputStreamFactory {
 
   /**
    * Create a new EC InputStream based on the missingLocations boolean. If it is
@@ -73,28 +50,9 @@ public final class ECBlockInputStreamFactoryImpl implements
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
    */
-  public BlockExtendedInputStream create(boolean missingLocations,
+  BlockExtendedInputStream create(boolean missingLocations,
       List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
-      OmKeyLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo, boolean verifyChecksum,
       XceiverClientFactory xceiverFactory,
-      Function<BlockID, Pipeline> refreshFunction) {
-    if (missingLocations) {
-      // We create the reconstruction reader
-      ECBlockReconstructedStripeInputStream sis =
-          new ECBlockReconstructedStripeInputStream(
-              (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
-              xceiverFactory, refreshFunction, inputStreamFactory,
-              byteBufferPool, ecReconstructExecutorSupplier.get());
-      if (failedLocations != null) {
-        sis.addFailedDatanodes(failedLocations);
-      }
-      return new ECBlockReconstructedInputStream(
-          (ECReplicationConfig) repConfig, byteBufferPool, sis);
-    } else {
-      // Otherwise create the more efficient non-reconstruction reader
-      return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,
-          verifyChecksum, xceiverFactory, refreshFunction, inputStreamFactory);
-    }
-  }
-
+      Function<BlockID, Pipeline> refreshFunction);
 }
