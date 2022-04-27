@@ -173,8 +173,8 @@ public class GrpcReplicationClient implements AutoCloseable {
 
     return future.thenApply(responses -> responses.stream()
         .filter(r -> r.getCmdType() == Type.ReadContainer)
-        .map(r -> r.getReadContainer().getContainerData())
-        .findFirst());
+        .findFirst()
+        .map(r -> r.getReadContainer().getContainerData()));
   }
 
   public CompletableFuture<List<ByteBuffer>> readChunk(long containerId,
