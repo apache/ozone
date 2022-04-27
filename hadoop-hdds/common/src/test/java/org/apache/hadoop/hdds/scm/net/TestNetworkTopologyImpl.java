@@ -925,7 +925,7 @@ public class TestNetworkTopologyImpl {
 
     List<String> excludedScope = new ArrayList<>();
     excludedScope.add("/r1");
-    Assert.assertFalse(n1.isUnderScope("/r1"));
+    Assert.assertFalse(n1.isDescendant("/r1"));
     Assert.assertEquals(n1, dc.getLeaf(0, excludedScope, null, 0));
 
   }

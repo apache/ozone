@@ -100,10 +100,12 @@ public interface Node {
   boolean isAncestor(Node n);
 
   /**
-   * Judge if this node is under a specific scope.
+   * Judge if this node is a descendant of the node representing by the
+   * nodePath.
+   * Descendant includes itself and all child generations.
    *
-   * @param scope the scope
+   * @param nodePath the scope
    * @return true if this node is under a specific scope
    */
-  boolean isUnderScope(String scope);
+  boolean isDescendant(String nodePath);
 }
