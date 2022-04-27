@@ -75,7 +75,7 @@ public class RangerAccessPolicy implements AccessPolicy {
   }
 
   @Override
-  public String serializePolicyToJsonString() throws Exception {
+  public String serializePolicyToJsonString() throws IOException {
     updatePolicyJsonString();
     return policyJsonString;
   }
@@ -186,7 +186,7 @@ public class RangerAccessPolicy implements AccessPolicy {
         "removeAccessPolicyElem:  aclType not found." + object.toString());
   }
 
-  private String createRangerResourceItems() throws IOException {
+  private String createRangerResourceItems() {
     StringBuilder resourceItems = new StringBuilder();
     resourceItems.append("\"resources\":{" +
         "\"volume\":{" +
@@ -290,7 +290,7 @@ public class RangerAccessPolicy implements AccessPolicy {
     }
   }
 
-  private void updatePolicyJsonString() throws Exception {
+  private void updatePolicyJsonString() throws IOException {
     policyJsonString =
         "{\"policyType\":\"0\"," + "\"name\":\"" + policyName + "\","
             + "\"isEnabled\":true," + "\"policyPriority\":0,"

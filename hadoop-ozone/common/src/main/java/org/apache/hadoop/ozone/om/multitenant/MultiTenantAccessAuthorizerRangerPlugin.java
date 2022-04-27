@@ -162,7 +162,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
 
   @Override
-  public void shutdown() throws Exception {
+  public void shutdown() throws IOException {
     // TBD
   }
 
@@ -504,7 +504,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
 
-  public String createAccessPolicy(AccessPolicy policy) throws Exception {
+  public String createAccessPolicy(AccessPolicy policy) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 
@@ -543,7 +543,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
   @Override
   public AccessPolicy getAccessPolicyById(String policyId)
-      throws Exception {
+      throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_POLICY_ID_HTTP_ENDPOINT +
             policyId;
@@ -608,7 +608,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   }
 
   public String getIncrementalRangersChanges(long baseVersion)
-      throws Exception {
+      throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_DOWNLOAD_ENDPOINT + baseVersion;
 

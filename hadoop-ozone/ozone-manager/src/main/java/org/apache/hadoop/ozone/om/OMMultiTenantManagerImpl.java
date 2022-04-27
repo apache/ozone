@@ -123,11 +123,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       // Start the Ranger Sync Thread
       this.start();
     } catch (OMException ex) {
+      omRangerBGSyncService = null;
       if (ex.getResult().equals(OMException.ResultCodes.INTERNAL_ERROR)) {
         LOG.warn("Unable to initialize OM Ranger Sync Service. "
             + "Please check OM configuration");
       }
-      omRangerBGSyncService = null;
     }
   }
 

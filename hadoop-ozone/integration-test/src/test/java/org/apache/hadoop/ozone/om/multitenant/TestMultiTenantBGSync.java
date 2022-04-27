@@ -312,6 +312,7 @@ public class TestMultiTenantBGSync {
 
 
   long bgSyncSetup() throws IOException {
+    // TODO: Further lower the interval for the UT?
     conf.setInt(OMConfigKeys.OZONE_OM_RANGER_SYNC_INTERVAL, 10);
     bgSync = new OMRangerBGSyncService(ozoneManager);
     OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
@@ -344,6 +345,7 @@ public class TestMultiTenantBGSync {
 
       // Wait for background sync to go through few cycles.
       while (bgSync.getRangerBGSyncCounter() <= 4) {
+        // TODO: Trigger the sync rather than busy waiting?
         sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
       Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() == ozoneVersion);
@@ -390,7 +392,7 @@ public class TestMultiTenantBGSync {
       createRolesAndPoliciesInRanger();
 
       while (bgSync.getRangerBGSyncCounter() <= 4) {
-        // TODO: Shorten the wait by setting a lower interval for the test.
+        // TODO: Trigger the sync rather than busy waiting?
         sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
       Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() == ozoneVersion);
@@ -459,41 +461,36 @@ public class TestMultiTenantBGSync {
 
       long baseVersion = bgSync.getRangerBGSyncCounter();
       while (bgSync.getRangerBGSyncCounter() <= baseVersion + 1) {
+        // TODO: Trigger the sync rather than busy waiting?
         sleep(bgSync.getRangerSyncInterval() * 1000 * 10);
       }
       Assert.assertTrue(bgSync.getOmdbRangerServiceVersion() >= ozoneVersion);
 
       for (String policy : policyNamesCreated) {
-        try {
-          AccessPolicy verifier =
-              omm.getAccessPolicyByName(policy);
+        AccessPolicy verifier =
+            omm.getAccessPolicyByName(policy);
 
-          Assert.assertTrue(verifier.getPolicyName().equals(policy));
-        } catch (Exception e) {
-        }
+        Assert.assertTrue(verifier.getPolicyName().equals(policy));
       }
 
       for (String role : roleIdsCreated) {
-        try {
-          rolename = new JsonParser().parse(role).getAsJsonObject().get(
-              "name").getAsString();
-          JsonObject newrole =
-              new JsonParser().parse(omm.getRole(rolename)).getAsJsonObject();
-          JsonArray verifier =
-                  newrole.get("users").getAsJsonArray();
-          Assert.assertTrue(verifier.size() == 2);
-          for (int i = 0; i < verifier.size();  ++i) {
-            String user = verifier.get(i).getAsJsonObject().get("name")
-                .getAsString();
-            Assert.assertTrue(userSet.contains(user));
-            userSet.remove(user);
-          }
-        } catch (Exception e) {
+        rolename = new JsonParser().parse(role).getAsJsonObject().get(
+            "name").getAsString();
+        JsonObject newrole =
+            new JsonParser().parse(omm.getRole(rolename)).getAsJsonObject();
+        JsonArray verifier =
+                newrole.get("users").getAsJsonArray();
+        Assert.assertTrue(verifier.size() == 2);
+        for (int i = 0; i < verifier.size();  ++i) {
+          String user = verifier.get(i).getAsJsonObject().get("name")
+              .getAsString();
+          Assert.assertTrue(userSet.contains(user));
+          userSet.remove(user);
         }
       }
 
       cleanupPoliciesRolesUsers();
-    } catch (Exception e) {
+    } catch (IOException | InterruptedException e) {
       cleanupPoliciesRolesUsers();
       Assert.fail(e.getMessage());
     } finally {

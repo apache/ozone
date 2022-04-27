@@ -123,13 +123,13 @@ public interface AccessPolicy {
    * All Authorizer policy engines are supposed to provide an implementation
    * of AccessPolicy interface.
    */
-  String serializePolicyToJsonString() throws Exception;
+  String serializePolicyToJsonString() throws IOException;
 
   /**
    * Given a serialized accessPolicy in a Json format, deserializes and
    * constructs a valid access Policy.
    * @return
-   * @throws Exception
+   * @throws IOException
    */
   String deserializePolicyFromJsonString(JsonObject jsonObject)
       throws IOException;

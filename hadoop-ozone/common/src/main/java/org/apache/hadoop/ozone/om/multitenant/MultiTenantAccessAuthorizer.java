@@ -48,9 +48,9 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
 
   /**
    * Shutdown for the MultiTenantGateKeeper.
-   * @throws Exception
+   * @throws IOException
    */
-  void shutdown() throws Exception;
+  void shutdown() throws IOException;
 
   /**
    * Assign user to an existing role in the Authorizer.
@@ -149,39 +149,39 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    *
    * @param policy
    * @return unique and opaque policy ID that is maintained by the plugin.
-   * @throws Exception
+   * @throws IOException
    */
-  String createAccessPolicy(AccessPolicy policy) throws Exception;
+  String createAccessPolicy(AccessPolicy policy) throws IOException;
 
   /**
    *
    * @param policyName
    * @return unique and opaque policy ID that is maintained by the plugin.
-   * @throws Exception
+   * @throws IOException
    */
-  AccessPolicy getAccessPolicyByName(String policyName) throws Exception;
+  AccessPolicy getAccessPolicyByName(String policyName) throws IOException;
 
   /**
    * given a policy Id, returs the policy.
    * @param policyId
    * @return
-   * @throws Exception
+   * @throws IOException
    */
-  AccessPolicy getAccessPolicyById(String policyId) throws Exception;
+  AccessPolicy getAccessPolicyById(String policyId) throws IOException;
 
   /**
    *
    * @param policyId that was returned earlier by the createAccessPolicy().
-   * @throws Exception
+   * @throws IOException
    */
   void deletePolicybyId(String policyId) throws IOException;
 
   /**
    *
    * @param policyName unique policyName.
-   * @throws Exception
+   * @throws IOException
    */
-  void deletePolicybyName(String policyName) throws Exception;
+  void deletePolicybyName(String policyName) throws IOException;
   /**
    * Grant user aclType access to bucketNameSpace.
    * @param bucketNameSpace

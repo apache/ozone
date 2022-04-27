@@ -41,7 +41,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public void shutdown() throws Exception {
+  public void shutdown() throws IOException {
 
   }
 
@@ -101,18 +101,17 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public String createAccessPolicy(AccessPolicy policy) throws Exception {
+  public String createAccessPolicy(AccessPolicy policy) throws IOException {
     return null;
   }
 
   @Override
-  public AccessPolicy getAccessPolicyByName(String policyName)
-      throws Exception {
+  public AccessPolicy getAccessPolicyByName(String policyName) {
     return null;
   }
 
   @Override
-  public AccessPolicy getAccessPolicyById(String policyName) throws Exception {
+  public AccessPolicy getAccessPolicyById(String policyName) {
     return null;
   }
 
@@ -122,7 +121,7 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   }
 
   @Override
-  public void deletePolicybyName(String policyName) throws Exception {
+  public void deletePolicybyName(String policyName) throws IOException {
 
   }
 
