@@ -25,7 +25,13 @@ summary: 支持原子的重命名和删除操作。
 
 基于前缀的文件系统优化特性支持命名空间中任意级别目录的重命名和删除操作，且操作均能在常数时间内完成。
 
-注意：该特性只在 `ozone.om.enable.filesystem.paths` 启用时有效，这意味着对 Hadoop 文件系统的兼容性优先于对 S3 的兼容性，某些不规范的 S3 键名将会被拒绝或规范化。
+若要启用该特性，需要在创建桶时指定 `--layout` 参数为 `FILE_SYSTEM_OPTIMIZED`.
+
+```bash
+ozone sh bucket create /<volume-name>/<bucket-name> --layout FILE_SYSTEM_OPTIMIZED
+```
+
+注意：在启用基于前缀的文件系统优化的桶中，对 Hadoop 文件系统的兼容性优先于对 S3 的兼容性，某些不规范的 S3 键名在操作时将会被拒绝或规范化。
 
 当 Ozone 中的桶主要通过兼容 Hadoop 的接口使用，尤其是涉及到较深目录层级下的大量文件时，强烈推荐开启该特性。
 
@@ -39,10 +45,12 @@ OzoneManager 支持两种元数据布局格式：简单布局格式和基于前�
 
 ### 基于前缀布局的目录删除操作 ###
 下图描述了进行目录删除操作时 OM 的元数据变化。
+
 ![FSO Delete](PrefixFSO-Delete.png)
 
 ### 基于前缀布局的目录重命名操作 ###
 下图描述了进行目录重命名操作时 OM 的元数据变化。
+
 ![FSO Rename](PrefixFSO-Rename.png)
 
 ## 配置
