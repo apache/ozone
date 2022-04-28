@@ -435,21 +435,13 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     try {
       final long lastStripeSize = ecChunkBufferCache.getDataSize();
       if (isPartialStripe(lastStripeSize)) {
-        ByteBuffer bytesToWrite =
-            ecChunkBufferCache.getDataBuffers()[blockOutputStreamEntryPool
-                .getCurrentStreamEntry().getCurrentStreamIdx()];
+        final int index = blockOutputStreamEntryPool.getCurrentStreamEntry()
+            .getCurrentStreamIdx();
+        ByteBuffer lastCell = ecChunkBufferCache.getDataBuffers()[index];
 
         // Finish writing the current partial cached chunk
-        if (bytesToWrite.position() % ecChunkSize != 0) {
-          final ECBlockOutputStreamEntry current =
-              blockOutputStreamEntryPool.getCurrentStreamEntry();
-          try {
-            byte[] array = bytesToWrite.array();
-            writeToOutputStream(current, array,
-                bytesToWrite.position(), 0, false);
-          } catch (Exception e) {
-            markStreamAsFailed(e);
-          }
+        if (lastCell.position() % ecChunkSize != 0) {
+          handleOutputStreamWrite(index, lastCell.position(), false);
         }
 
         encodeAndWriteParityCells();
