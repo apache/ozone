@@ -58,7 +58,8 @@ public class ReconstructECContainersCommand
     this.sourceDatanodes = sourceDatanodes;
     this.targetDatanodes = targetDatanodes;
     this.srcNodesIndexes = srcNodesIndexes;
-    this.missingContainerIndexes = missingContainerIndexes;
+    this.missingContainerIndexes =
+        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
     this.ecReplicationConfig = ecReplicationConfig;
   }
 
@@ -74,7 +75,8 @@ public class ReconstructECContainersCommand
     this.sourceDatanodes = sourceDatanodes;
     this.targetDatanodes = targetDatanodes;
     this.srcNodesIndexes = srcNodesIndexes;
-    this.missingContainerIndexes = missingContainerIndexes;
+    this.missingContainerIndexes =
+        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
     this.ecReplicationConfig = ecReplicationConfig;
   }
 
