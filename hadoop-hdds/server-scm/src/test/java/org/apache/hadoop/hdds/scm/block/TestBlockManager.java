@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +76,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 
-import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;

@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
-import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +47,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.LoggerFactory;

@@ -41,9 +41,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +51,6 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -94,6 +91,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private AtomicBoolean freezePipelineCreation;
   private final Clock clock;
 
+  @SuppressWarnings("checkstyle:parameterNumber")
   protected PipelineManagerImpl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
                                 NodeManager nodeManager,
@@ -121,6 +119,7 @@ public class PipelineManagerImpl implements PipelineManager {
     this.freezePipelineCreation = new AtomicBoolean();
   }
 
+  @SuppressWarnings("checkstyle:parameterNumber")
   public static PipelineManagerImpl newPipelineManager(
       ConfigurationSource conf,
       SCMHAManager scmhaManager,

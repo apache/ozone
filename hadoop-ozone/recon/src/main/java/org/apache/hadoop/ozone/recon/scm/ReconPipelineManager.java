@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
-import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;

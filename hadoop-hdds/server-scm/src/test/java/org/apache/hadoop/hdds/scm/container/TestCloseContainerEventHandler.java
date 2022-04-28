@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.Instant;
 import java.time.ZoneOffset;
 
 import org.apache.hadoop.conf.StorageUnit;
@@ -55,7 +54,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 
-import org.apache.ozone.test.TestClock;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
