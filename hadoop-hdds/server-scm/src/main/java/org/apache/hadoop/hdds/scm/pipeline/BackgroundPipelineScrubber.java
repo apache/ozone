@@ -136,7 +136,7 @@ public class BackgroundPipelineScrubber implements SCMService {
         LOG.info("Pipeline Scrubber Service is not running, skip stop.");
         return;
       }
-      notifyAll();
+      scrubThread.interrupt();
     }
     LOG.info("Stopping Pipeline Scrubber Service.");
   }
