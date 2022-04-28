@@ -35,6 +35,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -75,6 +76,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +89,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private static final Logger LOG =
           LoggerFactory.getLogger(KeyValueContainer.class);
+  private static final int SLOW_OPERATION_WARNING_THRESHOLD_MS = 300;
 
   // Use a non-fair RW lock for better throughput, we may revisit this decision
   // if this causes fairness issues.
@@ -96,6 +99,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private final KeyValueContainerData containerData;
   private ConfigurationSource config;
+
+  private final int slowOperationWarningThresholdMs;
 
   // Cache of Blocks (LocalIDs) awaiting final PutBlock call after the stream
   // is closed. When a block is added to the DB as part of putBlock, it is
@@ -123,6 +128,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } else {
       this.pendingPutBlockCache = Collections.emptySet();
     }
+    this.slowOperationWarningThresholdMs = config.getInt(
+        HddsConfigKeys.HDDS_SLOW_OPERATION_WARNING_THRESHOLD_MS,
+        HddsConfigKeys.HDDS_SLOW_OPERATION_WARNING_THRESHOLD_MS_DEFAULT);
   }
 
   @Override
@@ -179,7 +187,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // Create .container file
       File containerFile = getContainerFile();
       createContainerFile(containerFile);
-
     } catch (StorageContainerException ex) {
       if (containerMetaDataPath != null && containerMetaDataPath.getParentFile()
           .exists()) {
@@ -243,6 +250,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void writeToContainerFile(File containerFile, boolean isCreate)
       throws StorageContainerException {
     File tempContainerFile = null;
+    long createContainerFileStart = Time.monotonicNow();
     long containerId = containerData.getContainerID();
     try {
       tempContainerFile = createTempFile(containerFile);
@@ -270,6 +278,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throw new StorageContainerException(containerExceptionMessage, ex,
           CONTAINER_FILES_CREATE_ERROR);
     } finally {
+      long createContainerFileDurationMs =
+          Time.monotonicNow() - createContainerFileStart;
+      if (createContainerFileDurationMs > slowOperationWarningThresholdMs) {
+        LOG.warn("Creating the container file {} took {}ms",
+            containerFile, createContainerFileDurationMs);
+      }
+
       if (tempContainerFile != null && tempContainerFile.exists()) {
         if (!tempContainerFile.delete()) {
           LOG.warn("Unable to delete container temporary file: {}.",

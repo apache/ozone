@@ -85,6 +85,8 @@ public final class ChunkUtils {
       ));
   public static final FileAttribute<?>[] NO_ATTRIBUTES = {};
 
+  private static final int DISK_IO_WARNING_THRESHOLD_MS = 300;
+
   /** Never constructed. **/
   private ChunkUtils() {
 
@@ -138,6 +140,11 @@ public final class ChunkUtils {
       volume.getVolumeIOStats().incWriteTime(elapsed);
       volume.getVolumeIOStats().incWriteOpCount();
       volume.getVolumeIOStats().incWriteBytes(bytesWritten);
+    }
+
+    if (elapsed > DISK_IO_WARNING_THRESHOLD_MS) {
+      LOG.warn("Writing the chunk file {} into disk took {}ms",
+          filename, elapsed);
     }
 
     LOG.debug("Written {} bytes at offset {} to {} in {} ms",
@@ -216,11 +223,16 @@ public final class ChunkUtils {
     }
 
     // Increment volumeIO stats here.
-    long endTime = Time.monotonicNow();
+    long readChunkDurationMs = Time.monotonicNow() - startTime;
     if (volume != null) {
-      volume.getVolumeIOStats().incReadTime(endTime - startTime);
+      volume.getVolumeIOStats().incReadTime(readChunkDurationMs);
       volume.getVolumeIOStats().incReadOpCount();
       volume.getVolumeIOStats().incReadBytes(bytesRead);
+    }
+
+    if (readChunkDurationMs > DISK_IO_WARNING_THRESHOLD_MS) {
+      LOG.warn("Reading the chunk file {} into disk took {}ms",
+          file, readChunkDurationMs);
     }
 
     LOG.debug("Read {} bytes starting at offset {} from {}",

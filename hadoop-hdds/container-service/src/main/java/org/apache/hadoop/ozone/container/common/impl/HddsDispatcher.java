@@ -94,6 +94,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
 
+  private final int slowOperationWarningThresholdMs;
+
   /**
    * Constructs an OzoneContainer that receives calls from
    * XceiverServerHandler.
@@ -111,6 +113,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.containerCloseThreshold = conf.getFloat(
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD,
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT);
+    this.slowOperationWarningThresholdMs = conf.getInt(
+        HddsConfigKeys.HDDS_SLOW_OPERATION_WARNING_THRESHOLD_MS,
+        HddsConfigKeys.HDDS_SLOW_OPERATION_WARNING_THRESHOLD_MS_DEFAULT);
     this.tokenVerifier = tokenVerifier != null ? tokenVerifier
         : new NoopTokenVerifier();
 
@@ -249,6 +254,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       return ContainerUtils.logAndReturnError(LOG, sce, msg);
     }
 
+    long createContainerDurationMs = 0;
+
     if (cmdType != Type.CreateContainer) {
       /**
        * Create Container should happen only as part of Write_Data phase of
@@ -263,6 +270,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           || cmdType == Type.PutBlock)) {
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
+        long createContainerStartTime = Time.monotonicNow();
+
         responseProto = createContainer(msg);
         metrics.incContainerOpsMetrics(Type.CreateContainer);
         metrics.incContainerOpsLatencies(Type.CreateContainer,
@@ -284,6 +293,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           container2BCSIDMap.putIfAbsent(containerID, 0L);
         }
         container = getContainer(containerID);
+
+        createContainerDurationMs =
+            Time.monotonicNow() - createContainerStartTime;
       }
 
       // if container not found return error
@@ -317,10 +329,25 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       audit(action, eventType, params, AuditEventStatus.FAILURE, ex);
       return ContainerUtils.logAndReturnError(LOG, ex, msg);
     }
+    long handlingStartTime = Time.monotonicNow();
     responseProto = handler.handle(msg, container, dispatcherContext);
     if (responseProto != null) {
+      long requestDurationMs = Time.monotonicNow() - startTime;
+      long handlingDurationMs = Time.monotonicNow() - handlingStartTime;
       metrics.incContainerOpsLatencies(cmdType,
-              Time.monotonicNow() - startTime);
+          requestDurationMs);
+
+      if (requestDurationMs > slowOperationWarningThresholdMs) {
+        if (createContainerDurationMs > 0) {
+          LOG.warn("Slow request {} for container {} took {}ms; "
+                  + "of which handler spent {}ms, create container spent {}ms.",
+              cmdType, containerID, requestDurationMs, handlingDurationMs,
+              createContainerDurationMs);
+        } else {
+          LOG.warn("Slow request {} for container {} took {}ms.",
+              cmdType, containerID, requestDurationMs);
+        }
+      }
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
