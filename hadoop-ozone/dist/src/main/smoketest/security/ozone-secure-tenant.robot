@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoke test for ozone secure tenant commands.
+Documentation       Smoke test for ozone secure tenant commands
 Library             OperatingSystem
 Library             String
 Library             BuiltIn
@@ -26,14 +26,8 @@ Test Timeout        5 minutes
 ${RANGER_ENDPOINT_URL}  https://ranger:6182
 ${S3G_ENDPOINT_URL}     http://s3g:9878
 
-*** Keywords ***
-Init Ranger MockServer
-    ${output} =         Execute          curl -k ${RANGER_ENDPOINT_URL}
-                        Should contain   ${output}         {}
-
 *** Test Cases ***
 Secure Tenant Create Tenant Success with Cluster Admin
-    Run Keyword         Init Ranger MockServer
     Run Keyword         Kinit test user     testuser     testuser.keytab
     ${output} =         Execute          ozone tenant create tenantone
                         Should contain   ${output}         Created tenant 'tenantone'
