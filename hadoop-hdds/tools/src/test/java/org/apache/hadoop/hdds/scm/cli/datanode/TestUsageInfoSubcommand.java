@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.After;
@@ -35,7 +36,6 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
 import static org.mockito.Mockito.mock;
@@ -106,17 +106,7 @@ public class TestUsageInfoSubcommand {
   }
 
   private HddsProtos.DatanodeDetailsProto createDatanodeDetails() {
-    HddsProtos.DatanodeDetailsProto dnd =
-        HddsProtos.DatanodeDetailsProto.newBuilder()
-            .setHostName("host")
-            .setIpAddress("1.2.3.1")
-            .setNetworkLocation("/default")
-            .setNetworkName("host")
-            .addPorts(HddsProtos.Port.newBuilder()
-                .setName("ratis").setValue(5678).build())
-            .setUuid(UUID.randomUUID().toString())
-            .build();
-    return dnd;
+    return MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage();
   }
 
 }
