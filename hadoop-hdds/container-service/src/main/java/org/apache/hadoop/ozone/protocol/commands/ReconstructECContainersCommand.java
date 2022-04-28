@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,18 +43,21 @@ public class ReconstructECContainersCommand
   private final long containerID;
   private final List<DatanodeDetails> sourceDatanodes;
   private final List<DatanodeDetails> targetDatanodes;
+  private final List<Long> srcNodesIndexes;
   private final byte[] missingContainerIndexes;
   private final ECReplicationConfig ecReplicationConfig;
 
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetails> sourceDatanodes,
       List<DatanodeDetails> targetDatanodes,
+      List<Long> srcNodesIndexes,
       byte[] missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig) {
     super();
     this.containerID = containerID;
     this.sourceDatanodes = sourceDatanodes;
     this.targetDatanodes = targetDatanodes;
+    this.srcNodesIndexes = srcNodesIndexes;
     this.missingContainerIndexes = missingContainerIndexes;
     this.ecReplicationConfig = ecReplicationConfig;
   }
@@ -62,12 +66,14 @@ public class ReconstructECContainersCommand
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetails> sourceDatanodes,
       List<DatanodeDetails> targetDatanodes,
+      List<Long> srcNodesIndexes,
       byte[] missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig, long id) {
     super(id);
     this.containerID = containerID;
     this.sourceDatanodes = sourceDatanodes;
     this.targetDatanodes = targetDatanodes;
+    this.srcNodesIndexes = srcNodesIndexes;
     this.missingContainerIndexes = missingContainerIndexes;
     this.ecReplicationConfig = ecReplicationConfig;
   }
@@ -94,7 +100,6 @@ public class ReconstructECContainersCommand
   }
 
   public static ByteString getByteString(byte[] bytes) {
-    // return singleton to reduce object allocation
     return (bytes.length == 0) ? ByteString.EMPTY : ByteString.copyFrom(bytes);
   }
 
@@ -111,10 +116,10 @@ public class ReconstructECContainersCommand
 
     return new ReconstructECContainersCommand(protoMessage.getContainerID(),
         srcDatanodeDetails, targetDatanodeDetails,
+        protoMessage.getSrcNodesIndexesList(),
         protoMessage.getMissingContainerIndexes().toByteArray(),
         new ECReplicationConfig(protoMessage.getEcReplicationConfig()),
         protoMessage.getCmdId());
-
   }
 
   public long getContainerID() {
@@ -129,8 +134,13 @@ public class ReconstructECContainersCommand
     return targetDatanodes;
   }
 
+  public List<Long> getSrcNodesIndexes() {
+    return srcNodesIndexes;
+  }
+
   public byte[] getMissingContainerIndexes() {
-    return missingContainerIndexes;
+    return Arrays
+        .copyOf(missingContainerIndexes, missingContainerIndexes.length);
   }
 
   public ECReplicationConfig getEcReplicationConfig() {

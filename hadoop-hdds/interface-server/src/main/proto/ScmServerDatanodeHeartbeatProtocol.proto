@@ -417,9 +417,10 @@ message ReconstructECContainersCommandProto {
   required int64 containerID = 1;
   repeated DatanodeDetailsProto sources = 2;
   repeated DatanodeDetailsProto targets = 3;
-  required bytes missingContainerIndexes = 4;
-  required ECReplicationConfig ecReplicationConfig = 5;
-  required int64 cmdId = 6;
+  repeated int64 srcNodesIndexes = 4;
+  required bytes missingContainerIndexes = 5;
+  required ECReplicationConfig ecReplicationConfig = 6;
+  required int64 cmdId = 7;
 }
 
 /**
