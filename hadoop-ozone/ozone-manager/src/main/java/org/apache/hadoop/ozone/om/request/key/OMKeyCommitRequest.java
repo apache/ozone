@@ -227,9 +227,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Subtract the size of blocks to be overwritten.
       if (keyToDelete != null) {
         correctedSpace -= keyToDelete.getReplicatedSize();
+      } else {
+        // if keyToDelete isn't null, usedNamespace shouldn't increase.
+        checkBucketQuotaInNamespace(omBucketInfo, 1L);
       }
       checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
