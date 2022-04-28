@@ -23,7 +23,7 @@ Resource            ../s3/commonawslib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${RANGER_ENDPOINT_URL}  https://ranger:6182
+${RANGER_ENDPOINT_URL}  http://ranger:6080
 ${S3G_ENDPOINT_URL}     http://s3g:9878
 
 *** Test Cases ***
