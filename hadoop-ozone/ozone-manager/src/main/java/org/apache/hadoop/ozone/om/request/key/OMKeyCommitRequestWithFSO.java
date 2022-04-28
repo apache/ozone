@@ -166,8 +166,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       if (keyToDelete != null) {
         correctedSpace -= keyToDelete.getReplicatedSize();
       } else {
-        // if keyToDelete isn't null, usedNamespace shouldn't increase.
+        // if keyToDelete isn't null, usedNamespace shouldn't check and
+        // increase.
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        omBucketInfo.incrUsedNamespace(1L);
       }
       checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
 
@@ -184,7 +186,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
 
       omBucketInfo.incrUsedBytes(correctedSpace);
-      omBucketInfo.incrUsedNamespace(1L);
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
