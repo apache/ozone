@@ -316,7 +316,7 @@ public class TestMultiTenantBGSync {
     ObjectStore objectStore = Mockito.mock(ObjectStore.class);
     when(ozoneClient.getObjectStore()).thenReturn(objectStore);
     long ozoneVersion =
-        bgSync.getRangerServiceVersion();
+        bgSync.retrieveRangerServiceVersion();
 //    Mockito.doAnswer(invocationOnMock -> {
 //      long v = invocationOnMock.getArgument(0);
 //      ozoneManager.getMetadataManager().getOmRangerStateTable()
