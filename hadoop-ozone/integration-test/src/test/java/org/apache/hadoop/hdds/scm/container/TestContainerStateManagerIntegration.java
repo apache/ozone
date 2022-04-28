@@ -324,9 +324,6 @@ public class TestContainerStateManagerIntegration {
     containerManager
         .updateContainerState(container3.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.CLOSE);
-    containerManager
-        .updateContainerState(container1.getContainerInfo().containerID(),
-            HddsProtos.LifeCycleEvent.CLOSE);
     containerList = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.CLOSED);
     Assert.assertEquals(1, containerList.size());
