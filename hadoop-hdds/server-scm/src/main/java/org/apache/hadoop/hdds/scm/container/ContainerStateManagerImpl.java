@@ -255,10 +255,11 @@ public final class ContainerStateManagerImpl
         .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
     //when a CLEANUP event if fired , the state of the container will be changed
     //to DELETE. at this time, we should remove the reference of the container
-    // from scm. the reference of a container will be removed from scm immediately
-    // after the state is changed to DELETED, thus DELETED is a transient state
-    // and hardly be captured.
-    actions.put(CLEANUP, info -> removeContainer(info.containerID().getProtobuf()));
+    // from scm. the reference of a container will be removed from scm
+    // immediately after the state is changed to DELETED, thus DELETED is
+    // a transient state and hardly be captured.
+    actions.put(CLEANUP, info ->
+        removeContainer(info.containerID().getProtobuf()));
     return actions;
   }
 
