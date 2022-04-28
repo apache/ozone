@@ -148,9 +148,7 @@ public class BackgroundPipelineCreator implements SCMService {
     LOG.info("Stopping {}.", THREAD_NAME);
 
     // in case RatisPipelineUtilsThread is sleeping
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    thread.interrupt();
 
     try {
       thread.join();
@@ -175,6 +173,7 @@ public class BackgroundPipelineCreator implements SCMService {
         }
       } catch (InterruptedException e) {
         LOG.warn("{} is interrupted.", THREAD_NAME);
+        running.set(false);
         Thread.currentThread().interrupt();
       }
     }
