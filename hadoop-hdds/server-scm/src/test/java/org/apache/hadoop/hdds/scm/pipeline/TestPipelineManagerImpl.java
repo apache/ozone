@@ -611,7 +611,7 @@ public class TestPipelineManagerImpl {
   public void testScrubPipelinesShouldFailOnFollower() throws Exception {
     // No timeout for pipeline scrubber.
     conf.setTimeDuration(
-        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10000,
         TimeUnit.MILLISECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
@@ -633,6 +633,7 @@ public class TestPipelineManagerImpl {
     assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
     ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
 
+    testClock.fastForward(20000);
     try {
       pipelineManager.scrubPipelines();
     } catch (NotLeaderException ex) {

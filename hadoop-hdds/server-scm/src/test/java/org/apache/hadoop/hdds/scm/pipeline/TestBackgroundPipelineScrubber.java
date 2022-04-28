@@ -100,6 +100,8 @@ public class TestBackgroundPipelineScrubber {
     // kick a run
     synchronized (scrubber) {
       scrubber.notifyStatusChanged();
+      assertFalse(scrubber.shouldRun());
+      testClock.fastForward(60000);
       assertTrue(scrubber.shouldRun());
       scrubber.runImmediately();
     }
