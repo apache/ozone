@@ -182,4 +182,9 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
   public String getAllMultiTenantPolicies(int ozoneServiceId) {
     return null;
   }
+
+  @Override
+  public MultiTenantAccessController getMultiTenantAccessController() {
+    return null;
+  }
 }

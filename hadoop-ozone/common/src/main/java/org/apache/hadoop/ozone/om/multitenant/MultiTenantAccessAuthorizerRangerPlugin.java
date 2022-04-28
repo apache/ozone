@@ -81,6 +81,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   public static final Logger LOG = LoggerFactory
       .getLogger(MultiTenantAccessAuthorizerRangerPlugin.class);
 
+  private MultiTenantAccessController accessController;
+
   private OzoneConfiguration conf;
   private boolean ignoreServerCert = true;
   private int connectionTimeout;
@@ -91,6 +93,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
   @Override
   public void init(Configuration configuration) throws IOException {
     conf = new OzoneConfiguration(configuration);
+    accessController = new RangerRestMultiTenantAccessController(conf);
     rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     if (rangerHttpsAddress == null) {
       throw new OMException("Config ozone.om.ranger.https-address is not set! "
@@ -618,6 +621,11 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         "GET", false);
     String sInfo = getResponseData(conn);
     return sInfo;
+  }
+
+  @Override
+  public MultiTenantAccessController getMultiTenantAccessController() {
+    return this.accessController;
   }
 
   public void deleteUser(String userId) throws IOException {

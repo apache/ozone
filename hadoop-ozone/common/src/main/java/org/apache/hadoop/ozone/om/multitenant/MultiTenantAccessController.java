@@ -69,6 +69,22 @@ public interface MultiTenantAccessController {
   Map<Long, Role> getRoles() throws Exception;
 
   /**
+   * Sets the last update time to mtime.
+   * @param mtime Time in epoch milliseconds
+   */
+  void setPolicyLastUpdateTime(long mtime);
+
+  /**
+   * Returns the last update time of Ranger policies.
+   */
+  long getPolicyLastUpdateTime();
+
+  /**
+   * @return list of roles associated with this policy
+   */
+  HashSet<String> getRoleList();
+
+  /**
    * Define a role to be created.
    */
   class Role {

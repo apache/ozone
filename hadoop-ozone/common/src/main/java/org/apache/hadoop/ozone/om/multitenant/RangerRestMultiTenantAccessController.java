@@ -51,6 +51,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -90,6 +91,7 @@ public class RangerRestMultiTenantAccessController
   private final String rangerService;
   private final Map<IAccessAuthorizer.ACLType, String> aclToString;
   private final Map<String, IAccessAuthorizer.ACLType> stringToAcl;
+  private long lastPolicyUpdateTimeEpochMillis = -1;
 
   public RangerRestMultiTenantAccessController(Configuration configuration)
       throws IOException {
@@ -633,4 +635,19 @@ public class RangerRestMultiTenantAccessController
           return jsonMember;
         }
       };
+
+  @Override
+  public void setPolicyLastUpdateTime(long mtime) {
+    lastPolicyUpdateTimeEpochMillis = mtime;
+  }
+
+  @Override
+  public long getPolicyLastUpdateTime() {
+    return lastPolicyUpdateTimeEpochMillis;
+  }
+
+  @Override
+  public HashSet<String> getRoleList() {
+    return null;
+  }
 }
