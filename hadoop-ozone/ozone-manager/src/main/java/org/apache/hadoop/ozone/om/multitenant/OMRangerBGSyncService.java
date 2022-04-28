@@ -251,14 +251,12 @@ public class OMRangerBGSyncService extends BackgroundService {
 
         executeOMDBToRangerSync(currentOzoneServiceVerInDB);
 
-        if (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Setting OM DB Ranger Service Version to {} (was {})",
-                proposedOzoneServiceVerInDB, currentOzoneServiceVerInDB);
-          }
-          // Submit Ratis Request to sync the new service version in OM DB
-          setOMDBRangerServiceVersion(proposedOzoneServiceVerInDB);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Setting OM DB Ranger Service Version to {} (was {})",
+              proposedOzoneServiceVerInDB, currentOzoneServiceVerInDB);
         }
+        // Submit Ratis Request to sync the new service version in OM DB
+        setOMDBRangerServiceVersion(proposedOzoneServiceVerInDB);
 
         // Check Ranger ozone service version again
         currentOzoneServiceVerInDB = proposedOzoneServiceVerInDB;
