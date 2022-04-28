@@ -59,7 +59,8 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_OM_PORT_DEFAULT = 9862;
-
+  public static final String OZONE_OM_GRPC_PORT_KEY =
+      "ozone.om.grpc.port";
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
   public static final String OZONE_OM_HTTP_BIND_HOST_KEY =
@@ -310,6 +311,16 @@ public final class OMConfigKeys {
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
+  public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
+      "ozone.om.grpc.maximum.response.length";
+  /** Default value for GRPC_MAXIMUM_RESPONSE_LENGTH. */
+  public static final int OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT =
+      128 * 1024 * 1024;
+
+  public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
+      "ozone.om.s3.grpc.server_enabled";
+  public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
+      false;
   /**
    * Configuration properties for OMAdminProtcol service.
    */
@@ -320,7 +331,11 @@ public final class OMConfigKeys {
       "ozone.om.admin.protocol.wait.between.retries";
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
-
+  public static final String OZONE_OM_TRANSPORT_CLASS =
+      "ozone.om.transport.class";
+  public static final String OZONE_OM_TRANSPORT_CLASS_DEFAULT =
+      "org.apache.hadoop.ozone.om.protocolPB"
+          + ".Hadoop3OmTransportFactory";
   public static final String OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT =
       "ozone.om.unflushed.transaction.max.count";
   public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT

@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +53,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
   private final Function<BlockID, Pipeline> refreshFunction;
-  private final OmKeyLocationInfo blockInfo;
+  private final BlockLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
   private final BlockExtendedInputStream[] blockStreams;
   private final int maxLocations;
@@ -61,10 +61,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private long position = 0;
   private boolean closed = false;
   private boolean seeked = false;
-
-  protected OmKeyLocationInfo getBlockInfo() {
-    return blockInfo;
-  }
 
   protected ECReplicationConfig getRepConfig() {
     return repConfig;
@@ -109,7 +105,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStream(ECReplicationConfig repConfig,
-      OmKeyLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
       Pipeline> refreshFunction, BlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;
@@ -174,7 +170,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
-      OmKeyLocationInfo blkInfo = new OmKeyLocationInfo.Builder()
+      BlockLocationInfo blkInfo = new BlockLocationInfo.Builder()
           .setBlockID(blockInfo.getBlockID())
           .setLength(internalBlockLength(locationIndex + 1))
           .setPipeline(blockInfo.getPipeline())

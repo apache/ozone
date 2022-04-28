@@ -1369,6 +1369,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.scrub.interval</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      SCM schedules a fixed interval job using the configured interval to
+      scrub pipelines.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.creation.auto.factor.one</name>
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
@@ -3078,7 +3087,6 @@
     <description>The S3Gateway service principal.
       Ex: s3g/_HOST@REALM.COM</description>
   </property>
-
   <property>
     <name>hdds.container.checksum.verification.enabled</name>
     <value>true</value>
@@ -3096,7 +3104,14 @@
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
     </description>
   </property>
-
+  <property>
+    <name>ozone.om.grpc.maximum.response.length</name>
+    <value>134217728</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      OM/S3GATEWAY OMRequest, OMResponse over grpc max message length (bytes).
+    </description>
+  </property>
   <property>
     <name>ozone.default.bucket.layout</name>
     <value/>

@@ -90,6 +90,7 @@ import static org.junit.Assert.fail;
 
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -1297,6 +1298,7 @@ public class TestOzoneFileSystem {
    * since fs.rename(src,dst,options) is enabled.
    */
   @Test
+  @Flaky("HDDS-6646")
   public void testRenameToTrashEnabled() throws Exception {
     // Create a file
     String testKeyName = "testKey1";
@@ -1326,6 +1328,7 @@ public class TestOzoneFileSystem {
    * 2.Verify that the key gets deleted by the trash emptier.
    */
   @Test
+  @Flaky("HDDS-6645")
   public void testTrash() throws Exception {
     String testKeyName = "testKey2";
     Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
