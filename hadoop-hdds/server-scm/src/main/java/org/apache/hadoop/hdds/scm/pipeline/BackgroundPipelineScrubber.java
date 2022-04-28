@@ -57,6 +57,7 @@ public class BackgroundPipelineScrubber implements SCMService {
   private final long intervalInMillis;
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
+  private volatile boolean runImmediately = false;
 
   public BackgroundPipelineScrubber(PipelineManager pipelineManager,
       ConfigurationSource conf, SCMContext scmContext) {
@@ -152,7 +153,10 @@ public class BackgroundPipelineScrubber implements SCMService {
           scrubAllPipelines();
         }
         synchronized (this) {
-          wait(intervalInMillis);
+          if (!runImmediately) {
+            wait(intervalInMillis);
+          }
+          runImmediately = false;
         }
       } catch (InterruptedException e) {
         LOG.warn("{} is interrupted, exit", THREAD_NAME);
@@ -160,6 +164,11 @@ public class BackgroundPipelineScrubber implements SCMService {
         running.set(false);
       }
     }
+  }
+
+  public synchronized void runImmediately() {
+    runImmediately = true;
+    notify();
   }
 
   private void scrubAllPipelines() {
