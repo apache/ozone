@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -227,21 +228,24 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private StripeWriteStatus handleParityWrites(boolean isLastStripe)
       throws IOException {
     writeParityCells();
-    if (hasWriteFailure()) {
-      handleFailedStreams(false);
+
+    ECBlockOutputStreamEntry streamEntry =
+        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    List<ECBlockOutputStream> failedStreams =
+        streamEntry.streamsWithWriteFailure();
+    if (!failedStreams.isEmpty()) {
+      excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
 
     // By this time, we should have finished full stripe. So, lets call
     // executePutBlock for all.
     // TODO: we should alter the put block calls to share CRC to each stream.
-    ECBlockOutputStreamEntry streamEntry =
-        blockOutputStreamEntryPool.getCurrentStreamEntry();
-    streamEntry
-        .executePutBlock(isLastStripe);
+    streamEntry.executePutBlock(isLastStripe);
 
-    if (hasPutBlockFailure()) {
-      handleFailedStreams(true);
+    failedStreams = streamEntry.streamsWithPutBlockFailure();
+    if (!failedStreams.isEmpty()) {
+      excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
     streamEntry.updateBlockGroupToAckedPosition(
@@ -257,44 +261,18 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     return StripeWriteStatus.SUCCESS;
   }
 
-  private boolean hasWriteFailure() {
-    return !blockOutputStreamEntryPool.getCurrentStreamEntry()
-        .streamsWithWriteFailure().isEmpty();
-  }
+  private void excludePipelineAndFailedDN(Pipeline pipeline,
+      List<ECBlockOutputStream> failedStreams) {
 
-  private boolean hasPutBlockFailure() {
-    return !blockOutputStreamEntryPool.getCurrentStreamEntry()
-        .streamsWithPutBlockFailure().isEmpty();
-  }
+    // Exclude the failed pipeline
+    blockOutputStreamEntryPool.getExcludeList().addPipeline(pipeline.getId());
 
-  private void handleFailedStreams(boolean forPutBlock) {
-    ECBlockOutputStreamEntry currentStreamEntry =
-        blockOutputStreamEntryPool.getCurrentStreamEntry();
-    List<ECBlockOutputStream> failedStreams = forPutBlock
-        ? currentStreamEntry.streamsWithPutBlockFailure()
-        : currentStreamEntry.streamsWithWriteFailure();
-
-    // Since writes are async, let's check the failures once.
-    boolean containerToExcludeAll = true;
-    for (ECBlockOutputStream failedStream : failedStreams) {
-      Throwable cause = HddsClientUtils.checkForException(
-          failedStream.getIoException());
-      Preconditions.checkNotNull(cause);
-      if (!checkIfContainerToExclude(cause)) {
-        blockOutputStreamEntryPool.getExcludeList()
-            .addDatanode(failedStream.getDatanodeDetails());
-        containerToExcludeAll = false;
-      }
-    }
-
-    // NOTE: For now, this is mainly for ContainerNotOpenException
-    // due to container full, but may also for those cases that
-    // a DN do respond but with one with certain failures.
-    // In such cases we don't treat the replied DNs as failed.
-    if (containerToExcludeAll) {
-      blockOutputStreamEntryPool.getExcludeList()
-          .addPipeline(currentStreamEntry.getPipeline().getId());
-    }
+    // If the failure is NOT caused by other reasons (e.g. container full),
+    // we assume it is caused by DN failure and exclude the failed DN.
+    failedStreams.stream()
+        .filter(s -> !checkIfContainerToExclude(s.getIoException()))
+        .forEach(s -> blockOutputStreamEntryPool.getExcludeList()
+            .addDatanode(s.getDatanodeDetails()));
   }
 
   @Override
