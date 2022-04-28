@@ -58,7 +58,7 @@ public final class SCMEvents {
       "Node_Registration_Container_Report");
 
   /**
-   * ContainerReports are send out by Datanodes. This report is received by
+   * ContainerReports are sent out by Datanodes. This report is received by
    * SCMDatanodeHeartbeatDispatcher and Container_Report Event is generated.
    */
   public static final TypedEvent<ContainerReportFromDatanode> CONTAINER_REPORT =

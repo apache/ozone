@@ -192,7 +192,7 @@ public class ProfileServlet extends HttpServlet {
   protected static String generateFileName(Integer pid, Output output,
       Event event) {
     String outputFormat = output.name().toLowerCase();
-    if(output == Output.FLAMEGRAPH) {
+    if (output == Output.FLAMEGRAPH) {
       outputFormat = "html";
     }
     return FILE_PREFIX + pid + "-" +

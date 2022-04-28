@@ -25,7 +25,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -55,13 +55,15 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     String openKey = getOpenKey();
 
     // Not adding key entry before to test whether commit is successful or not.
-    Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertFalse(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     omAllocateBlockResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertTrue(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
   }
 
   @Test
@@ -82,7 +84,8 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
 
     // Before calling addToDBBatch
     String openKey = getOpenKey();
-    Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertFalse(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
     omAllocateBlockResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -90,12 +93,13 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse is error it is a no-op.
-    Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
+    Assert.assertFalse(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
   }
 
   protected OmKeyInfo createOmKeyInfo() throws Exception {
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, replicationType, replicationFactor);
   }
 
@@ -109,6 +113,6 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
           OMResponse omResponse) {
     return new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
-            omBucketInfo);
+            omBucketInfo, getBucketLayout());
   }
 }

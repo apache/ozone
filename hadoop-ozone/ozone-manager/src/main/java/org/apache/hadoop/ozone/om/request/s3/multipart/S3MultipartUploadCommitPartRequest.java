@@ -26,15 +26,21 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart
     .S3MultipartUploadCommitPartResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
@@ -46,6 +52,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -69,8 +76,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCommitPartRequest.class);
 
-  public S3MultipartUploadCommitPartRequest(OMRequest omRequest) {
-    super(omRequest);
+  public S3MultipartUploadCommitPartRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -79,13 +87,14 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         getOmRequest().getCommitMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
     return getOmRequest().toBuilder().setCommitMultiPartUploadRequest(
-        multipartCommitUploadPartRequest.toBuilder()
-            .setKeyArgs(keyArgs.toBuilder().setModificationTime(Time.now())
-                .setKeyName(validateAndNormalizeKey(
-                    ozoneManager.getEnableFileSystemPaths(),
-                    keyArgs.getKeyName()))))
-        .setUserInfo(getUserInfo()).build();
+        multipartCommitUploadPartRequest.toBuilder().setKeyArgs(
+            keyArgs.toBuilder().setModificationTime(Time.now())
+                .setKeyName(keyPath))).setUserInfo(getUserInfo()).build();
   }
 
   @Override
@@ -213,7 +222,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(multipartKeyInfo),
               trxnLogIndex));
 
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
@@ -224,7 +233,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
-      long correctedSpace = omKeyInfo.getDataSize() * factor -
+      long correctedSpace = omKeyInfo.getReplicatedSize() -
           keyArgs.getKeyLocationsList().size() * scmBlockSize * factor;
       omBucketInfo.incrUsedBytes(correctedSpace);
 
@@ -276,13 +285,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
         multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-        ozoneManager.isRatisEnabled(), omBucketInfo);
+        ozoneManager.isRatisEnabled(), omBucketInfo, getBucketLayout());
   }
 
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
       String openKey, String keyName) throws IOException {
 
-    return omMetadataManager.getOpenKeyTable().get(openKey);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
   }
 
   protected String getOpenKey(String volumeName, String bucketName,
@@ -331,5 +340,25 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     return omMetadataManager.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
   }
-}
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitMultiPartUpload
+  )
+  public static OMRequest disallowCommitMultiPartUploadWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager().isAllowed(
+        OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getCommitMultiPartUploadRequest().getKeyArgs()
+          .hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+}

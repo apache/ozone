@@ -41,6 +41,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -76,6 +77,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
  */
 @Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class ContainerEndpoint {
 
   @Inject
@@ -158,8 +160,8 @@ public class ContainerEndpoint {
         // Directly calling get() on the Key table instead of iterating since
         // only full keys are supported now. When we change to using a prefix
         // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().getSkipCache(
-            containerKeyPrefix.getKeyPrefix());
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+            .getSkipCache(containerKeyPrefix.getKeyPrefix());
         if (null != omKeyInfo) {
           // Filter keys by version.
           List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo
@@ -375,5 +377,9 @@ public class ContainerEndpoint {
       }
     }
     return blockIds;
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

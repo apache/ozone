@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -65,8 +66,8 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   private OzoneObj obj;
 
   public OMKeyAddAclRequestWithFSO(
-      OzoneManagerProtocolProtos.OMRequest omReq) {
-    super(omReq);
+      OzoneManagerProtocolProtos.OMRequest omReq, BucketLayout bucketLayout) {
+    super(omReq, bucketLayout);
     OzoneManagerProtocolProtos.AddAclRequest addAclRequest =
         getOmRequest().getAddAclRequest();
     obj = OzoneObjInfo.fromProtobuf(addAclRequest.getObj());
@@ -146,6 +147,7 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
     omResponse.setAddAclResponse(
         OzoneManagerProtocolProtos.AddAclResponse.newBuilder()
             .setResponse(operationResult));
-    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir);
+    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir,
+        getBucketLayout());
   }
 }

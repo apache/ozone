@@ -55,6 +55,11 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     super(securityConfig, LOG, null, COMPONENT_NAME);
   }
 
+  public SCMCertificateClient(SecurityConfig securityConfig,
+      String certSerialId, String component) {
+    super(securityConfig, LOG, certSerialId, component);
+  }
+
   @Override
   protected InitResponse handleCase(InitCase init)
       throws CertificateException {
@@ -131,10 +136,5 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public Logger getLogger() {
     return LOG;
-  }
-
-  @Override
-  public String getComponentName() {
-    return COMPONENT_NAME;
   }
 }

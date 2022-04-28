@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -63,11 +63,11 @@ public class TestSCMContainerPlacementCapacity {
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
-      StorageReportProto storage1 = TestUtils.createStorageReport(
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
-          TestUtils.createMetadataStorageReport(
+          HddsTestUtils.createMetadataStorageReport(
               "/metadata1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
@@ -78,19 +78,19 @@ public class TestSCMContainerPlacementCapacity {
       datanodes.add(datanodeInfo);
     }
 
-    StorageReportProto storage2 = TestUtils.createStorageReport(
+    StorageReportProto storage2 = HddsTestUtils.createStorageReport(
         datanodes.get(2).getUuid(),
         "/data1-" + datanodes.get(2).getUuidString(),
         100L, 90L, 10L, null);
     datanodes.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
-    StorageReportProto storage3 = TestUtils.createStorageReport(
+    StorageReportProto storage3 = HddsTestUtils.createStorageReport(
         datanodes.get(3).getUuid(),
         "/data1-" + datanodes.get(3).getUuidString(),
         100L, 80L, 20L, null);
     datanodes.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
-    StorageReportProto storage4 = TestUtils.createStorageReport(
+    StorageReportProto storage4 = HddsTestUtils.createStorageReport(
         datanodes.get(4).getUuid(),
         "/data1-" + datanodes.get(4).getUuidString(),
         100L, 70L, 30L, null);
@@ -148,10 +148,10 @@ public class TestSCMContainerPlacementCapacity {
 
     }
 
-    //datanode 4 has less space. Should be selected less times.
-    Assert.assertTrue(selectedCount.get(datanodes.get(3)) > selectedCount
+    //datanode 6 has more space than datanode 3 and datanode 4.
+    Assert.assertTrue(selectedCount.get(datanodes.get(3)) < selectedCount
         .get(datanodes.get(6)));
-    Assert.assertTrue(selectedCount.get(datanodes.get(4)) > selectedCount
+    Assert.assertTrue(selectedCount.get(datanodes.get(4)) < selectedCount
         .get(datanodes.get(6)));
   }
 }

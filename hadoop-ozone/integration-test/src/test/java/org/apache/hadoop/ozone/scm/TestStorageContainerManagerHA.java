@@ -58,7 +58,7 @@ import java.io.IOException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
 /**
  * Base class for Ozone Manager HA tests.
@@ -155,7 +155,7 @@ public class TestStorageContainerManagerHA {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket
-        .createKey(keyName, value.getBytes(UTF_8).length, STAND_ALONE, ONE,
+        .createKey(keyName, value.getBytes(UTF_8).length, RATIS, ONE,
             new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
@@ -170,7 +170,7 @@ public class TestStorageContainerManagerHA {
     is.close();
     final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setKeyName(keyName)
         .setRefreshPipeline(true).build();
@@ -226,7 +226,7 @@ public class TestStorageContainerManagerHA {
     conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
         scm1.getSCMNodeId());
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf1));
-    scm1.getScmHAManager().shutdown();
+    scm1.getScmHAManager().stop();
     Assert.assertTrue(
         StorageContainerManager.scmInit(conf1, scm1.getClusterId()));
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));

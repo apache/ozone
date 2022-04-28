@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * Class defining Safe mode exit criteria for Containers.
  */
 public class ContainerSafeModeRule extends
-    SafeModeExitRule<NodeRegistrationContainerReport>{
+    SafeModeExitRule<NodeRegistrationContainerReport> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerSafeModeRule.class);
@@ -53,12 +53,12 @@ public class ContainerSafeModeRule extends
   private double maxContainer;
 
   private AtomicLong containerWithMinReplicas = new AtomicLong(0);
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
-      ConfigurationSource conf,
-      List<ContainerInfo> containers,
-      ContainerManagerV2 containerManager, SCMSafeModeManager manager) {
+             ConfigurationSource conf,
+             List<ContainerInfo> containers,
+             ContainerManager containerManager, SCMSafeModeManager manager) {
     super(manager, ruleName, eventQueue);
     this.containerManager = containerManager;
     safeModeCutoff = conf.getDouble(
@@ -115,7 +115,7 @@ public class ContainerSafeModeRule extends
 
     reportsProto.getReport().getReportsList().forEach(c -> {
       if (containerMap.containsKey(c.getContainerID())) {
-        if(containerMap.remove(c.getContainerID()) != null) {
+        if (containerMap.remove(c.getContainerID()) != null) {
           containerWithMinReplicas.getAndAdd(1);
           getSafeModeMetrics()
               .incCurrentContainersWithOneReplicaReportedCount();

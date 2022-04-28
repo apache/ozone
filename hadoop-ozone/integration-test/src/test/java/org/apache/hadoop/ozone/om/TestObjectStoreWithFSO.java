@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -68,7 +68,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
@@ -100,13 +100,14 @@ public class TestObjectStoreWithFSO {
    *
    * @throws IOException
    */
-  @BeforeClass public static void init() throws Exception {
+  @BeforeClass
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
-    TestOMRequestUtils.configureFSOptimizedPaths(conf, true,
-        OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
@@ -169,7 +170,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
 
     Table<String, OmKeyInfo> openFileTable =
-            cluster.getOzoneManager().getMetadataManager().getOpenKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getOpenKeyTable(getBucketLayout());
 
     // before file creation
     verifyKeyInFileTable(openFileTable, file, 0, true);
@@ -195,7 +197,8 @@ public class TestObjectStoreWithFSO {
     ozoneOutputStream.close();
 
     Table<String, OmKeyInfo> fileTable =
-            cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
     // After closing the file. File entry should be removed from openFileTable
     // and it should be added to fileTable.
     verifyKeyInFileTable(fileTable, file, dirPathC.getObjectID(), false);
@@ -208,6 +211,87 @@ public class TestObjectStoreWithFSO {
     verifyKeyInFileTable(fileTable, file, dirPathC.getObjectID(), true);
     verifyKeyInOpenFileTable(openFileTable, clientID, file,
             dirPathC.getObjectID(), true);
+  }
+
+  /**
+   * Tests bucket deletion behaviour. Buckets should not be allowed to be
+   * deleted if they contain files or directories under them.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testDeleteBucketWithKeys() throws Exception {
+    // Create temporary volume and bucket for this test.
+    OzoneBucket testBucket = TestDataUtil
+        .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    String testVolumeName = testBucket.getVolumeName();
+    String testBucketName = testBucket.getName();
+
+    String parent = "a/b/c/";
+    String file = "key" + RandomStringUtils.randomNumeric(5);
+    String key = parent + file;
+
+    OzoneClient client = cluster.getClient();
+
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume ozoneVolume = objectStore.getVolume(testVolumeName);
+    assertEquals(ozoneVolume.getName(), testVolumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(testBucketName);
+    assertEquals(ozoneBucket.getName(), testBucketName);
+
+    Table<String, OmKeyInfo> openFileTable =
+        cluster.getOzoneManager().getMetadataManager()
+            .getOpenKeyTable(getBucketLayout());
+
+    // before file creation
+    verifyKeyInFileTable(openFileTable, file, 0, true);
+
+    // Create a key.
+    ozoneBucket.createKey(key, 10).close();
+    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
+
+    try {
+      // Try to delete the bucket while a key is present under it.
+      ozoneVolume.deleteBucket(testBucketName);
+      fail("Bucket Deletion should fail, since bucket is not empty.");
+    } catch (IOException ioe) {
+      // Do nothing
+    }
+
+    // Delete the key (this only deletes the file)
+    ozoneBucket.deleteKey(key);
+    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
+    try {
+      // Try to delete the bucket while intermediate dirs are present under it.
+      ozoneVolume.deleteBucket(testBucketName);
+      fail("Bucket Deletion should fail, since bucket still contains " +
+          "intermediate directories");
+    } catch (IOException ioe) {
+      // Do nothing
+    }
+
+    // Delete last level of directories.
+    ozoneBucket.deleteDirectory(parent, true);
+    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
+    try {
+      // Try to delete the bucket while dirs are present under it.
+      ozoneVolume.deleteBucket(testBucketName);
+      fail("Bucket Deletion should fail, since bucket still contains " +
+          "intermediate directories");
+    } catch (IOException ioe) {
+      // Do nothing
+    }
+
+    // Delete all the intermediate directories
+    ozoneBucket.deleteDirectory("a/", true);
+    Assert.assertTrue(cluster.getOzoneManager().getMetadataManager()
+        .isBucketEmpty(testVolumeName, testBucketName));
+    ozoneVolume.deleteBucket(testBucketName);
+    // Cleanup the Volume.
+    cluster.getClient().getObjectStore().deleteVolume(testVolumeName);
   }
 
   @Test
@@ -225,7 +309,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
 
     Table<String, OmKeyInfo> openFileTable =
-            cluster.getOzoneManager().getMetadataManager().getOpenKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getOpenKeyTable(getBucketLayout());
 
     String data = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
@@ -262,7 +347,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(key, keyDetails.getName());
 
     Table<String, OmKeyInfo> fileTable =
-            cluster.getOzoneManager().getMetadataManager().getKeyTable();
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getBucketLayout());
 
     // When closing the key, entry should be removed from openFileTable
     // and it should be added to fileTable.
@@ -647,7 +733,8 @@ public class TestObjectStoreWithFSO {
     Assert.assertEquals(sampleBucketName, bucket.getName());
     Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
 
-    // Case 3: Bucket layout: Empty and OM Metadata layout: PREFIX
+    // Case 3: Bucket layout: Empty and
+    // OM default bucket layout: FILE_SYSTEM_OPTIMIZED
     builder = BucketArgs.newBuilder();
     sampleBucketName = UUID.randomUUID().toString();
     volume.createBucket(sampleBucketName, builder.build());
@@ -687,7 +774,7 @@ public class TestObjectStoreWithFSO {
   private void createTestKey(OzoneBucket bucket, String keyName,
       String keyValue) throws IOException {
     OzoneOutputStream out = bucket.createKey(keyName,
-            keyValue.getBytes(StandardCharsets.UTF_8).length, STAND_ALONE,
+            keyValue.getBytes(StandardCharsets.UTF_8).length, RATIS,
             ONE, new HashMap<>());
     out.write(keyValue.getBytes(StandardCharsets.UTF_8));
     out.close();
@@ -698,7 +785,7 @@ public class TestObjectStoreWithFSO {
   private OmDirectoryInfo getDirInfo(String parentKey) throws Exception {
     OMMetadataManager omMetadataManager =
             cluster.getOzoneManager().getMetadataManager();
-    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
+    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
             omMetadataManager);
     String[] pathComponents = StringUtils.split(parentKey, '/');
     long parentId = bucketId;
@@ -760,6 +847,10 @@ public class TestObjectStoreWithFSO {
       Assert.assertEquals("Invalid Key", parentID,
               omKeyInfo.getParentObjectID());
     }
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   /**

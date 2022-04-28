@@ -34,12 +34,6 @@ TL;DR:
    export OZONE_REPLICATION_FACTOR=3
    ./run.sh -d
    ```
-3. with [FileSystem Optimization (FSO)](https://ci-hadoop.apache.org/view/Hadoop%20Ozone/job/ozone-doc-master/lastSuccessfulBuild/artifact/hadoop-hdds/docs/public/feature/prefixfso.html) feature enabled
-   ```
-   export OZONE_OM_METADATA_LAYOUT=PREFIX
-   export OZONE_OM_ENABLE_FILESYSTEM_PATHS=true
-   ./run.sh -d
-   ```
 
 ### Basics
 

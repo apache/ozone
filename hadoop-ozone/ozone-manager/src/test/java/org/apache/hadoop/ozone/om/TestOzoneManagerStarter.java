@@ -30,7 +30,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This class is used to test the CLI provided by OzoneManagerStarter, which is
@@ -178,8 +180,8 @@ public class TestOzoneManagerStarter {
     }
 
     @Override
-    public void bootstrap(OzoneConfiguration conf) throws IOException,
-        AuthenticationException {
+    public void bootstrap(OzoneConfiguration conf, boolean force)
+        throws IOException, AuthenticationException {
       //TODO: Add test for bootstrap
     }
 

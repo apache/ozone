@@ -138,8 +138,8 @@ public final class ScmConfigKeys {
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT =
       "64KB";
 
-  public static final String OZONE_SCM_CHUNK_LAYOUT_KEY =
-      "ozone.scm.chunk.layout";
+  public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
+      "ozone.scm.container.layout";
 
   public static final String OZONE_SCM_CLIENT_PORT_KEY =
       "ozone.scm.client.port";
@@ -335,16 +335,14 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DATANODE_ID_DIR =
       "ozone.scm.datanode.id.dir";
 
-  public static final String OZONE_SCM_DB_CACHE_SIZE_MB =
-      "ozone.scm.db.cache.size.mb";
-  public static final int OZONE_SCM_DB_CACHE_SIZE_DEFAULT = 128;
-
   public static final String OZONE_SCM_CONTAINER_SIZE =
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";
 
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
+  public static final String OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY =
+      "ozone.scm.container.placement.ec.impl";
 
   public static final String OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT =
       "ozone.scm.pipeline.owner.container.count";
@@ -405,6 +403,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT =
       "120s";
 
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
+      "ozone.scm.pipeline.scrub.interval";
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+
+
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
       "ozone.scm.pipeline.creation.auto.factor.one";
@@ -439,7 +443,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_ENABLE_KEY
       = "ozone.scm.ratis.enable";
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = false;
+      = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT
@@ -453,11 +457,6 @@ public final class ScmConfigKeys {
       "ozone.scm.datanode.admin.monitor.interval";
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
-
-  public static final String HDDS_DATANODE_UPGRADE_LAYOUT_INLINE =
-      "hdds.datanode.upgrade.layout.inline";
-  public static final boolean HDDS_DATANODE_UPGRADE_LAYOUT_INLINE_DEFAULT =
-      true;
 
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";
@@ -482,12 +481,12 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE =
           "ozone.scm.ha.ratis.segment.size";
-  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "16KB";
+  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "4MB";
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE =
           "ozone.scm.ha.ratis.segment.preallocated.size";
   public static final String
-          OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT = "16KB";
+          OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE_DEFAULT = "4MB";
 
   public static final String OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_NUM =
       "ozone.scm.ha.ratis.log.appender.queue.num-elements";
@@ -534,7 +533,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_LOG_PURGE_GAP =
           "ozone.scm.ha.ratis.log.purge.gap";
-  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT =1000000;
+  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT = 1000000;
 
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD =
           "ozone.scm.ha.ratis.snapshot.threshold";
@@ -554,7 +553,13 @@ public final class ScmConfigKeys {
   public static final long
           OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT = 30 * 1000L;
 
+  public static final String OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE =
+      "ozone.scm.ha.ratis.server.leaderelection.pre-vote";
+  public static final boolean
+      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
 
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
+      "ozone.audit.log.debug.cmd.list.scmaudit";
   /**
    * Never constructed.
    */

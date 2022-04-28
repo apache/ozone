@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -132,6 +133,10 @@ public final class OmKeyInfo extends WithParentObjectId {
     return dataSize;
   }
 
+  public long getReplicatedSize() {
+    return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
+  }
+
   public void setDataSize(long size) {
     this.dataSize = size;
   }
@@ -150,7 +155,7 @@ public final class OmKeyInfo extends WithParentObjectId {
 
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
-    return keyLocationVersions.size() == 0? null :
+    return keyLocationVersions.size() == 0 ? null :
         keyLocationVersions.get(keyLocationVersions.size() - 1);
   }
 
@@ -271,13 +276,21 @@ public final class OmKeyInfo extends WithParentObjectId {
    * version to the all version list.
    *
    * @param newLocationList the list of new blocks to be added.
-   * @param updateTime - if true, updates modification time.
+   * @param updateTime if true, updates modification time.
+   * @param keepOldVersions if false, old blocks won't be kept
+   *                        and the new block versions will always be 0
    * @throws IOException
    */
   public synchronized long addNewVersion(
-      List<OmKeyLocationInfo> newLocationList, boolean updateTime)
-      throws IOException {
+      List<OmKeyLocationInfo> newLocationList, boolean updateTime,
+      boolean keepOldVersions) {
     long latestVersionNum;
+
+    if (!keepOldVersions) {
+      // If old versions are cleared, new block version will always start at 0
+      keyLocationVersions.clear();
+    }
+
     if (keyLocationVersions.size() == 0) {
       // no version exist, these blocks are the very first version.
       keyLocationVersions.add(new OmKeyLocationInfoGroup(0, newLocationList));
@@ -286,6 +299,10 @@ public final class OmKeyInfo extends WithParentObjectId {
       // it is important that the new version are always at the tail of the list
       OmKeyLocationInfoGroup currentLatestVersion =
           keyLocationVersions.get(keyLocationVersions.size() - 1);
+
+      // Create a new version here. When bucket versioning is enabled,
+      // It includes previous block versions. Otherwise, only the blocks
+      // of new version is included.
       OmKeyLocationInfoGroup newVersion =
           currentLatestVersion.generateNextVersion(newLocationList);
       keyLocationVersions.add(newVersion);
@@ -332,6 +349,10 @@ public final class OmKeyInfo extends WithParentObjectId {
 
   public void setParentObjectID(long parentObjectID) {
     this.parentObjectID = parentObjectID;
+  }
+
+  public void setReplicationConfig(ReplicationConfig repConfig) {
+    this.replicationConfig = repConfig;
   }
 
   /**
@@ -540,9 +561,14 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setDataSize(dataSize)
-        .setType(replicationConfig.getReplicationType())
-        .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
-        .setLatestVersion(latestVersion)
+        .setType(replicationConfig.getReplicationType());
+    if (replicationConfig instanceof ECReplicationConfig) {
+      kb.setEcReplicationConfig(
+          ((ECReplicationConfig) replicationConfig).toProto());
+    } else {
+      kb.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+    kb.setLatestVersion(latestVersion)
         .addAllKeyLocationList(keyLocations)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
@@ -582,7 +608,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())
         .setReplicationConfig(ReplicationConfig
-                .fromTypeAndFactor(keyInfo.getType(), keyInfo.getFactor()))
+            .fromProto(keyInfo.getType(), keyInfo.getFactor(),
+                keyInfo.getEcReplicationConfig()))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
@@ -666,7 +693,8 @@ public final class OmKeyInfo extends WithParentObjectId {
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(
             new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                keyLocationVersion.getLocationList())));
+                keyLocationVersion.getLocationList(),
+                keyLocationVersion.isMultipartKey())));
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),
@@ -688,6 +716,14 @@ public final class OmKeyInfo extends WithParentObjectId {
    */
   public void clearFileEncryptionInfo() {
     this.encInfo = null;
+  }
+
+  /**
+   * Set the file encryption info.
+   * @param fileEncryptionInfo
+   */
+  public void setFileEncryptionInfo(FileEncryptionInfo fileEncryptionInfo) {
+    this.encInfo = fileEncryptionInfo;
   }
 
   public String getPath() {

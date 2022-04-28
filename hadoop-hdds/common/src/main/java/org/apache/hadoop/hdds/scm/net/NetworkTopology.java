@@ -183,7 +183,8 @@ public interface NetworkTopology {
    * @return the chosen node
    */
   Node chooseRandom(String scope, List<String>  excludedScopes,
-      Collection<Node> excludedNodes, Node affinityNode, int ancestorGen);
+      Collection<? extends Node> excludedNodes, Node affinityNode,
+      int ancestorGen);
 
   /**
    * Choose the node at index <i>index</i> from <i>scope</i>, share the same

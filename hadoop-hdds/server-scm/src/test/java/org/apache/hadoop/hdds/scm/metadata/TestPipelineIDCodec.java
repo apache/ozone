@@ -57,7 +57,7 @@ public class TestPipelineIDCodec {
 
   @Test
   public void testPersistingARandomUUID() throws Exception {
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
       UUID uuid = UUID.randomUUID();
 
       long mask = 0x0000_0000_0000_00FFL;

@@ -29,7 +29,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "roles",
-    description = "List all SCMs and their respective Ratis server roles",
+    description = "List all SCMs, their respective Ratis server roles " +
+        "and RaftPeerIds",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class GetScmRatisRolesSubcommand extends ScmSubcommand {
@@ -40,6 +41,8 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
   @Override
   protected void execute(ScmClient scmClient) throws IOException {
     List<String> roles = scmClient.getScmRatisRoles();
-    System.out.println(roles);
+    for (String role: roles) {
+      System.out.println(role);
+    }
   }
 }

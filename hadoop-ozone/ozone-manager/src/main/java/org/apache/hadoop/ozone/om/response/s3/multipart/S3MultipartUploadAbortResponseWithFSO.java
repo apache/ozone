@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -40,10 +41,10 @@ public class S3MultipartUploadAbortResponseWithFSO
   public S3MultipartUploadAbortResponseWithFSO(@Nonnull OMResponse omResponse,
       String multipartKey, String multipartOpenKey,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, multipartKey, multipartOpenKey, omMultipartKeyInfo,
-        isRatisEnabled, omBucketInfo);
+        isRatisEnabled, omBucketInfo, bucketLayout);
   }
 
   /**
@@ -51,7 +52,7 @@ public class S3MultipartUploadAbortResponseWithFSO
    * For a successful request, the other constructor should be used.
    */
   public S3MultipartUploadAbortResponseWithFSO(
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
+      @Nonnull OMResponse omResponse, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 }

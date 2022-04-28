@@ -102,8 +102,8 @@ public class TestCloseContainer {
   public void testReplicasAreReportedForClosedContainerAfterRestart()
       throws Exception {
     // Create some keys to write data into the open containers
-    for (int i=0; i<10; i++) {
-      TestDataUtil.createKey(bucket, "key"+i, ReplicationFactor.THREE,
+    for (int i = 0; i < 10; i++) {
+      TestDataUtil.createKey(bucket, "key" + i, ReplicationFactor.THREE,
           ReplicationType.RATIS, "this is the content");
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();

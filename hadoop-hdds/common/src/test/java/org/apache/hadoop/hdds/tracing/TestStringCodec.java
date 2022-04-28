@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,7 +23,7 @@ import io.jaegertracing.internal.exceptions.MalformedTracerStateStringException;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TestStringCodec {
 
@@ -44,9 +44,17 @@ class TestStringCodec {
         "String does not match tracer state format",
         () -> codec.extract(sb));
     sb.append(":66");
+
     JaegerSpanContext context = codec.extract(sb);
-    String expectedContextString = "123:456:789:66";
-    assertTrue(context.getTraceId().equals("123"));
-    assertTrue(context.toString().equals(expectedContextString));
+    StringBuilder injected = new StringBuilder();
+    codec.inject(context, injected);
+
+    String expectedTraceId = pad("123");
+    assertEquals(expectedTraceId, context.getTraceId());
+    assertEquals(expectedTraceId + ":456:789:66", injected.toString());
+  }
+
+  private static String pad(String s) {
+    return "0000000000000000".substring(s.length()) + s;
   }
 }

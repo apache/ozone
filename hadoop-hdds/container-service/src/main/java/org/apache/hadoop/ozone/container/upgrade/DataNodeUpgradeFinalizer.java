@@ -46,7 +46,7 @@ public class DataNodeUpgradeFinalizer extends
   @Override
   public void preFinalizeUpgrade(DatanodeStateMachine dsm)
       throws IOException {
-    if(!canFinalizeDataNode(dsm)) {
+    if (!canFinalizeDataNode(dsm)) {
       // DataNode is not yet ready to finalize.
       // Reset the Finalization state.
       getVersionManager().setUpgradeState(FINALIZATION_REQUIRED);
@@ -65,11 +65,12 @@ public class DataNodeUpgradeFinalizer extends
     while (containerIt.hasNext()) {
       Container ctr = containerIt.next();
       ContainerProtos.ContainerDataProto.State state = ctr.getContainerState();
+      long id = ctr.getContainerData().getContainerID();
       switch (state) {
       case OPEN:
       case CLOSING:
-        LOG.warn("FinalizeUpgrade : Waiting for container to close, current "
-            + "state is: {}", state);
+        LOG.warn("FinalizeUpgrade : Waiting for container {} to close, current "
+            + "state is: {}", id, state);
         return false;
       default:
         continue;

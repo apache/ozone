@@ -125,6 +125,17 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   /**
+   * The count returned here, is the count of queued SCM delete block commands.
+   * We get at most one such command per heartbeat, but the command can contain
+   * many blocks to delete.
+   * @return The number of SCM delete block commands pending in the queue.
+   */
+  @Override
+  public int getQueuedCount() {
+    return deleteCommandQueues.size();
+  }
+
+  /**
    * A delete command info.
    */
   public static final class DeleteCmdInfo {

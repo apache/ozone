@@ -56,6 +56,19 @@ public final class TestDataUtil {
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
       String volumeName, String bucketName, BucketLayout bucketLayout)
       throws IOException {
+    BucketArgs omBucketArgs;
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(bucketLayout);
+    omBucketArgs = builder.build();
+
+    return createVolumeAndBucket(cluster, volumeName, bucketName, bucketLayout,
+        omBucketArgs);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
+      String volumeName, String bucketName, BucketLayout bucketLayout,
+      BucketArgs omBucketArgs) throws IOException {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
     String adminName = "admin" + RandomStringUtils.randomNumeric(5);
 
@@ -69,11 +82,6 @@ public final class TestDataUtil {
     objectStore.createVolume(volumeName, volumeArgs);
 
     OzoneVolume volume = objectStore.getVolume(volumeName);
-    BucketArgs omBucketArgs;
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
-    builder.setBucketLayout(bucketLayout);
-    omBucketArgs = builder.build();
 
     volume.createBucket(bucketName, omBucketArgs);
     return volume.getBucket(bucketName);
@@ -83,7 +91,7 @@ public final class TestDataUtil {
   public static void createKey(OzoneBucket bucket, String keyName,
                                String content) throws IOException {
     createKey(bucket, keyName, ReplicationFactor.ONE,
-        ReplicationType.STAND_ALONE, content);
+        ReplicationType.RATIS, content);
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,

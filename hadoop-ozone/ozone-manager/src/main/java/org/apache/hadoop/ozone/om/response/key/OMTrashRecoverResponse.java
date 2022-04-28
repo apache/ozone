@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -38,13 +38,13 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
  * Response for RecoverTrash request.
  */
 @CleanupTableInfo(cleanupTables = {KEY_TABLE})
-public class OMTrashRecoverResponse extends OMClientResponse {
+public class OMTrashRecoverResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;
 
   public OMTrashRecoverResponse(@Nullable OmKeyInfo omKeyInfo,
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
+      @Nonnull OMResponse omResponse, BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.omKeyInfo = omKeyInfo;
   }
 
@@ -62,7 +62,7 @@ public class OMTrashRecoverResponse extends OMClientResponse {
     omMetadataManager.getDeletedTable()
         .deleteWithBatch(batchOperation, omKeyInfo.getKeyName());
     /* TODO: trashKey should be updated to destinationBucket. */
-    omMetadataManager.getKeyTable()
+    omMetadataManager.getKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, trashKey, omKeyInfo);
   }
 

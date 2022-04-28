@@ -59,6 +59,7 @@ public class DUResponse {
     this.duData = new ArrayList<>();
     // by default, the replication feature is disabled
     this.sizeWithReplica = -1L;
+    this.keySize = -1L;
   }
 
   public ResponseStatus getStatus() {

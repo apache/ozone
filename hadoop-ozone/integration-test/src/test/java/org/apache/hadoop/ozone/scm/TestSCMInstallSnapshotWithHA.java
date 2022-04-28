@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.junit.Assert.assertTrue;
@@ -60,6 +62,7 @@ import org.slf4j.event.Level;
  * Tests the Ratis snapshot feature in SCM.
  */
 @Timeout(500)
+@Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -120,7 +123,7 @@ public class TestSCMInstallSnapshotWithHA {
     StorageContainerManager leaderSCM = getLeader(cluster);
     Assert.assertNotNull(leaderSCM);
     // Find the inactive SCM
-    String followerId = getInactiveSCM(cluster).getScmId();
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
 
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
     // Do some transactions so that the log index increases
@@ -159,7 +162,7 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    String followerId = getInactiveSCM(cluster).getScmId();
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
     // Find the inactive SCM
 
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
@@ -213,7 +216,7 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallCorruptedCheckpointFailure() throws Exception {
     StorageContainerManager leaderSCM = getLeader(cluster);
     // Find the inactive SCM
-    String followerId = getInactiveSCM(cluster).getScmId();
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
     // Do some transactions so that the log index increases
     writeToIncreaseLogIndex(leaderSCM, 100);
@@ -290,7 +293,7 @@ public class TestSCMInstallSnapshotWithHA {
     while (logIndex <= targetLogIndex) {
       containers.add(scm.getContainerManager()
           .allocateContainer(
-              new RatisReplicationConfig(ReplicationFactor.THREE),
+              RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
               TestSCMInstallSnapshotWithHA.class.getName()));
       Thread.sleep(100);
       logIndex = stateMachine.getLastAppliedTermIndex().getIndex();
@@ -316,13 +319,10 @@ public class TestSCMInstallSnapshotWithHA {
     return null;
   }
 
-  static StorageContainerManager getInactiveSCM(MiniOzoneHAClusterImpl impl) {
-    for (StorageContainerManager scm : impl.getStorageContainerManagers()) {
-      if (!impl.isSCMActive(scm.getScmId())) {
-        return scm;
-      }
-    }
-    return null;
+  private static StorageContainerManager getInactiveSCM(
+      MiniOzoneHAClusterImpl cluster) {
+    Iterator<StorageContainerManager> inactiveScms = cluster.getInactiveSCM();
+    return inactiveScms.hasNext() ? inactiveScms.next() : null;
   }
 }
 

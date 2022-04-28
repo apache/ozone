@@ -81,6 +81,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .setmaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
         .setIndexToTerm((val) -> term)
         .build();
@@ -109,7 +110,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(0, metrics.getTotalNumOfFlushedTransactions());
     assertEquals(0, metrics.getMaxNumberOfTransactionsFlushedInOneIteration());
 
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
           trxId.incrementAndGet());
     }

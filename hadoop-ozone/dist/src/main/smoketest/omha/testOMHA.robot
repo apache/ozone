@@ -73,7 +73,7 @@ Write Test File
     ${testFilePath} =       Set Variable            ${TEMPDIR}/${fileName}
                             Copy File               ${TEST_FILE}            ${testFilePath}
                             Execute                 ozone fs -copyFromLocal ${testFilePath} o3fs://${BUCKET}.${VOLUME}.${OM_SERVICE_ID}/
-    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | jq -r '.[].name'
                             Should contain          ${result}               ${fileName}
                             Remove File             ${testFilePath}
 

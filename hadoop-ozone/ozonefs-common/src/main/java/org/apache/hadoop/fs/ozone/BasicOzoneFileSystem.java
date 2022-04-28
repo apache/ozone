@@ -285,7 +285,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     @Override
     boolean processKey(List<String> keyList) throws IOException {
       // TODO RenameKey needs to be changed to batch operation
-      for(String key : keyList) {
+      for (String key : keyList) {
         String newKeyName = dstKey.concat(key.substring(srcKey.length()));
         adapter.renameKey(key, newKeyName);
       }
@@ -512,7 +512,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     if (adapter.isFSOptimizedBucket()) {
       if (f.isRoot()) {
-        if (!recursive && listStatus(f).length!=0){
+        if (!recursive && listStatus(f).length != 0) {
           throw new PathIsNotEmptyDirectoryException(f.toString());
         }
         LOG.warn("Cannot delete root directory.");
@@ -800,7 +800,10 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
-    return super.getFileChecksum(f, length);
+    statistics.incrementReadOps(1);
+    Path qualifiedPath = f.makeQualified(uri, workingDir);
+    String key = pathToKey(qualifiedPath);
+    return adapter.getFileChecksum(key, length);
   }
 
   @Override

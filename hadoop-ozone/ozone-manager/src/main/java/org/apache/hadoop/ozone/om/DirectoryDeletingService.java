@@ -18,10 +18,12 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -36,7 +38,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
 
@@ -59,7 +60,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_
  */
 public class DirectoryDeletingService extends BackgroundService {
 
-  private final KeyManager keyManager;
   private final OzoneManager ozoneManager;
   private AtomicLong deletedDirsCount;
   private AtomicLong deletedFilesCount;
@@ -76,15 +76,15 @@ public class DirectoryDeletingService extends BackgroundService {
   private final long pathLimitPerTask;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
-      long serviceTimeout, OzoneManager ozoneManager) {
+      long serviceTimeout, OzoneManager ozoneManager,
+      OzoneConfiguration configuration) {
     super("DirectoryDeletingService", interval, unit,
         DIR_DELETING_CORE_POOL_SIZE, serviceTimeout);
-    this.keyManager = ozoneManager.getKeyManager();
     this.ozoneManager = ozoneManager;
     this.deletedDirsCount = new AtomicLong(0);
     this.deletedFilesCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
-    this.pathLimitPerTask = ozoneManager.getConfiguration()
+    this.pathLimitPerTask = configuration
         .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
             OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
   }
@@ -126,16 +126,16 @@ public class DirectoryDeletingService extends BackgroundService {
         try {
           long startTime = Time.monotonicNow();
           // step-1) Get one pending deleted directory
-          OmKeyInfo pendingDeletedDirInfo = keyManager.getPendingDeletionDir();
+          OmKeyInfo pendingDeletedDirInfo =
+              ozoneManager.getKeyManager().getPendingDeletionDir();
           if (pendingDeletedDirInfo != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Pending deleted dir name: {}",
                   pendingDeletedDirInfo.getKeyName());
             }
             // step-1: get all sub directories under the deletedDir
-            List<OmKeyInfo> dirs =
-                keyManager.getPendingDeletionSubDirs(pendingDeletedDirInfo,
-                    count);
+            List<OmKeyInfo> dirs = ozoneManager.getKeyManager()
+                .getPendingDeletionSubDirs(pendingDeletedDirInfo, count);
             count = count - dirs.size();
             List<OmKeyInfo> deletedSubDirList = new ArrayList<>();
             for (OmKeyInfo dirInfo : dirs) {
@@ -147,9 +147,8 @@ public class DirectoryDeletingService extends BackgroundService {
             }
 
             // step-2: get all sub files under the deletedDir
-            List<OmKeyInfo> purgeDeletedFiles =
-                keyManager.getPendingDeletionSubFiles(pendingDeletedDirInfo,
-                    count);
+            List<OmKeyInfo> purgeDeletedFiles = ozoneManager.getKeyManager()
+                .getPendingDeletionSubFiles(pendingDeletedDirInfo, count);
             count = count - purgeDeletedFiles.size();
 
             if (LOG.isDebugEnabled()) {
@@ -239,13 +238,14 @@ public class DirectoryDeletingService extends BackgroundService {
     }
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
-          purgeFile.getProtobuf(true, CURRENT_VERSION));
+          purgeFile.getProtobuf(true, ClientVersion.CURRENT_VERSION));
     }
 
     // Add these directories to deletedDirTable, so that its sub-paths will be
     // traversed in next iteration to ensure cleanup all sub-children.
     for (OmKeyInfo dir : markDirsAsDeleted) {
-      purgePathsRequest.addMarkDeletedSubDirs(dir.getProtobuf(CURRENT_VERSION));
+      purgePathsRequest.addMarkDeletedSubDirs(
+          dir.getProtobuf(ClientVersion.CURRENT_VERSION));
     }
 
     OzoneManagerProtocolProtos.OMRequest omRequest =

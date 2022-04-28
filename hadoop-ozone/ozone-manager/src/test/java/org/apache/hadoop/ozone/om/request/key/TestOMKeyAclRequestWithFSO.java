@@ -17,14 +17,13 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
-import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestWithFSO;;
+import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
@@ -41,41 +40,41 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
     keyName = key; // updated key name
 
     // Create parent dirs for the path
-    long parentId = TestOMRequestUtils
+    long parentId = OMRequestTestUtils
         .addParentsToDirTable(volumeName, bucketName, parentDir,
             omMetadataManager);
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils
+    OmKeyInfo omKeyInfo = OMRequestTestUtils
         .createOmKeyInfo(volumeName, bucketName, key,
             HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
             parentId + 1, parentId, 100, Time.now());
-    TestOMRequestUtils
+    OMRequestTestUtils
         .addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50,
             omMetadataManager);
     return omKeyInfo.getPath();
   }
 
-  @Override protected OMKeyAclRequest getOmKeyAddAclRequest(
+  @Override
+  protected OMKeyAclRequest getOmKeyAddAclRequest(
       OzoneManagerProtocolProtos.OMRequest originalRequest) {
-    return new OMKeyAddAclRequestWithFSO(originalRequest);
+    return new OMKeyAddAclRequestWithFSO(originalRequest, getBucketLayout());
   }
 
-  @Override protected OMKeyAclRequest getOmKeyRemoveAclRequest(
+  @Override
+  protected OMKeyAclRequest getOmKeyRemoveAclRequest(
       OzoneManagerProtocolProtos.OMRequest removeAclRequest) {
-    return new OMKeyRemoveAclRequestWithFSO(removeAclRequest);
+    return new OMKeyRemoveAclRequestWithFSO(removeAclRequest,
+        getBucketLayout());
   }
 
-  @Override protected OMKeyAclRequest getOmKeySetAclRequest(
+  @Override
+  protected OMKeyAclRequest getOmKeySetAclRequest(
       OzoneManagerProtocolProtos.OMRequest setAclRequest) {
-    return new OMKeySetAclRequestWithFSO(setAclRequest);
+    return new OMKeySetAclRequestWithFSO(setAclRequest, getBucketLayout());
   }
 
-  @Override protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

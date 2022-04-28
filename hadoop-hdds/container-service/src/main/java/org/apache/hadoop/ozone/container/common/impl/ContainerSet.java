@@ -127,6 +127,9 @@ public class ContainerSet {
       if (c.getContainerData().getVolume().isFailed()) {
         try {
           c.markContainerUnhealthy();
+          LOG.info("Marking Container {} UNHEALTHY as the Volume {} " +
+              "has failed", c.getContainerData().getContainerID(),
+              c.getContainerData().getVolume());
         } catch (StorageContainerException e) {
           LOG.error("Failed to move container {} to UNHEALTHY state in "
                   + "volume {}", c.getContainerData().getContainerID(),
@@ -232,18 +235,20 @@ public class ContainerSet {
   public ContainerReportsProto getContainerReport() throws IOException {
     LOG.debug("Starting container report iteration.");
 
+    ContainerReportsProto.Builder crBuilder =
+        ContainerReportsProto.newBuilder();
     // No need for locking since containerMap is a ConcurrentSkipListMap
     // And we can never get the exact state since close might happen
     // after we iterate a point.
     List<Container<?>> containers = new ArrayList<>(containerMap.values());
-
-    ContainerReportsProto.Builder crBuilder =
-        ContainerReportsProto.newBuilder();
-
-    for (Container<?> container: containers) {
-      crBuilder.addReports(container.getContainerReport());
+    // Incremental Container reports can read stale container information
+    // This is to make sure FCR and ICR can be linearized and processed by
+    // consumers such as SCM.
+    synchronized (this) {
+      for (Container<?> container : containers) {
+        crBuilder.addReports(container.getContainerReport());
+      }
     }
-
     return crBuilder.build();
   }
 

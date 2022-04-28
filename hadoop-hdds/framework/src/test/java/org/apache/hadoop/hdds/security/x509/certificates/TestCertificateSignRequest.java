@@ -279,8 +279,8 @@ public class TestCertificateSignRequest {
         GeneralNames.fromExtensions(
             extensions, Extension.subjectAlternativeName);
     GeneralName[] names = gns.getNames();
-    for(int i=0; i < names.length; i++) {
-      if(names[i].getTagNo() == GeneralName.otherName) {
+    for (int i = 0; i < names.length; i++) {
+      if (names[i].getTagNo() == GeneralName.otherName) {
         ASN1Encodable asn1Encodable = names[i].getName();
         Iterator iterator = ((DLSequence) asn1Encodable).iterator();
         while (iterator.hasNext()) {

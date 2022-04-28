@@ -24,9 +24,20 @@ summary: Recon server supports HTTP endpoints to help troubleshoot and monitor O
 -->
 
 The Recon API v1 is a set of HTTP endpoints that help you understand the current 
-state of an Ozone cluster and to troubleshoot if needed. 
+state of an Ozone cluster and to troubleshoot if needed.
 
-## Containers 
+Endpoints that are marked as *admin only* can only be accessed by Kerberos users
+specified in the **ozone.administrators** or **ozone.recon.administrators**
+configurations of a secure cluster. See [Securing Ozone]({{< relref "../security/SecureOzone.md" >}}) for more information.
+To restrict access to these endpoints, set the following configurations:
+
+Property|Value
+----------------------|---------
+ozone.security.enabled| *true*
+ozone.security.http.kerberos.enabled| *true*
+ozone.acl.enabled| *true*
+
+## Containers (admin only)
 
 ### GET /api/v1/containers
 
@@ -229,11 +240,11 @@ Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
 
 **Returns**
 
-Returns the UnhealthyContainerMetadata objects for the containers in the givenstate.
+Returns the UnhealthyContainerMetadata objects for the containers in the given state.
 Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
 The response structure is same as `/containers/unhealthy`.
 
-## Namespace Metadata
+## Namespace Metadata (admin only)
 
 ### GET /api/v1/namespace/summary
 
@@ -629,7 +640,7 @@ response object being the upper cap for file size range.
  
 **Parameters**
 
-Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheuslatest/querying/api/) 
+Refer to [Prometheus HTTP API Reference](https://prometheus.io/docs/prometheus/latest/querying/api/) 
 for complete documentation on querying. 
 
 **Returns**

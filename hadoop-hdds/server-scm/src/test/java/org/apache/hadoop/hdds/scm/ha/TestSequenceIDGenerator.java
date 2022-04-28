@@ -36,7 +36,7 @@ public class TestSequenceIDGenerator {
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
-    SCMHAManager scmHAManager = MockSCMHAManager
+    SCMHAManager scmHAManager = SCMHAManagerStub
         .getInstance(true, new SCMDBTransactionBufferImpl());
 
     SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
@@ -82,7 +82,7 @@ public class TestSequenceIDGenerator {
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
-    SCMHAManager scmHAManager = MockSCMHAManager.getInstance(true);
+    SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
 
     SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());

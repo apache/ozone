@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.ozone.OzoneConsts;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT;
 
 /**
@@ -36,7 +36,7 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
     super(conf, "ozoneManager");
     addServlet("serviceList", OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT,
         ServiceListJSONServlet.class);
-    addServlet("dbCheckpoint", OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT,
+    addServlet("dbCheckpoint", OZONE_DB_CHECKPOINT_HTTP_ENDPOINT,
         OMDBCheckpointServlet.class);
     getWebAppContext().setAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE, om);
   }

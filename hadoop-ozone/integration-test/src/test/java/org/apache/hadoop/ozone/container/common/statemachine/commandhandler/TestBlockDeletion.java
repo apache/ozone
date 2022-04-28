@@ -50,19 +50,20 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -103,14 +104,16 @@ public class TestBlockDeletion {
   private MiniOzoneCluster cluster = null;
   private StorageContainerManager scm = null;
   private OzoneManager om = null;
+  private OzoneManagerProtocol writeClient;
   private Set<Long> containerIdsWithDeletedBlocks;
   private long maxTransactionId = 0;
   private File baseDir;
   private ScmBlockDeletingServiceMetrics metrics;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
@@ -156,13 +159,15 @@ public class TestBlockDeletion {
     cluster.waitForClusterToBeReady();
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
     om = cluster.getOzoneManager();
+    writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
     scm = cluster.getStorageContainerManager();
     containerIdsWithDeletedBlocks = new HashSet<>();
     metrics = scm.getScmBlockManager().getSCMBlockDeletingService()
         .getMetrics();
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
@@ -194,7 +199,8 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
@@ -218,7 +224,7 @@ public class TestBlockDeletion {
     matchContainerTransactionIds();
 
     Assert.assertEquals(0L, metrics.getNumBlockDeletionTransactionCreated());
-    om.deleteKey(keyArgs);
+    writeClient.deleteKey(keyArgs);
     Thread.sleep(5000);
     // The blocks should not be deleted in the DN as the container is open
     try {
@@ -306,7 +312,8 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
@@ -334,7 +341,7 @@ public class TestBlockDeletion {
               .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
     });
 
-    om.deleteKey(keyArgs);
+    writeClient.deleteKey(keyArgs);
     // Wait for blocks to be deleted and container reports to be processed
     Thread.sleep(5000);
     containerInfos = scm.getContainerManager().getContainers();
@@ -502,10 +509,11 @@ public class TestBlockDeletion {
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keys.get(j)).setDataSize(0)
           .setReplicationConfig(
-              new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+              RatisReplicationConfig
+                  .getInstance(HddsProtos.ReplicationFactor.THREE))
           .setRefreshPipeline(true)
           .build();
-      om.deleteKey(keyArgs);
+      writeClient.deleteKey(keyArgs);
     }
 
     // Wait for block delete command sent from OM

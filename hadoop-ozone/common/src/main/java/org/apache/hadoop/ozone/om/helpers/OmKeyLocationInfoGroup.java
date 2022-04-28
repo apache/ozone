@@ -151,8 +151,7 @@ public class OmKeyLocationInfoGroup {
    */
   OmKeyLocationInfoGroup generateNextVersion(
       List<OmKeyLocationInfo> newLocationList) {
-    Map<Long, List<OmKeyLocationInfo>> newMap =
-        new HashMap<>();
+    Map<Long, List<OmKeyLocationInfo>> newMap = new HashMap<>();
     newMap.put(version + 1, new ArrayList<>(newLocationList));
     return new OmKeyLocationInfoGroup(version + 1, newMap);
   }
@@ -165,7 +164,7 @@ public class OmKeyLocationInfoGroup {
     }
   }
 
-  void removeBlocks(long versionToRemove){
+  void removeBlocks(long versionToRemove) {
     locationVersionMap.remove(versionToRemove);
   }
 
@@ -181,7 +180,7 @@ public class OmKeyLocationInfoGroup {
     sb.append("version:").append(version).append(" ");
     sb.append("isMultipartKey:").append(isMultipartKey);
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
-      for(OmKeyLocationInfo kli: kliList) {
+      for (OmKeyLocationInfo kli: kliList) {
         sb.append(kli.getLocalID()).append(" || ");
       }
     }

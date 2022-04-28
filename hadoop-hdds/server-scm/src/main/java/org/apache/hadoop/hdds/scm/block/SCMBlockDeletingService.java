@@ -81,10 +81,11 @@ public class SCMBlockDeletingService extends BackgroundService
 
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
-              NodeManager nodeManager,
-      EventPublisher eventPublisher, SCMContext scmContext,
-      SCMServiceManager serviceManager, Duration interval, long serviceTimeout,
-      ConfigurationSource conf, ScmBlockDeletingServiceMetrics metrics) {
+             NodeManager nodeManager, EventPublisher eventPublisher,
+             SCMContext scmContext, SCMServiceManager serviceManager,
+             Duration interval, long serviceTimeout,
+             ConfigurationSource conf,
+             ScmBlockDeletingServiceMetrics metrics) {
     super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
     this.deletedBlockLog = deletedBlockLog;

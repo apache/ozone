@@ -37,10 +37,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Handles container reports from datanode.
@@ -52,7 +50,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       LoggerFactory.getLogger(ContainerReportHandler.class);
 
   private final NodeManager nodeManager;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final String unknownContainerHandleAction;
 
   /**
@@ -71,7 +69,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    * @param conf OzoneConfiguration instance
    */
   public ContainerReportHandler(final NodeManager nodeManager,
-                                final ContainerManagerV2 containerManager,
+                                final ContainerManager containerManager,
                                 final SCMContext scmContext,
                                 OzoneConfiguration conf) {
     super(containerManager, scmContext, LOG);
@@ -87,12 +85,55 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   public ContainerReportHandler(final NodeManager nodeManager,
-      final ContainerManagerV2 containerManager) {
+      final ContainerManager containerManager) {
     this(nodeManager, containerManager, SCMContext.emptyContext(), null);
   }
 
   /**
-   * Process the container reports from datanodes.
+   * Process the container reports from datanodes. The datanode sends a list
+   * of all containers it knows about, including their State and stats, such as
+   * key count and bytes used.
+   *
+   * Inside SCM, there are two key places which store Container Replica details:
+   *
+   *   1. Inside the SCMNodeManager, there is a Map with datanode as the key
+   *      and the value is a Set of ContainerIDs. This is the set of containers
+   *      stored on this DN, and it is the only place we can quickly obtain
+   *      the list of Containers a DN knows about. This list is used by the
+   *      DeadNodeHandler to close any containers residing on a dead node, and
+   *      to purge the Replicas stored on the dead node from
+   *      SCMContainerManager. It is also used during decommission to check the
+   *      replicas on a datanode are sufficiently replicated.
+   *
+   *   2. Inside SCMContainerManagerImpl, there is a Map that is keyed on
+   *      ContainerID and the value is a Set of ContainerReplica objects,
+   *      allowing the current locations for any given Container to be found.
+   *
+   *  When a Full Container report is received, we must ensure the list in (1)
+   *  is correct, keeping in mind Containers could get lost on a Datanode, for
+   *  example by a failed disk. We must also store the new replicas, keeping in
+   *  mind their stats may have changed from the previous report and also that
+   *  the container may have gone missing on the datanode.
+   *
+   *  The most tricky part of the processing is around the containers that
+   *  were on the datanode, and are no longer there. To find them, we take a
+   *  snapshot of the ContainerSet from NodeManager (stored in the
+   *  expectedContainersInDatanode variable). For each replica in the report, we
+   *  check if it is in the snapshot and if so remove it from the snapshot.
+   *  After processing all replicas in the report, the containers
+   *  remaining in this set are now missing on the Datanode, and must be removed
+   *  from both NodeManager and ContainerManager.
+   *
+   *  Another case which must be handled is when a datanode reports a replica
+   *  which is not present in SCM. The default Ozone behaviour is log a warning
+   *  for, and allow the replica to remain on the datanode. This can be
+   *  changed to have a command sent to the datanode to delete the replica via
+   *  the hdds.scm.unknown-container.action setting.
+   *
+   *  Note that the datanode also sends smaller Incremental Container Reports
+   *  more frequently, but the logic is synchronized on the datanode to prevent
+   *  full and incremental reports processing in parallel for the same datanode
+   *  on SCM.
    *
    * @param reportFromDatanode Container Report
    * @param publisher EventPublisher reference
@@ -120,25 +161,37 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       synchronized (datanodeDetails) {
         final List<ContainerReplicaProto> replicas =
             containerReport.getReportsList();
-        final Set<ContainerID> containersInSCM =
+        final Set<ContainerID> expectedContainersInDatanode =
             nodeManager.getContainers(datanodeDetails);
 
-        final Set<ContainerID> containersInDn = replicas.parallelStream()
-            .map(ContainerReplicaProto::getContainerID)
-            .map(ContainerID::valueOf).collect(Collectors.toSet());
+        for (ContainerReplicaProto replica : replicas) {
+          ContainerID cid = ContainerID.valueOf(replica.getContainerID());
+          ContainerInfo container = null;
+          try {
+            // We get the container using the ContainerID object we obtained
+            // from protobuf. However we don't want to store that object if
+            // there is already an instance for the same ContainerID we can
+            // reuse.
+            container = containerManager.getContainer(cid);
+            cid = container.containerID();
+          } catch (ContainerNotFoundException e) {
+            // Ignore this for now. It will be handled later with a null check
+            // and the code will either log a warning or remove this replica
+            // from the datanode, depending on the cluster setting for handling
+            // unexpected containers.
+          }
 
-        final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
-        missingReplicas.removeAll(containersInDn);
-
-        processContainerReplicas(datanodeDetails, replicas, publisher);
-        processMissingReplicas(datanodeDetails, missingReplicas);
-
-        /*
-         * Update the latest set of containers for this datanode in
-         * NodeManager
-         */
-        nodeManager.setContainers(datanodeDetails, containersInDn);
-
+          boolean alreadyInDn = expectedContainersInDatanode.remove(cid);
+          if (!alreadyInDn) {
+            // This is a new Container not in the nodeManager -> dn map yet
+            nodeManager.addContainer(datanodeDetails, cid);
+          }
+          processSingleReplica(datanodeDetails, container, replica, publisher);
+        }
+        // Anything left in expectedContainersInDatanode was not in the full
+        // report, so it is now missing on the DN. We need to remove it from the
+        // list
+        processMissingReplicas(datanodeDetails, expectedContainersInDatanode);
         containerManager.notifyContainerReportProcessing(true, true);
       }
     } catch (NodeNotFoundException ex) {
@@ -154,32 +207,34 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    * that will be deleted by SCM.
    *
    * @param datanodeDetails Datanode from which this report was received
-   * @param replicas list of ContainerReplicaProto
+   * @param container ContainerInfo representing the container
+   * @param replicaProto Proto message for the replica
    * @param publisher EventPublisher reference
    */
-  private void processContainerReplicas(final DatanodeDetails datanodeDetails,
-      final List<ContainerReplicaProto> replicas,
+  private void processSingleReplica(final DatanodeDetails datanodeDetails,
+      final ContainerInfo container, final ContainerReplicaProto replicaProto,
       final EventPublisher publisher) {
-    for (ContainerReplicaProto replicaProto : replicas) {
-      try {
-        processContainerReplica(datanodeDetails, replicaProto, publisher);
-      } catch (ContainerNotFoundException e) {
-        if(unknownContainerHandleAction.equals(
-            UNKNOWN_CONTAINER_ACTION_WARN)) {
-          LOG.error("Received container report for an unknown container" +
-              " {} from datanode {}.", replicaProto.getContainerID(),
-              datanodeDetails, e);
-        } else if (unknownContainerHandleAction.equals(
-            UNKNOWN_CONTAINER_ACTION_DELETE)) {
-          final ContainerID containerId = ContainerID
-              .valueOf(replicaProto.getContainerID());
-          deleteReplica(containerId, datanodeDetails, publisher, "unknown");
-        }
-      } catch (IOException | InvalidStateTransitionException e) {
-        LOG.error("Exception while processing container report for container" +
+    if (container == null) {
+      if (unknownContainerHandleAction.equals(
+          UNKNOWN_CONTAINER_ACTION_WARN)) {
+        LOG.error("Received container report for an unknown container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails, e);
+            datanodeDetails);
+      } else if (unknownContainerHandleAction.equals(
+          UNKNOWN_CONTAINER_ACTION_DELETE)) {
+        final ContainerID containerId = ContainerID
+            .valueOf(replicaProto.getContainerID());
+        deleteReplica(containerId, datanodeDetails, publisher, "unknown");
       }
+      return;
+    }
+    try {
+      processContainerReplica(
+          datanodeDetails, container, replicaProto, publisher);
+    } catch (IOException | InvalidStateTransitionException e) {
+      LOG.error("Exception while processing container report for container" +
+              " {} from datanode {}.", replicaProto.getContainerID(),
+          datanodeDetails, e);
     }
   }
 
@@ -192,6 +247,12 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   private void processMissingReplicas(final DatanodeDetails datanodeDetails,
                                       final Set<ContainerID> missingReplicas) {
     for (ContainerID id : missingReplicas) {
+      try {
+        nodeManager.removeContainer(datanodeDetails, id);
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Failed to remove container {} from a node which does not " +
+            "exist {}", id, datanodeDetails, e);
+      }
       try {
         containerManager.getContainerReplicas(id).stream()
             .filter(replica -> replica.getDatanodeDetails()

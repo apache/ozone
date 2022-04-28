@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -88,12 +89,12 @@ public class AbstractReconContainerManagerTest {
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
-    scmhaManager = MockSCMHAManager.getInstance(
-        true, new MockSCMHADBTransactionBuffer(store));
+    scmhaManager = SCMHAManagerStub.getInstance(
+        true, new SCMHADBTransactionBufferStub(store));
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(store));
     scmContext = SCMContext.emptyContext();
-    scmStorageConfig = new ReconStorageConfig(conf);
+    scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     layoutVersionManager = mock(HDDSLayoutVersionManager.class);
@@ -153,7 +154,7 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOwner("test")
             .setState(OPEN)
             .build();
@@ -173,7 +174,8 @@ public class AbstractReconContainerManagerTest {
               .setContainerID(cID.getId())
               .setNumberOfKeys(10)
               .setPipelineID(pipeline.getId())
-              .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+              .setReplicationConfig(
+                  StandaloneReplicationConfig.getInstance(ONE))
               .setOwner("test")
               //add containers in all kinds of state
               .setState(stateTypes[i % stateTypeCount])
@@ -207,7 +209,7 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOwner("test")
             .setState(state)
             .build();
@@ -225,7 +227,7 @@ public class AbstractReconContainerManagerTest {
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOwner("test")
             .setState(state)
             .build();

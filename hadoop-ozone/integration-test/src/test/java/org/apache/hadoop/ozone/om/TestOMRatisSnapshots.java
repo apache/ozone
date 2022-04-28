@@ -27,13 +27,14 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.hdds.ExitManager;
@@ -57,7 +58,7 @@ import org.slf4j.event.Level;
 @Timeout(500)
 public class TestOMRatisSnapshots {
 
-  private MiniOzoneOMHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
   private String clusterId;
@@ -88,7 +89,7 @@ public class TestOMRatisSnapshots {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
-    cluster = (MiniOzoneOMHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId("om-service-test1")
@@ -192,8 +193,9 @@ public class TestOMRatisSnapshots {
     Assert.assertNotNull(followerOMMetaMngr.getBucketTable().get(
         followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
-      Assert.assertNotNull(followerOMMetaMngr.getKeyTable().get(
-          followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
+      Assert.assertNotNull(followerOMMetaMngr.getKeyTable(
+          getDefaultBucketLayout())
+          .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
   }
 
@@ -315,6 +317,10 @@ public class TestOMRatisSnapshots {
       logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     }
     return keys;
+  }
+
+  private static BucketLayout getDefaultBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   private static class DummyExitManager extends ExitManager {

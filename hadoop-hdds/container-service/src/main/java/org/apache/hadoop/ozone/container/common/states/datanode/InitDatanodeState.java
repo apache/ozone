@@ -29,7 +29,6 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -81,7 +80,7 @@ public class InitDatanodeState implements DatanodeState,
     try {
       addresses = getSCMAddressForDatanodes(conf);
     } catch (IllegalArgumentException e) {
-      if(!Strings.isNullOrEmpty(e.getMessage())) {
+      if (!Strings.isNullOrEmpty(e.getMessage())) {
         LOG.error("Failed to get SCM addresses: {}", e.getMessage());
       }
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
@@ -123,12 +122,6 @@ public class InitDatanodeState implements DatanodeState,
    */
   private void persistContainerDatanodeDetails() {
     String dataNodeIDPath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (Strings.isNullOrEmpty(dataNodeIDPath)) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      this.context.setState(DatanodeStateMachine.DatanodeStates.SHUTDOWN);
-      return;
-    }
     File idPath = new File(dataNodeIDPath);
     DatanodeDetails datanodeDetails = this.context.getParent()
         .getDatanodeDetails();

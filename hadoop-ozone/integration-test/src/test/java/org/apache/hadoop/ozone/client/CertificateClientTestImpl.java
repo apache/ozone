@@ -177,12 +177,12 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public String getSignatureAlgorithm(){
+  public String getSignatureAlgorithm() {
     return securityConfig.getSignatureAlgo();
   }
 
   @Override
-  public String getSecurityProvider(){
+  public String getSecurityProvider() {
     return securityConfig.getProvider();
   }
 

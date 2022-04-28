@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
@@ -80,7 +80,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       description = "Strategy to layout files in the container",
       defaultValue = "FILE_PER_CHUNK"
   )
-  private ChunkLayOutVersion chunkLayout;
+  private ContainerLayoutVersion containerLayout;
 
   private ChunkManager chunkManager;
 
@@ -120,7 +120,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
 
         KeyValueContainerData keyValueContainerData =
             new KeyValueContainerData(containerId,
-                chunkLayout,
+                containerLayout,
                 1_000_000L,
                 getPrefix(),
                 "nodeid");
@@ -143,7 +143,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
 
       LOG.info("Running chunk write test: threads={} chunkSize={} " +
               "chunksPerBlock={} layout={}",
-          threadCount, chunkSize, chunksPerBlock, chunkLayout);
+          threadCount, chunkSize, chunksPerBlock, containerLayout);
 
       runTests(this::writeChunk);
 

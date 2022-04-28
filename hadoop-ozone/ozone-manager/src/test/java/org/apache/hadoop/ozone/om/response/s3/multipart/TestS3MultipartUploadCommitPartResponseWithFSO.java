@@ -22,7 +22,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
@@ -49,7 +50,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
 
     createParentPath(volumeName, bucketName);
@@ -70,7 +71,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     Assert.assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -86,7 +88,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     createParentPath(volumeName, bucketName);
 
@@ -128,7 +130,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -157,7 +160,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     createParentPath(volumeName, bucketName);
 
@@ -199,7 +202,8 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(openKey));
+    Assert.assertNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey));
     Assert.assertNull(
             omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
@@ -220,7 +224,12 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
   private void createParentPath(String volumeName, String bucketName)
       throws Exception {
     // Create parent dirs for the path
-    parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
+    parentID = OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName,
             dirName, omMetadataManager);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

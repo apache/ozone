@@ -52,12 +52,11 @@ public class ReplicationConfigValidator {
     if (validationRegexp != null) {
       if (!validationRegexp.matcher(replicationConfig.toString()).matches()) {
         throw new IllegalArgumentException("Invalid replication config " +
-            replicationConfig.toString() +
-            " Replication config should match " + validationPattern);
+            replicationConfig + ". Replication config should match the "
+            + validationPattern + " pattern.");
       }
     }
     return replicationConfig;
   }
-
 
 }

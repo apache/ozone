@@ -84,6 +84,7 @@ public class TestOzoneManagerStateMachine {
     when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
     when(ozoneManager.getSnapshotInfo()).thenReturn(
         Mockito.mock(RatisSnapshotInfo.class));
+    when(ozoneManager.getConfiguration()).thenReturn(conf);
     ozoneManagerStateMachine =
         new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
@@ -303,7 +304,7 @@ public class TestOzoneManagerStateMachine {
           mockTransactionContext(createKeyRequest));
       Assert.fail("Expected StateMachineException to be thrown when " +
           "submitting write request while prepared.");
-    } catch(StateMachineException smEx) {
+    } catch (StateMachineException smEx) {
       Assert.assertFalse(smEx.leaderShouldStepDown());
 
       Throwable cause = smEx.getCause();

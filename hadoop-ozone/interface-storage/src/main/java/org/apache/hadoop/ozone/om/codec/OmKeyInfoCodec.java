@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.codec;
 
 import java.io.IOException;
 
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -28,15 +29,12 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
-
 /**
  * Codec to encode OmKeyInfo as byte array.
  *
  * <p>
- * If the layout "ozone.om.metadata.layout" is PREFIX and
- * "ozone.om.enable.filesystem.paths" is TRUE. Then, DB stores only the leaf
- * node name into the 'keyName' field.
+ * If the bucket layout is FileSystem Optimized.
+ * Then, DB stores only the leaf node name into the 'keyName' field.
  * <p>
  * For example, the user given key path is '/a/b/c/d/e/file1', then in DB
  * 'keyName' field stores only the leaf node name, which is 'file1'.
@@ -55,7 +53,8 @@ public class OmKeyInfoCodec implements Codec<OmKeyInfo> {
   public byte[] toPersistedFormat(OmKeyInfo object) throws IOException {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.getProtobuf(ignorePipeline, CURRENT_VERSION).toByteArray();
+    return object.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION)
+        .toByteArray();
   }
 
   @Override

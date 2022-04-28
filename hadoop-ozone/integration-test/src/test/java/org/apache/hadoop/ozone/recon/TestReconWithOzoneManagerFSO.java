@@ -23,6 +23,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -30,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
@@ -63,16 +65,15 @@ public class TestReconWithOzoneManagerFSO {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.om.enable.filesystem.paths", true);
-    conf.set("ozone.om.metadata.layout", "PREFIX");
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     cluster =
             MiniOzoneCluster.newBuilder(conf)
                     .setNumDatanodes(1)
                     .includeRecon(true)
                     .build();
     cluster.waitForClusterToBeReady();
-
-    cluster.getStorageContainerManager().exitSafeMode();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
     store = cluster.getClient().getObjectStore();
   }
@@ -92,7 +93,7 @@ public class TestReconWithOzoneManagerFSO {
     byte[] data = ContainerTestHelper.getFixedLengthString(
             keyString, 100).getBytes(UTF_8);
     OzoneOutputStream keyStream = TestHelper.createKey(
-            keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+            keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
             100, store, volumeName, bucketName);
     keyStream.write(data);
     keyStream.close();
@@ -131,7 +132,7 @@ public class TestReconWithOzoneManagerFSO {
     Assert.assertEquals(0, entity.getNumTotalDir());
     for (int i = 0; i < 10; i++) {
       Assert.assertNotNull(impl.getOMMetadataManagerInstance()
-              .getVolumeTable().get("/vol"+ i));
+              .getVolumeTable().get("/vol" + i));
     }
     addKeys(10, 12, "dir");
     impl.syncDataFromOM();
@@ -139,7 +140,7 @@ public class TestReconWithOzoneManagerFSO {
     // test Recon is sync'ed with OM.
     for (int i = 10; i < 12; i++) {
       Assert.assertNotNull(impl.getOMMetadataManagerInstance()
-              .getVolumeTable().getSkipCache("/vol"+ i));
+              .getVolumeTable().getSkipCache("/vol" + i));
     }
 
     // test root response
@@ -159,8 +160,8 @@ public class TestReconWithOzoneManagerFSO {
    * For test purpose each container will have only one key.
    */
   private void addKeys(int start, int end, String dirPrefix) throws Exception {
-    for(int i = start; i < end; i++) {
-      writeKeys("vol"+i, "bucket"+i, dirPrefix + i + "/key"+i);
+    for (int i = start; i < end; i++) {
+      writeKeys("vol" + i, "bucket" + i, dirPrefix + i + "/key" + i);
     }
   }
 }

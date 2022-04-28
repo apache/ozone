@@ -21,7 +21,7 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -46,9 +46,9 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
 
     // Manually add volume, bucket and key to DB
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
         keyName, clientID, replicationType, replicationFactor, 1L,
         omMetadataManager);
 
