@@ -514,10 +514,14 @@ public class ReplicationManager implements SCMService {
         }
 
         /**
-         * We don't need to take any action for a DELETE container - eventually
-         * it will be removed from SCM.
+         * a container reference should be removed from scm immediately
+         * after a CLEANUP event is fired, so DELETED is a transient
+         * state and hardly appears.if it appears at any unknown scenario，
+         * just remove it.
          */
         if (state == LifeCycleState.DELETED) {
+          LOG.warn("container {} is in DELETED state, but not removed", id);
+          containerManager.deleteContainer(id);
           return;
         }
 
