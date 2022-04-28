@@ -120,10 +120,10 @@ public class BackgroundPipelineScrubber implements SCMService {
   @Override
   public void start() {
     if (!running.compareAndSet(false, true)) {
-      LOG.info("Pipeline Scrubber Service is already running, skip start.");
+      LOG.info("{} Service is already running, skip start.", getServiceName());
       return;
     }
-    LOG.info("Starting Pipeline Scrubber Service.");
+    LOG.info("Starting {} Service.", getServiceName());
 
     scrubThread = new Thread(this::run);
     scrubThread.setName(THREAD_NAME);
@@ -135,12 +135,12 @@ public class BackgroundPipelineScrubber implements SCMService {
   public void stop() {
     synchronized (this) {
       if (!running.compareAndSet(true, false)) {
-        LOG.info("Pipeline Scrubber Service is not running, skip stop.");
+        LOG.info("{} Service is not running, skip stop.", getServiceName());
         return;
       }
       notifyAll();
     }
-    LOG.info("Stopping Pipeline Scrubber Service.");
+    LOG.info("Stopping {} Service.", getServiceName());
   }
 
   @VisibleForTesting
