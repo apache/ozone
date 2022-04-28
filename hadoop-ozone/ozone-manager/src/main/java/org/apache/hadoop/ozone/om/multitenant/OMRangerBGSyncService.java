@@ -74,8 +74,6 @@ public class OMRangerBGSyncService extends BackgroundService {
   private static final int MAX_ATTEMPT = 2;
 
   private long rangerBGSyncCounter = 0;
-  private long currentOzoneServiceVersionInOMDB;
-  private long proposedOzoneServiceVersionInOMDB;
   private int rangerOzoneServiceId;  // TODO: Unused?
 
   private MultiTenantAccessAuthorizer authorizer;
@@ -241,10 +239,9 @@ public class OMRangerBGSyncService extends BackgroundService {
       while (!multiTenantManager.tryAcquireInProgressMtOp(WAIT_MILI)) {
         sleep(10);
       }
-      currentOzoneServiceVersionInOMDB = getOMDBRangerServiceVersion();
-      proposedOzoneServiceVersionInOMDB = getRangerServiceVersion();
-      while (currentOzoneServiceVersionInOMDB !=
-          proposedOzoneServiceVersionInOMDB) {
+      long currentOzoneServiceVerInDB = getOMDBRangerServiceVersion();
+      long proposedOzoneServiceVerInDB = getRangerServiceVersion();
+      while (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
         if (++attempt > MAX_ATTEMPT) {
           break;
         }
@@ -255,18 +252,17 @@ public class OMRangerBGSyncService extends BackgroundService {
         LOG.info("Executing Ranger Sync run {}, attempt {}",
             runCount.get(), attempt);
 
-        executeOmdbToRangerSync(currentOzoneServiceVersionInOMDB);
+        executeOmdbToRangerSync(currentOzoneServiceVerInDB);
 
-        if (currentOzoneServiceVersionInOMDB !=
-            proposedOzoneServiceVersionInOMDB) {
+        if (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
           // Submit Ratis Request to sync the new ozone service version in OMDB
-          setOMDBRangerServiceVersion(proposedOzoneServiceVersionInOMDB);
+          setOMDBRangerServiceVersion(proposedOzoneServiceVerInDB);
         }
         while (!multiTenantManager.tryAcquireInProgressMtOp(WAIT_MILI)) {
           sleep(10);
         }
-        currentOzoneServiceVersionInOMDB = proposedOzoneServiceVersionInOMDB;
-        proposedOzoneServiceVersionInOMDB = getRangerServiceVersion();
+        currentOzoneServiceVerInDB = proposedOzoneServiceVerInDB;
+        proposedOzoneServiceVerInDB = getRangerServiceVersion();
       }
     } catch (IOException | InterruptedException e) {
       LOG.warn("Exception during a Ranger Sync: {}. Stacktrace: {}",
