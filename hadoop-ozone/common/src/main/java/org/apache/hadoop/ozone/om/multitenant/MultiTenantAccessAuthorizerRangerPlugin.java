@@ -46,6 +46,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -63,6 +64,7 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.http.HttpConnection;
 import org.apache.kerby.util.Base64;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -225,7 +227,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT +
             principal.getName();
 
-    HttpsURLConnection conn = makeHttpsGetCall(endpointUrl, "GET", false);
+    HttpURLConnection conn = makeHttpGetCall(endpointUrl, "GET", false);
     return getResponseData(conn);
   }
 
@@ -236,7 +238,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT +
             roleName;
 
-    HttpsURLConnection conn = makeHttpsGetCall(endpointUrl, "GET", false);
+    HttpURLConnection conn = makeHttpGetCall(endpointUrl, "GET", false);
     return getResponseData(conn);
   }
 
@@ -246,7 +248,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT +
         principal.getName();
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
     String response = getResponseData(conn);
     String userIDCreated = null;
@@ -304,7 +306,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT + roleId;
     final String jsonData = roleObj.toString();
 
-    HttpsURLConnection conn =
+    HttpURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
     if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
@@ -355,7 +357,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT + roleId;
     final String jsonData = roleObj.toString();
 
-    HttpsURLConnection conn =
+    HttpURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
     if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
@@ -409,7 +411,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT + roleId;
     final String jsonData = roleObj.toString();
 
-    HttpsURLConnection conn =
+    HttpURLConnection conn =
         makeHttpCall(endpointUrl, jsonData, "PUT", false);
     if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
@@ -446,7 +448,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     String jsonData = getCreateRoleJsonStr(role, adminRoleName);
 
-    final HttpsURLConnection conn = makeHttpCall(endpointUrl,
+    final HttpURLConnection conn = makeHttpCall(endpointUrl,
         jsonData, "POST", false);
     if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
@@ -484,7 +486,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
 
     String jsonData = getCreateUserJsonStr(userName, password);
 
-    final HttpsURLConnection conn = makeHttpCall(endpointUrl,
+    final HttpURLConnection conn = makeHttpCall(endpointUrl,
         jsonData, "POST", false);
     if (conn.getResponseCode() != HTTP_OK) {
       throw new IOException("Ranger REST API failure: " + conn.getResponseCode()
@@ -509,7 +511,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT;
 
-    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl,
         policy.serializePolicyToJsonString(),
         "POST", false);
     String policyInfo = getResponseData(conn);
@@ -532,7 +534,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT +
         policyName;
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
     String policyInfo = getResponseData(conn);
     JsonArray jArry = new JsonParser().parse(policyInfo).getAsJsonArray();
@@ -549,7 +551,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_GET_POLICY_ID_HTTP_ENDPOINT +
             policyId;
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
     String policyInfo = getResponseData(conn);
     JsonArray jArry = new JsonParser().parse(policyInfo).getAsJsonArray();
@@ -570,7 +572,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT;
     int id = 0;
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
     String sInfo = getResponseData(conn);
     JsonObject jObject = new JsonParser().parse(sInfo).getAsJsonObject();
@@ -591,8 +593,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String rangerAdminUrl = rangerHttpsAddress
         + OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT + ozoneServiceId;
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
-        "GET", false);
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl, "GET", false);
     String sInfo = getResponseData(conn);
     JsonObject jObject = new JsonParser().parse(sInfo).getAsJsonObject();
     return jObject.get("policyVersion").getAsLong();
@@ -603,8 +604,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_DOWNLOAD_ENDPOINT + baseVersion;
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
-        "GET", false);
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl, "GET", false);
     String sInfo = getResponseData(conn);
     return sInfo;
   }
@@ -615,7 +615,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT
             + ozoneServiceId + "?policyLabelsPartial=OzoneMultiTenant";
 
-    HttpsURLConnection conn = makeHttpsGetCall(rangerAdminUrl,
+    HttpURLConnection conn = makeHttpGetCall(rangerAdminUrl,
         "GET", false);
     String sInfo = getResponseData(conn);
     return sInfo;
@@ -627,7 +627,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT
             + userId + "?forceDelete=true";
 
-    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
@@ -641,7 +641,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT
             + roleName + "?forceDelete=true";
 
-    HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+    HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
@@ -663,7 +663,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         rangerHttpsAddress + OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT
             + policyId + "?forceDelete=true";
     try {
-      HttpsURLConnection conn = makeHttpCall(rangerAdminUrl, null,
+      HttpURLConnection conn = makeHttpCall(rangerAdminUrl, null,
           "DELETE", false);
       int respnseCode = conn.getResponseCode();
       if (respnseCode != 200 && respnseCode != 204) {
@@ -674,7 +674,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     }
   }
 
-  private String getResponseData(HttpsURLConnection urlConnection)
+  private String getResponseData(HttpURLConnection urlConnection)
       throws IOException {
     StringBuilder response = new StringBuilder();
     try (BufferedReader br = new BufferedReader(
@@ -692,13 +692,29 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return response.toString();
   }
 
-  private HttpsURLConnection makeHttpCall(String urlString,
-                                              String jsonInputString,
-                                              String method, boolean isSpnego)
+  private HttpURLConnection openURLConnection(URL url) throws IOException {
+    final HttpURLConnection urlConnection;
+    if (url.getProtocol().equals("https")) {
+      urlConnection = (HttpsURLConnection) url.openConnection();
+    } else if (url.getProtocol().equals("http")) {
+      urlConnection = (HttpURLConnection) url.openConnection();
+    } else {
+      throw new IOException("Unsupported protocol: " + url.getProtocol() +
+          "URL: " + url);
+    }
+    return urlConnection;
+  }
+
+  /**
+   * Can make either http or https request.
+   */
+  private HttpURLConnection makeHttpCall(String urlString,
+      String jsonInputString, String method, boolean isSpnego)
       throws IOException {
 
     URL url = new URL(urlString);
-    HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
+    final HttpURLConnection urlConnection = openURLConnection(url);
+
     urlConnection.setRequestMethod(method);
     urlConnection.setConnectTimeout(connectionTimeout);
     urlConnection.setReadTimeout(connectionRequestTimeout);
@@ -718,11 +734,15 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return urlConnection;
   }
 
-  private HttpsURLConnection makeHttpsGetCall(String urlString,
+  /**
+   * Can make either http or https request.
+   */
+  private HttpURLConnection makeHttpGetCall(String urlString,
       String method, boolean isSpnego) throws IOException {
 
     URL url = new URL(urlString);
-    HttpsURLConnection urlConnection = (HttpsURLConnection)url.openConnection();
+    final HttpURLConnection urlConnection = openURLConnection(url);
+
     urlConnection.setRequestMethod(method);
     urlConnection.setConnectTimeout(connectionTimeout);
     urlConnection.setReadTimeout(connectionRequestTimeout);
