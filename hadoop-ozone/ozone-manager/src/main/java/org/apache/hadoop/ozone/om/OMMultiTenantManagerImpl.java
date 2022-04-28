@@ -761,18 +761,4 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   Map<String, CachedTenantState> getTenantCache() {
     return tenantCache;
   }
-
-  @Override
-  public boolean tryAcquireInProgressMtOp(long milli) {
-    try {
-      return inProgressMtOp.tryAcquire(milli, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      return false;
-    }
-  }
-
-  @Override
-  public void resetInProgressMtOpState() {
-    inProgressMtOp.drainPermits();
-  }
 }

@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.multitenant;
 
-import static java.lang.Thread.sleep;
-
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -233,19 +231,14 @@ public class OMRangerBGSyncService extends BackgroundService {
   private void executeOneRangerSyncCycle() {
     int attempt = 0;
     try {
-      // Taking the lock only makes sure that while we are reading
-      // the current Ozone service version, another multitenancy
-      // request is not changing it. We can drop the lock after that.
-      while (!multiTenantManager.tryAcquireInProgressMtOp(WAIT_MILI)) {
-        sleep(10);
-      }
+
       long currentOzoneServiceVerInDB = getOMDBRangerServiceVersion();
       long proposedOzoneServiceVerInDB = getRangerServiceVersion();
       while (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
         if (++attempt > MAX_ATTEMPT) {
           break;
         }
-        multiTenantManager.resetInProgressMtOpState();
+
         if (!ozoneManager.isLeaderReady()) {
           return;
         }
@@ -258,18 +251,15 @@ public class OMRangerBGSyncService extends BackgroundService {
           // Submit Ratis Request to sync the new ozone service version in OMDB
           setOMDBRangerServiceVersion(proposedOzoneServiceVerInDB);
         }
-        while (!multiTenantManager.tryAcquireInProgressMtOp(WAIT_MILI)) {
-          sleep(10);
-        }
+
         currentOzoneServiceVerInDB = proposedOzoneServiceVerInDB;
         proposedOzoneServiceVerInDB = getRangerServiceVersion();
       }
-    } catch (IOException | InterruptedException e) {
+    } catch (IOException e) {
       LOG.warn("Exception during a Ranger Sync: {}. Stacktrace: {}",
           e.getMessage(), e.getStackTrace());
-    } finally {
-      multiTenantManager.resetInProgressMtOpState();
     }
+
   }
 
   public long getRangerServiceVersion() throws IOException {

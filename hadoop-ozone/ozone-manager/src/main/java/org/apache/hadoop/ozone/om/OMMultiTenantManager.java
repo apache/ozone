@@ -237,16 +237,6 @@ public interface OMMultiTenantManager {
       UserGroupInformation ugi) throws IOException;
 
   /**
-   * Currently we allow only one in-progress multi-tenant operation.
-   * tryAcquireInProgressMtOp/resetInProgressMtOpState help with this.
-   * @param milli milliseconds to wait before giving up on the lock.
-   * @return
-   */
-  boolean tryAcquireInProgressMtOp(long milli);
-
-  void resetInProgressMtOpState();
-
-  /**
    * Returns true if the tenant doesn't have any accessIds assigned to it
    * Returns false otherwise.
    *
