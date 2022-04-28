@@ -127,6 +127,7 @@ public class TestContainerManagerImpl {
         HddsProtos.LifeCycleEvent.DELETE);
     Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
         containerManager.getContainer(cid).getState());
+    Assert.assertTrue(containerManager.containerExist(cid));
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.CLEANUP);
     //when a CLEANUP event is fired , the container should be

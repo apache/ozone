@@ -308,9 +308,9 @@ public class TestContainerStateManagerIntegration {
     containerManager
         .updateContainerState(container1.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerList = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assert.assertEquals(1, containerList.size());
+    //when CLEANUP is fired, container will be removed from scm
+    Assert.assertFalse(containerManager.containerExist(
+        container1.getContainerInfo().containerID()));
 
     // Allocate container1 and update its state from
     // OPEN -> CLOSING -> CLOSED
