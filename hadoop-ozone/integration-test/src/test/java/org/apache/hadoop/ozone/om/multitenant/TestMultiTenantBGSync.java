@@ -339,7 +339,7 @@ public class TestMultiTenantBGSync {
 
       bgSync.start();
       // Wait for background sync to go through few cycles.
-      while (bgSync.getRangerBGSyncCounter() <= 4) {
+      while (bgSync.getRangerSyncRunCount() <= 4) {
         // TODO: Trigger the sync rather than busy waiting?
         sleep(TEST_SYNC_INTERVAL_SEC * 1000);
       }
@@ -388,7 +388,7 @@ public class TestMultiTenantBGSync {
       createRolesAndPoliciesInRanger();
 
       bgSync.start();
-      while (bgSync.getRangerBGSyncCounter() <= 4) {
+      while (bgSync.getRangerSyncRunCount() <= 4) {
         // TODO: Trigger the sync rather than busy waiting?
         sleep(TEST_SYNC_INTERVAL_SEC * 1000);
       }
@@ -457,9 +457,9 @@ public class TestMultiTenantBGSync {
             .put(userAccessId, omDBAccessIdInfo);
       }
 
-      long baseVersion = bgSync.getRangerBGSyncCounter();
+      long baseVersion = bgSync.getRangerSyncRunCount();
       bgSync.start();
-      while (bgSync.getRangerBGSyncCounter() <= baseVersion + 1) {
+      while (bgSync.getRangerSyncRunCount() <= baseVersion + 1) {
         // TODO: Trigger the sync rather than busy waiting?
         sleep(TEST_SYNC_INTERVAL_SEC * 1000);
       }

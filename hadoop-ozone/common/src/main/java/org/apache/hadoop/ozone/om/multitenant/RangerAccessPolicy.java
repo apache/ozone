@@ -41,12 +41,12 @@ public class RangerAccessPolicy implements AccessPolicy {
 
   // For now RangerAccessPolicy supports only one object per policy
   private OzoneObj accessObject;
-  private Map<String, List<AccessPolicyElem>> policyMap;
-  private HashSet<String> roleList;
+  private final Map<String, List<AccessPolicyElem>> policyMap;
+  private final HashSet<String> roleList;
   private String policyID;
   private String policyJsonString;
   private String policyName;
-  private long lastUpdateTime;
+  private long lastPolicyUpdateTimeEpochMillis;
 
   public RangerAccessPolicy(String name) {
     policyMap = new ConcurrentHashMap<>();
@@ -56,10 +56,6 @@ public class RangerAccessPolicy implements AccessPolicy {
 
   public void setPolicyID(String id) {
     policyID = id;
-  }
-
-  public void setLastUpdateTime(long mtime) {
-    lastUpdateTime = mtime;
   }
 
   public String getPolicyID() {
@@ -75,14 +71,23 @@ public class RangerAccessPolicy implements AccessPolicy {
   }
 
   @Override
+  public void setPolicyLastUpdateTime(long mtime) {
+    lastPolicyUpdateTimeEpochMillis = mtime;
+  }
+
+  @Override
+  public long getPolicyLastUpdateTime() {
+    return lastPolicyUpdateTimeEpochMillis;
+  }
+
+  @Override
   public String serializePolicyToJsonString() throws IOException {
     updatePolicyJsonString();
     return policyJsonString;
   }
 
   @Override
-  public String deserializePolicyFromJsonString(JsonObject jsonObject)
-      throws IOException {
+  public String deserializePolicyFromJsonString(JsonObject jsonObject) {
     setPolicyID(jsonObject.get("id").getAsString());
     try {
       JsonArray policyItems = jsonObject
@@ -102,7 +107,7 @@ public class RangerAccessPolicy implements AccessPolicy {
     }
     // TODO : retrieve other policy fields as well.
     try {
-      setLastUpdateTime(jsonObject.get("updateTime").getAsLong());
+      setPolicyLastUpdateTime(jsonObject.get("updateTime").getAsLong());
     } catch (Exception e) {
       // lets ignore the exception in case the field is not set.
     }
@@ -151,11 +156,6 @@ public class RangerAccessPolicy implements AccessPolicy {
       list.addAll(entry.getValue());
     }
     return list;
-  }
-
-  @Override
-  public long getLastUpdateTime() {
-    return lastUpdateTime;
   }
 
   @Override

@@ -61,12 +61,14 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMRangerBGSyncService.class);
-  private static final ClientId clientId = ClientId.randomId();
+  private static final ClientId CLIENT_ID = ClientId.randomId();
+  private static final long ONE_HOUR_IN_MILLIS = 3600 * 1000;
 
   private final OzoneManager ozoneManager;
   private final OMMetadataManager metadataManager;
   private final MultiTenantAccessAuthorizer authorizer;
 
+  // Maximum number of attempts for each sync run
   private static final int MAX_ATTEMPT = 2;
   private final AtomicLong runCount = new AtomicLong(0);
   private int rangerOzoneServiceId;
@@ -277,7 +279,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   private RaftClientRequest newRaftClientRequest(OMRequest omRequest) {
     return RaftClientRequest.newBuilder()
-        .setClientId(clientId)
+        .setClientId(CLIENT_ID)
         .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
         .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
         .setCallId(runCount.get())
@@ -297,7 +299,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.RangerServiceVersionSync)
         .setRangerServiceVersionSyncRequest(versionSyncRequest)
-        .setClientId(clientId.toString())
+        .setClientId(CLIENT_ID.toString())
         .build();
 
     // Submit PurgeKeys request to OM
@@ -442,10 +444,15 @@ public class OMRangerBGSyncService extends BackgroundService {
       // TODO: Its best to not create these policies automatically and the
       //  let the user delete the tenant and recreate the tenant.
       String policyName = entry.getKey();
+
+      // TODO: Use AccessController instead of AccessPolicy
+//      MultiTenantAccessController accessController =
+//          authorizer.getMultiTenantAccessController();
       AccessPolicy accessPolicy = authorizer.getAccessPolicyByName(policyName);
+
       if (lastRangerPolicyLoadTime >
-          (accessPolicy.getLastUpdateTime() + 3600 * 1000)) {
-        LOG.warn("Deleting policies from Ranger: " + policyName);
+          (accessPolicy.getPolicyLastUpdateTime() + ONE_HOUR_IN_MILLIS)) {
+        LOG.warn("Deleting policy from Ranger: {}", policyName);
         authorizer.deletePolicybyName(policyName);
         for (String deletedRole : accessPolicy.getRoleList()) {
           authorizer.deleteRole(new JsonParser()
@@ -555,5 +562,9 @@ public class OMRangerBGSyncService extends BackgroundService {
     HashSet<String> omdbUserList = mtOMDBRoles.get(roleName);
     String roleJsonStr = authorizer.getRole(roleName);
     authorizer.assignAllUsers(omdbUserList, roleJsonStr);
+  }
+
+  public long getRangerSyncRunCount() {
+    return runCount.get();
   }
 }

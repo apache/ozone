@@ -91,28 +91,12 @@ public interface AccessPolicy {
    */
   void setPolicyID(String id);
 
-  /**
-   * Sets the last update time to mtime.
-   * @param mtime
-   */
-  void setLastUpdateTime(long mtime);
-
-  /**
-   * Returns the last update time.
-   */
-  long getLastUpdateTime();
-
   String getPolicyID();
 
   /**
    * @return unique policy-name for this policy.
    */
   String getPolicyName();
-
-  /**
-   * @return list of roles associated with this policy
-   */
-  HashSet<String> getRoleList();
 
   /**
    *
@@ -149,4 +133,20 @@ public interface AccessPolicy {
       throws IOException;
 
   List<AccessPolicyElem> getAccessPolicyElem();
+
+  /**
+   * Sets the last update time to mtime.
+   * @param mtime Time in epoch milliseconds
+   */
+  void setPolicyLastUpdateTime(long mtime);
+
+  /**
+   * Returns the last update time of Ranger policies.
+   */
+  long getPolicyLastUpdateTime();
+
+  /**
+   * @return list of roles associated with this policy
+   */
+  HashSet<String> getRoleList();
 }

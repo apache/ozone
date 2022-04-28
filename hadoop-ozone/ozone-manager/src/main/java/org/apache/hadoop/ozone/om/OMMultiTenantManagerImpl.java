@@ -748,7 +748,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   @Override
   public boolean isTenantEmpty(String tenantId) throws IOException {
 
-
     if (!tenantCache.containsKey(tenantId)) {
       throw new OMException("Tenant does not exist for tenantId: " + tenantId,
           TENANT_NOT_FOUND);

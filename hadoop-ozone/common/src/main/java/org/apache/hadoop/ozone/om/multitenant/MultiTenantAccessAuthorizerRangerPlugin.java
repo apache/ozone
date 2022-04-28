@@ -598,7 +598,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
     return jObject.get("policyVersion").getAsLong();
   }
 
-  public String getIncrementalRangersChanges(long baseVersion)
+  public String getIncrementalRangerChanges(long baseVersion)
       throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_OM_RANGER_DOWNLOAD_ENDPOINT + baseVersion;
