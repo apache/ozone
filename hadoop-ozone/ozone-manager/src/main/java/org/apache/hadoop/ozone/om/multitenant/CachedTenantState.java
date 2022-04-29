@@ -44,8 +44,7 @@ public class CachedTenantState {
   public static class CachedAccessIdInfo {
     private final String userPrincipal;
     /**
-     * Stores if the accessId is a tenant admin
-     * (whether delegated or not doesn't matter here)
+     * Stores if the accessId is a tenant admin (either delegated or not).
      */
     private boolean isAdmin;
 

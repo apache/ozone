@@ -284,7 +284,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
    */
   @Override
   public String revokeUserFromRole(BasicUserPrincipal principal,
-                               String existingRole) throws IOException {
+      String existingRole) throws IOException {
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
     // Parse Json
     final String roleId = roleObj.get("id").getAsString();
@@ -337,8 +337,8 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
    * @return roleId (not useful for now)
    * @throws IOException
    */
-  public String assignUser(BasicUserPrincipal principal, String existingRole,
-      boolean isAdmin) throws IOException {
+  public String assignUserToRole(BasicUserPrincipal principal,
+      String existingRole, boolean isAdmin) throws IOException {
 
     JsonObject roleObj = new JsonParser().parse(existingRole).getAsJsonObject();
     // Parse Json
@@ -479,8 +479,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         + "}";
   }
 
-  public String createUser(String userName,
-                           String password)
+  public String createUser(String userName, String password)
       throws IOException {
 
     String endpointUrl =
@@ -638,7 +637,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
-      throw new IOException("Couldnt delete user " + userId);
+      throw new IOException("Couldn't delete user " + userId);
     }
   }
 
@@ -652,7 +651,7 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         "DELETE", false);
     int respnseCode = conn.getResponseCode();
     if (respnseCode != 200 && respnseCode != 204) {
-      throw new IOException("Couldnt delete role " + roleName);
+      throw new IOException("Couldn't delete role " + roleName);
     }
   }
 

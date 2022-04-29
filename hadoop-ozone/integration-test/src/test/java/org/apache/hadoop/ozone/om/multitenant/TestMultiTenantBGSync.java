@@ -242,7 +242,7 @@ public class TestMultiTenantBGSync {
     try {
       omm.createUser("user1Test", "user1Test1234");
       usersCreated.add(userPrincipal);
-      omm.assignUser(userPrincipal, omm.getRole(role2Principal), false);
+      omm.assignUserToRole(userPrincipal, omm.getRole(role2Principal), false);
     } catch (Exception e) {
       LOG.info(e.getMessage());
     }
@@ -250,7 +250,7 @@ public class TestMultiTenantBGSync {
     try {
       omm.createUser("user2Test", "user1Test1234");
       usersCreated.add(userPrincipal2);
-      omm.assignUser(userPrincipal2, omm.getRole(role2Principal), false);
+      omm.assignUserToRole(userPrincipal2, omm.getRole(role2Principal), false);
     } catch (Exception e) {
       LOG.info(e.getMessage());
     }

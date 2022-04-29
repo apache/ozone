@@ -499,7 +499,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         (OMMultiTenantManagerImpl) multiTenantManager;
     final Map<String, CachedTenantState> tenantCache = impl.getTenantCache();
 
-    // tenantId -> CachedTenantState
+    // tenantCache: tenantId -> CachedTenantState
     for (Map.Entry<String, CachedTenantState> e1 : tenantCache.entrySet()) {
       final CachedTenantState cachedTenantState = e1.getValue();
 
@@ -509,7 +509,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       final Map<String, CachedAccessIdInfo> accessIdInfoMap =
           cachedTenantState.getAccessIdInfoMap();
 
-      // accessId -> CachedAccessIdInfo
+      // accessIdInfoMap: accessId -> CachedAccessIdInfo
       for (Map.Entry<String, CachedAccessIdInfo> e2 :
           accessIdInfoMap.entrySet()) {
         final CachedAccessIdInfo cachedAccessIdInfo = e2.getValue();

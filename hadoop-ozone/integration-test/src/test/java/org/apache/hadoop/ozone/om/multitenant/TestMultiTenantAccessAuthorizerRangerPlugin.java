@@ -107,9 +107,9 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
 
       BasicUserPrincipal userPrincipal = new BasicUserPrincipal("user1Test");
       usersIdsCreated.add(
-          omm.assignUser(userPrincipal, userRole.getName(), false));
+          omm.assignUserToRole(userPrincipal, userRole.getName(), false));
       usersIdsCreated.add(
-          omm.assignUser(userPrincipal, adminRole.getName(), true));
+          omm.assignUserToRole(userPrincipal, adminRole.getName(), true));
 
       AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
           "vol1", "tenant1");
@@ -164,7 +164,7 @@ public class TestMultiTenantAccessAuthorizerRangerPlugin {
       groupIdsCreated.add(omm.getRole(group2Principal));
 
       userPrincipal = new BasicUserPrincipal("user1Test");
-      omm.assignUser(userPrincipal, group2Principal.getName(), false);
+      omm.assignUserToRole(userPrincipal, group2Principal.getName(), false);
 
       AccessPolicy tenant1VolumeAccessPolicy = createVolumeAccessPolicy(
           "vol1", "tenant1");

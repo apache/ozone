@@ -62,7 +62,7 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * MultiTenantGateKeeperplugin Implementation. E.g. a Ranger
    * based Implementation can return some ID thats relevant for it.
    */
-  String assignUser(BasicUserPrincipal principal, String existingRole,
+  String assignUserToRole(BasicUserPrincipal principal, String existingRole,
       boolean isAdmin) throws IOException;
 
   /**
