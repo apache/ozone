@@ -145,7 +145,7 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID of the pipeline to be retrieved
    * @return Pipeline
-   * @throws IOException if pipeline is not found
+   * @throws PipelineNotFoundException if pipeline is not found
    */
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID,
@@ -205,7 +205,7 @@ class PipelineStateMap {
     if (state == PipelineState.OPEN) {
       return new ArrayList<>(
           query2OpenPipelines.getOrDefault(
-              replicationConfig, Collections.EMPTY_LIST));
+              replicationConfig, Collections.emptyList()));
     }
 
     List<Pipeline> pipelines = new ArrayList<>();
@@ -236,7 +236,7 @@ class PipelineStateMap {
 
     if (state == PipelineState.OPEN) {
       return query2OpenPipelines.getOrDefault(
-              replicationConfig, Collections.EMPTY_LIST).size();
+              replicationConfig, Collections.emptyList()).size();
     }
 
     int count = 0;
@@ -269,12 +269,12 @@ class PipelineStateMap {
     Preconditions
         .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
     Preconditions
-        .checkNotNull(excludeDns, "Pipeline exclude list cannot be null");
+        .checkNotNull(excludePipelines, "Pipeline exclude list cannot be null");
 
     List<Pipeline> pipelines = null;
     if (state == PipelineState.OPEN) {
       pipelines = new ArrayList<>(query2OpenPipelines.getOrDefault(
-          replicationConfig, Collections.EMPTY_LIST));
+          replicationConfig, Collections.emptyList()));
     } else {
       pipelines = new ArrayList<>(pipelineMap.values());
     }
@@ -304,7 +304,7 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID
    * @return Set of containerIDs belonging to the pipeline
-   * @throws IOException if pipeline is not found
+   * @throws PipelineNotFoundException if pipeline is not found
    */
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
@@ -324,7 +324,7 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID
    * @return Number of containers belonging to the pipeline
-   * @throws IOException if pipeline is not found
+   * @throws PipelineNotFoundException if pipeline is not found
    */
   int getNumberOfContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
@@ -389,7 +389,7 @@ class PipelineStateMap {
    *                   to be updated
    * @param state - new state of the pipeline
    * @return Pipeline with the updated state
-   * @throws IOException if pipeline does not exist
+   * @throws PipelineNotFoundException if pipeline does not exist
    */
   Pipeline updatePipelineState(PipelineID pipelineID, PipelineState state)
       throws PipelineNotFoundException {
