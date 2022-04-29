@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -403,6 +404,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             pipelineManager, containerManager, scmContext);
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(scmNodeManager);
+    CommandQueueReportHandler commandQueueReportHandler =
+        new CommandQueueReportHandler(scmNodeManager);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(
             scmSafeModeManager, pipelineManager, scmContext, configuration);
@@ -440,6 +443,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
+    eventQueue.addHandler(SCMEvents.COMMAND_QUEUE_REPORT,
+        commandQueueReportHandler);
 
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
