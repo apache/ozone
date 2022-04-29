@@ -43,8 +43,11 @@ for scheme in ofs o3fs; do
   done
 done
 
+exclude=""
 for bucket in encrypted link generated; do
-  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} s3
+  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
+  # some tests are independent of the bucket type, only need to be run once
+  exclude="--exclude no-bucket-type"
 done
 
 #expects 4 pipelines, should be run before
