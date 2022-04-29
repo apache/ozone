@@ -337,13 +337,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           createErrorOMResponse(omResponse, ex));
       exception = ex;
     } finally {
-      if (omClientResponse != null) {
-        // TODO: Use this instead
-//        addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-//            ozoneManagerDoubleBufferHelper);
-        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper
-            .add(omClientResponse, transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
         omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
       }
