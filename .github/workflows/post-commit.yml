@@ -233,6 +233,7 @@ jobs:
         suite:
           - secure
           - unsecure
+          - compat
           - HA
           - MR
           - misc
