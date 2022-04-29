@@ -260,6 +260,7 @@ public class KeyValueContainerData extends ContainerData {
     builder.setContainerID(this.getContainerID());
     builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
+    builder.setBlockCount(this.getBlockCount());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =
