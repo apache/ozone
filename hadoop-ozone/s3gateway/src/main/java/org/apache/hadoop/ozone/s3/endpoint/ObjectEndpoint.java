@@ -53,7 +53,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -78,6 +79,7 @@ import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 
@@ -88,6 +90,9 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
@@ -106,7 +111,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.genAuditParam;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
 import org.apache.http.HttpStatus;
@@ -165,15 +169,6 @@ public class ObjectEndpoint extends EndpointBase {
 
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "path", keyPath,
-        "Content-Length", String.valueOf(length),
-        "partNumber", String.valueOf(partNumber)
-    );
-    if (partNumber != 0) {
-      auditParams.put("uploadId", uploadID);
-    }
 
     OzoneOutputStream output = null;
 
@@ -188,34 +183,24 @@ public class ObjectEndpoint extends EndpointBase {
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
-      S3StorageType s3StorageType;
-      boolean storageTypeDefault;
-      if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
-        storageTypeDefault = true;
-      } else {
-        s3StorageType = toS3StorageType(storageType);
-        storageTypeDefault = false;
-      }
-      ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      // Normal put object
+      OzoneBucket bucket = getBucket(bucketName);
+      ReplicationConfig replicationConfig =
+          getReplicationConfig(bucket, storageType);
 
       if (copyHeader != null) {
         //Copy object, as copy source available.
         s3GAction = S3GAction.COPY_OBJECT;
         CopyObjectResponse copyObjectResponse = copyObject(
-            copyHeader, bucketName, keyPath, replicationType,
-            replicationFactor, storageTypeDefault);
+            copyHeader, bucket, keyPath, replicationConfig, storageTypeDefault);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
 
-      // Normal put object
-      OzoneBucket bucket = getBucket(bucketName);
-
-      output = bucket.createKey(keyPath, length, replicationType,
-          replicationFactor, new HashMap<>());
+      output =
+          bucket.createKey(keyPath, length, replicationConfig, new HashMap<>());
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
@@ -230,7 +215,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       if (copyHeader != null) {
         getMetrics().incCopyObjectFailure();
       } else {
@@ -252,12 +237,12 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(s3GAction, auditParams));
+            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       }
       if (output != null) {
         output.close();
@@ -285,13 +270,6 @@ public class ObjectEndpoint extends EndpointBase {
 
     S3GAction s3GAction = S3GAction.GET_KEY;
     boolean auditSuccess = true;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "path", keyPath,
-        "uploadId", uploadId,
-        "max-parts", String.valueOf(maxParts),
-        "part-number-marker", partNumberMarker
-    );
 
     try {
       if (uploadId != null) {
@@ -373,7 +351,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex)
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
       );
       if (uploadId != null) {
         getMetrics().incListPartsFailure();
@@ -390,13 +368,13 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex)
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(s3GAction, auditParams)
+            buildAuditMessageForSuccess(s3GAction, getAuditParameters())
         );
       }
     }
@@ -425,10 +403,6 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("path") String keyPath) throws IOException, OS3Exception {
 
     S3GAction s3GAction = S3GAction.HEAD_KEY;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "keyPath", keyPath
-    );
 
     OzoneKey key;
     try {
@@ -436,7 +410,7 @@ public class ObjectEndpoint extends EndpointBase {
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incHeadKeyFailure();
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
@@ -448,7 +422,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
     } catch (Exception ex) {
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
 
@@ -458,7 +432,8 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
     getMetrics().incHeadKeySuccess();
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
+        getAuditParameters()));
     return response.build();
   }
 
@@ -506,11 +481,6 @@ public class ObjectEndpoint extends EndpointBase {
       IOException, OS3Exception {
 
     S3GAction s3GAction = S3GAction.DELETE_KEY;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucketName,
-        "path", keyPath,
-        "uploadId", uploadId
-    );
 
     try {
       if (uploadId != null && !uploadId.equals("")) {
@@ -522,7 +492,7 @@ public class ObjectEndpoint extends EndpointBase {
       bucket.deleteKey(keyPath);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       if (uploadId != null && !uploadId.equals("")) {
         getMetrics().incAbortMultiPartUploadFailure();
       } else {
@@ -545,11 +515,12 @@ public class ObjectEndpoint extends EndpointBase {
       }
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
     getMetrics().incDeleteKeySuccess();
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction, auditParams));
+    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
+        getAuditParameters()));
     return Response
         .status(Status.NO_CONTENT)
         .build();
@@ -569,26 +540,16 @@ public class ObjectEndpoint extends EndpointBase {
   )
       throws IOException, OS3Exception {
     S3GAction s3GAction = S3GAction.INIT_MULTIPART_UPLOAD;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucket,
-        "path", key
-    );
 
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
-      S3StorageType s3StorageType;
-      if (storageType == null || storageType.equals("")) {
-        s3StorageType = S3StorageType.getDefault(ozoneConfiguration);
-      } else {
-        s3StorageType = toS3StorageType(storageType);
-      }
-      ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      ReplicationConfig replicationConfig =
+          getReplicationConfig(ozoneBucket, storageType);
 
-      OmMultipartInfo multipartInfo = ozoneBucket
-          .initiateMultipartUpload(key, replicationType, replicationFactor);
+      OmMultipartInfo multipartInfo =
+          ozoneBucket.initiateMultipartUpload(key, replicationConfig);
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
@@ -598,13 +559,13 @@ public class ObjectEndpoint extends EndpointBase {
       multipartUploadInitiateResponse.setUploadID(multipartInfo.getUploadID());
 
       AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, auditParams));
+          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incInitMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incInitMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
@@ -614,9 +575,23 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
+  }
+
+  private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket,
+      String storageType) throws OS3Exception {
+    ReplicationConfig clientConfiguredReplicationConfig = null;
+    String replication = ozoneConfiguration.get(OZONE_REPLICATION);
+    if (replication != null) {
+      clientConfiguredReplicationConfig = ReplicationConfig.parse(
+          ReplicationType.valueOf(ozoneConfiguration
+              .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT)),
+          replication, ozoneConfiguration);
+    }
+    return S3Utils.resolveS3ClientSideReplicationConfig(storageType,
+        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig());
   }
 
   /**
@@ -630,11 +605,6 @@ public class ObjectEndpoint extends EndpointBase {
       CompleteMultipartUploadRequest multipartUploadRequest)
       throws IOException, OS3Exception {
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
-    Map<String, String> auditParams = genAuditParam(
-        "bucket", bucket,
-        "path", key,
-        "uploadId", uploadID
-    );
     OzoneBucket ozoneBucket = getBucket(bucket);
     // Using LinkedHashMap to preserve ordering of parts list.
     Map<Integer, String> partsMap = new LinkedHashMap<>();
@@ -661,13 +631,13 @@ public class ObjectEndpoint extends EndpointBase {
       // Location also setting as bucket name.
       completeMultipartUploadResponse.setLocation(bucket);
       AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, auditParams));
+          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incCompleteMultiPartUploadSuccess();
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incCompleteMultiPartUploadFailure();
       if (ex.getResult() == ResultCodes.INVALID_PART) {
         throw newError(S3ErrorTable.INVALID_PART, key, ex);
@@ -697,7 +667,7 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, auditParams, ex));
+          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     }
   }
@@ -818,9 +788,8 @@ public class ObjectEndpoint extends EndpointBase {
       listPartsResponse.setPartNumberMarker(partNumberMarker);
       listPartsResponse.setTruncated(false);
 
-      listPartsResponse.setStorageClass(S3StorageType.fromReplicationType(
-          ozoneMultipartUploadPartListParts.getReplicationType(),
-          ozoneMultipartUploadPartListParts.getReplicationFactor()).toString());
+      listPartsResponse.setStorageClass(S3StorageType.fromReplicationConfig(
+          ozoneMultipartUploadPartListParts.getReplicationConfig()).toString());
 
       if (ozoneMultipartUploadPartListParts.isTruncated()) {
         listPartsResponse.setTruncated(
@@ -858,10 +827,9 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private CopyObjectResponse copyObject(String copyHeader,
-                                        String destBucket,
+                                        OzoneBucket destBucket,
                                         String destkey,
-                                        ReplicationType replicationType,
-                                        ReplicationFactor replicationFactor,
+                                        ReplicationConfig replicationConfig,
                                         boolean storageTypeDefault)
       throws OS3Exception, IOException {
 
@@ -875,7 +843,8 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       // Checking whether we trying to copying to it self.
 
-      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)) {
+      if (sourceBucket.equals(destBucket.getName()) && sourceKey
+          .equals(destkey)) {
         // When copying to same storage type when storage type is provided,
         // we should not throw exception, as aws cli checks if any of the
         // options like storage type are provided or not when source and
@@ -901,15 +870,15 @@ public class ObjectEndpoint extends EndpointBase {
 
 
       OzoneBucket sourceOzoneBucket = getBucket(sourceBucket);
-      OzoneBucket destOzoneBucket = getBucket(destBucket);
+      OzoneBucket destOzoneBucket = destBucket;
 
       OzoneKeyDetails sourceKeyDetails = sourceOzoneBucket.getKey(sourceKey);
       long sourceKeyLen = sourceKeyDetails.getDataSize();
 
       sourceInputStream = sourceOzoneBucket.readKey(sourceKey);
 
-      destOutputStream = destOzoneBucket.createKey(destkey, sourceKeyLen,
-          replicationType, replicationFactor, new HashMap<>());
+      destOutputStream = destOzoneBucket
+          .createKey(destkey, sourceKeyLen, replicationConfig, new HashMap<>());
 
       IOUtils.copy(sourceInputStream, destOutputStream);
 
@@ -974,15 +943,6 @@ public class ObjectEndpoint extends EndpointBase {
       OS3Exception ex = newError(INVALID_ARGUMENT, header, e);
       ex.setErrorMessage("Copy Source header could not be url-decoded");
       throw ex;
-    }
-  }
-
-  private static S3StorageType toS3StorageType(String storageType)
-      throws OS3Exception {
-    try {
-      return S3StorageType.valueOf(storageType);
-    } catch (IllegalArgumentException ex) {
-      throw newError(INVALID_ARGUMENT, storageType, ex);
     }
   }
 

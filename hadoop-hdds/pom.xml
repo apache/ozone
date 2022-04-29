@@ -45,6 +45,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>docs</module>
     <module>config</module>
     <module>test-utils</module>
+    <module>erasurecode</module>
   </modules>
 
   <repositories>
@@ -103,6 +104,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-interface-admin</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-erasurecode</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 

@@ -142,7 +142,15 @@ public enum ContainerLayoutVersion {
       throw new StorageContainerException("Unable to get Chunks directory.",
           UNABLE_TO_FIND_DATA_DIR);
     }
-    return new File(chunksPath);
+
+    File chunksDir = new File(chunksPath);
+    if (!chunksDir.exists()) {
+      LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
+      throw new StorageContainerException("Chunks directory " +
+          chunksDir.getAbsolutePath() + " does not exist.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+    return chunksDir;
   }
 
 }

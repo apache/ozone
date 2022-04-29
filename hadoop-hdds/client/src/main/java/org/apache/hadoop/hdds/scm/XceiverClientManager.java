@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -230,6 +231,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             case STAND_ALONE:
               client = new XceiverClientGrpc(pipeline, conf, caCerts);
               break;
+            case EC:
+              client = new ECXceiverClientGrpc(pipeline, conf, caCerts);
+              break;
             case CHAINED:
             default:
               throw new IOException("not implemented" + pipeline.getType());
@@ -246,9 +250,16 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   private String getPipelineCacheKey(Pipeline pipeline, boolean forRead) {
     String key = pipeline.getId().getId().toString() + pipeline.getType();
-    if (topologyAwareRead && forRead) {
+    boolean isEC = pipeline.getReplicationConfig()
+        .getReplicationType() == HddsProtos.ReplicationType.EC;
+    if (topologyAwareRead && forRead || isEC) {
       try {
         key += pipeline.getClosestNode().getHostName();
+        if (isEC) {
+          // Currently EC uses standalone client.
+          key += pipeline.getClosestNode()
+              .getPort(DatanodeDetails.Port.Name.STANDALONE);
+        }
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
             e.getMessage());
