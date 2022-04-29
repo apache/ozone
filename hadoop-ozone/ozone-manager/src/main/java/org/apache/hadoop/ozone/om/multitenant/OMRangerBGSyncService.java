@@ -238,11 +238,11 @@ public class OMRangerBGSyncService extends BackgroundService {
   private void triggerRangerSyncOnce() {
     int attempt = 0;
     try {
-
+      // TODO: Acquire lock
       long currentOzoneServiceVerInDB = getOMDBRangerServiceVersion();
       long proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
       while (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
-
+        // TODO: Release lock
         if (++attempt > MAX_ATTEMPT) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Reached maximum number of attempts ({}). Abort",
@@ -269,6 +269,8 @@ public class OMRangerBGSyncService extends BackgroundService {
         // Submit Ratis Request to sync the new service version in OM DB
         setOMDBRangerServiceVersion(proposedOzoneServiceVerInDB);
 
+        // TODO: Acquire lock
+
         // Check Ranger ozone service version again
         currentOzoneServiceVerInDB = proposedOzoneServiceVerInDB;
         proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
@@ -277,6 +279,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       LOG.warn("Exception during Ranger Sync", e);
       // TODO: Check specific exception once switched to
       //  RangerRestMultiTenantAccessController
+//    } finally {
+//      // TODO: Release lock
     }
 
   }
@@ -329,9 +333,11 @@ public class OMRangerBGSyncService extends BackgroundService {
   private void executeOMDBToRangerSync(long baseVersion) throws IOException {
     clearPolicyAndRoleMaps();
 
+    // TODO: Acquire global lock
     loadAllPoliciesRolesFromRanger(baseVersion);
     loadAllRolesFromRanger();
     loadAllRolesFromOM();
+    // TODO: Release global lock
 
     // This should isolate policies into two groups
     // 1. mtRangerPoliciesTobeDeleted and
