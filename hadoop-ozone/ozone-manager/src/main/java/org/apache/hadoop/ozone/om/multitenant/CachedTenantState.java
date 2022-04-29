@@ -27,9 +27,7 @@ public class CachedTenantState {
   private final String tenantId;
   private final String tenantUserRoleName;
   private final String tenantAdminRoleName;
-  // Set of userPrincipal, accessId pairs
-//  private final Set<Pair<String, String>> tenantUserAccessIds;
-  // Map from accessId to
+  // accessId -> userPrincipal and isAdmin flag
   private final HashMap<String, CachedAccessIdInfo> accessIdInfoMap;
 
   public String getTenantUserRoleName() {
@@ -45,7 +43,11 @@ public class CachedTenantState {
    */
   public static class CachedAccessIdInfo {
     private final String userPrincipal;
-    private final boolean isAdmin;
+    /**
+     * Stores if the accessId is a tenant admin
+     * (whether delegated or not doesn't matter here)
+     */
+    private boolean isAdmin;
 
     public CachedAccessIdInfo(String userPrincipal, boolean isAdmin) {
       this.userPrincipal = userPrincipal;
@@ -56,41 +58,29 @@ public class CachedTenantState {
       return userPrincipal;
     }
 
-    public boolean isAdmin() {
+    public void setIsAdmin(boolean isAdmin) {
+      this.isAdmin = isAdmin;
+    }
+
+    public boolean getIsAdmin() {
       return isAdmin;
     }
   }
-
-  /**
-   * This constructor initializes the user role name and admin role name to the
-   * default value.
-   * This constructor should ONLY be used in tests.
-   */
-//  public CachedTenantState(String tenantId) {
-//    this(tenantId,
-//        OMMultiTenantManager.getDefaultUserRoleName(tenantId),
-//        OMMultiTenantManager.getDefaultAdminRoleName(tenantId));
-//  }
 
   public CachedTenantState(String tenantId,
       String tenantUserRoleName, String tenantAdminRoleName) {
     this.tenantId = tenantId;
     this.tenantUserRoleName = tenantUserRoleName;
     this.tenantAdminRoleName = tenantAdminRoleName;
-//    this.tenantUserAccessIds = new HashSet<>();
     this.accessIdInfoMap = new HashMap<>();
-  }
-
-//  public Set<Pair<String, String>> getTenantUsers() {
-//    return tenantUserAccessIds;
-//  }
-
-  public HashMap<String, CachedAccessIdInfo> getAccessIdInfoMap() {
-    return accessIdInfoMap;
   }
 
   public String getTenantId() {
     return tenantId;
+  }
+
+  public HashMap<String, CachedAccessIdInfo> getAccessIdInfoMap() {
+    return accessIdInfoMap;
   }
 
   public boolean isTenantEmpty() {

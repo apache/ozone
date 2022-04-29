@@ -493,20 +493,14 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
-  private void loadAllRolesFromCache() throws IOException {
-
-    if (!(multiTenantManager instanceof OMMultiTenantManagerImpl)) {
-      throw new OMException("Cache is not supported for " +
-          multiTenantManager.getClass().getSimpleName(),
-          OMException.ResultCodes.INTERNAL_ERROR);
-    }
+  private void loadAllRolesFromCache() {
 
     final OMMultiTenantManagerImpl impl =
         (OMMultiTenantManagerImpl) multiTenantManager;
     final Map<String, CachedTenantState> tenantCache = impl.getTenantCache();
 
+    // tenantId -> CachedTenantState
     for (Map.Entry<String, CachedTenantState> e1 : tenantCache.entrySet()) {
-      final String tenantId = e1.getKey();
       final CachedTenantState cachedTenantState = e1.getValue();
 
       final String userRoleName = cachedTenantState.getTenantUserRoleName();
@@ -515,13 +509,13 @@ public class OMRangerBGSyncService extends BackgroundService {
       final Map<String, CachedAccessIdInfo> accessIdInfoMap =
           cachedTenantState.getAccessIdInfoMap();
 
+      // accessId -> CachedAccessIdInfo
       for (Map.Entry<String, CachedAccessIdInfo> e2 :
           accessIdInfoMap.entrySet()) {
-        final String accessId = e2.getKey();
         final CachedAccessIdInfo cachedAccessIdInfo = e2.getValue();
 
         final String userPrincipal = cachedAccessIdInfo.getUserPrincipal();
-        final boolean isAdmin = cachedAccessIdInfo.isAdmin();
+        final boolean isAdmin = cachedAccessIdInfo.getIsAdmin();
 
         addUserToMtOMDBRoles(userRoleName, userPrincipal);
 
