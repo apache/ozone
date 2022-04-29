@@ -34,12 +34,15 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
+import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.om.multitenant.CachedTenantState.CachedAccessIdInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerServiceVersionSyncRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -66,6 +69,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   private final OzoneManager ozoneManager;
   private final OMMetadataManager metadataManager;
+  private final OMMultiTenantManager multiTenantManager;
   private final MultiTenantAccessAuthorizer authorizer;
 
   // Maximum number of attempts for each sync run
@@ -152,8 +156,10 @@ public class OMRangerBGSyncService extends BackgroundService {
     super("OMRangerBGSyncService", interval, unit, 1, serviceTimeout);
 
     this.ozoneManager = ozoneManager;
-    this.authorizer = authorizer;
     this.metadataManager = ozoneManager.getMetadataManager();
+    this.multiTenantManager = ozoneManager.getMultiTenantManager();
+
+    this.authorizer = authorizer;
 
     if (authorizer != null) {
       if (authorizer instanceof MultiTenantAccessAuthorizerRangerPlugin) {
@@ -322,7 +328,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     loadAllPoliciesRolesFromRanger(baseVersion);
     loadAllRolesFromRanger();
-    loadAllRolesFromOMDB();
+    loadAllRolesFromOM();
 
     // This should isolate policies into two groups
     // 1. mtRangerPoliciesTobeDeleted and
@@ -477,7 +483,56 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
-  private void loadAllRolesFromOMDB() throws IOException {
+  private void loadAllRolesFromOM() throws IOException {
+    if (multiTenantManager instanceof OMMultiTenantManagerImpl) {
+      loadAllRolesFromCache();
+    } else {
+      LOG.warn("Cache is not supported for {}. Loading roles directly from DB",
+          multiTenantManager.getClass().getSimpleName());
+      loadAllRolesFromDB();
+    }
+  }
+
+  private void loadAllRolesFromCache() throws IOException {
+
+    if (!(multiTenantManager instanceof OMMultiTenantManagerImpl)) {
+      throw new OMException("Cache is not supported for " +
+          multiTenantManager.getClass().getSimpleName(),
+          OMException.ResultCodes.INTERNAL_ERROR);
+    }
+
+    final OMMultiTenantManagerImpl impl =
+        (OMMultiTenantManagerImpl) multiTenantManager;
+    final Map<String, CachedTenantState> tenantCache = impl.getTenantCache();
+
+    for (Map.Entry<String, CachedTenantState> e1 : tenantCache.entrySet()) {
+      final String tenantId = e1.getKey();
+      final CachedTenantState cachedTenantState = e1.getValue();
+
+      final String userRoleName = cachedTenantState.getTenantUserRoleName();
+      final String adminRoleName = cachedTenantState.getTenantAdminRoleName();
+
+      final Map<String, CachedAccessIdInfo> accessIdInfoMap =
+          cachedTenantState.getAccessIdInfoMap();
+
+      for (Map.Entry<String, CachedAccessIdInfo> e2 :
+          accessIdInfoMap.entrySet()) {
+        final String accessId = e2.getKey();
+        final CachedAccessIdInfo cachedAccessIdInfo = e2.getValue();
+
+        final String userPrincipal = cachedAccessIdInfo.getUserPrincipal();
+        final boolean isAdmin = cachedAccessIdInfo.isAdmin();
+
+        addUserToMtOMDBRoles(userRoleName, userPrincipal);
+
+        if (isAdmin) {
+          addUserToMtOMDBRoles(adminRoleName, userPrincipal);
+        }
+      }
+    }
+  }
+
+  private void loadAllRolesFromDB() throws IOException {
     // We have the following in OM DB
     //  tenantStateTable: tenantId -> TenantState (has user and admin role name)
     //  tenantAccessIdTable : accessId -> OmDBAccessIdInfo

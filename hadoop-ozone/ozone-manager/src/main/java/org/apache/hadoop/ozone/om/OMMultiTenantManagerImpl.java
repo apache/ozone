@@ -79,7 +79,6 @@ import org.apache.http.auth.BasicUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 /**
@@ -817,8 +816,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return tenantCache.get(tenantId).isTenantEmpty();
   }
 
-  @VisibleForTesting
-  Map<String, CachedTenantState> getTenantCache() {
+  public Map<String, CachedTenantState> getTenantCache() {
     return tenantCache;
   }
 }
