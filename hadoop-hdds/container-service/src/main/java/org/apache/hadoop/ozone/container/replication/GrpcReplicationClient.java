@@ -130,13 +130,20 @@ public class GrpcReplicationClient implements AutoCloseable {
   }
 
   public CompletableFuture<List<BlockData>> listBlock(
+      long containerId, String datanodeUUID, int count) {
+    return listBlock(containerId, datanodeUUID, -1, count);
+  }
+
+  public CompletableFuture<List<BlockData>> listBlock(
       long containerId, String datanodeUUID, long start, int count) {
 
-    ListBlockRequestProto request =
+    ListBlockRequestProto.Builder requestBuilder =
         ListBlockRequestProto.newBuilder()
-            .setStartLocalID(start)
-            .setCount(count)
-            .build();
+            .setCount(count);
+    if (start >= 0) {
+      requestBuilder.setStartLocalID(start);
+    }
+    ListBlockRequestProto request = requestBuilder.build();
 
     ContainerCommandRequestProto command =
         ContainerCommandRequestProto.newBuilder()
