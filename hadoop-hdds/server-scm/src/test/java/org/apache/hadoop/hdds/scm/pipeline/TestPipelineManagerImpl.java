@@ -545,8 +545,7 @@ public class TestPipelineManagerImpl {
   public void testScrubPipelines() throws Exception {
     // Allocated pipelines should not be scrubbed for 50 seconds.
     conf.setTimeDuration(
-        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50000,
-        TimeUnit.MILLISECONDS);
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     pipelineManager.setScmContext(scmContext);
@@ -597,8 +596,7 @@ public class TestPipelineManagerImpl {
 
     pipelineManager.scrubPipelines();
 
-    // The allocatedPipeline should not be scrubbed as the interval has not
-    // yet passed.
+    // The allocatedPipeline should now be scrubbed as the interval has passed
     Assert.assertFalse(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
@@ -609,10 +607,8 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testScrubPipelinesShouldFailOnFollower() throws Exception {
-    // No timeout for pipeline scrubber.
     conf.setTimeDuration(
-        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10000,
-        TimeUnit.MILLISECONDS);
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     pipelineManager.setScmContext(scmContext);

@@ -55,9 +55,8 @@ public class TestBackgroundPipelineScrubber {
     this.pipelineManager = mock(PipelineManager.class);
     doNothing().when(pipelineManager).scrubPipelines();
 
-    // no initial delay after exit safe mode
     this.conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "50000ms");
+    conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "50s");
 
     this.scrubber = new BackgroundPipelineScrubber(pipelineManager, conf,
         scmContext, testClock);
