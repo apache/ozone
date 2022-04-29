@@ -164,7 +164,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
           deletedOpenKeys.put(fullKeyName, omKeyInfo);
 
-          // Update table cache.
+          // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
               new CacheKey<>(fullKeyName),
               new CacheValue<>(Optional.absent(), trxnLogIndex));
