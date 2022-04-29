@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
@@ -50,11 +51,6 @@ public final class StatefulServiceStateManagerImpl
   @Override
   public void saveConfiguration(String serviceName, ByteString bytes)
       throws IOException {
-    // do we need a write lock here?
-    // do we need the buffer here or should we directly put the key-value?
-    /*
-    Alternative: statefulServiceConfig.put(serviceName, bytes);
-     */
     transactionBuffer.addToBuffer(statefulServiceConfig, serviceName, bytes);
     if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
       SCMHADBTransactionBuffer buffer =
@@ -68,7 +64,6 @@ public final class StatefulServiceStateManagerImpl
    */
   @Override
   public ByteString readConfiguration(String serviceName) throws IOException {
-    // do we need a read lock here?
     return statefulServiceConfig.get(serviceName);
   }
 
@@ -110,6 +105,10 @@ public final class StatefulServiceStateManagerImpl
     }
 
     public StatefulServiceStateManager build() {
+      Preconditions.checkNotNull(statefulServiceConfig);
+      Preconditions.checkNotNull(transactionBuffer);
+      Preconditions.checkNotNull(scmRatisServer);
+
       final StatefulServiceStateManager stateManager =
           new StatefulServiceStateManagerImpl(statefulServiceConfig,
               transactionBuffer);

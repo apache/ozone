@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.protobuf.Message;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * A StatefulService is an SCMService that persists configuration to RocksDB.
@@ -39,12 +42,13 @@ public abstract class StatefulService implements SCMService {
   }
 
   /**
-   * Persists the specified {@link Message} configurationMessage to RocksDB
-   * with this service's {@link SCMService#getServiceName()} as the key.
-   * @param configurationMessage configuration Message to persist
+   * Persists the specified {@link GeneratedMessage} configurationMessage
+   * to RocksDB with this service's {@link SCMService#getServiceName()} as the
+   * key.
+   * @param configurationMessage configuration GeneratedMessage to persist
    * @throws IOException on failure to persist configuration
    */
-  protected final void saveConfiguration(Message configurationMessage)
+  protected final void saveConfiguration(GeneratedMessage configurationMessage)
       throws IOException {
     stateManager.saveConfiguration(getServiceName(),
         configurationMessage.toByteString());
@@ -54,14 +58,23 @@ public abstract class StatefulService implements SCMService {
    * Reads persisted configuration mapped to this service's
    * {@link SCMService#getServiceName()} name.
    *
-   * @param defaultInstanceForType the
-   * {@link Message#getDefaultInstanceForType()} for this message's actual type
-   * @return the persisted {@link Message} that can be cast to the required type
-   * @throws IOException on failure
+   * @param configType the Class object of the protobuf message type
+   * @param <T> the Type of the protobuf message
+   * @return persisted protobuf message
+   * @throws IOException on failure to fetch the message from DB or when
+   * parsing it. ensure the specified configType is correct
    */
-  protected final Message readConfiguration(Message defaultInstanceForType)
-      throws IOException {
-    return defaultInstanceForType.getParserForType()
-        .parseFrom(stateManager.readConfiguration(getServiceName()));
+  protected final <T extends GeneratedMessage> T readConfiguration(Class<T> configType)
+          throws IOException {
+    try {
+      return configType.cast(ReflectionUtil.getMethod(configType,
+                      "parseFrom", ByteString.class)
+              .invoke(null, stateManager.readConfiguration(getServiceName())));
+    } catch (NoSuchMethodException | IllegalAccessException
+            | InvocationTargetException e) {
+      e.printStackTrace();
+      throw new InvalidProtocolBufferException("GeneratedMessage cannot " +
+              "be parsed for type " + configType + ": " + e.getMessage());
+    }
   }
 }
