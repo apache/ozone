@@ -138,7 +138,7 @@ message SCMHeartbeatRequestProto {
   optional PipelineActionsProto pipelineActions = 7;
   optional PipelineReportsProto pipelineReports = 8;
   optional LayoutVersionProto dataNodeLayoutVersion = 9;
-  optional CommandQueueReportProto queuedCommandReport = 10;
+  optional CommandQueueReportProto commandQueueReport = 10;
 }
 
 message CommandQueueReportProto {
@@ -309,6 +309,7 @@ message PipelineAction {
  */
 message SCMCommandProto {
   enum Type {
+    unknownScmCommand = 0;
     reregisterCommand = 1;
     deleteBlocksCommand = 2;
     closeContainerCommand = 3;
