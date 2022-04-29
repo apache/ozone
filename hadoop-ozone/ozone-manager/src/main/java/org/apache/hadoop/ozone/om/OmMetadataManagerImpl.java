@@ -587,6 +587,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return openKey;
   }
 
+  private static long getClientID(String dbOpenKeyName) {
+    int beginIndex = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX) + 1;
+    String clientID = dbOpenKeyName.substring(beginIndex);
+    return Long.parseLong(clientID);
+  }
+
   @Override
   public String getMultipartKey(String volume, String bucket, String key,
                                 String
@@ -1214,8 +1220,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       while (count < limit && keyValueTableIterator.hasNext()) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String dbOpenKeyName = openKeyValue.getKey();
-        long clientID = Long.parseLong(dbOpenKeyName.substring(
-            dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX) + 1));
+        long clientID = getClientID(dbOpenKeyName);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
         if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
