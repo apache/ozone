@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -55,6 +56,8 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
@@ -430,8 +433,21 @@ public class OMRangerBGSyncService extends BackgroundService {
       final Table.KeyValue<String, OmDBTenantState> tableKeyValue =
           tenantStateTableIter.next();
       final OmDBTenantState dbTenantState = tableKeyValue.getValue();
-      mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName());
-      mtRangerPoliciesOpHelper(dbTenantState.getBucketPolicyName());
+      final String volumeName = dbTenantState.getBucketNamespaceName();
+      Preconditions.checkNotNull(volumeName);
+
+      boolean acquiredVolumeLock = false;
+      try {
+        acquiredVolumeLock = metadataManager.getLock().acquireWriteLock(
+            VOLUME_LOCK, volumeName);
+
+        mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName());
+        mtRangerPoliciesOpHelper(dbTenantState.getBucketPolicyName());
+      } finally {
+        if (acquiredVolumeLock) {
+          metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+        }
+      }
     }
 
     for (Map.Entry<String, String> entry :
@@ -571,7 +587,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   private void processAllRolesFromOMDB() throws IOException {
     // Lets First make sure that all the Roles in OMDB are present in Ranger
     // as well as the corresponding userlist matches matches.
-    for (Map.Entry<String, HashSet<String>> entry: mtOMDBRoles.entrySet()) {
+    for (Map.Entry<String, HashSet<String>> entry : mtOMDBRoles.entrySet()) {
       final String roleName = entry.getKey();
       boolean pushRoleToRanger = false;
       if (mtRangerRoles.containsKey(roleName)) {
@@ -607,7 +623,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       mtRangerRoles.remove(roleName);
     }
 
-    for (String roleName: mtRangerRoles.keySet()) {
+    for (String roleName : mtRangerRoles.keySet()) {
       authorizer.deleteRole(new JsonParser().parse(authorizer.getRole(roleName))
           .getAsJsonObject().get("id").getAsString());
     }
