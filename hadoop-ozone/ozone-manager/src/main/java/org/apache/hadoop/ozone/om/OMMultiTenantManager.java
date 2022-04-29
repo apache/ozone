@@ -70,9 +70,12 @@ public interface OMMultiTenantManager {
    * Given a TenantID String, Create and return Tenant Interface.
    *
    * @param tenantID
+   * @param userRoleName
+   * @param adminRoleName
    * @return Tenant interface.
    */
-  Tenant createTenantAccessInAuthorizer(String tenantID) throws IOException;
+  Tenant createTenantAccessInAuthorizer(String tenantID, String userRoleName,
+      String adminRoleName) throws IOException;
 
   /**
    * Given a TenantID, destroys all state associated with that tenant.
@@ -97,10 +100,10 @@ public interface OMMultiTenantManager {
 
   /**
    * Revoke user accessId.
-   * @param accessID
+   * @param accessId
    * @throws IOException
    */
-  void revokeUserAccessId(String accessID) throws IOException;
+  void revokeUserAccessId(String accessId) throws IOException;
 
   /**
    * A placeholder method to remove a failed-to-assign accessId from

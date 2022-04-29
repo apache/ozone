@@ -1492,6 +1492,8 @@ message RevokeS3SecretRequest {
 message CreateTenantRequest {
     optional string tenantId = 1;  // Tenant name
     optional string volumeName = 2;
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
 }
 
 message RangerServiceVersionSyncRequest {

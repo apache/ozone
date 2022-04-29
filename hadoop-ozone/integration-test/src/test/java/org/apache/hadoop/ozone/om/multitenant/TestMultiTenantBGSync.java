@@ -190,13 +190,12 @@ public class TestMultiTenantBGSync {
     framework().clearInlineMocks();
   }
 
-  private AccessPolicy createVolumeAccessPolicy(String vol, String tnt)
+  private AccessPolicy createVolumeAccessPolicy(String vol, String tenantId)
       throws IOException {
-    OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tnt);
+    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        // principal already contains volume name
-        principal.getName() + "VolumeAccess");
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId));
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(VOLUME).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("").setKeyName("").build();
@@ -207,13 +206,12 @@ public class TestMultiTenantBGSync {
     return tenantVolumeAccessPolicy;
   }
 
-  private AccessPolicy allowCreateBucketPolicy(String vol, String tnt)
+  private AccessPolicy allowCreateBucketPolicy(String vol, String tenantId)
       throws IOException {
-    OzoneTenantRolePrincipal principal =
-        OzoneTenantRolePrincipal.getUserRole(tnt);
+    OzoneTenantRolePrincipal principal = new OzoneTenantRolePrincipal(
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId));
     AccessPolicy tenantVolumeAccessPolicy = new RangerAccessPolicy(
-        // principal already contains volume name
-        principal.getName() + "BucketAccess");
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId));
     OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(BUCKET).setStoreType(OZONE).setVolumeName(vol)
         .setBucketName("*").setKeyName("").build();
@@ -231,8 +229,8 @@ public class TestMultiTenantBGSync {
     roleIdsCreated.clear();
 
     Assert.assertTrue(policyNamesCreated.size() == 0);
-    OzoneTenantRolePrincipal role2Principal =
-        OzoneTenantRolePrincipal.getUserRole("tenant1");
+    OzoneTenantRolePrincipal role2Principal = new OzoneTenantRolePrincipal(
+        OMMultiTenantManager.getDefaultUserRoleName("tenant1"));
     try {
       omm.createRole(role2Principal.getName(), null);
       String role2 = omm.getRole(role2Principal);

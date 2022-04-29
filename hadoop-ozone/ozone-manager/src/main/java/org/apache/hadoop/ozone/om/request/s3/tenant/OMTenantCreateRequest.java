@@ -164,16 +164,23 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             .setModificationTime(initialTime)
             .build();
 
+    final String userRoleName =
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+    final String adminRoleName =
+        OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
+
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
     tenantInContext = ozoneManager.getMultiTenantManager()
-        .createTenantAccessInAuthorizer(tenantId);
+        .createTenantAccessInAuthorizer(tenantId, userRoleName, adminRoleName);
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantId(tenantId)
-                .setVolumeName(volumeName))
+                .setVolumeName(volumeName)
+                .setUserRoleName(userRoleName)
+                .setAdminRoleName(adminRoleName))
         .setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         // TODO: Can the three lines below be ignored?
@@ -222,14 +229,19 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String owner = getOmRequest().getUserInfo().getUserName();
     Map<String, String> auditMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
     final CreateTenantRequest request = getOmRequest().getCreateTenantRequest();
     final String tenantId = request.getTenantId();
+    final String userRoleName = request.getUserRoleName();
+    final String adminRoleName = request.getAdminRoleName();
+
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
     Preconditions.checkState(request.getVolumeName().equals(volumeName),
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
+
     IOException exception = null;
 
     try {
@@ -290,10 +302,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
       final String bucketPolicyName =
           OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
-      final String userRoleName =
-          OMMultiTenantManager.getDefaultUserRoleName(tenantId);
-      final String adminRoleName =
-          OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
       final OmDBTenantState omDBTenantState = new OmDBTenantState(
           tenantId, bucketNamespaceName, userRoleName, adminRoleName,
           bucketNamespacePolicyName, bucketPolicyName);

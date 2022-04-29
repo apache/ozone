@@ -265,8 +265,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
       }
     } catch (IOException e) {
-      LOG.warn("Exception during Ranger Sync: {}. Stacktrace: {}",
-          e.getMessage(), e.getStackTrace());
+      LOG.warn("Exception during Ranger Sync", e);
       // TODO: Check specific exception once switched to
       //  RangerRestMultiTenantAccessController
     }
