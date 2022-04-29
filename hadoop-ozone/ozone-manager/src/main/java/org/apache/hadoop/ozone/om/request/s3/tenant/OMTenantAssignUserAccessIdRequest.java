@@ -148,6 +148,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     // Below call implies user existence check in authorizer.
     // If the user doesn't exist, Ranger return 400 and the call should throw.
 
+    // TODO: Acquire some lock
     // Call OMMTM
     // Inform MultiTenantManager of user assignment so it could
     //  initialize some policies in Ranger.
@@ -231,7 +232,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String tenantId = request.getTenantId();
     final String userPrincipal = request.getUserPrincipal();
 
-    assert (accessId.equals(request.getAccessId()));
+    Preconditions.checkState(accessId.equals(request.getAccessId()));
     IOException exception = null;
 
     String volumeName = null;
@@ -353,6 +354,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Audit

@@ -125,8 +125,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           ResultCodes.PERMISSION_DENIED);
     }
 
+    // TODO: Acquire some lock
     // Call OMMTM to revoke user access to tenant
-    // TODO: Check destroyUser() behavior
     ozoneManager.getMultiTenantManager().revokeUserAccessId(accessId);
 
     final Builder omRequestBuilder = getOmRequest().toBuilder()
@@ -233,6 +233,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Audit

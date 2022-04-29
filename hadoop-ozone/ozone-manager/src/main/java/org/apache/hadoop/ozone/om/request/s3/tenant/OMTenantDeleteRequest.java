@@ -72,6 +72,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     // Check Ozone cluster admin privilege
     ozoneManager.getMultiTenantManager().checkAdmin();
 
+    // TODO: Acquire some lock
     // TODO: TBD: Call ozoneManager.getMultiTenantManager().deleteTenant() ?
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo()).build();
@@ -187,6 +188,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Perform audit logging

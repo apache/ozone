@@ -114,9 +114,10 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_TENANT_ID);
     }
 
-    // TODO: Call OMMTM to remove user from admin group of the tenant.
-    // The call should remove user (not accessId) from the tenant's admin group
-    // ozoneManager.getMultiTenantManager().revokeTenantAdmin();
+    // TODO: Acquire some lock
+    // Call OMMTM to remove user from admin group of the tenant.
+    // The call should remove user (not accessId) from the tenant's admin role
+    ozoneManager.getMultiTenantManager().revokeTenantAdmin(accessId);
 
     final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
@@ -212,6 +213,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Audit

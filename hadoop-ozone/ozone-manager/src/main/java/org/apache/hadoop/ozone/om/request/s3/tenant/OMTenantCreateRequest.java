@@ -169,6 +169,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String adminRoleName =
         OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
 
+    // TODO: Acquire some lock
+
     // If we fail after pre-execute. handleRequestFailure() callback
     // would clean up any state maintained by the getMultiTenantManager.
     tenantInContext = ozoneManager.getMultiTenantManager()
@@ -345,6 +347,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Perform audit logging

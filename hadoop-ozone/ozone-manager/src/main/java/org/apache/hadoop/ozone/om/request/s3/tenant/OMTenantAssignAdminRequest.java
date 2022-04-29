@@ -121,6 +121,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       delegated = true;
     }
 
+    // TODO: Acquire some lock
     // Call OMMTM to add user to tenant admin role
     ozoneManager.getMultiTenantManager().assignTenantAdmin(
         request.getAccessId(), delegated);
@@ -234,6 +235,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
       }
+      // TODO: Release some lock
     }
 
     // Audit
