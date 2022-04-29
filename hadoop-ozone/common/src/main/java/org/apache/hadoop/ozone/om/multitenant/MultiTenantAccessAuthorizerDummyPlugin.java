@@ -53,8 +53,8 @@ public class MultiTenantAccessAuthorizerDummyPlugin implements
 
   @Override
   public String revokeUserFromRole(BasicUserPrincipal principal,
-                                   String existingRole) throws IOException {
-    return null;
+      String existingRole) {
+    return "roleId";
   }
 
   @Override

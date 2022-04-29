@@ -499,31 +499,38 @@ public class OMRangerBGSyncService extends BackgroundService {
         (OMMultiTenantManagerImpl) multiTenantManager;
     final Map<String, CachedTenantState> tenantCache = impl.getTenantCache();
 
-    // tenantCache: tenantId -> CachedTenantState
-    for (Map.Entry<String, CachedTenantState> e1 : tenantCache.entrySet()) {
-      final CachedTenantState cachedTenantState = e1.getValue();
+    impl.acquireTenantCacheReadLock();
 
-      final String userRoleName = cachedTenantState.getTenantUserRoleName();
-      final String adminRoleName = cachedTenantState.getTenantAdminRoleName();
+    try {
+      // tenantCache: tenantId -> CachedTenantState
+      for (Map.Entry<String, CachedTenantState> e1 : tenantCache.entrySet()) {
+        final CachedTenantState cachedTenantState = e1.getValue();
 
-      final Map<String, CachedAccessIdInfo> accessIdInfoMap =
-          cachedTenantState.getAccessIdInfoMap();
+        final String userRoleName = cachedTenantState.getTenantUserRoleName();
+        final String adminRoleName = cachedTenantState.getTenantAdminRoleName();
 
-      // accessIdInfoMap: accessId -> CachedAccessIdInfo
-      for (Map.Entry<String, CachedAccessIdInfo> e2 :
-          accessIdInfoMap.entrySet()) {
-        final CachedAccessIdInfo cachedAccessIdInfo = e2.getValue();
+        final Map<String, CachedAccessIdInfo> accessIdInfoMap =
+            cachedTenantState.getAccessIdInfoMap();
 
-        final String userPrincipal = cachedAccessIdInfo.getUserPrincipal();
-        final boolean isAdmin = cachedAccessIdInfo.getIsAdmin();
+        // accessIdInfoMap: accessId -> CachedAccessIdInfo
+        for (Map.Entry<String, CachedAccessIdInfo> e2 :
+            accessIdInfoMap.entrySet()) {
+          final CachedAccessIdInfo cachedAccessIdInfo = e2.getValue();
 
-        addUserToMtOMDBRoles(userRoleName, userPrincipal);
+          final String userPrincipal = cachedAccessIdInfo.getUserPrincipal();
+          final boolean isAdmin = cachedAccessIdInfo.getIsAdmin();
 
-        if (isAdmin) {
-          addUserToMtOMDBRoles(adminRoleName, userPrincipal);
+          addUserToMtOMDBRoles(userRoleName, userPrincipal);
+
+          if (isAdmin) {
+            addUserToMtOMDBRoles(adminRoleName, userPrincipal);
+          }
         }
       }
+    } finally {
+      impl.releaseTenantCacheReadLock();
     }
+
   }
 
   private void loadAllRolesFromDB() throws IOException {

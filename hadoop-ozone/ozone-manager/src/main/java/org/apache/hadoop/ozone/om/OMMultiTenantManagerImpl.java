@@ -98,19 +98,19 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   private final OzoneManager ozoneManager;
   private final OMMetadataManager omMetadataManager;
   private final OzoneConfiguration conf;
-  private final ReentrantReadWriteLock tenantCacheLock;
   // tenantCache: tenantId -> CachedTenantState
   private final Map<String, CachedTenantState> tenantCache;
-  private OMRangerBGSyncService omRangerBGSyncService;
+  private final ReentrantReadWriteLock tenantCacheLock;
+  private final OMRangerBGSyncService omRangerBGSyncService;
 
   public OMMultiTenantManagerImpl(OzoneManager ozoneManager,
                                   OzoneConfiguration conf)
       throws IOException {
     this.conf = conf;
-    this.tenantCacheLock = new ReentrantReadWriteLock();
     this.ozoneManager = ozoneManager;
     this.omMetadataManager = ozoneManager.getMetadataManager();
     this.tenantCache = new ConcurrentHashMap<>();
+    this.tenantCacheLock = new ReentrantReadWriteLock();
 
     loadTenantCacheFromDB();
 
@@ -265,13 +265,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       tenantCache.put(tenantId, new CachedTenantState(
           tenantId, userRoleName, adminRoleName));
 
-    } catch (Exception e) {
+    } catch (IOException e) {
       try {
         removeTenantAccessFromAuthorizer(tenant);
-      } catch (Exception exception) {
+      } catch (IOException ignored) {
         // Best effort cleanup.
       }
-      throw new IOException(e.getMessage());
+      throw e;
     } finally {
       tenantCacheLock.writeLock().unlock();
     }
@@ -279,7 +279,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   }
 
   @Override
-  public void removeTenantAccessFromAuthorizer(Tenant tenant) throws Exception {
+  public void removeTenantAccessFromAuthorizer(Tenant tenant)
+      throws IOException {
     try {
       tenantCacheLock.writeLock().lock();
       for (AccessPolicy policy : tenant.getTenantAccessPolicies()) {
@@ -293,7 +294,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
             tenant.getTenantId());
         tenantCache.remove(tenant.getTenantId());
       }
-    }  finally {
+    } finally {
       tenantCacheLock.writeLock().unlock();
     }
   }
@@ -846,5 +847,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   public Map<String, CachedTenantState> getTenantCache() {
     return tenantCache;
+  }
+
+  public void acquireTenantCacheReadLock() {
+    tenantCacheLock.readLock().lock();
+  }
+
+  public void releaseTenantCacheReadLock() {
+    tenantCacheLock.readLock().unlock();
   }
 }

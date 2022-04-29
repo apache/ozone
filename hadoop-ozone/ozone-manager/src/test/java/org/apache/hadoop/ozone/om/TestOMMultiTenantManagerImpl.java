@@ -52,7 +52,7 @@ import org.mockito.Mockito;
 public class TestOMMultiTenantManagerImpl {
 
   private OMMultiTenantManagerImpl tenantManager;
-  private static String tenantId = "tenant1";
+  private static final String TENANT_ID = "tenant1";
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -65,23 +65,23 @@ public class TestOMMultiTenantManagerImpl {
     conf.set(OZONE_OM_TENANT_DEV_SKIP_RANGER, "true");
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
 
-    final String bucketNamespaceName = tenantId;
+    final String bucketNamespaceName = TENANT_ID;
     final String bucketNamespacePolicyName =
-        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(TENANT_ID);
     final String bucketPolicyName =
-        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
+        OMMultiTenantManager.getDefaultBucketPolicyName(TENANT_ID);
     final String userRoleName =
-        OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+        OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID);
     final String adminRoleName =
-        OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
-    final OmDBTenantState omDBTenantState = new OmDBTenantState(tenantId,
+        OMMultiTenantManager.getDefaultAdminRoleName(TENANT_ID);
+    final OmDBTenantState omDBTenantState = new OmDBTenantState(TENANT_ID,
         bucketNamespaceName, userRoleName, adminRoleName,
         bucketNamespacePolicyName, bucketPolicyName);
 
-    omMetadataManager.getTenantStateTable().put(tenantId, omDBTenantState);
+    omMetadataManager.getTenantStateTable().put(TENANT_ID, omDBTenantState);
 
     omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
-        new OmDBAccessIdInfo(tenantId, "seed-user1", false, false));
+        new OmDBAccessIdInfo(TENANT_ID, "seed-user1", false, false));
 
     OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
     Mockito.when(ozoneManager.getMetadataManager())
@@ -100,19 +100,17 @@ public class TestOMMultiTenantManagerImpl {
 
     tenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
     assertEquals(1, tenantManager.getTenantCache().size());
-//    assertEquals(1, tenantManager.getTenantCache().get(tenantId)
-//        .getTenantUsers().size());
-    assertEquals(1, tenantManager.getTenantCache().get(tenantId)
+    assertEquals(1, tenantManager.getTenantCache().get(TENANT_ID)
         .getAccessIdInfoMap().size());
   }
 
   @Test
   public void testListUsersInTenant() throws Exception {
     tenantManager.assignUserToTenant(
-        new BasicUserPrincipal("user1"), tenantId, "accessId1");
+        new BasicUserPrincipal("user1"), TENANT_ID, "accessId1");
 
     TenantUserList tenantUserList =
-        tenantManager.listUsersInTenant(tenantId, "");
+        tenantManager.listUsersInTenant(TENANT_ID, "");
     List<UserAccessIdInfo> userAccessIds = tenantUserList.getUserAccessIds();
     assertEquals(2, userAccessIds.size());
 
@@ -132,7 +130,7 @@ public class TestOMMultiTenantManagerImpl {
           tenantManager.listUsersInTenant("tenant2", null);
         });
 
-    assertTrue(tenantManager.listUsersInTenant(tenantId, "abc")
+    assertTrue(tenantManager.listUsersInTenant(TENANT_ID, "abc")
         .getUserAccessIds().isEmpty());
   }
 
@@ -144,11 +142,9 @@ public class TestOMMultiTenantManagerImpl {
     assertEquals(1, tenantManager.getTenantCache().size());
 
     tenantManager.revokeUserAccessId("seed-accessId1");
-//    assertTrue(tenantManager.getTenantCache().get(tenantId)
-//        .getTenantUsers().isEmpty());
-    assertTrue(tenantManager.getTenantCache().get(tenantId)
+    assertTrue(tenantManager.getTenantCache().get(TENANT_ID)
         .getAccessIdInfoMap().isEmpty());
-    assertTrue(tenantManager.listUsersInTenant(tenantId, null)
+    assertTrue(tenantManager.listUsersInTenant(TENANT_ID, null)
         .getUserAccessIds().isEmpty());
   }
 
@@ -157,6 +153,6 @@ public class TestOMMultiTenantManagerImpl {
     Optional<String> optionalTenant = tenantManager.getTenantForAccessID(
         "seed-accessId1");
     assertTrue(optionalTenant.isPresent());
-    assertEquals(tenantId, optionalTenant.get());
+    assertEquals(TENANT_ID, optionalTenant.get());
   }
 }
