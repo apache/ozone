@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.container.replication.GrpcReplicationClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -185,6 +186,18 @@ public interface MiniOzoneCluster {
    * @throws IOException
    */
   OzoneClient getRpcClient() throws IOException;
+
+  /**
+   * Creates a {@link GrpcReplicationClient} to access the replication
+   * service of datanode i.
+   *
+   * @param datanode the datanode which the replication client will connect to
+   * @return a {@link GrpcReplicationClient} connected to datanode i,
+   *         should call close() after finish.
+   * @throws IOException
+   */
+  GrpcReplicationClient getReplicationClient(DatanodeDetails datanode)
+      throws IOException;
 
   /**
    * Returns StorageContainerLocationClient to communicate with

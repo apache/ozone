@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
+import org.apache.hadoop.ozone.container.replication.GrpcReplicationClient;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -327,6 +329,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   @Override
   public OzoneClient getRpcClient() throws IOException {
     return OzoneClientFactory.getRpcClient(conf);
+  }
+
+  @Override
+  public GrpcReplicationClient getReplicationClient(DatanodeDetails datanode)
+      throws IOException {
+    String workdir = conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
+        System.getProperty("java.io.tmpdir"));
+    return new GrpcReplicationClient(datanode.getIpAddress(),
+        datanode.getPort(DatanodeDetails.Port.Name.REPLICATION).getValue(),
+        Paths.get(workdir), new SecurityConfig(conf), caClient);
   }
 
   /**
