@@ -310,7 +310,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Get the number of commands of the given type queued on the datanode at the
    * last heartbeat. If the Datanode has not reported information for the given
-   * command type, -1 wil be returned.
+   * command type, -1 will be returned.
    * @param cmdType
    * @return The queued count or -1 if no data has been received from the DN.
    */
