@@ -19,18 +19,16 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto
-    .Builder;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 
 import com.google.common.base.Preconditions;
 
@@ -39,25 +37,20 @@ import com.google.common.base.Preconditions;
  */
 public class ReconstructECContainersCommand
     extends SCMCommand<ReconstructECContainersCommandProto> {
-
   private final long containerID;
-  private final List<DatanodeDetails> sourceDatanodes;
+  private final List<DatanodeDetailsAndReplicaIndex> sources;
   private final List<DatanodeDetails> targetDatanodes;
-  private final List<Long> srcNodesIndexes;
   private final byte[] missingContainerIndexes;
   private final ECReplicationConfig ecReplicationConfig;
 
   public ReconstructECContainersCommand(long containerID,
-      List<DatanodeDetails> sourceDatanodes,
-      List<DatanodeDetails> targetDatanodes,
-      List<Long> srcNodesIndexes,
-      byte[] missingContainerIndexes,
+      List<DatanodeDetailsAndReplicaIndex> sources,
+      List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig) {
     super();
     this.containerID = containerID;
-    this.sourceDatanodes = sourceDatanodes;
+    this.sources = sources;
     this.targetDatanodes = targetDatanodes;
-    this.srcNodesIndexes = srcNodesIndexes;
     this.missingContainerIndexes =
         Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
     this.ecReplicationConfig = ecReplicationConfig;
@@ -65,16 +58,13 @@ public class ReconstructECContainersCommand
 
   // Should be called only for protobuf conversion
   public ReconstructECContainersCommand(long containerID,
-      List<DatanodeDetails> sourceDatanodes,
-      List<DatanodeDetails> targetDatanodes,
-      List<Long> srcNodesIndexes,
-      byte[] missingContainerIndexes,
+      List<DatanodeDetailsAndReplicaIndex> sourceDatanodes,
+      List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig, long id) {
     super(id);
     this.containerID = containerID;
-    this.sourceDatanodes = sourceDatanodes;
+    this.sources = sourceDatanodes;
     this.targetDatanodes = targetDatanodes;
-    this.srcNodesIndexes = srcNodesIndexes;
     this.missingContainerIndexes =
         Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
     this.ecReplicationConfig = ecReplicationConfig;
@@ -90,8 +80,8 @@ public class ReconstructECContainersCommand
     Builder builder =
         ReconstructECContainersCommandProto.newBuilder().setCmdId(getId())
             .setContainerID(containerID);
-    for (DatanodeDetails dd : sourceDatanodes) {
-      builder.addSources(dd.getProtoBufMessage());
+    for (DatanodeDetailsAndReplicaIndex dd : sources) {
+      builder.addSources(dd.toProto());
     }
     for (DatanodeDetails dd : targetDatanodes) {
       builder.addTargets(dd.getProtoBufMessage());
@@ -109,16 +99,16 @@ public class ReconstructECContainersCommand
       ReconstructECContainersCommandProto protoMessage) {
     Preconditions.checkNotNull(protoMessage);
 
-    List<DatanodeDetails> srcDatanodeDetails =
+    List<DatanodeDetailsAndReplicaIndex> srcDatanodeDetails =
         protoMessage.getSourcesList().stream()
-            .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList());
+            .map(a -> DatanodeDetailsAndReplicaIndex.fromProto(a))
+            .collect(Collectors.toList());
     List<DatanodeDetails> targetDatanodeDetails =
         protoMessage.getTargetsList().stream()
             .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList());
 
     return new ReconstructECContainersCommand(protoMessage.getContainerID(),
         srcDatanodeDetails, targetDatanodeDetails,
-        protoMessage.getSrcNodesIndexesList(),
         protoMessage.getMissingContainerIndexes().toByteArray(),
         new ECReplicationConfig(protoMessage.getEcReplicationConfig()),
         protoMessage.getCmdId());
@@ -128,16 +118,12 @@ public class ReconstructECContainersCommand
     return containerID;
   }
 
-  public List<DatanodeDetails> getSourceDatanodes() {
-    return sourceDatanodes;
+  public List<DatanodeDetailsAndReplicaIndex> getSources() {
+    return sources;
   }
 
   public List<DatanodeDetails> getTargetDatanodes() {
     return targetDatanodes;
-  }
-
-  public List<Long> getSrcNodesIndexes() {
-    return srcNodesIndexes;
   }
 
   public byte[] getMissingContainerIndexes() {
@@ -147,5 +133,58 @@ public class ReconstructECContainersCommand
 
   public ECReplicationConfig getEcReplicationConfig() {
     return ecReplicationConfig;
+  }
+
+  static class DatanodeDetailsAndReplicaIndex {
+    private DatanodeDetails dnDetails;
+    private int replicaIndex;
+
+    DatanodeDetailsAndReplicaIndex(DatanodeDetails dnDetails,
+        int replicaIndex) {
+      this.dnDetails = dnDetails;
+      this.replicaIndex = replicaIndex;
+    }
+
+    public DatanodeDetails getDnDetails() {
+      return dnDetails;
+    }
+
+    public int getReplicaIndex() {
+      return replicaIndex;
+    }
+
+    public StorageContainerDatanodeProtocolProtos
+        .DatanodeDetailsAndReplicaIndexProto toProto() {
+      return StorageContainerDatanodeProtocolProtos
+          .DatanodeDetailsAndReplicaIndexProto.newBuilder()
+          .setDatanodeDetails(dnDetails.getProtoBufMessage())
+          .setReplicaIndex(replicaIndex).build();
+    }
+
+    public static DatanodeDetailsAndReplicaIndex fromProto(
+        StorageContainerDatanodeProtocolProtos
+            .DatanodeDetailsAndReplicaIndexProto proto) {
+      return new DatanodeDetailsAndReplicaIndex(
+          DatanodeDetails.getFromProtoBuf(proto.getDatanodeDetails()),
+          proto.getReplicaIndex());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      DatanodeDetailsAndReplicaIndex that = (DatanodeDetailsAndReplicaIndex) o;
+      return replicaIndex == that.replicaIndex && Objects
+          .equals(dnDetails, that.dnDetails);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(dnDetails, replicaIndex);
+    }
   }
 }

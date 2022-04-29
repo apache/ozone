@@ -41,24 +41,30 @@ public class TestReconstructionECContainersCommands {
       srcNodesIndexes.add(i + 1L);
     }
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    List<DatanodeDetails> sources = getDNDetails(5);
+    final List<DatanodeDetails> dnDetails = getDNDetails(5);
+
+    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
+        sources = dnDetails.stream().map(
+          a -> new ReconstructECContainersCommand
+              .DatanodeDetailsAndReplicaIndex(a, dnDetails.indexOf(a)))
+        .collect(Collectors.toList());
     List<DatanodeDetails> targets = getDNDetails(5);
     ReconstructECContainersCommand reconstructECContainersCommand =
         new ReconstructECContainersCommand(1L, sources, targets,
-            srcNodesIndexes, missingContainerIndexes, ecReplicationConfig);
+            missingContainerIndexes, ecReplicationConfig);
     StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto
         proto = reconstructECContainersCommand.getProto();
 
-    List<DatanodeDetails> srcDnsFromProto = proto.getSourcesList().stream()
-        .map(a -> DatanodeDetails.getFromProtoBuf(a))
-        .collect(Collectors.toList());
+    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
+        srcDnsFromProto = proto.getSourcesList().stream().map(
+          a -> ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex
+            .fromProto(a)).collect(Collectors.toList());
     List<DatanodeDetails> targetDnsFromProto = proto.getTargetsList().stream()
         .map(a -> DatanodeDetails.getFromProtoBuf(a))
         .collect(Collectors.toList());
     Assert.assertEquals(1L, proto.getContainerID());
     Assert.assertEquals(sources, srcDnsFromProto);
     Assert.assertEquals(targets, targetDnsFromProto);
-    Assert.assertEquals(srcNodesIndexes, proto.getSrcNodesIndexesList());
     Assert.assertArrayEquals(missingContainerIndexes,
         proto.getMissingContainerIndexes().toByteArray());
     Assert.assertEquals(ecReplicationConfig,
@@ -69,12 +75,10 @@ public class TestReconstructionECContainersCommands {
 
     Assert.assertEquals(reconstructECContainersCommand.getContainerID(),
         fromProtobuf.getContainerID());
-    Assert.assertEquals(reconstructECContainersCommand.getSourceDatanodes(),
-        fromProtobuf.getSourceDatanodes());
+    Assert.assertEquals(reconstructECContainersCommand.getSources(),
+        fromProtobuf.getSources());
     Assert.assertEquals(reconstructECContainersCommand.getTargetDatanodes(),
         fromProtobuf.getTargetDatanodes());
-    Assert.assertEquals(reconstructECContainersCommand.getSrcNodesIndexes(),
-        fromProtobuf.getSrcNodesIndexes());
     Assert.assertArrayEquals(
         reconstructECContainersCommand.getMissingContainerIndexes(),
         fromProtobuf.getMissingContainerIndexes());
