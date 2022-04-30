@@ -81,7 +81,6 @@ public class TestOzoneManagerConfiguration {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
-
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
     // writes the version file properties
@@ -100,6 +99,7 @@ public class TestOzoneManagerConfiguration {
       .setClusterId(clusterId)
       .setScmId(scmId)
       .setOmId(omId)
+      .withoutDatanodes()
       .build();
     cluster.waitForClusterToBeReady();
   }
@@ -240,7 +240,7 @@ public class TestOzoneManagerConfiguration {
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
-        expectedPeerAddress = "0.0.0.0:"+
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode3Id :
@@ -323,7 +323,7 @@ public class TestOzoneManagerConfiguration {
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
-        expectedPeerAddress = "0.0.0.0:"+
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode3Id :

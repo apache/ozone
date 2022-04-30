@@ -47,15 +47,18 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Slow;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test OM prepare against actual mini cluster.
  */
+@Flaky("HDDS-5990")
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final String BUCKET = "bucket";
   private static final String VOLUME = "volume";
@@ -80,13 +83,22 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   /**
+   * Make sure OM is out of Prepare state before executing individual tests.
+   * @throws Exception
+   */
+  @BeforeEach
+  public void initOM() throws Exception {
+    setup();
+    submitCancelPrepareRequest();
+    assertClusterNotPrepared();
+  }
+
+  /**
    * Writes data to the cluster via the leader OM, and then prepares it.
    * Checks that every OM is prepared successfully.
    */
   @Test
   public void testPrepareWithTransactions() throws Exception {
-    setup();
-
     long prepareIndex = submitPrepareRequest();
     assertClusterPrepared(prepareIndex);
     assertRatisLogsCleared();
@@ -120,7 +132,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    */
   @Test
   public void testPrepareDownedOM() throws Exception {
-    setup();
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
     List<OzoneManager> runningOms = cluster.getOzoneManagersList();
@@ -175,7 +186,12 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   @Test
   public void testPrepareWithRestart() throws Exception {
+    // Create fresh cluster for this test to prevent timeout from restarting
+    // modified cluster.
+    shutdown();
+    init();
     setup();
+
     String volumeName = VOLUME + UUID.randomUUID().toString();
     writeKeysAndWaitForLogs(volumeName, 10);
 
@@ -190,13 +206,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     assertClusterPrepared(prepareIndex);
   }
 
-  @Ignore("Saving on CI time since this is a pessimistic test. We should not " +
+  @Slow("Saving on CI time since this is a pessimistic test. We should not " +
       "be able to do anything with 2 OMs down.")
   @Test
   public void testPrepareFailsWhenTwoOmsAreDown() throws Exception {
-
-    setup();
-
     // Shut down 2 OMs.
     for (int i : Arrays.asList(1, 2)) {
       cluster.stopOzoneManager(i);
@@ -216,11 +229,11 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * the requests will execute, so this test checks that the cluster ends in
    * a prepared state, and that create volume requests either succeed, or fail
    * indicating the cluster was prepared before they were encountered.
+   *
    * @throws Exception
    */
   @Test
   public void testPrepareWithMultipleThreads() throws Exception {
-    setup();
     final int numThreads = 10;
     final int prepareTaskIndex = 5;
 
@@ -276,7 +289,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   @Test
   public void testCancelPrepare() throws Exception {
-    setup();
     String volumeName = VOLUME + UUID.randomUUID().toString();
     Set<String> writtenKeys = writeKeysAndWaitForLogs(volumeName, 10);
     long prepareIndex = submitPrepareRequest();
@@ -348,7 +360,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
-    for (OzoneManager om: ozoneManagers) {
+    for (OzoneManager om : ozoneManagers) {
       LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000,
           () -> logFilesPresentInRatisPeer(om));
     }
@@ -363,7 +375,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     byte[] data = ContainerTestHelper.getFixedLengthString(
         keyString, 100).getBytes(UTF_8);
     OzoneOutputStream keyStream = TestHelper.createKey(
-        keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+        keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
         100, store, volumeName, bucketName);
     keyStream.write(data);
     keyStream.close();

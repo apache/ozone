@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -58,19 +59,21 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * This class verifies the watchForCommit Handling by xceiverClient.
  */
+@Flaky("HDDS-5818")
 public class TestWatchForCommit {
 
   private MiniOzoneCluster cluster;
@@ -94,7 +97,7 @@ public class TestWatchForCommit {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     chunkSize = 100;
@@ -156,7 +159,7 @@ public class TestWatchForCommit {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -183,7 +186,7 @@ public class TestWatchForCommit {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
     Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
@@ -363,7 +366,7 @@ public class TestWatchForCommit {
           .watchForCommit(reply.getLogIndex() +
                   new Random().nextInt(100) + 10);
       Assert.fail("Expected exception not thrown");
-    } catch(Exception e) {
+    } catch (Exception e) {
       Assert.assertTrue(HddsClientUtils
           .checkForException(e) instanceof GroupMismatchException);
     }

@@ -1,9 +1,9 @@
 ---
-title: "高可用OM"
+title: "高可用 OM"
 weight: 1
 menu:
    main:
-      parent: 特点
+      parent: 特性
 summary: Ozone Manager 用于避免单点故障的高可用设置
 ---
 

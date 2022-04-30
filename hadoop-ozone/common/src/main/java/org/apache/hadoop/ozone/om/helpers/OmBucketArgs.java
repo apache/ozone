@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -51,6 +52,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
   private long quotaInBytes;
   private long quotaInNamespace;
+  private DefaultReplicationConfig defaultReplicationConfig = null;
+  /**
+   * Bucket Owner Name.
+   */
+  private String ownerName;
 
   /**
    * Private constructor, constructed via builder.
@@ -61,9 +67,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    * @param quotaInBytes Volume quota in bytes.
    * @param quotaInNamespace Volume quota in counts.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketArgs(String volumeName, String bucketName,
       Boolean isVersionEnabled, StorageType storageType,
-      Map<String, String> metadata, long quotaInBytes, long quotaInNamespace) {
+      Map<String, String> metadata, long quotaInBytes, long quotaInNamespace,
+      String ownerName) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.isVersionEnabled = isVersionEnabled;
@@ -71,6 +79,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.metadata = metadata;
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
+    this.ownerName = ownerName;
   }
 
   /**
@@ -122,6 +131,31 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
+   * Returns Bucket default replication config.
+   * @return
+   */
+  public DefaultReplicationConfig getDefaultReplicationConfig() {
+    return defaultReplicationConfig;
+  }
+
+  /**
+   * Sets the Bucket default replication config.
+   */
+  private void setDefaultReplicationConfig(
+      DefaultReplicationConfig defaultReplicationConfig) {
+    this.defaultReplicationConfig = defaultReplicationConfig;
+  }
+
+  /**
+   * Returns Bucket Owner Name.
+   *
+   * @return ownerName.
+   */
+  public String getOwnerName() {
+    return ownerName;
+  }
+
+  /**
    * Returns new builder class that builds a OmBucketArgs.
    * @return Builder
    */
@@ -138,8 +172,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         this.metadata.get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
                 String.valueOf(this.isVersionEnabled));
-    if(this.storageType != null){
+    if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
+    }
+    if (this.ownerName != null) {
+      auditMap.put(OzoneConsts.OWNER, this.ownerName);
     }
     return auditMap;
   }
@@ -155,7 +192,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private Map<String, String> metadata;
     private long quotaInBytes;
     private long quotaInNamespace;
-
+    private DefaultReplicationConfig defaultReplicationConfig;
+    private String ownerName;
     /**
      * Constructs a builder.
      */
@@ -199,6 +237,17 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setDefaultReplicationConfig(
+        DefaultReplicationConfig defaultRepConfig) {
+      this.defaultReplicationConfig = defaultRepConfig;
+      return this;
+    }
+
+    public Builder setOwnerName(String owner) {
+      ownerName = owner;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketArgs.
      * @return instance of OmBucketArgs.
@@ -206,8 +255,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     public OmBucketArgs build() {
       Preconditions.checkNotNull(volumeName);
       Preconditions.checkNotNull(bucketName);
-      return new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
-          storageType, metadata, quotaInBytes, quotaInNamespace);
+      OmBucketArgs omBucketArgs =
+          new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
+              storageType, metadata, quotaInBytes, quotaInNamespace, ownerName);
+      omBucketArgs.setDefaultReplicationConfig(defaultReplicationConfig);
+      return omBucketArgs;
     }
   }
 
@@ -218,17 +270,23 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName);
-    if(isVersionEnabled != null) {
+    if (isVersionEnabled != null) {
       builder.setIsVersionEnabled(isVersionEnabled);
     }
-    if(storageType != null) {
+    if (storageType != null) {
       builder.setStorageType(storageType.toProto());
     }
-    if(quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET) {
+    if (quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET) {
       builder.setQuotaInBytes(quotaInBytes);
     }
-    if(quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
+    if (quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
       builder.setQuotaInNamespace(quotaInNamespace);
+    }
+    if (defaultReplicationConfig != null) {
+      builder.setDefaultReplicationConfig(defaultReplicationConfig.toProto());
+    }
+    if (ownerName != null) {
+      builder.setOwnerName(ownerName);
     }
     return builder.build();
   }
@@ -239,14 +297,22 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    * @return instance of OmBucketArgs
    */
   public static OmBucketArgs getFromProtobuf(BucketArgs bucketArgs) {
-    return new OmBucketArgs(bucketArgs.getVolumeName(),
-        bucketArgs.getBucketName(),
-        bucketArgs.hasIsVersionEnabled() ?
-            bucketArgs.getIsVersionEnabled() : null,
-        bucketArgs.hasStorageType() ? StorageType.valueOf(
-            bucketArgs.getStorageType()) : null,
-        KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()),
-        bucketArgs.getQuotaInBytes(),
-        bucketArgs.getQuotaInNamespace());
+    OmBucketArgs omBucketArgs =
+        new OmBucketArgs(bucketArgs.getVolumeName(),
+            bucketArgs.getBucketName(),
+            bucketArgs.hasIsVersionEnabled() ?
+                bucketArgs.getIsVersionEnabled() : null,
+            bucketArgs.hasStorageType() ? StorageType.valueOf(
+                bucketArgs.getStorageType()) : null,
+            KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()),
+            bucketArgs.getQuotaInBytes(),
+            bucketArgs.getQuotaInNamespace(),
+            bucketArgs.hasOwnerName() ?
+                bucketArgs.getOwnerName() : null);
+    // OmBucketArgs ctor already has more arguments, so setting the default
+    // replication config separately.
+    omBucketArgs.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig()));
+    return omBucketArgs;
   }
 }

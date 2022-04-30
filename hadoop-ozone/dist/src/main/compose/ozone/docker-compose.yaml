@@ -19,16 +19,11 @@ version: "3.4"
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-common-config:
   &common-config
-  image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
   volumes:
     - ../..:/opt/hadoop
   env_file:
     - docker-config
-
-x-layout_version:
-  &metadata_layout
-  OZONE-SITE.XML_ozone.om.metadata.layout: ${OZONE_OM_METADATA_LAYOUT:-SIMPLE}
-  OZONE-SITE.XML_ozone.om.enable.filesystem.paths: "${OZONE_OM_ENABLE_FILESYSTEM_PATHS:-false}"
 
 x-replication:
   &replication
@@ -42,7 +37,6 @@ services:
       - 9882
     environment:
       <<: *replication
-      <<: *metadata_layout
       OZONE_OPTS:
     command: ["ozone","datanode"]
   om:
@@ -51,7 +45,6 @@ services:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       OZONE_OPTS:
       <<: *replication
-      <<: *metadata_layout
     ports:
       - 9874:9874
       - 9862:9862
@@ -66,14 +59,12 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       OZONE_OPTS:
       <<: *replication
-      <<: *metadata_layout
     command: ["ozone","scm"]
   s3g:
     <<: *common-config
     environment:
       OZONE_OPTS:
       <<: *replication
-      <<: *metadata_layout
     ports:
       - 9878:9878
     command: ["ozone","s3g"]
@@ -84,5 +75,4 @@ services:
     environment:
       OZONE_OPTS:
       <<: *replication
-      <<: *metadata_layout
     command: ["ozone","recon"]

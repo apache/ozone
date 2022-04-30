@@ -36,7 +36,7 @@ If you are a Hadoop ninja, and wise in the ways of Apache, you already know
 that a real Apache release is a source release.
 
 If you want to build from sources, Please untar the source tarball (or clone the latest code 
-from the [git repository](https://github.com/apache/hadoop-ozone)) and run the ozone build command. This instruction assumes that you have all the
+from the [git repository](https://github.com/apache/ozone)) and run the ozone build command. This instruction assumes that you have all the
 dependencies to build Hadoop on your build machine. If you need instructions
 on how to build Hadoop, please look at the Apache Hadoop Website.
 

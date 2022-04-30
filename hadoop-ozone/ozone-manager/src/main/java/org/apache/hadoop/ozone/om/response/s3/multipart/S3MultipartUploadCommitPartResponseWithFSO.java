@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -60,10 +61,10 @@ public class S3MultipartUploadCommitPartResponseWithFSO
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, multipartKey, openKey, omMultipartKeyInfo,
             oldPartKeyInfo, openPartKeyInfoToBeDeleted, isRatisEnabled,
-            omBucketInfo);
+            omBucketInfo, bucketLayout);
   }
 }

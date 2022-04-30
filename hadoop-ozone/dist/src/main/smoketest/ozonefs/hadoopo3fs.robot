@@ -33,6 +33,7 @@ Test hadoop dfs
     ${dir} =          Format FS URL         ${SCHEME}     ${volume}    ${bucket}
     ${random} =        Generate Random String  5  [NUMBERS]
     ${result} =        Execute                    hdfs dfs -put /opt/hadoop/NOTICE.txt ${dir}/${PREFIX}-${random}
+                       Should Not Contain         ${result}           multiple SLF4J bindings
     ${result} =        Execute                    hdfs dfs -ls ${dir}
                        Should contain             ${result}   ${PREFIX}-${random}
     ${result} =        Execute                    hdfs dfs -cat ${dir}/${PREFIX}-${random}

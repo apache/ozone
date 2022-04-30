@@ -16,18 +16,21 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.util.ArrayList;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -36,9 +39,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import org.junit.AfterClass;
 import static org.junit.Assert.assertTrue;
+
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -56,7 +60,10 @@ public class TestOmAcls {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private static boolean aclAllow = true;
+  private static boolean volumeAclAllow = true;
+  private static boolean bucketAclAllow = true;
+  private static boolean keyAclAllow = true;
+  private static boolean prefixAclAllow = true;
   private static MiniOzoneCluster cluster = null;
   private static OMMetrics omMetrics;
   private static OzoneConfiguration conf;
@@ -80,7 +87,6 @@ public class TestOmAcls {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.setClass(OZONE_ACL_AUTHORIZER_CLASS, OzoneAccessAuthorizerTest.class,
         IAccessAuthorizer.class);
     conf.setStrings(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
@@ -106,13 +112,18 @@ public class TestOmAcls {
   }
 
   /**
-   * Tests the OM Initialization.
+   * Reset ACL.
    */
+  @Before
+  public void resetAcl() {
+    TestOmAcls.volumeAclAllow = true;
+    TestOmAcls.bucketAclAllow = true;
+    TestOmAcls.keyAclAllow = true;
+    TestOmAcls.prefixAclAllow = true;
+  }
 
   @Test
   public void testBucketCreationPermissionDenied() throws Exception {
-
-    TestOmAcls.aclAllow = true;
 
     String volumeName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
     String bucketName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
@@ -127,7 +138,7 @@ public class TestOmAcls {
     OzoneVolume volume =
         cluster.getClient().getObjectStore().getVolume(volumeName);
 
-    TestOmAcls.aclAllow = false;
+    TestOmAcls.bucketAclAllow = false;
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> volume.createBucket(bucketName));
 
@@ -139,16 +150,45 @@ public class TestOmAcls {
   public void testFailureInKeyOp() throws Exception {
     final VolumeArgs createVolumeArgs;
 
-    TestOmAcls.aclAllow = true;
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     logCapturer.clearOutput();
 
-    TestOmAcls.aclAllow = false;
+    TestOmAcls.keyAclAllow = false;
 
     OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
         () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
     assertTrue(logCapturer.getOutput().contains("doesn't have CREATE " +
         "permission to access key"));
+  }
+
+  @Test
+  public void testSetACLPermissionDenied() throws Exception {
+
+    String volumeName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
+    String bucketName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner("user" + RandomStringUtils.randomNumeric(5))
+        .setAdmin("admin" + RandomStringUtils.randomNumeric(5))
+        .build();
+    BucketArgs createBucketArgs = BucketArgs.newBuilder()
+        .setOwner("user" + RandomStringUtils.randomNumeric(5))
+        .build();
+
+    cluster.getClient().getObjectStore().createVolume(volumeName,
+        createVolumeArgs);
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    volume.createBucket(bucketName, createBucketArgs);
+
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    TestOmAcls.bucketAclAllow = false;
+    OzoneTestUtils.expectOmException(ResultCodes.PERMISSION_DENIED,
+        () -> bucket.setAcl(new ArrayList<>()));
+
+    assertTrue(logCapturer.getOutput()
+        .contains("doesn't have WRITE_ACL permission to access bucket"));
   }
 
   /**
@@ -158,7 +198,18 @@ public class TestOmAcls {
 
     @Override
     public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context) {
-      return TestOmAcls.aclAllow;
+      switch (((OzoneObjInfo) ozoneObject).getResourceType()) {
+      case VOLUME:
+        return TestOmAcls.volumeAclAllow;
+      case BUCKET:
+        return TestOmAcls.bucketAclAllow;
+      case KEY:
+        return TestOmAcls.keyAclAllow;
+      case PREFIX:
+        return TestOmAcls.prefixAclAllow;
+      default:
+        return false;
+      }
     }
   }
 }

@@ -166,7 +166,7 @@ public class TestPermissionCheck {
 
     try {
       bucketEndpoint.get("bucketName", null, null, null, 1000,
-          null, null, null, null, null, null, null);
+          null, null, null, null, null, null);
       Assert.fail("Should fail");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception);
@@ -211,7 +211,7 @@ public class TestPermissionCheck {
     bucketEndpoint.setClient(client);
     try {
       bucketEndpoint.get("bucketName", null, null, null, 1000,
-          null, null, null, null, null, "acl", null);
+          null, null, null, null, "acl", null);
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
@@ -251,6 +251,7 @@ public class TestPermissionCheck {
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.get("bucketName", "keyPath", null, 1000, "marker",
@@ -267,10 +268,11 @@ public class TestPermissionCheck {
   public void testPutKey() throws IOException {
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket)
-        .createKey(anyString(), anyLong(), any(), any(), any());
+        .createKey(anyString(), anyLong(), any(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.put("bucketName", "keyPath", 1024, 0, null, null);
@@ -288,6 +290,7 @@ public class TestPermissionCheck {
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.delete("bucketName", "keyPath", null);
@@ -301,11 +304,11 @@ public class TestPermissionCheck {
   @Test
   public void testMultiUploadKey() throws IOException {
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket)
-        .initiateMultipartUpload(anyString(), any(), any());
+    doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.initializeMultipartUpload("bucketName", "keyPath");

@@ -13,6 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -36,8 +39,9 @@ mkdir -p "$REPORT_DIR"
 export OZONE_ACCEPTANCE_SUITE
 
 cd "$DIST_DIR/compose" || exit 1
-./test-all.sh
+./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
 RES=$?
-cp result/* "$REPORT_DIR/"
+cp -rv result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
+find "$REPORT_DIR" -type f -empty -print0 | xargs -0 rm -v
 exit $RES

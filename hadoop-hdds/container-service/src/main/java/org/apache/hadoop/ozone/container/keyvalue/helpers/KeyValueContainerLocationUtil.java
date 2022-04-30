@@ -97,7 +97,7 @@ public final class KeyValueContainerLocationUtil {
    * @param containerId
    * @return container sub directory
    */
-  private static String getContainerSubDirectory(long containerId){
+  private static String getContainerSubDirectory(long containerId) {
     int directory = (int) ((containerId >> 9) & 0xFF);
     return Storage.CONTAINER_DIR + directory;
   }

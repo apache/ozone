@@ -33,7 +33,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
-import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -176,6 +176,13 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void notifyLogFailed(Throwable ex,
+      RaftProtos.LogEntryProto failedEntry) {
+    LOG.error("SCM statemachine appendLog failed, entry: {}", failedEntry);
+    ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+  }
+
+  @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     if (!isInitialized) {
       return;
@@ -258,8 +265,8 @@ public class SCMStateMachine extends BaseStateMachine {
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
     Preconditions.checkArgument(
-        deletedBlockLog instanceof DeletedBlockLogImplV2);
-    ((DeletedBlockLogImplV2) deletedBlockLog).onBecomeLeader();
+        deletedBlockLog instanceof DeletedBlockLogImpl);
+    ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
     scm.getScmDecommissionManager().onBecomeLeader();
   }
 
@@ -350,7 +357,7 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void reinitialize() {
+  public void reinitialize() throws IOException {
     Preconditions.checkNotNull(installingDBCheckpoint);
     DBCheckpoint checkpoint = installingDBCheckpoint;
 
@@ -362,8 +369,8 @@ public class SCMStateMachine extends BaseStateMachine {
       termIndex =
           scm.getScmHAManager().installCheckpoint(checkpoint);
     } catch (Exception e) {
-      LOG.error("Failed to reinitialize SCMStateMachine.");
-      return;
+      LOG.error("Failed to reinitialize SCMStateMachine.", e);
+      throw new IOException(e);
     }
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
@@ -383,10 +390,17 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    super.close();
-    transactionBuffer.close();
-    HadoopExecutors.
-        shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    //if ratis server is stopped , it indicates this `close` originates
+    // from `scm.stop()`, otherwise, it indicates this `close` originates
+    // from ratis.
+    if (scm.getScmHAManager().getRatisServer().isStopped()) {
+      super.close();
+      transactionBuffer.close();
+      HadoopExecutors.
+          shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    } else {
+      scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
+    }
   }
 
   @VisibleForTesting

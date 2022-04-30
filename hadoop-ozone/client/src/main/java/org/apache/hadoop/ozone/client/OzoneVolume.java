@@ -480,7 +480,7 @@ public class OzoneVolume extends WithMetadata {
 
     @Override
     public OzoneBucket next() {
-      if(hasNext()) {
+      if (hasNext()) {
         currentValue = currentIterator.next();
         return currentValue;
       }

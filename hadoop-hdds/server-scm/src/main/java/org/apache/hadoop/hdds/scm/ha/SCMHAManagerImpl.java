@@ -73,6 +73,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
     this.scm = scm;
+    this.exitManager = new ExitManager();
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
       this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
@@ -258,7 +259,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       throw e;
     }
 
-    File dbBackup = null;
+    File dbBackup;
     try {
       dbBackup = HAUtils
           .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
@@ -266,29 +267,41 @@ public class SCMHAManagerImpl implements SCMHAManager {
       LOG.info("Replaced DB with checkpoint, term: {}, index: {}",
           term, lastAppliedIndex);
     } catch (Exception e) {
+      // If we are not able to install latest checkpoint we should throw
+      // this exception. In this way reinitialize can throw exception to
+      // ratis to handle properly.
       LOG.error("Failed to install Snapshot as SCM failed to replace"
-          + " DB with downloaded checkpoint. Reloading old SCM state.", e);
+          + " DB with downloaded checkpoint. Checkpoint transaction {}", e,
+          checkpointTxnInfo.getTransactionIndex());
+      throw e;
     }
+
     // Reload the DB store with the new checkpoint.
-    // Restart (unpause) the state machine and update its last applied index
-    // to the installed checkpoint's snapshot index.
     try {
       reloadSCMState();
       LOG.info("Reloaded SCM state with Term: {} and Index: {}", term,
           lastAppliedIndex);
     } catch (Exception ex) {
+      LOG.info("Failed to reload SCM state with Term: {} and Index: {}", term,
+          lastAppliedIndex);
+      // revert to the old db, since the new db may be a corrupted one
+      // so that SCM can restart from the old db.
       try {
-        // revert to the old db, since the new db may be a corrupted one,
-        // so that SCM can restart from the old db.
         if (dbBackup != null) {
-          dbBackup = HAUtils
-              .replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+          dbBackup =
+              HAUtils.replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
                   dbBackup.toPath(), OzoneConsts.SCM_DB_BACKUP_PREFIX);
-          startServices();
+          LOG.error("Replacing SCM state with Term : {} and Index:",
+              termIndex.getTerm(), termIndex.getTerm());
+          // This is being done to check before stop with old db
+          // try to reload and then finally terminate and also test has
+          // assumption for re-verify after corrupt DB loading without
+          // reloadSCMState call test fails with NPE when finding db location.
+          reloadSCMState();
         }
       } finally {
-        String errorMsg =
-            "Failed to reload SCM state and instantiate services.";
+        String errorMsg = "Failed to reload SCM state and instantiate " +
+            "services.";
         exitManager.exitSystem(1, errorMsg, ex, LOG);
       }
     }
@@ -321,10 +334,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
    * {@inheritDoc}
    */
   @Override
-  public void shutdown() throws IOException {
+  public void stop() throws IOException {
     if (ratisServer != null) {
       ratisServer.stop();
-      ratisServer.getSCMStateMachine().close();
       grpcServer.stop();
     }
   }
@@ -361,6 +373,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
         metadataStore.getDeletedBlocksTXTable());
+    scm.getReplicationManager().getMoveScheduler()
+        .reinitialize(metadataStore.getMoveTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       if (scm.getRootCertificateServer() != null) {
         scm.getRootCertificateServer().reinitialize(metadataStore);

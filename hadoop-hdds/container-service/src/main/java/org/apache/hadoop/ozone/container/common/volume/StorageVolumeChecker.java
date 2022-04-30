@@ -381,6 +381,7 @@ public class StorageVolumeChecker {
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
     periodicDiskChecker.cancel(true);
     diskCheckerservice.shutdownNow();
+    checkVolumeResultHandlerExecutorService.shutdownNow();
     try {
       delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
     } catch (InterruptedException e) {

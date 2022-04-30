@@ -23,12 +23,19 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,8 +176,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
           .get(volumeKey);
-      if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs,
-          volumeKey)) {
+      if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs)) {
         bucketInfoBuilder.setQuotaInBytes(omBucketArgs.getQuotaInBytes());
       } else {
         bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
@@ -181,6 +187,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       } else {
         bucketInfoBuilder.setQuotaInNamespace(
             dbBucketInfo.getQuotaInNamespace());
+      }
+
+      DefaultReplicationConfig defaultReplicationConfig =
+          omBucketArgs.getDefaultReplicationConfig();
+      if (defaultReplicationConfig != null) {
+        // Resetting the default replication config.
+        bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
@@ -245,7 +258,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   }
 
   public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
-      OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs, String volumeKey)
+                     OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs)
       throws IOException {
     long quotaInBytes = omBucketArgs.getQuotaInBytes();
 
@@ -268,20 +281,20 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
-    for(OmBucketInfo bucketInfo : bucketList) {
+    for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
           !omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
         totalBucketQuota += nextQuotaInBytes;
       }
     }
 
-    if(volumeQuotaInBytes < totalBucketQuota &&
+    if (volumeQuotaInBytes < totalBucketQuota &&
         volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
-      throw new IllegalArgumentException("Total buckets quota in this volume " +
+      throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +
           " set to:" + totalBucketQuota + ". But the volume space quota is:" +
-          volumeQuotaInBytes);
+          volumeQuotaInBytes, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
   }
@@ -296,4 +309,28 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     return true;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetBucketProperty
+  )
+  public static OMRequest disallowSetBucketPropertyWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      SetBucketPropertyRequest propReq =
+          req.getSetBucketPropertyRequest();
+      if (propReq.hasBucketArgs()
+          && propReq.getBucketArgs().hasDefaultReplicationConfig()
+          && propReq.getBucketArgs().getDefaultReplicationConfig()
+          .hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
 }

@@ -125,11 +125,6 @@ public class OzoneBlockTokenSecretManager extends
           "expired, current time: " + Time.formatTime(now) +
           " expiry time: " + identifier.getExpiryDate());
     }
-
-    // FIXME since verifySignature always throws, don't see how this could work
-    if (!verifySignature(identifier, createPassword(identifier))) {
-      throw new InvalidToken("Tampered/Invalid token.");
-    }
     return true;
   }
 

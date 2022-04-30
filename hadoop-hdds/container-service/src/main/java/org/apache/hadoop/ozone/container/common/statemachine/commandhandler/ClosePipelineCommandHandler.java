@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -68,12 +69,18 @@ public class ClosePipelineCommandHandler implements CommandHandler {
     final DatanodeDetails dn = context.getParent().getDatanodeDetails();
     ClosePipelineCommand closePipelineCommand = (ClosePipelineCommand) command;
     final PipelineID pipelineID = closePipelineCommand.getPipelineID();
+    final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
-      server.removeGroup(pipelineID.getProtobuf());
-      LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
-          dn.getUuidString());
+      if (server.isExist(pipelineIdProto)) {
+        server.removeGroup(pipelineIdProto);
+        LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
+            dn.getUuidString());
+      } else {
+        LOG.debug("Ignoring close pipeline command for pipeline {} " +
+            "as it does not exist", pipelineID);
+      }
     } catch (IOException e) {
       LOG.error("Can't close pipeline {}", pipelineID, e);
     } finally {

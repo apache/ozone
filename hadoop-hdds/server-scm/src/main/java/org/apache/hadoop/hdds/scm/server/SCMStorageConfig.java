@@ -133,6 +133,6 @@ public class SCMStorageConfig extends Storage {
   }
 
   public boolean checkPrimarySCMIdInitialized() {
-    return getPrimaryScmNodeId() != null ? true : false;
+    return getPrimaryScmNodeId() != null;
   }
 }

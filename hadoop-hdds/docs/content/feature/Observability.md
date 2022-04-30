@@ -69,7 +69,7 @@ Tracing is turned off by default, but can be turned on with `hdds.tracing.enable
 </property>
 ```
 
-Jager client can be configured with environment variables as documented [here](https://github.com/jaegertracing/jaeger-client-java/blob/master/jaeger-core/README.md):
+Jaeger client can be configured with environment variables as documented [here](https://github.com/jaegertracing/jaeger-client-java/blob/master/jaeger-core/README.md):
 
 For example:
 

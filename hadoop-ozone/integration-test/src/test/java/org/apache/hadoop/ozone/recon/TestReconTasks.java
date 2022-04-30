@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -102,12 +102,12 @@ public class TestReconTasks {
     LambdaTestUtils.await(60000, 5000,
         () -> (reconPipelineManager.getPipelines().size() >= 1));
 
-    ContainerManagerV2 scmContainerManager = scm.getContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
         (ReconContainerManager) reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(new RatisReplicationConfig(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());

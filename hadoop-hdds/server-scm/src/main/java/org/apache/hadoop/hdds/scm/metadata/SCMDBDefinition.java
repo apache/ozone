@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfoCodec;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -143,6 +144,16 @@ public class SCMDBDefinition implements DBDefinition {
           Long.class,
           new LongCodec());
 
+  public static final DBColumnFamilyDefinition<ContainerID,
+      MoveDataNodePair>
+      MOVE =
+      new DBColumnFamilyDefinition<>(
+          "move",
+          ContainerID.class,
+          new ContainerIDCodec(),
+          MoveDataNodePair.class,
+          new MoveDataNodePairCodec());
+
   @Override
   public String getName() {
     return "scm.db";
@@ -157,6 +168,6 @@ public class SCMDBDefinition implements DBDefinition {
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
         VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
-        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID};
+        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE};
   }
 }

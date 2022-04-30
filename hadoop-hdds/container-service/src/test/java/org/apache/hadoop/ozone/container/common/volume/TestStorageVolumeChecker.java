@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -65,11 +65,17 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.*;
+import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.anyObject;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -98,10 +104,10 @@ public class TestStorageVolumeChecker {
    */
   private final VolumeCheckResult expectedVolumeHealth;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
   public TestStorageVolumeChecker(VolumeCheckResult result,
-      ChunkLayOutVersion layout) {
+      ContainerLayoutVersion layout) {
     this.expectedVolumeHealth = result;
     this.layout = layout;
   }
@@ -127,7 +133,7 @@ public class TestStorageVolumeChecker {
   @Parameters
   public static Collection<Object[]> data() {
     List<Object[]> values = new ArrayList<>();
-    for (ChunkLayOutVersion layout : ChunkLayOutVersion.values()) {
+    for (ContainerLayoutVersion layout : ContainerLayoutVersion.values()) {
       for (VolumeCheckResult result : VolumeCheckResult.values()) {
         values.add(new Object[]{result, layout});
       }
@@ -175,6 +181,8 @@ public class TestStorageVolumeChecker {
     if (result) {
       assertThat(numCallbackInvocations.get(), is(1L));
     }
+
+    checker.shutdownAndWait(0, TimeUnit.SECONDS);
   }
 
   /**
@@ -207,6 +215,8 @@ public class TestStorageVolumeChecker {
     for (HddsVolume volume : volumes) {
       verify(volume, times(1)).check(anyObject());
     }
+
+    checker.shutdownAndWait(0, TimeUnit.SECONDS);
   }
 
 

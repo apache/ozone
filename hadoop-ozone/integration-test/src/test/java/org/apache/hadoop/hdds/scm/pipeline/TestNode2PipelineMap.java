@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerV2;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -57,7 +57,7 @@ public class TestNode2PipelineMap {
   private OzoneConfiguration conf;
   private StorageContainerManager scm;
   private ContainerWithPipeline ratisContainer;
-  private ContainerManagerV2 containerManager;
+  private ContainerManager containerManager;
   private PipelineManager pipelineManager;
 
   /**
@@ -74,7 +74,7 @@ public class TestNode2PipelineMap {
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));

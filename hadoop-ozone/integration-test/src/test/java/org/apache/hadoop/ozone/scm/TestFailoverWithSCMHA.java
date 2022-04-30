@@ -17,8 +17,11 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
@@ -28,6 +31,7 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.ozone.test.GenericTestUtils;
@@ -38,7 +42,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.UUID;
+
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 
 /**
  * Tests failover with SCM HA setup.
@@ -67,10 +75,8 @@ public class TestFailoverWithSCMHA {
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-    SCMHAConfiguration scmhaConfiguration =
-        conf.getObject(SCMHAConfiguration.class);
-    scmhaConfiguration.setRatisSnapshotThreshold(SNAPSHOT_THRESHOLD);
-    conf.setFromObject(scmhaConfiguration);
+    conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
+            SNAPSHOT_THRESHOLD);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId).setScmId(scmId).setOMServiceId(omServiceId)
@@ -134,6 +140,90 @@ public class TestFailoverWithSCMHA {
         HddsProtos.ReplicationFactor.ONE, "ozone");
     Assert.assertTrue(logCapture.getOutput()
         .contains("Performing failover to suggested leader"));
+  }
+
+  @Test
+  public void testMoveFailover() throws Exception {
+    SCMClientConfig scmClientConfig =
+        conf.getObject(SCMClientConfig.class);
+    scmClientConfig.setRetryCount(1);
+    scmClientConfig.setRetryInterval(100);
+    scmClientConfig.setMaxRetryTimeout(1500);
+    Assert.assertEquals(scmClientConfig.getRetryCount(), 15);
+    conf.setFromObject(scmClientConfig);
+    StorageContainerManager scm = getLeader(cluster);
+    Assert.assertNotNull(scm);
+
+    final ContainerID id =
+        getContainer(HddsProtos.LifeCycleState.CLOSED).containerID();
+    DatanodeDetails dn1 = randomDatanodeDetails();
+    DatanodeDetails dn2 = randomDatanodeDetails();
+
+    //here we just want to test whether the new leader will get the same
+    //inflight move after failover, so no need to create container and datanode,
+    //just mock them bypassing all the pre checks.
+    scm.getReplicationManager().getMoveScheduler().startMove(id.getProtobuf(),
+        (new MoveDataNodePair(dn1, dn2))
+            .getProtobufMessage(ClientVersion.CURRENT_VERSION));
+
+    SCMBlockLocationFailoverProxyProvider failoverProxyProvider =
+        new SCMBlockLocationFailoverProxyProvider(conf);
+    failoverProxyProvider.changeCurrentProxy(scm.getSCMNodeId());
+    ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
+        new ScmBlockLocationProtocolClientSideTranslatorPB(
+            failoverProxyProvider);
+    GenericTestUtils
+        .setLogLevel(SCMBlockLocationFailoverProxyProvider.LOG, Level.DEBUG);
+    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+        .captureLogs(SCMBlockLocationFailoverProxyProvider.LOG);
+    ScmBlockLocationProtocol scmBlockLocationProtocol = TracingUtil
+        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
+            conf);
+    scmBlockLocationProtocol.getScmInfo();
+    Assert.assertTrue(logCapture.getOutput()
+        .contains("Performing failover to suggested leader"));
+    scm = getLeader(cluster);
+    Assert.assertNotNull(scm);
+
+    //switch to the new leader successfully, new leader should
+    //get the same inflightMove
+    Map<ContainerID, MoveDataNodePair> inflightMove =
+        scm.getReplicationManager().getMoveScheduler().getInflightMove();
+    Assert.assertTrue(inflightMove.containsKey(id));
+    MoveDataNodePair mp = inflightMove.get(id);
+    Assert.assertTrue(dn2.equals(mp.getTgt()));
+    Assert.assertTrue(dn1.equals(mp.getSrc()));
+
+    //complete move in the new leader
+    scm.getReplicationManager().getMoveScheduler()
+        .completeMove(id.getProtobuf());
+
+
+    SCMContainerLocationFailoverProxyProvider proxyProvider =
+        new SCMContainerLocationFailoverProxyProvider(conf, null);
+    GenericTestUtils.setLogLevel(SCMContainerLocationFailoverProxyProvider.LOG,
+        Level.DEBUG);
+    logCapture = GenericTestUtils.LogCapturer
+        .captureLogs(SCMContainerLocationFailoverProxyProvider.LOG);
+    proxyProvider.changeCurrentProxy(scm.getSCMNodeId());
+    StorageContainerLocationProtocol scmContainerClient =
+        TracingUtil.createProxy(
+            new StorageContainerLocationProtocolClientSideTranslatorPB(
+                proxyProvider), StorageContainerLocationProtocol.class, conf);
+
+    scmContainerClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, "ozone");
+    Assert.assertTrue(logCapture.getOutput()
+        .contains("Performing failover to suggested leader"));
+
+    //switch to the new leader successfully, new leader should
+    //get the same inflightMove , which should not contains
+    //that container.
+    scm = getLeader(cluster);
+    Assert.assertNotNull(scm);
+    inflightMove = scm.getReplicationManager()
+        .getMoveScheduler().getInflightMove();
+    Assert.assertFalse(inflightMove.containsKey(id));
   }
 
   static StorageContainerManager getLeader(MiniOzoneHAClusterImpl impl) {

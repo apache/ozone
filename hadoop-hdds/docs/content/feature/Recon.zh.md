@@ -3,7 +3,7 @@ title: "Recon 服务器"
 weight: 7
 menu:
    main:
-      parent: 特点
+      parent: 特性
 summary: Recon 是 Ozone 中用于分析服务的网页用户界面（Web UI）
 ---
 <!---

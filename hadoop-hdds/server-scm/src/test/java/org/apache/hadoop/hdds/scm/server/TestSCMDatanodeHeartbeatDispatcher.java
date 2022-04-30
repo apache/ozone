@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.scm.server.
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .NodeReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandQueueReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
@@ -49,6 +51,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.COMMAND_QUEUE_REPORT;
 
 /**
  * This class tests the behavior of SCMDatanodeHeartbeatDispatcher.
@@ -70,16 +73,16 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(mockNodeManager,
             new EventPublisher() {
-          @Override
-          public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void fireEvent(
-              EVENT_TYPE event, PAYLOAD payload) {
-            Assert.assertEquals(event, NODE_REPORT);
-            eventReceived.incrementAndGet();
-            Assert.assertEquals(nodeReport,
-                ((NodeReportFromDatanode)payload).getReport());
+              @Override
+              public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+                  EVENT event, PAYLOAD payload) {
+                Assert.assertEquals(event, NODE_REPORT);
+                eventReceived.incrementAndGet();
+                Assert.assertEquals(nodeReport,
+                    ((NodeReportFromDatanode)payload).getReport());
 
-          }
-        });
+              }
+            });
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
@@ -113,24 +116,24 @@ public class TestSCMDatanodeHeartbeatDispatcher {
         new SCMDatanodeHeartbeatDispatcher(
             mockNodeManager,
             new EventPublisher() {
-          @Override
-          public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void fireEvent(
-              EVENT_TYPE event, PAYLOAD payload) {
-            Assert.assertTrue(
-                event.equals(CONTAINER_REPORT)
-                    || event.equals(CMD_STATUS_REPORT));
+              @Override
+              public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+                  EVENT event, PAYLOAD payload) {
+                Assert.assertTrue(
+                    event.equals(CONTAINER_REPORT)
+                        || event.equals(CMD_STATUS_REPORT));
 
-            if (payload instanceof ContainerReportFromDatanode) {
-              Assert.assertEquals(containerReport,
-                  ((ContainerReportFromDatanode) payload).getReport());
-            }
-            if (payload instanceof CommandStatusReportFromDatanode) {
-              Assert.assertEquals(commandStatusReport,
-                  ((CommandStatusReportFromDatanode) payload).getReport());
-            }
-            eventReceived.incrementAndGet();
-          }
-        });
+                if (payload instanceof ContainerReportFromDatanode) {
+                  Assert.assertEquals(containerReport,
+                      ((ContainerReportFromDatanode) payload).getReport());
+                }
+                if (payload instanceof CommandStatusReportFromDatanode) {
+                  Assert.assertEquals(commandStatusReport,
+                      ((CommandStatusReportFromDatanode) payload).getReport());
+                }
+                eventReceived.incrementAndGet();
+              }
+            });
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
@@ -144,6 +147,46 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     Assert.assertEquals(2, eventReceived.get());
 
 
+  }
+
+  @Test
+  public void testCommandQueueReportDispatched() {
+    AtomicInteger eventReceived = new AtomicInteger();
+
+    CommandQueueReportProto commandQueueReport =
+        CommandQueueReportProto.getDefaultInstance();
+
+    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    Mockito.when(mockNodeManager.isNodeRegistered(Mockito.any()))
+        .thenReturn(true);
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(
+            mockNodeManager,
+            new EventPublisher() {
+              @Override
+              public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+                  EVENT event, PAYLOAD payload) {
+                Assert.assertTrue(event.equals(COMMAND_QUEUE_REPORT));
+
+                if (payload instanceof CommandQueueReportFromDatanode) {
+                  Assert.assertEquals(commandQueueReport,
+                      ((CommandQueueReportFromDatanode) payload).getReport());
+                }
+                eventReceived.incrementAndGet();
+              }
+            });
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+
+    SCMHeartbeatRequestProto heartbeat =
+        SCMHeartbeatRequestProto.newBuilder()
+            .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+            .setCommandQueueReport(commandQueueReport)
+            .setCommandQueueReport(commandQueueReport)
+            .build();
+    dispatcher.dispatch(heartbeat);
+    Assert.assertEquals(1, eventReceived.get());
   }
 
   /**

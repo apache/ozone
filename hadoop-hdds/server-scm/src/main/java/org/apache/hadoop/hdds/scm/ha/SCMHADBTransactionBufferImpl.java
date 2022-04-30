@@ -18,7 +18,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
-import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImplV2;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -107,8 +107,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
     Preconditions.checkArgument(
-        deletedBlockLog instanceof DeletedBlockLogImplV2);
-    ((DeletedBlockLogImplV2) deletedBlockLog).onFlush();
+        deletedBlockLog instanceof DeletedBlockLogImpl);
+    ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
   }
 
   @Override

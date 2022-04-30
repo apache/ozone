@@ -43,7 +43,7 @@ public final class OzoneQuota {
   public static final String OZONE_QUOTA_TB = "TB";
 
   /** Quota Units.*/
-  public enum Units {B, KB, MB, GB, TB}
+  public enum Units { B, KB, MB, GB, TB }
 
   // Quota to decide how many buckets can be created.
   private long quotaInNamespace;

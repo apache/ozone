@@ -72,11 +72,11 @@ public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
     try {
       StatusAndMessages finalizationResponse =
           scmClient.finalizeScmUpgrade(upgradeClientID);
-      if (isFinalized(finalizationResponse.status())){
+      if (isFinalized(finalizationResponse.status())) {
         System.out.println("Upgrade has already been finalized.");
         emitExitMsg();
         return;
-      } else if (!isStarting(finalizationResponse.status())){
+      } else if (!isStarting(finalizationResponse.status())) {
         System.err.println("Invalid response from Storage Container Manager.");
         System.err.println(
             "Current finalization status is: " + finalizationResponse.status()
@@ -99,8 +99,11 @@ public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
     try {
       monitor.get();
       emitFinishedMsg("Storage Container Manager");
-    } catch (CancellationException |InterruptedException e) {
+    } catch (CancellationException e) {
       emitCancellationMsg("Storage Container Manager");
+    } catch (InterruptedException e) {
+      emitCancellationMsg("Storage Container Manager");
+      Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
       emitGeneralErrorMsg();
       throw new IOException(e.getCause());

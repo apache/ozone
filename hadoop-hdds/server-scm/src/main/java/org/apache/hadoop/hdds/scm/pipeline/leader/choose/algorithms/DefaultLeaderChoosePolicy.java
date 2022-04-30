@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.StateManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 
 import java.util.List;
 
@@ -31,7 +31,7 @@ import java.util.List;
 public class DefaultLeaderChoosePolicy extends LeaderChoosePolicy {
 
   public DefaultLeaderChoosePolicy(
-      NodeManager nodeManager, StateManager pipelineStateManager) {
+      NodeManager nodeManager, PipelineStateManager pipelineStateManager) {
     super(nodeManager, pipelineStateManager);
   }
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
@@ -114,12 +115,17 @@ public class TestContainerBalancerSubCommand {
   public void testContainerBalancerStartSubcommandWhenBalancerIsNotRunning()
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startContainerBalancer(null, null, null, null))
-        .thenAnswer(invocation -> true);
+    Mockito.when(scmClient.startContainerBalancer(
+            null, null, null, null, null, null))
+        .thenReturn(
+            StorageContainerLocationProtocolProtos
+                .StartContainerBalancerResponseProto.newBuilder()
+                .setStart(true)
+                .build());
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Starting\\sContainerBalancer" +
-        "\\sSuccessfully.");
+    Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
+        "\\ssuccessfully.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
@@ -128,12 +134,18 @@ public class TestContainerBalancerSubCommand {
   public void testContainerBalancerStartSubcommandWhenBalancerIsRunning()
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startContainerBalancer(null, null, null, null))
-        .thenAnswer(invocation -> false);
+    Mockito.when(scmClient.startContainerBalancer(
+            null, null, null, null, null, null))
+        .thenReturn(StorageContainerLocationProtocolProtos
+            .StartContainerBalancerResponseProto.newBuilder()
+            .setStart(false)
+            .setMessage("")
+            .build());
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^ContainerBalancer\\sis\\salready\\srunning," +
-        "\\sPlease\\sstop\\sit\\sfirst.");
+    Pattern p = Pattern.compile("^Failed\\sto\\sstart\\sContainer" +
+        "\\sBalancer.");
+
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }

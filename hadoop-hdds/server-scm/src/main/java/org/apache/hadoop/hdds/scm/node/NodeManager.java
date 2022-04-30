@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.node;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collection;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -152,6 +155,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed);
 
   /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails DatanodeDetails.
    * @return node stat if it is live/stale, null if it is decommissioned or
@@ -226,6 +237,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                     ContainerID containerId) throws NodeNotFoundException;
 
   /**
+   * Removes the given container from the specified datanode.
+   *
+   * @param datanodeDetails - DatanodeDetails
+   * @param containerId - containerID
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  void removeContainer(DatanodeDetails datanodeDetails,
+      ContainerID containerId) throws NodeNotFoundException;
+
+  /**
    * Remaps datanode to containers mapping to the new set of containers.
    * @param datanodeDetails - DatanodeDetails
    * @param containerIds - Set of containerIDs
@@ -251,6 +273,13 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   void addDatanodeCommand(UUID dnId, SCMCommand command);
 
+
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  void refreshAllHealthyDnUsageInfo();
+
   /**
    * Process node report.
    *
@@ -269,6 +298,24 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   void processLayoutVersionReport(DatanodeDetails datanodeDetails,
                          LayoutVersionProto layoutReport);
 
+  /**
+   * Process the Command Queue Report sent from datanodes as part of the
+   * heartbeat message.
+   * @param datanodeDetails
+   * @param commandReport
+   */
+  void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
+      CommandQueueReportProto commandReport);
+
+  /**
+   * Get the number of commands of the given type queued on the datanode at the
+   * last heartbeat. If the Datanode has not reported information for the given
+   * command type, -1 will be returned.
+   * @param cmdType
+   * @return The queued count or -1 if no data has been received from the DN.
+   */
+  int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException;
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
@@ -307,7 +354,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   int minPipelineLimit(List<DatanodeDetails> dn);
 
-  default HDDSLayoutVersionManager getLayoutVersionManager(){
+  /**
+   * Gets the peers in all the pipelines for the particular datnode.
+   * @param dn datanode
+   */
+  default Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
+    return null;
+  }
+
+  default HDDSLayoutVersionManager getLayoutVersionManager() {
     return null;
   }
 

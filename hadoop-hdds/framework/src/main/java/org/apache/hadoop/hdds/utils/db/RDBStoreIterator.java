@@ -36,7 +36,7 @@ public class RDBStoreIterator
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreIterator.class);
 
-  private RocksIterator rocksDBIterator;
+  private final RocksIterator rocksDBIterator;
   private RDBTable rocksDBTable;
   private ByteArrayKeyValue currentEntry;
 
@@ -99,23 +99,6 @@ public class RDBStoreIterator
     rocksDBIterator.seek(key);
     setCurrentEntry();
     return currentEntry;
-  }
-
-  @Override
-  public byte[] key() {
-    if (rocksDBIterator.isValid()) {
-      return rocksDBIterator.key();
-    }
-    return null;
-  }
-
-  @Override
-  public ByteArrayKeyValue value() {
-    if (rocksDBIterator.isValid()) {
-      return ByteArrayKeyValue.create(rocksDBIterator.key(),
-          rocksDBIterator.value());
-    }
-    return null;
   }
 
   @Override

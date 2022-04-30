@@ -17,17 +17,16 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
+
+import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group container balancer related operations.
@@ -42,22 +41,25 @@ import picocli.CommandLine.Spec;
  * To start:
  *      ozone admin containerbalancer start
  *      [ -t/--threshold {@literal <threshold>}]
- *      [ -i/--idleiterations {@literal <idleiterations>}]
- *      [ -d/--maxDatanodesToBalance {@literal <maxDatanodesToBalance>}]
- *      [ -s/--maxSizeToMoveInGB {@literal <maxSizeToMoveInGB>}]
+ *      [ -i/--iterations {@literal <iterations>}]
+ *      [ -d/--maxDatanodesPercentageToInvolvePerIteration
+ *      {@literal <maxDatanodesPercentageToInvolvePerIteration>}]
+ *      [ -s/--maxSizeToMovePerIterationInGB
+ *      {@literal <maxSizeToMovePerIterationInGB>}]
  *      Examples:
  *      ozone admin containerbalancer start
  *        start balancer with default values in the configuration
- *      ozone admin containerbalancer start -t 0.05
+ *      ozone admin containerbalancer start -t 5
  *        start balancer with a threshold of 5%
  *      ozone admin containerbalancer start -i 20
- *        start balancer with maximum 20 consecutive idle iterations
- *      ozone admin containerbalancer start -i 0
+ *        start balancer with maximum 20 consecutive iterations
+ *      ozone admin containerbalancer start -i -1
  *        run balancer infinitely with default values in the configuration
- *      ozone admin containerbalancer start -d 10
- *        start balancer with maximum 10 datanodes to balance
+ *      ozone admin containerbalancer start -d 40
+ *        start balancer with maximum 40% of healthy, in-service datanodes
+ *        involved in balancing
  *      ozone admin containerbalancer start -s 10
- *        start balancer with maximum size of 10GB to move
+ *        start balancer with maximum size of 10GB to move in one iteration
  * To stop:
  *      ozone admin containerbalancer stop
  * </pre>

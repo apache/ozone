@@ -52,7 +52,8 @@ public class TestS3InitiateMultipartUploadResponse
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
 
-    Assert.assertNotNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
+    Assert.assertNotNull(
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
     Assert.assertNotNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
 

@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * >>/<<dataDir>>}
  * <p>
  * Each hdds volume has its own VERSION file. The hdds volume will have one
- * scmUuid directory for each SCM it is a part of (currently only one SCM is
+ * clusterUuid directory for each SCM it is a part of (currently only one SCM is
  * supported).
  *
  * During DN startup, if the VERSION file exists, we verify that the

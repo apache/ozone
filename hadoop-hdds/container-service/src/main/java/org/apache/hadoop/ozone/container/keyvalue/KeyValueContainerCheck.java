@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -83,7 +83,7 @@ public class KeyValueContainerCheck {
    * @return true : integrity checks pass, false : otherwise.
    */
   public boolean fastCheck() {
-    LOG.info("Running basic checks for container {};", containerID);
+    LOG.debug("Running basic checks for container {};", containerID);
     boolean valid = false;
     try {
       loadContainerData();
@@ -92,6 +92,8 @@ public class KeyValueContainerCheck {
       valid = true;
 
     } catch (IOException e) {
+      LOG.info("Marking Container {} UNHEALTHY as it failed metadata check",
+              containerID);
       handleCorruption(e);
     }
 
@@ -170,7 +172,7 @@ public class KeyValueContainerCheck {
     Preconditions
         .checkState(onDiskContainerData != null, "Container File not loaded");
 
-    ContainerUtils.verifyChecksum(onDiskContainerData);
+    ContainerUtils.verifyChecksum(onDiskContainerData, checkConfig);
 
     if (onDiskContainerData.getContainerType()
         != ContainerProtos.ContainerType.KeyValueContainer) {
@@ -226,15 +228,15 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData.setDbFile(dbFile);
 
-    ChunkLayOutVersion layout = onDiskContainerData.getLayOutVersion();
+    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
 
-    try(ReferenceCountedDB db =
+    try (ReferenceCountedDB db =
             BlockUtils.getDB(onDiskContainerData, checkConfig);
         BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
 
-      while(kvIter.hasNext()) {
+      while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
-        for(ContainerProtos.ChunkInfo chunk : block.getChunks()) {
+        for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
           File chunkFile = layout.getChunkFile(onDiskContainerData,
               block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
 
@@ -261,7 +263,7 @@ public class KeyValueContainerCheck {
 
   private static void verifyChecksum(BlockData block,
       ContainerProtos.ChunkInfo chunk, File chunkFile,
-      ChunkLayOutVersion layout,
+      ContainerLayoutVersion layout,
       DataTransferThrottler throttler, Canceler canceler) throws IOException {
     ChecksumData checksumData =
         ChecksumData.getFromProtoBuf(chunk.getChecksumData());
@@ -273,12 +275,12 @@ public class KeyValueContainerCheck {
     long bytesRead = 0;
     try (FileChannel channel = FileChannel.open(chunkFile.toPath(),
         ChunkUtils.READ_OPTIONS, ChunkUtils.NO_ATTRIBUTES)) {
-      if (layout == ChunkLayOutVersion.FILE_PER_BLOCK) {
+      if (layout == ContainerLayoutVersion.FILE_PER_BLOCK) {
         channel.position(chunk.getOffset());
       }
       for (int i = 0; i < checksumCount; i++) {
         // limit last read for FILE_PER_BLOCK, to avoid reading next chunk
-        if (layout == ChunkLayOutVersion.FILE_PER_BLOCK &&
+        if (layout == ContainerLayoutVersion.FILE_PER_BLOCK &&
             i == checksumCount - 1 &&
             chunk.getLen() % bytesPerChecksum != 0) {
           buffer.limit((int) (chunk.getLen() % bytesPerChecksum));

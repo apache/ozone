@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -114,7 +115,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // with out volume creation. Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
-      if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
+      OmBucketInfo omBucketInfo =
+          omMetadataManager.getBucketTable().get(bucketKey);
+
+      if (omBucketInfo == null) {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket not exists", BUCKET_NOT_FOUND);
       }
@@ -124,6 +128,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         LOG.debug("bucket: {} is not empty ", bucketName);
         throw new OMException("Bucket is not empty",
             OMException.ResultCodes.BUCKET_NOT_EMPTY);
+      }
+      if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
+        omMetrics.incNumFSOBucketDeletes();
       }
       omMetrics.decNumBuckets();
 

@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -63,8 +67,18 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private static boolean withKey;
 
   @CommandLine.Option(names = {"--length", "-l"},
-          description = "Maximum number of items to list")
+          description = "Maximum number of items to list. " +
+              "If -1 dumps the entire table data")
   private static int limit = 100;
+
+  @CommandLine.Option(names = {"--out", "-o"},
+      description = "File to dump table scan data")
+  private static String fileName;
+
+  @CommandLine.Option(names = {"--dnSchema", "-d"},
+      description = "Datanode DB Schema Version : V1/V2",
+      defaultValue = "V2")
+  private static String dnDBSchemaVersion;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -77,23 +91,47 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
     iterator.seekToFirst();
-    while (iterator.isValid() && limit > 0){
-      StringBuilder result = new StringBuilder();
-      if (withKey) {
-        Object key = dbColumnFamilyDefinition.getKeyCodec()
-            .fromPersistedFormat(iterator.key());
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        result.append(gson.toJson(key));
-        result.append(" -> ");
+
+    Writer fileWriter = null;
+    PrintWriter printWriter = null;
+    try {
+      if (fileName != null) {
+        fileWriter = new OutputStreamWriter(
+            new FileOutputStream(fileName), StandardCharsets.UTF_8);
+        printWriter = new PrintWriter(fileWriter);
       }
-      Object o = dbColumnFamilyDefinition.getValueCodec()
-              .fromPersistedFormat(iterator.value());
-      outputs.add(o);
-      Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      result.append(gson.toJson(o));
-      System.out.println(result.toString());
-      limit--;
-      iterator.next();
+      while (iterator.isValid()) {
+        StringBuilder result = new StringBuilder();
+        if (withKey) {
+          Object key = dbColumnFamilyDefinition.getKeyCodec()
+              .fromPersistedFormat(iterator.key());
+          Gson gson = new GsonBuilder().setPrettyPrinting().create();
+          result.append(gson.toJson(key));
+          result.append(" -> ");
+        }
+        Object o = dbColumnFamilyDefinition.getValueCodec()
+            .fromPersistedFormat(iterator.value());
+        outputs.add(o);
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        result.append(gson.toJson(o));
+        if (fileName != null) {
+          printWriter.println(result);
+        } else {
+          System.out.println(result.toString());
+        }
+        limit--;
+        iterator.next();
+        if (limit == 0) {
+          break;
+        }
+      }
+    } finally {
+      if (printWriter != null) {
+        printWriter.close();
+      }
+      if (fileWriter != null) {
+        fileWriter.close();
+      }
     }
     return outputs;
   }
@@ -118,6 +156,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     return scannedObjects;
   }
 
+  public static void setFileName(String name) {
+    DBScanner.fileName = name;
+  }
+
   private static ColumnFamilyHandle getColumnFamilyHandle(
             byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
     return columnFamilyHandles
@@ -135,7 +177,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private void constructColumnFamilyMap(DBDefinition dbDefinition) {
-    if (dbDefinition == null){
+    if (dbDefinition == null) {
       System.out.println("Incorrect Db Path");
       return;
     }
@@ -166,14 +208,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
           RocksDB rocksDB, String dbPath) throws IOException {
-    if (limit < 1) {
+    if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
-              "List length should be a positive number");
+              "List length should be a positive number. Only allowed negative" +
+                  " number is -1 which is to dump entire table");
     }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
+    DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
     this.constructColumnFamilyMap(DBDefinitionFactory.
             getDefinition(Paths.get(dbPath)));
-    if (this.columnFamilyMap !=null) {
+    if (this.columnFamilyMap != null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
         System.out.print("Table with name:" + tableName + " does not exist");
       } else {
@@ -195,8 +239,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private String removeTrailingSlashIfNeeded(String dbPath) {
-    if(dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)){
-      dbPath = dbPath.substring(0, dbPath.length()-1);
+    if (dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)) {
+      dbPath = dbPath.substring(0, dbPath.length() - 1);
     }
     return dbPath;
   }

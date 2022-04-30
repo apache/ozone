@@ -24,11 +24,15 @@ import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -49,7 +53,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -103,6 +106,7 @@ public class TestOMKeyRequest {
   protected long dataSize;
   protected Random random;
   protected long txnLogId = 100000L;
+  protected long version = 0L;
 
   // Just setting ozoneManagerDoubleBuffer which does nothing.
   protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
@@ -133,6 +137,8 @@ public class TestOMKeyRequest {
     when(ozoneManager.isAdmin(any(String.class))).thenReturn(true);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
+    when(ozoneManager.getBucketInfo(anyString(), anyString())).thenReturn(
+        new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     scmClient = Mockito.mock(ScmClient.class);
@@ -158,23 +164,25 @@ public class TestOMKeyRequest {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.ONE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setNodes(new ArrayList<>())
         .build();
 
-    AllocatedBlock allocatedBlock =
-        new AllocatedBlock.Builder()
-            .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID))
-            .setPipeline(pipeline).build();
-
-    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
-
-    allocatedBlocks.add(allocatedBlock);
+    AllocatedBlock.Builder blockBuilder = new AllocatedBlock.Builder()
+        .setPipeline(pipeline);
 
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
-        any(HddsProtos.ReplicationType.class),
-        any(HddsProtos.ReplicationFactor.class),
-        anyString(), any(ExcludeList.class))).thenReturn(allocatedBlocks);
+        any(ReplicationConfig.class),
+        anyString(), any(ExcludeList.class))).thenAnswer(invocation -> {
+          int num = invocation.getArgument(1);
+          List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
+          for (int i = 0; i < num; i++) {
+            blockBuilder.setContainerBlockID(
+                new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
+            allocatedBlocks.add(blockBuilder.build());
+          }
+          return allocatedBlocks;
+        });
 
 
     volumeName = UUID.randomUUID().toString();
@@ -185,6 +193,7 @@ public class TestOMKeyRequest {
     clientID = Time.now();
     dataSize = 1000L;
     random = new Random();
+    version = 0L;
 
     Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
@@ -216,11 +225,16 @@ public class TestOMKeyRequest {
           throws Exception {
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
             key, id);
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (doAssert) {
       Assert.assertNotNull("Failed to find key in OpenKeyTable", omKeyInfo);
     }
     return omKeyInfo;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   @After

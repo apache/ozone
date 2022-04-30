@@ -28,9 +28,8 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.debug.PrefixParser;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -64,16 +63,14 @@ public class TestOzoneFileSystemPrefixParser {
 
     configuration = new OzoneConfiguration();
 
-    TestOMRequestUtils.configureFSOptimizedPaths(configuration,
-        true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
-
     cluster = MiniOzoneCluster.newBuilder(configuration)
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     String rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,

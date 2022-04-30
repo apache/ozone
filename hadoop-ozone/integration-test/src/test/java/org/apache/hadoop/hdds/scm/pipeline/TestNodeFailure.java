@@ -80,7 +80,7 @@ public class TestNodeFailure {
     final StorageContainerManager scm = cluster.getStorageContainerManager();
     pipelineManager = scm.getPipelineManager();
     ratisPipelines = pipelineManager.getPipelines(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
 
     timeForFailure = (int) ratisServerConfig

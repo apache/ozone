@@ -46,7 +46,7 @@ public enum ReplicationFactor {
    * @return ReplicationFactor
    */
   public static ReplicationFactor valueOf(int value) {
-    if(value == 1) {
+    if (value == 1) {
       return ONE;
     }
     if (value == 3) {
@@ -65,6 +65,22 @@ public enum ReplicationFactor {
       return ReplicationFactor.ONE;
     case THREE:
       return ReplicationFactor.THREE;
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported ProtoBuf replication factor: " + replicationFactor);
+    }
+  }
+
+  public static HddsProtos.ReplicationFactor toProto(
+       ReplicationFactor replicationFactor) {
+    if (replicationFactor == null) {
+      return null;
+    }
+    switch (replicationFactor) {
+    case ONE:
+      return HddsProtos.ReplicationFactor.ONE;
+    case THREE:
+      return HddsProtos.ReplicationFactor.THREE;
     default:
       throw new IllegalArgumentException(
           "Unsupported ProtoBuf replication factor: " + replicationFactor);

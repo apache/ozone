@@ -53,11 +53,11 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       LoggerFactory.getLogger(CloseContainerEventHandler.class);
 
   private final PipelineManager pipelineManager;
-  private final ContainerManagerV2 containerManager;
+  private final ContainerManager containerManager;
   private final SCMContext scmContext;
 
   public CloseContainerEventHandler(final PipelineManager pipelineManager,
-                                    final ContainerManagerV2 containerManager,
+                                    final ContainerManager containerManager,
                                     final SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
@@ -89,7 +89,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
             publisher.fireEvent(DATANODE_COMMAND,
                 new CommandForDatanode<>(node.getUuid(), command)));
       } else {
-        LOG.warn("Cannot close container {}, which is in {} state.",
+        LOG.debug("Cannot close container {}, which is in {} state.",
             containerID, container.getState());
       }
 
@@ -102,10 +102,12 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
   }
 
   private String getContainerToken(ContainerID containerID) {
-    StorageContainerManager scm = scmContext.getScm();
-    return scm != null
-        ? scm.getContainerTokenGenerator().generateEncodedToken(containerID)
-        : ""; // unit test
+    if (scmContext.getScm() instanceof StorageContainerManager) {
+      StorageContainerManager scm =
+          (StorageContainerManager) scmContext.getScm();
+      return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
+    }
+    return ""; //Recon and unit test
   }
 
   /**

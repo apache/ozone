@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.node.states;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -330,7 +329,7 @@ public class NodeStateMap {
   }
 
   public void setContainers(UUID uuid, Set<ContainerID> containers)
-      throws NodeNotFoundException{
+      throws NodeNotFoundException {
     lock.writeLock().lock();
     try {
       checkIfNodeExist(uuid);
@@ -345,8 +344,7 @@ public class NodeStateMap {
     lock.readLock().lock();
     try {
       checkIfNodeExist(uuid);
-      return Collections
-          .unmodifiableSet(new HashSet<>(nodeToContainer.get(uuid)));
+      return new HashSet<>(nodeToContainer.get(uuid));
     } finally {
       lock.readLock().unlock();
     }

@@ -20,15 +20,19 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Test for NSSummary manager.
@@ -38,8 +42,8 @@ public class TestReconNamespaceSummaryManagerImpl {
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private static int[] testBucket;
-  private static final List<Long> TEST_CHILD_DIR =
-          new ArrayList<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
+  private static final Set<Long> TEST_CHILD_DIR =
+          new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeClass
   public static void setupOnce() throws Exception {
@@ -75,6 +79,10 @@ public class TestReconNamespaceSummaryManagerImpl {
     Assert.assertEquals(5, summary3.getNumOfFiles());
     Assert.assertEquals(6, summary3.getSizeOfFiles());
 
+    Assert.assertEquals("dir1", summary.getDirName());
+    Assert.assertEquals("dir2", summary2.getDirName());
+    Assert.assertEquals("dir3", summary3.getDirName());
+
     // test child dir is written
     Assert.assertEquals(3, summary.getChildDir().size());
     // non-existent key
@@ -93,9 +101,9 @@ public class TestReconNamespaceSummaryManagerImpl {
 
   private void putThreeNSMetadata() throws IOException {
     HashMap<Long, NSSummary> hmap = new HashMap<>();
-    hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR));
-    hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR));
-    hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR));
+    hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR, "dir1"));
+    hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR, "dir2"));
+    hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR, "dir3"));
     for (Map.Entry entry: hmap.entrySet()) {
       reconNamespaceSummaryManager.storeNSSummary(
               (long)entry.getKey(), (NSSummary)entry.getValue());

@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
@@ -38,17 +38,17 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @Override
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-      String ozoneKey) {
+      String ozoneKey, RepeatedOmKeyInfo deleteKeys) {
     Assert.assertNotNull(omBucketInfo);
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo);
+        openKey, omBucketInfo, deleteKeys);
   }
 
   @NotNull
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     Assert.assertNotNull(omBucketInfo);
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName,
             omBucketInfo.getBucketName(), keyName, replicationType,
             replicationFactor,
             omBucketInfo.getObjectID() + 1,
@@ -63,13 +63,13 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
     long objectId = parentID + 10;
 
     OmKeyInfo omKeyInfoFSO =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, 100,
                     Time.now());
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    TestOMRequestUtils.addFileToKeyTable(true, false,
+    OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
   }
 
@@ -89,14 +89,8 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
             keyName);
   }
 
-  @NotNull
   @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration config = super.getOzoneConfiguration();
-    // Metadata layout prefix will be set while invoking OzoneManager#start()
-    // and its not invoked in this test. Hence it is explicitly setting
-    // this configuration to populate prefix tables.
-    OzoneManagerRatisUtils.setBucketFSOptimized(true);
-    return config;
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

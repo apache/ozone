@@ -20,7 +20,8 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -53,8 +54,8 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -99,11 +100,14 @@ public class TestS3MultipartUploadCommitPartRequest
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
     Assert.assertTrue(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey).getPartKeyInfoMap().size() == 1);
-    Assert.assertNotNull(omMetadataManager.getOpenKeyTable()
+    Assert.assertNotNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
         .get(multipartOpenKey));
 
     String partKey = getOpenKey(volumeName, bucketName, keyName, clientID);
-    Assert.assertNull(omMetadataManager.getOpenKeyTable().get(partKey));
+    Assert.assertNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
+        .get(partKey));
   }
 
   @Test
@@ -112,8 +116,8 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -151,8 +155,8 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
 
     long clientID = Time.now();
@@ -172,8 +176,13 @@ public class TestS3MultipartUploadCommitPartRequest
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
             2L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
+    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+          == OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND);
+    } else {
+      Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+          == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
+    }
 
   }
 
@@ -184,7 +193,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
 
     long clientID = Time.now();
@@ -211,7 +220,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
             keyName, clientID, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, omMetadataManager);
   }

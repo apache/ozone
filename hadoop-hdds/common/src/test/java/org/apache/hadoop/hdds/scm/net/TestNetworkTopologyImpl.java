@@ -171,7 +171,7 @@ public class TestNetworkTopologyImpl {
   @Test
   public void testContains() {
     Node nodeNotInMap = createDatanode("8.8.8.8", "/d2/r4");
-    for (int i=0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       assertTrue(cluster.contains(dataNodes[i]));
     }
     assertFalse(cluster.contains(nodeNotInMap));
@@ -238,7 +238,7 @@ public class TestNetworkTopologyImpl {
     assumeTrue(cluster.getMaxLevel() > 2);
     int maxLevel = cluster.getMaxLevel();
     assertTrue(cluster.isSameParent(dataNodes[0], dataNodes[1]));
-    while(maxLevel > 1) {
+    while (maxLevel > 1) {
       assertTrue(cluster.isSameAncestor(dataNodes[0], dataNodes[1],
           maxLevel - 1));
       maxLevel--;
@@ -262,17 +262,17 @@ public class TestNetworkTopologyImpl {
 
   @Test
   public void testAddRemove() {
-    for(int i = 0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       cluster.remove(dataNodes[i]);
     }
-    for(int i = 0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       assertFalse(cluster.contains(dataNodes[i]));
     }
     // no leaf nodes
     assertEquals(0, cluster.getNumOfLeafNode(null));
     // no inner nodes
     assertEquals(0, cluster.getNumOfNodes(2));
-    for(int i = 0; i < dataNodes.length; i++) {
+    for (int i = 0; i < dataNodes.length; i++) {
       cluster.add(dataNodes[i]);
     }
     // Inner nodes are created automatically
@@ -296,7 +296,7 @@ public class TestNetworkTopologyImpl {
   }
 
   @Test
-  public void testGetNodesWithLevel() {
+  public void testGetNumOfNodesWithLevel() {
     int maxLevel = cluster.getMaxLevel();
     try {
       assertEquals(1, cluster.getNumOfNodes(0));
@@ -331,6 +331,30 @@ public class TestNetworkTopologyImpl {
     // leaf nodes
     assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
     assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
+  }
+
+  @Test
+  public void testGetNodesWithLevel() {
+    int maxLevel = cluster.getMaxLevel();
+    try {
+      assertNotNull(cluster.getNodes(0));
+      fail("level 0 is not supported");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().startsWith("Invalid level"));
+    }
+
+    try {
+      assertNotNull(cluster.getNodes(maxLevel + 1));
+      fail("level out of scope");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().startsWith("Invalid level"));
+    }
+
+    // root node
+    assertEquals(1, cluster.getNodes(1).size());
+    // leaf nodes
+    assertEquals(dataNodes.length, cluster.getNodes(maxLevel).size());
+    assertEquals(dataNodes.length, cluster.getNodes(maxLevel).size());
   }
 
   @Test
@@ -443,10 +467,10 @@ public class TestNetworkTopologyImpl {
         }};
     int leafNum = cluster.getNumOfLeafNode(null);
     Map<Node, Integer> frequency;
-    for(Node[] list : excludedNodeLists) {
+    for (Node[] list : excludedNodeLists) {
       List<Node> excludedList = Arrays.asList(list);
       int ancestorGen = 0;
-      while(ancestorGen < cluster.getMaxLevel()) {
+      while (ancestorGen < cluster.getMaxLevel()) {
         frequency = pickNodesAtRandom(leafNum, null, excludedList, ancestorGen);
         List<Node> ancestorList = NetUtils.getAncestorList(cluster,
             excludedList, ancestorGen);
@@ -466,7 +490,7 @@ public class TestNetworkTopologyImpl {
     // all nodes excluded, no node will be picked
     List<Node> excludedList = Arrays.asList(dataNodes);
     int ancestorGen = 0;
-    while(ancestorGen < cluster.getMaxLevel()) {
+    while (ancestorGen < cluster.getMaxLevel()) {
       frequency = pickNodesAtRandom(leafNum, null, excludedList, ancestorGen);
       for (Node key : dataNodes) {
         assertTrue(frequency.get(key) == 0);
@@ -476,7 +500,7 @@ public class TestNetworkTopologyImpl {
     // out scope excluded nodes, each node will be picked
     excludedList = Arrays.asList(createDatanode("1.1.1.1.", "/city1/rack1"));
     ancestorGen = 0;
-    while(ancestorGen < cluster.getMaxLevel()) {
+    while (ancestorGen < cluster.getMaxLevel()) {
       frequency = pickNodes(leafNum, null, excludedList, null, ancestorGen);
       for (Node key : dataNodes) {
         assertTrue(frequency.get(key) != 0);
@@ -512,7 +536,7 @@ public class TestNetworkTopologyImpl {
       while (!path.equals(ROOT)) {
         scope = "~" + path;
         int ancestorGen = 0;
-        while(ancestorGen < cluster.getMaxLevel()) {
+        while (ancestorGen < cluster.getMaxLevel()) {
           for (Node[] list : excludedNodeLists) {
             List<Node> excludedList = Arrays.asList(list);
             frequency =
@@ -610,11 +634,12 @@ public class TestNetworkTopologyImpl {
         while (!pathList.get(0).equals(ROOT)) {
           int ancestorGen = cluster.getMaxLevel() - 1;
           while (ancestorGen > 0) {
+            Node affinityNode = dataNodes[k];
             for (Node[] list : excludedNodeLists) {
               List<Node> excludedList = Arrays.asList(list);
               frequency = pickNodes(leafNum, pathList, excludedList,
-                  dataNodes[k], ancestorGen);
-              Node affinityAncestor = dataNodes[k].getAncestor(ancestorGen);
+                  affinityNode, ancestorGen);
+              Node affinityAncestor = affinityNode.getAncestor(ancestorGen);
               for (Node key : dataNodes) {
                 if (affinityAncestor != null) {
                   if (frequency.get(key) > 0) {
@@ -627,6 +652,9 @@ public class TestNetworkTopologyImpl {
                   } else if (pathList != null &&
                       pathList.stream().anyMatch(path ->
                           key.getNetworkFullPath().startsWith(path))) {
+                    continue;
+                  } else if (key.getNetworkFullPath().equals(
+                      affinityNode.getNetworkFullPath())) {
                     continue;
                   } else {
                     fail("Node is not picked when sequentially going " +
@@ -850,6 +878,31 @@ public class TestNetworkTopologyImpl {
         length--;
       }
     }
+  }
+
+  @Test
+  public void testSingleNodeRackWithAffinityNode() {
+    // network topology with default cost
+    List<NodeSchema> schemas = new ArrayList<>();
+    schemas.add(ROOT_SCHEMA);
+    schemas.add(RACK_SCHEMA);
+    schemas.add(LEAF_SCHEMA);
+
+    NodeSchemaManager manager = NodeSchemaManager.getInstance();
+    manager.init(schemas.toArray(new NodeSchema[0]), true);
+    NetworkTopology newCluster =
+        new NetworkTopologyImpl(manager);
+    Node node = createDatanode("1.1.1.1", "/r1");
+    newCluster.add(node);
+    Node chosenNode =
+        newCluster.chooseRandom(NetConstants.ROOT, null, null, node, 0);
+    assertNull(chosenNode);
+    chosenNode = newCluster.chooseRandom(NetConstants.ROOT, null,
+        Arrays.asList(node), node, 0);
+    assertNull(chosenNode);
+    chosenNode = newCluster.chooseRandom(NetConstants.ROOT,
+        Arrays.asList(node.getNetworkFullPath()), Arrays.asList(node), node, 0);
+    assertNull(chosenNode);
   }
 
   private static Node createDatanode(String name, String path) {

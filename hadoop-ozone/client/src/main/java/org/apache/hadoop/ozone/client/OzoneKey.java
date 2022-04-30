@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -107,7 +108,7 @@ public class OzoneKey {
    *
    * @return bucketName
    */
-  public String getBucketName(){
+  public String getBucketName() {
     return bucketName;
   }
 
@@ -154,12 +155,14 @@ public class OzoneKey {
    */
 
   @Deprecated
+  @JsonIgnore
   public ReplicationType getReplicationType() {
     return ReplicationType
             .fromProto(replicationConfig.getReplicationType());
   }
 
   @Deprecated
+  @JsonIgnore
   public int getReplicationFactor() {
     return replicationConfig.getRequiredNodes();
   }
