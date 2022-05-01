@@ -511,6 +511,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
   }
 
+  @SuppressWarnings("java:S2245") // no need for secure random
   private Node chooseNodeInternal(String scope, int leafIndex,
       List<String> excludedScopes, Collection<? extends Node> excludedNodes,
       Node affinityNode, int ancestorGen) {
