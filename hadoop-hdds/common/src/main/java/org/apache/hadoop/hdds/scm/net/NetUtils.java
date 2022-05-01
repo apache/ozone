@@ -155,22 +155,16 @@ public final class NetUtils {
    * the path.
    * @param path path to add suffix
    * @return the normalised path
-   * If <i>path</i>is empty, then {@link NetConstants#ROOT} is returned
+   * If <i>path</i>is empty, then {@link NetConstants#PATH_SEPARATOR_STR} is
+   * returned
    */
   public static String addSuffix(String path) {
     if (path == null) {
       return null;
     }
-
-    int len = path.length();
-    if (len == 0) {
-      return NetConstants.PATH_SEPARATOR_STR;
-    }
-
-    if (path.charAt(len - 1) != NetConstants.PATH_SEPARATOR) {
+    if (!path.endsWith(NetConstants.PATH_SEPARATOR_STR)) {
       return path + NetConstants.PATH_SEPARATOR_STR;
     }
-
     return path;
   }
 }
