@@ -107,7 +107,6 @@ public final class StatefulServiceStateManagerImpl
     public StatefulServiceStateManager build() {
       Preconditions.checkNotNull(statefulServiceConfig);
       Preconditions.checkNotNull(transactionBuffer);
-      Preconditions.checkNotNull(scmRatisServer);
 
       final StatefulServiceStateManager stateManager =
           new StatefulServiceStateManagerImpl(statefulServiceConfig,

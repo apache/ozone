@@ -59,22 +59,22 @@ public abstract class StatefulService implements SCMService {
    * {@link SCMService#getServiceName()} name.
    *
    * @param configType the Class object of the protobuf message type
-   * @param <T> the Type of the protobuf message
+   * @param <T>        the Type of the protobuf message
    * @return persisted protobuf message
    * @throws IOException on failure to fetch the message from DB or when
-   * parsing it. ensure the specified configType is correct
+   *                     parsing it. ensure the specified configType is correct
    */
-  protected final <T extends GeneratedMessage> T readConfiguration(Class<T> configType)
-          throws IOException {
+  protected final <T extends GeneratedMessage> T readConfiguration(
+      Class<T> configType) throws IOException {
     try {
       return configType.cast(ReflectionUtil.getMethod(configType,
-                      "parseFrom", ByteString.class)
-              .invoke(null, stateManager.readConfiguration(getServiceName())));
+              "parseFrom", ByteString.class)
+          .invoke(null, stateManager.readConfiguration(getServiceName())));
     } catch (NoSuchMethodException | IllegalAccessException
-            | InvocationTargetException e) {
+        | InvocationTargetException e) {
       e.printStackTrace();
       throw new InvalidProtocolBufferException("GeneratedMessage cannot " +
-              "be parsed for type " + configType + ": " + e.getMessage());
+          "be parsed for type " + configType + ": " + e.getMessage());
     }
   }
 }
