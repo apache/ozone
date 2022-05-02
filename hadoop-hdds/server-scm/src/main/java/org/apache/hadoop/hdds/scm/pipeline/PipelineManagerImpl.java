@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -51,6 +52,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +76,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private PipelineFactory pipelineFactory;
   private PipelineStateManager stateManager;
   private BackgroundPipelineCreator backgroundPipelineCreator;
+  private BackgroundPipelineScrubber backgroundPipelineScrubber;
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
@@ -139,10 +142,16 @@ public class PipelineManagerImpl implements PipelineManager {
 
     // Create background thread.
     BackgroundPipelineCreator backgroundPipelineCreator =
-        new BackgroundPipelineCreator(
-            pipelineManager, conf, serviceManager, scmContext);
+        new BackgroundPipelineCreator(pipelineManager, conf, scmContext);
+
+    BackgroundPipelineScrubber backgroundPipelineScrubber =
+        new BackgroundPipelineScrubber(pipelineManager, conf, scmContext);
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
+    pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
+
+    serviceManager.register(backgroundPipelineCreator);
+    serviceManager.register(backgroundPipelineScrubber);
 
     return pipelineManager;
   }
@@ -151,6 +160,14 @@ public class PipelineManagerImpl implements PipelineManager {
   public Pipeline createPipeline(
       ReplicationConfig replicationConfig
   ) throws IOException {
+    return createPipeline(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     if (!isPipelineCreationAllowed() && !factorOne(replicationConfig)) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
@@ -167,7 +184,8 @@ public class PipelineManagerImpl implements PipelineManager {
 
     acquireWriteLock();
     try {
-      Pipeline pipeline = pipelineFactory.create(replicationConfig);
+      Pipeline pipeline = pipelineFactory.create(replicationConfig,
+          excludedNodes, favoredNodes);
       stateManager.addPipeline(pipeline.getProtobufMessage(
           ClientVersion.CURRENT_VERSION));
       recordMetricsForPipeline(pipeline);
@@ -204,6 +222,12 @@ public class PipelineManagerImpl implements PipelineManager {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
     return pipelineFactory.create(replicationConfig, nodes);
+  }
+
+  @Override
+  public Pipeline createPipelineForRead(
+      ReplicationConfig replicationConfig, Set<ContainerReplica> replicas) {
+    return pipelineFactory.createForRead(replicationConfig, replicas);
   }
 
   @Override
@@ -245,6 +269,19 @@ public class PipelineManagerImpl implements PipelineManager {
       Collection<PipelineID> excludePipelines) {
     return stateManager
         .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
+  }
+
+  @Override
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  public int getPipelineCount(ReplicationConfig config,
+                                     Pipeline.PipelineState state) {
+    return stateManager.getPipelineCount(config, state);
   }
 
   @Override
@@ -378,15 +415,14 @@ public class PipelineManagerImpl implements PipelineManager {
    * Scrub pipelines.
    */
   @Override
-  public void scrubPipeline(ReplicationConfig config)
-      throws IOException {
+  public void scrubPipelines() throws IOException {
     Instant currentTime = Instant.now();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    List<Pipeline> candidates = stateManager.getPipelines(config);
+    List<Pipeline> candidates = stateManager.getPipelines();
 
     for (Pipeline p : candidates) {
       // scrub pipelines who stay ALLOCATED for too long.
@@ -407,7 +443,6 @@ public class PipelineManagerImpl implements PipelineManager {
         removePipeline(p);
       }
     }
-    return;
   }
 
   /**
@@ -561,6 +596,9 @@ public class PipelineManagerImpl implements PipelineManager {
     if (backgroundPipelineCreator != null) {
       backgroundPipelineCreator.stop();
     }
+    if (backgroundPipelineScrubber != null) {
+      backgroundPipelineScrubber.stop();
+    }
 
     if (pmInfoBean != null) {
       MBeans.unregister(this.pmInfoBean);
@@ -607,6 +645,16 @@ public class PipelineManagerImpl implements PipelineManager {
   @VisibleForTesting
   public BackgroundPipelineCreator getBackgroundPipelineCreator() {
     return this.backgroundPipelineCreator;
+  }
+
+  private void setBackgroundPipelineScrubber(
+      BackgroundPipelineScrubber backgroundPipelineScrubber) {
+    this.backgroundPipelineScrubber = backgroundPipelineScrubber;
+  }
+
+  @VisibleForTesting
+  public BackgroundPipelineScrubber getBackgroundPipelineScrubber() {
+    return this.backgroundPipelineScrubber;
   }
 
   @VisibleForTesting

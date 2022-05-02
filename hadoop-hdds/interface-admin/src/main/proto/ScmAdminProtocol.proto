@@ -265,6 +265,8 @@ message SCMListContainerRequestProto {
   optional string traceID = 3;
   optional LifeCycleState state = 4;
   optional ReplicationFactor factor = 5;
+  optional ReplicationType type = 6;
+  optional ECReplicationConfig ecReplicationConfig = 7;
 }
 
 message SCMListContainerResponseProto {

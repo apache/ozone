@@ -63,11 +63,6 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
-  @CommandLine.Option(names = { "--replicas" },
-      defaultValue = "false",
-      description = "Adds replica related details")
-  private boolean addReplicaDetails;
-
   @Parameters(description = "Decimal id of the container.")
   private long containerID;
 
@@ -108,7 +103,7 @@ public class InfoSubcommand extends ScmSubcommand {
       LOG.info("Datanodes: [{}]", machinesStr);
 
       // Print the replica details if available
-      if (addReplicaDetails && replicas != null) {
+      if (replicas != null) {
         String replicaStr = replicas.stream().map(
             InfoSubcommand::buildReplicaDetails)
             .collect(Collectors.joining(",\n"));
@@ -124,6 +119,9 @@ public class InfoSubcommand extends ScmSubcommand {
   private static String buildReplicaDetails(ContainerReplicaInfo replica) {
     StringBuilder sb = new StringBuilder();
     sb.append("State: " + replica.getState() + ";");
+    if (replica.getReplicaIndex() != -1) {
+      sb.append(" ReplicaIndex: " + replica.getReplicaIndex() + ";");
+    }
     sb.append(" Origin: " + replica.getPlaceOfBirth().toString() + ";");
     sb.append(" Location: "
         + buildDatanodeDetails(replica.getDatanodeDetails()));

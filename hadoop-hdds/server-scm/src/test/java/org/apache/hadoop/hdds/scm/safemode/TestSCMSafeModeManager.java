@@ -354,6 +354,7 @@ public class TestSCMSafeModeManager {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     pipelineManager.getBackgroundPipelineCreator().stop();
+    pipelineManager.getBackgroundPipelineScrubber().stop();
 
     for (int i = 0; i < pipelineCount; i++) {
       // Create pipeline

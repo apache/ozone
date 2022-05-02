@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
-import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
@@ -69,7 +68,7 @@ public class TestRequestValidations {
   }
 
   @Test(expected = NullPointerException.class)
-  public void testUsingRegistryWithoutLoading() throws ServiceException {
+  public void testUsingRegistryWithoutLoading() throws Exception {
     new RequestValidations()
         .fromPackage(PACKAGE)
         .withinContext(of(aFinalizedVersionManager()))
@@ -77,7 +76,7 @@ public class TestRequestValidations {
   }
 
   @Test(expected = NullPointerException.class)
-  public void testUsingRegistryWithoutContext() throws ServiceException {
+  public void testUsingRegistryWithoutContext() throws Exception {
     new RequestValidations()
         .fromPackage(PACKAGE)
         .load()
@@ -85,7 +84,7 @@ public class TestRequestValidations {
   }
 
   @Test
-  public void testUsingRegistryWithoutPackage() throws ServiceException {
+  public void testUsingRegistryWithoutPackage() throws Exception {
     new RequestValidations()
         .withinContext(of(aFinalizedVersionManager()))
         .load()
@@ -96,7 +95,7 @@ public class TestRequestValidations {
 
   @Test
   public void testNoPreValidationsWithoutValidationMethods()
-      throws ServiceException {
+      throws Exception {
     int omVersion = 0;
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadEmptyValidations(ctx);
@@ -108,7 +107,7 @@ public class TestRequestValidations {
 
   @Test
   public void testNoPostValidationsWithoutValidationMethods()
-      throws ServiceException {
+      throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadEmptyValidations(ctx);
 
@@ -120,7 +119,7 @@ public class TestRequestValidations {
 
   @Test
   public void testNoPreValidationsRunningForRequestTypeWithoutValidators()
-      throws ServiceException {
+      throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
@@ -131,7 +130,7 @@ public class TestRequestValidations {
 
   @Test
   public void testNoPostValidationsAreRunningForRequestTypeWithoutValidators()
-      throws ServiceException {
+      throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
@@ -142,14 +141,14 @@ public class TestRequestValidations {
   }
 
   @Test
-  public void testPreProcessorExceptionHandling() {
+  public void testPreProcessorExceptionHandling() throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
     try {
       validations.validateRequest(aDeleteKeysRequest(olderClientVersion()));
       fail("ServiceException was expected but was not thrown.");
-    } catch (ServiceException ignored) { }
+    } catch (Exception ignored) { }
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
@@ -165,7 +164,7 @@ public class TestRequestValidations {
       validations.validateResponse(
           aDeleteKeysRequest(olderClientVersion()), aDeleteKeysResponse());
       fail("ServiceException was expected but was not thrown.");
-    } catch (ServiceException ignored) { }
+    } catch (Exception ignored) { }
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
@@ -174,7 +173,7 @@ public class TestRequestValidations {
 
   @Test
   public void testOldClientConditionIsRecognizedAndPreValidatorsApplied()
-      throws ServiceException {
+      throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
@@ -187,7 +186,7 @@ public class TestRequestValidations {
 
   @Test
   public void testOldClientConditionIsRecognizedAndPostValidatorsApplied()
-      throws ServiceException {
+      throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
@@ -202,7 +201,7 @@ public class TestRequestValidations {
 
   @Test
   public void testPreFinalizedWithOldClientConditionPreProcValidatorsApplied()
-      throws ServiceException {
+      throws Exception {
     ValidationContext ctx = of(anUnfinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 
@@ -216,7 +215,7 @@ public class TestRequestValidations {
 
   @Test
   public void testPreFinalizedWithOldClientConditionPostProcValidatorsApplied()
-      throws ServiceException {
+      throws Exception {
     ValidationContext ctx = of(anUnfinalizedVersionManager());
     RequestValidations validations = loadValidations(ctx);
 

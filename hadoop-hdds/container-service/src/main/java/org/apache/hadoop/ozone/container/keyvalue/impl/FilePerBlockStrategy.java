@@ -137,7 +137,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     // check whether offset matches block file length if its an overwrite
     if (!overwrite) {
-      ChunkUtils.validateChunkSize(chunkFile, info);
+      ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
     }
 
     ChunkUtils

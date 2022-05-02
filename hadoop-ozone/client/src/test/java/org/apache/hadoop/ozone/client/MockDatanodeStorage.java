@@ -18,11 +18,13 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.commons.collections.map.HashedMap;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,10 +34,17 @@ import java.util.Map;
 public class MockDatanodeStorage {
 
   private final Map<DatanodeBlockID, BlockData> blocks = new HashedMap();
+  private final Map<BlockID, String> fullBlockData = new HashMap<>();
 
   private final Map<String, ChunkInfo> chunks = new HashMap<>();
 
   private final Map<String, ByteString> data = new HashMap<>();
+
+  private boolean failed = false;
+
+  public void setStorageFailed() {
+    this.failed = true;
+  }
 
   public void putBlock(DatanodeBlockID blockID, BlockData blockData) {
     blocks.put(blockID, blockData);
@@ -47,9 +56,17 @@ public class MockDatanodeStorage {
 
   public void writeChunk(
       DatanodeBlockID blockID,
-      ChunkInfo chunkInfo, ByteString bytes) {
-    data.put(createKey(blockID, chunkInfo), bytes);
+      ChunkInfo chunkInfo, ByteString bytes) throws IOException {
+    if (failed) {
+      throw new IOException("This storage was marked as failed.");
+    }
+    data.put(createKey(blockID, chunkInfo),
+        ByteString.copyFrom(bytes.toByteArray()));
     chunks.put(createKey(blockID, chunkInfo), chunkInfo);
+    fullBlockData
+        .put(new BlockID(blockID.getContainerID(), blockID.getLocalID()),
+            fullBlockData.getOrDefault(blockID, "")
+                .concat(bytes.toStringUtf8()));
   }
 
   public ChunkInfo readChunkInfo(
@@ -68,6 +85,14 @@ public class MockDatanodeStorage {
   private String createKey(DatanodeBlockID blockId, ChunkInfo chunkInfo) {
     return blockId.getContainerID() + "_" + blockId.getLocalID() + "_"
         + chunkInfo.getChunkName() + "_" + chunkInfo.getOffset();
+  }
+
+  public Map<String, ByteString> getAllBlockData() {
+    return this.data;
+  }
+
+  public String getFullBlockData(BlockID blockID) {
+    return this.fullBlockData.get(blockID);
   }
 
 }

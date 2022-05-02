@@ -165,6 +165,14 @@ public class TestContainerPlacementFactory {
     Assert.assertSame(SCMContainerPlacementRandom.class, policy.getClass());
   }
 
+  @Test
+  public void testECPolicy() throws IOException {
+    PlacementPolicy policy = ContainerPlacementPolicyFactory
+        .getECPolicy(conf, null, null, true, null);
+    Assert.assertSame(SCMContainerPlacementRackScatter.class,
+        policy.getClass());
+  }
+
   /**
    * A dummy container placement implementation for test.
    */
