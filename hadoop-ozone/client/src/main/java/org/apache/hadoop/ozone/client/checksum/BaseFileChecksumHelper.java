@@ -179,6 +179,7 @@ public abstract class BaseFileChecksumHelper {
    */
   public void compute() throws IOException {
     if (fileChecksum != null) {
+      LOG.debug("Checksum is available. Skip computing it.");
       return;
     }
     /**
