@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -384,6 +385,36 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     resp.setBucketInfo(omBucketInfo.getProtobuf());
 
     return resp.build();
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.InfoBucket
+  )
+  public static OMResponse disallowInfoBucketResponseWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException {
+    if (!resp.hasInfoBucketResponse()) {
+      return resp;
+    }
+    if (resp.getInfoBucketResponse().getBucketInfo().hasBucketLayout() &&
+        !BucketLayout.fromProto(
+                resp.getInfoBucketResponse().getBucketInfo().getBucketLayout())
+            .isLegacy()) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Requested bucket uses Bucket Layout feature, which"
+              + " the client can not understand.\n" +
+              "Please upgrade the client before trying to read this bucket's" +
+              " information: "
+              + req.getInfoBucketRequest().getVolumeName()
+              + "/" + req.getInfoBucketRequest().getBucketName()
+              + ".")
+          .clearInfoBucketResponse()
+          .build();
+    }
+    return resp;
   }
 
   private LookupKeyResponse lookupKey(LookupKeyRequest request,

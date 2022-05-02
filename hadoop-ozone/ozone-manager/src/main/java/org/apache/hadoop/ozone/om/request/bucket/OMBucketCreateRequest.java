@@ -393,4 +393,52 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
     return req;
   }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
+  public static OMRequest disallowCreateBucketWithBucketLayoutDuringPreFinalize(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+      if (req.getCreateBucketRequest()
+          .getBucketInfo().hasBucketLayout()
+          &&
+          !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
+              .getBucketLayout()).isLegacy()) {
+        throw new OMException("Cluster does not have the Bucket Layout"
+            + " support feature finalized yet, but the request contains"
+            + " a non LEGACY bucket type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
+  public static OMRequest disallowCreateBucketWithBucketLayoutFromOlderClient(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+      if (req.getCreateBucketRequest()
+          .getBucketInfo().hasBucketLayout()
+          &&
+          !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
+              .getBucketLayout()).isLegacy()) {
+        throw new OMException("Cluster does not have the Bucket Layout"
+            + " support feature finalized yet, but the request contains"
+            + " a non LEGACY bucket type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+    }
+    return req;
+  }
 }
