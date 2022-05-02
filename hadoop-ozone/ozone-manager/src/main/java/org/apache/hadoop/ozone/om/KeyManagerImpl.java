@@ -1862,7 +1862,8 @@ public class KeyManagerImpl implements KeyManager {
     }
 
 
-    return buildFinalStatusList(cacheFileMap, cacheDirMap, args, clientAddress);
+    return buildFinalStatusList(cacheFileMap, cacheDirMap, args,
+        clientAddress, numEntries);
 
   }
 
@@ -1873,18 +1874,27 @@ public class KeyManagerImpl implements KeyManager {
   private List<OzoneFileStatus> buildFinalStatusList(
       Map<String, OzoneFileStatus> cacheFileMap,
       Map<String, OzoneFileStatus> cacheDirMap, OmKeyArgs omKeyArgs,
-      String clientAddress)
+      String clientAddress, long numEntries)
       throws IOException {
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
 
+    long countEntries = 0;
     for (OzoneFileStatus fileStatus : cacheFileMap.values()) {
       fileStatusFinalList.add(fileStatus);
       keyInfoList.add(fileStatus.getKeyInfo());
+      countEntries++;
+      if (countEntries >= numEntries) {
+        break;
+      }
     }
 
     for (OzoneFileStatus fileStatus : cacheDirMap.values()) {
+      if (countEntries >= numEntries) {
+        break;
+      }
       fileStatusFinalList.add(fileStatus);
+      countEntries++;
     }
 
     if (omKeyArgs.getLatestVersionLocation()) {
@@ -1947,7 +1957,7 @@ public class KeyManagerImpl implements KeyManager {
             iterator = dirTable.iterator();
 
     iterator.seek(seekDirInDB);
-
+    countEntries = 0;
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
@@ -1985,6 +1995,7 @@ public class KeyManagerImpl implements KeyManager {
           iterator)
       throws IOException {
     iterator.seek(seekKeyInDB);
+    countEntries = 0;
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
       OmKeyInfo keyInfo = entry.getValue();
