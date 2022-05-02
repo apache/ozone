@@ -19,15 +19,11 @@
  */
 package org.apache.hadoop.ozone.s3.metrics;
 
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
@@ -48,7 +44,6 @@ import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
 
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -65,7 +60,7 @@ import static org.mockito.Mockito.when;
 public class TestS3GatewayMetrics {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private String keyName =  OzoneConsts.KEY;
+  private String keyName = OzoneConsts.KEY;
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
   private RootEndpoint rootEndpoint;
@@ -96,6 +91,7 @@ public class TestS3GatewayMetrics {
     headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
   }
 
@@ -263,7 +259,8 @@ public class TestS3GatewayMetrics {
         .getResourceAsStream("userAccessControlList.xml");
 
     try {
-      bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers, inputBody);
+      bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers,
+          inputBody);
       fail();
     } catch (OS3Exception ex) {
     } finally {
@@ -280,14 +277,8 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testHeadKeySuccess() throws Exception {
-    String value = RandomStringUtils.randomAlphanumeric(32);
-    OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.ONE, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+    bucket.createKey(keyName, 0).close();
 
-    // Test for Success of HeadKeySuccess Metric
     long oriMetric = metrics.getHeadKeySuccess();
 
     keyEndpoint.head(bucketName, keyName);
@@ -298,7 +289,6 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testHeadKeyFailure() throws Exception {
-    // Test for Failure of HeadKeyFailure Metric
     long oriMetric = metrics.getHeadKeyFailure();
 
     keyEndpoint.head(bucketName, "unknownKey");
@@ -310,12 +300,10 @@ public class TestS3GatewayMetrics {
   @Test
   public void testCreateKeySuccess() throws Exception {
 
-    // Test for Success of CreateKeySuccess Metric
     long oriMetric = metrics.getCreateKeySuccess();
     // Create an input stream
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    keyEndpoint.setHeaders(headers);
     // Create the file
     keyEndpoint.put(bucketName, keyName, CONTENT
         .length(), 1, null, body);
@@ -326,9 +314,8 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testCreateKeyFailure() throws Exception {
-    // Test for Success of createKeyFailure Metric
     long oriMetric = metrics.getCreateKeyFailure();
-    keyEndpoint.setHeaders(headers);
+
     // Create the file in a bucket that does not exist
     try {
       keyEndpoint.put("unknownBucket", keyName, CONTENT
@@ -344,13 +331,9 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testDeleteKeySuccess() throws Exception {
-    // Test for Success of DeleteKeySuccess Metric
     long oriMetric = metrics.getDeleteKeySuccess();
 
-    OzoneBucket bkt =
-        clientStub.getObjectStore().getS3Bucket(bucketName);
-
-    bkt.createKey(keyName, 0).close();
+    bucket.createKey(keyName, 0).close();
     keyEndpoint.delete(bucketName, keyName, null);
     long curMetric = metrics.getDeleteKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -358,7 +341,6 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testDeleteKeyFailure() throws Exception {
-    // Test for Success of DeleteKeyFailure Metric
     long oriMetric = metrics.getDeleteKeyFailure();
     try {
       keyEndpoint.delete("unknownBucket", keyName, null);
@@ -372,13 +354,11 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testGetKeySuccess() throws Exception {
-    // Test for Success of GetKeySuccess Metric
     long oriMetric = metrics.getGetKeySuccess();
 
     // Create an input stream
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    keyEndpoint.setHeaders(headers);
     // Create the file
     keyEndpoint.put(bucketName, keyName, CONTENT
         .length(), 1, null, body);
@@ -391,9 +371,7 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testGetKeyFailure() throws Exception {
-    // Test for Success of GetKeyFailure Metric
     long oriMetric = metrics.getGetKeyFailure();
-    keyEndpoint.setHeaders(headers);
     // Fetching a non-existent key
     try {
       keyEndpoint.get(bucketName, "unknownKey", null, 0,
@@ -408,9 +386,7 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testInitMultiPartUploadSuccess() throws Exception {
-    keyEndpoint.setHeaders(headers);
 
-    // Test for Success of InitMultiPartUploadSuccess Metric
     long oriMetric = metrics.getInitMultiPartUploadSuccess();
     keyEndpoint.initializeMultipartUpload(bucketName, keyName);
     long curMetric = metrics.getInitMultiPartUploadSuccess();
@@ -419,9 +395,7 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testInitMultiPartUploadFailure() throws Exception {
-    // Test for Success of InitMultiPartUploadFailure Metric
     long oriMetric = metrics.getInitMultiPartUploadFailure();
-    keyEndpoint.setHeaders(headers);
     try {
       keyEndpoint.initializeMultipartUpload("unknownBucket", keyName);
       fail();
@@ -434,12 +408,10 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testAbortMultiPartUploadSuccess() throws Exception {
-    keyEndpoint.setHeaders(headers);
 
     // Initiate the Upload and fetch the upload ID
     String uploadID = initiateMultipartUpload(bucketName, keyName);
 
-    // Test for Success of AbortMultiPartUploadSuccess Metric
     long oriMetric = metrics.getAbortMultiPartUploadSuccess();
 
     // Abort the Upload Successfully by deleting the key using the Upload-Id
@@ -451,7 +423,6 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testAbortMultiPartUploadFailure() throws Exception {
-    // Test for Success of AbortMultiPartUploadFailure Metric
     long oriMetric = metrics.getAbortMultiPartUploadFailure();
 
     // Fail the Abort Method by providing wrong uploadID
@@ -468,12 +439,10 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testCompleteMultiPartUploadSuccess() throws Exception {
-    keyEndpoint.setHeaders(headers);
 
     // Initiate the Upload and fetch the upload ID
     String uploadID = initiateMultipartUpload(bucketName, keyName);
 
-    // Test for Success of CompleteMultiPartUploadSuccess Metric
     long oriMetric = metrics.getCompleteMultiPartUploadSuccess();
     // complete multipart upload
     CompleteMultipartUploadRequest completeMultipartUploadRequest = new
@@ -487,7 +456,6 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testCompleteMultiPartUploadFailure() throws Exception {
-    // Test for Success of CompleteMultiPartUploadFailure Metric
     long oriMetric = metrics.getCompleteMultiPartUploadFailure();
     CompleteMultipartUploadRequest completeMultipartUploadRequestNew = new
         CompleteMultipartUploadRequest();
@@ -504,12 +472,10 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testCreateMultipartKeySuccess() throws Exception {
-    keyEndpoint.setHeaders(headers);
 
     // Initiate the Upload and fetch the upload ID
     String uploadID = initiateMultipartUpload(bucketName, keyName);
 
-    // Test for Success of CreateMultipartKeySuccess Metric
     long oriMetric = metrics.getCreateMultipartKeySuccess();
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
@@ -521,8 +487,6 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testCreateMultipartKeyFailure() throws Exception {
-    keyEndpoint.setHeaders(headers);
-    // Test for Success of CreateMultipartKeyFailure Metric
     long oriMetric = metrics.getCreateMultipartKeyFailure();
     try {
       keyEndpoint.put(bucketName, keyName, CONTENT.length(),
@@ -537,9 +501,6 @@ public class TestS3GatewayMetrics {
   @Test
   public void testListPartsSuccess() throws Exception {
 
-    keyEndpoint.setHeaders(headers);
-
-    // Test for Success of ListPartsSuccess Metric
     long oriMetric = metrics.getListPartsSuccess();
     // Initiate the Upload and fetch the upload ID
     String uploadID = initiateMultipartUpload(bucketName, keyName);
@@ -553,9 +514,7 @@ public class TestS3GatewayMetrics {
 
   @Test
   public void testListPartsFailure() throws Exception {
-    keyEndpoint.setHeaders(headers);
 
-    // Test for Success of ListPartsFailure Metric
     long oriMetric = metrics.getListPartsFailure();
     try {
       // Listing out the parts by providing the uploadID after aborting
@@ -570,9 +529,7 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testCopyObjectSuccess() throws Exception {
-
-    keyEndpoint.setHeaders(headers);
+  public void testCopyObject() throws Exception {
 
     String destBucket = "b2";
     String destKey = "key2";
@@ -598,7 +555,7 @@ public class TestS3GatewayMetrics {
     long curMetric = metrics.getCopyObjectSuccess();
     assertEquals(1L, curMetric - oriMetric);
 
-    // Test for Success of CopyObjectFailure Metric
+    // Test for Failure of CopyObjectFailure Metric
     oriMetric = metrics.getCopyObjectFailure();
     // source and dest same
     try {
@@ -614,9 +571,8 @@ public class TestS3GatewayMetrics {
   }
 
   private OzoneClient createClientWithKeys(String... keys) throws IOException {
-    OzoneBucket bkt = clientStub.getObjectStore().getS3Bucket(bucketName);
     for (String key : keys) {
-      bkt.createKey(key, 0).close();
+      bucket.createKey(key, 0).close();
     }
     return clientStub;
   }
