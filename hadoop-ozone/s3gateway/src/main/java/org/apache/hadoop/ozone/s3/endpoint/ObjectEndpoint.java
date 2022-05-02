@@ -992,8 +992,8 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private boolean checkCopySourceModificationTime(Long lastModificationTime,
-          String copySourceIfModifiedSinceStr,
-          String copySourceIfUnmodifiedSinceStr) {
+      String copySourceIfModifiedSinceStr,
+      String copySourceIfUnmodifiedSinceStr) {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
     long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
 
