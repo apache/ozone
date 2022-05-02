@@ -3393,7 +3393,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
     LOG.info("Install Checkpoint is finished with Term: {} and Index: {}. " +
         "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
-        (Time.monotonicNow() - startTime) );
+        (Time.monotonicNow() - startTime));
     return newTermIndex;
   }
 
