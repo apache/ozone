@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -71,15 +72,18 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    boolean result = scmClient.startContainerBalancer(threshold, iterations,
+    StartContainerBalancerResponseProto response = scmClient.
+        startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB);
-    if (result) {
+    if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
-      return;
+    } else {
+      System.out.println("Failed to start Container Balancer.");
+      if (response.hasMessage()) {
+        System.out.printf("Failure reason: %s", response.getMessage());
+      }
     }
-    System.out.println("Container Balancer is either already running or " +
-        "failed to start.\nPlease check the logs for more info.");
   }
 }

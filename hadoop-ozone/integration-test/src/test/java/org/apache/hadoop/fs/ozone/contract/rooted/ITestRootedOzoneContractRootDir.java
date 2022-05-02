@@ -26,8 +26,6 @@ import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
 
 /**
  * Ozone contract test for ROOT directory operations.
@@ -58,19 +56,5 @@ public class ITestRootedOzoneContractRootDir extends
   @Override
   public void testRmNonEmptyRootDirNonRecursive() {
     // OFS doesn't support creating files directly under root
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-6414")
-  public void testRmEmptyRootDirNonRecursive() {
-    // Temporarily ignored test case, please add it back with HDDS-6414.
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-6414")
-  public void testListEmptyRootDirectory() {
-    // Temporarily ignored test case, please add it back with HDDS-6414.
   }
 }

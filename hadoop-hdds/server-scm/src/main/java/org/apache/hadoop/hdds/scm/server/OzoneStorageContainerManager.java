@@ -41,6 +41,8 @@ public interface OzoneStorageContainerManager {
 
   void join();
 
+  void shutDown(String message);
+
   NodeManager getScmNodeManager();
 
   BlockManager getScmBlockManager();

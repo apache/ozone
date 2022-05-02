@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -908,6 +910,37 @@ public class TestSCMNodeManager {
         .equals(node1.getUuid()));
     assertTrue(captor.getValue().getCommand().getType()
         .equals(finalizeNewLayoutVersionCommand));
+  }
+
+  @Test
+  public void testProcessCommandQueueReport()
+      throws IOException, NodeNotFoundException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    EventPublisher eventPublisher = mock(EventPublisher.class);
+    HDDSLayoutVersionManager lvm  =
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    SCMNodeManager nodeManager  = new SCMNodeManager(conf,
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
+        SCMContext.emptyContext(), lvm);
+    DatanodeDetails node1 =
+        HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
+    verify(eventPublisher,
+        times(1)).fireEvent(NEW_NODE, node1);
+    nodeManager.processNodeCommandQueueReport(node1,
+        CommandQueueReportProto.newBuilder()
+            .addCommand(SCMCommandProto.Type.replicateContainerCommand)
+            .addCount(123)
+            .addCommand(SCMCommandProto.Type.closeContainerCommand)
+            .addCount(11)
+            .build());
+    Assert.assertEquals(-1, nodeManager.getNodeQueuedCommandCount(
+        node1, SCMCommandProto.Type.closePipelineCommand));
+    Assert.assertEquals(123, nodeManager.getNodeQueuedCommandCount(
+        node1, SCMCommandProto.Type.replicateContainerCommand));
+    Assert.assertEquals(11, nodeManager.getNodeQueuedCommandCount(
+        node1, SCMCommandProto.Type.closeContainerCommand));
   }
 
   /**

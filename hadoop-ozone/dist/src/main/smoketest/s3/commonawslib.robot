@@ -105,6 +105,7 @@ Setup s3 tests
                        Set Suite Variable                        ${BUCKET}
                        Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
                        Run Keyword if                            '${BUCKET}' == 'encrypted'            Create encrypted bucket
+                       Run Keyword if                            '${BUCKET}' == 'erasure'              Create EC bucket
 
 Setup links for S3 tests
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
@@ -123,6 +124,11 @@ Create link
     [arguments]       ${bucket}
     Execute           ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/${bucket}
     [return]          ${bucket}
+
+Create EC bucket
+    ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/erasure
+    Return From Keyword If    ${exists}
+    Execute            ozone sh bucket create --replication rs-3-2-1024k --type EC o3://${OM_SERVICE_ID}/s3v/erasure
 
 Generate random prefix
     ${random} =          Generate Ozone String

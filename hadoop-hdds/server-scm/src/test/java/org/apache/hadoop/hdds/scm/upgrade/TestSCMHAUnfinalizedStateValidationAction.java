@@ -27,7 +27,9 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -62,6 +64,12 @@ public class TestSCMHAUnfinalizedStateValidationAction {
   private final boolean shouldFail;
   private final String dataPath;
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
+
+  @BeforeClass
+  public static void setup() {
+    ExitUtils.disableSystemExit();
+  }
+
 
   @Parameterized.Parameters(name = "haEnabledBefore={0} " +
       "haEnabledPreFinalized={1}")

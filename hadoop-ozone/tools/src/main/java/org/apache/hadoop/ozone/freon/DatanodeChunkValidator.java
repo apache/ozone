@@ -18,15 +18,12 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
-import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -79,7 +76,6 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
 
   @Override
-  @SuppressWarnings("java:S3864") // Stream.peek (for debug)
   public Void call() throws Exception {
 
     init();
@@ -91,33 +87,9 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
       );
     }
 
-    try (StorageContainerLocationProtocol scmLocationClient =
+    try (StorageContainerLocationProtocol scmClient =
                  createStorageContainerLocationClient(ozoneConf)) {
-      Stream<Pipeline> pipelines = scmLocationClient.listPipelines().stream();
-      if (LOG.isDebugEnabled()) {
-        pipelines = pipelines
-            .peek(p -> LOG.debug("Found pipeline {}", p.getId()));
-      }
-      Pipeline pipeline;
-      if (pipelineId != null && pipelineId.length() > 0) {
-        pipeline = pipelines
-              .filter(p -> p.getId().getId().toString().equals(pipelineId))
-              .findFirst()
-              .orElseThrow(() -> new IllegalArgumentException(
-                      "Pipeline ID is defined, but there is no such pipeline: "
-                              + pipelineId));
-
-      } else {
-        pipeline = pipelines
-            .filter(
-                p -> ReplicationConfig.getLegacyFactor(p.getReplicationConfig())
-                    == HddsProtos.ReplicationFactor.THREE)
-              .findFirst()
-              .orElseThrow(() -> new IllegalArgumentException(
-                      "Pipeline ID is NOT defined, and no pipeline " +
-                              "has been found with factor=THREE"));
-        LOG.info("Using pipeline {}", pipeline.getId());
-      }
+      Pipeline pipeline = findPipelineForTest(pipelineId, scmClient, LOG);
 
       try (XceiverClientManager xceiverClientManager =
                    new XceiverClientManager(ozoneConf)) {

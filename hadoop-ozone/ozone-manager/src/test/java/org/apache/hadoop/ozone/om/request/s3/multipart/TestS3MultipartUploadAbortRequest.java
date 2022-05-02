@@ -53,7 +53,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -105,7 +105,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String keyName = UUID.randomUUID().toString();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     String multipartUploadID = "randomMPU";
 

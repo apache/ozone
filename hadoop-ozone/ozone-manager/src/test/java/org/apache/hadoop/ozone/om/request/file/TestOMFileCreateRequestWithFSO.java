@@ -98,7 +98,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     String fileName = "f";
     String key = parentDir + "/" + fileName;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
     // Create parent dirs for the path
     long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName,
             bucketName, parentDir, omMetadataManager);

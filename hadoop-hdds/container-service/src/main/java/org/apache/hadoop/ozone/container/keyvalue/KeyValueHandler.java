@@ -85,6 +85,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSIN
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_NON_EMPTY_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_OPEN_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
@@ -93,6 +94,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
@@ -215,7 +217,7 @@ public class KeyValueHandler extends Handler {
     case DeleteBlock:
       return handler.handleDeleteBlock(request, kvContainer);
     case ListBlock:
-      return handler.handleUnsupportedOp(request);
+      return handler.handleListBlock(request, kvContainer);
     case ReadChunk:
       return handler.handleReadChunk(request, kvContainer, dispatcherContext);
     case DeleteChunk:
@@ -272,6 +274,8 @@ public class KeyValueHandler extends Handler {
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
+    newContainerData.setReplicaIndex(request.getCreateContainer()
+        .getReplicaIndex());
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
     KeyValueContainer newContainer = new KeyValueContainer(
@@ -544,6 +548,43 @@ public class KeyValueHandler extends Handler {
     }
 
     return getBlockLengthResponse(request, blockLength);
+  }
+
+  /**
+   * Handle List Block operation. Calls BlockManager to process the request.
+   */
+  ContainerCommandResponseProto handleListBlock(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+
+    if (!request.hasListBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed list block request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    List<ContainerProtos.BlockData> returnData = new ArrayList<>();
+    try {
+      int count = request.getListBlock().getCount();
+      long startLocalId = -1;
+      if (request.getListBlock().hasStartLocalID()) {
+        startLocalId = request.getListBlock().getStartLocalID();
+      }
+      List<BlockData> responseData =
+          blockManager.listBlock(kvContainer, startLocalId, count);
+      for (int i = 0; i < responseData.size(); i++) {
+        returnData.add(responseData.get(i).getProtoBufMessage());
+      }
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("List blocks failed", ex, IO_EXCEPTION),
+          request);
+    }
+
+    return getListBlockResponse(request, returnData);
   }
 
   /**
@@ -1052,6 +1093,18 @@ public class KeyValueHandler extends Handler {
           throw new StorageContainerException(
               "Deletion of Open Container is not allowed.",
               DELETE_ON_OPEN_CONTAINER);
+        }
+        // Safety check that the container is empty.
+        // If the container is not empty, it should not be deleted unless the
+        // container is beinf forcefully deleted (which happens when
+        // container is unhealthy or over-replicated).
+        if (container.getContainerData().getBlockCount() != 0) {
+          LOG.error("Received container deletion command for container {} but" +
+              " the container is not empty.",
+              container.getContainerData().getContainerID());
+          throw new StorageContainerException("Non-force deletion of " +
+              "non-empty container is not allowed.",
+              DELETE_ON_NON_EMPTY_CONTAINER);
         }
       }
       long containerId = container.getContainerData().getContainerID();
