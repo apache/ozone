@@ -22,11 +22,11 @@ Resource            lib.resource
 Test Bucket Layout Prior To Finalization
     [Tags]  pre-finalized-bucket-layout-tests
     Execute         ozone sh volume create /bucket-layout-test
-    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/fsoBucket --layout FILE_SYSTEM_OPTIMIZED
+    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/fso-bucket --layout FILE_SYSTEM_OPTIMIZED
                     Should contain  ${result}   NOT_SUPPORTED_OPERATION
-    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/obsBucket --layout OBJECT_STORE
+    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/obs-bucket --layout OBJECT_STORE
                     Should contain  ${result}   NOT_SUPPORTED_OPERATION
-    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/legacyBucket --layout LEGACY
+    ${result} =     Execute                     ozone sh bucket create bucket-layout-test/legacy-bucket --layout LEGACY
                     Should Not contain  ${result}   NOT_SUPPORTED_OPERATION
 
 
@@ -34,17 +34,17 @@ Test Bucket Layout Prior To Finalization
 Test Bucket Layout After Finalization
     [Tags]  post-finalized-bucket-layout-tests
     Execute         ozone sh volume create /bucket-layout-test-new
-    ${result} =     Execute                         ozone sh bucket create bucket-layout-test-new/fsoBucket-new --layout FILE_SYSTEM_OPTIMIZED
+    ${result} =     Execute                         ozone sh bucket create bucket-layout-test-new/fso-bucket-new --layout FILE_SYSTEM_OPTIMIZED
                     Should Not contain  ${result}   NOT_SUPPORTED_OPERATION
-    ${result} =     Execute                         ozone sh bucket info bucket-layout-test-new/fsoBucket-new
+    ${result} =     Execute                         ozone sh bucket info bucket-layout-test-new/fso-bucket-new | grep bucketLayout
                     Should contain      ${result}   FILE_SYSTEM_OPTIMIZED
 
-    ${result} =     Execute                         ozone sh bucket create bucket-layout-test-new/obsBucket-new --layout OBJECT_STORE
+    ${result} =     Execute                         ozone sh bucket create bucket-layout-test-new/obs-bucket-new --layout OBJECT_STORE
                     Should Not contain  ${result}   NOT_SUPPORTED_OPERATION
-    ${result} =     Execute                         ozone sh bucket info bucket-layout-test-new/obsBucket-new
+    ${result} =     Execute                         ozone sh bucket info bucket-layout-test-new/obs-bucket-new | grep bucketLayout
                     Should contain      ${result}   OBJECT_STORE
 
-    ${result} =     Execute                         ozone sh bucket create bucket-layout-test-new/legacyBucket-new --layout LEGACY
+    ${result} =     Execute                         ozone sh bucket create bucket-layout-test-new/legacy-bucket-new --layout LEGACY
                     Should Not contain  ${result}   NOT_SUPPORTED_OPERATION
-    ${result} =     Execute                         ozone sh bucket info bucket-layout-test-new/legacyBucket-new
+    ${result} =     Execute                         ozone sh bucket info bucket-layout-test-new/legacy-bucket-new | grep bucketLayout
                     Should contain      ${result}   LEGACY
