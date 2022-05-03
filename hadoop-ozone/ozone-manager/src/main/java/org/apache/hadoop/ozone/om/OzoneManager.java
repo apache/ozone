@@ -3273,7 +3273,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           "installing the new checkpoint.");
       // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
-      startSecretManager();
+      startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
       throw e;
     }
@@ -3354,6 +3354,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             "Index: {}", term, lastAppliedIndex);
       }
     } catch (Exception ex) {
+
       String errorMsg = "Failed to reload OM state and instantiate services.";
       exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
