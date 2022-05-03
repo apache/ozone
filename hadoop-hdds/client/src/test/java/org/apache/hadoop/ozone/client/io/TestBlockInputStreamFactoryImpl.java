@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc.read;
+package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -28,10 +28,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.junit.Test;
 import org.junit.Assert;
 
@@ -50,7 +47,7 @@ public class TestBlockInputStreamFactoryImpl {
     ReplicationConfig repConfig =
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
 
-    OmKeyLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
+    BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
         1024 * 1024 * 10);
 
     BlockExtendedInputStream stream =
@@ -67,7 +64,7 @@ public class TestBlockInputStreamFactoryImpl {
     ReplicationConfig repConfig =
         new ECReplicationConfig(3, 2);
 
-    OmKeyLocationInfo blockInfo =
+    BlockLocationInfo blockInfo =
         createKeyLocationInfo(repConfig, 5, 1024 * 1024 * 10);
 
     BlockExtendedInputStream stream =
@@ -78,7 +75,7 @@ public class TestBlockInputStreamFactoryImpl {
     Assert.assertEquals(stream.getLength(), blockInfo.getLength());
   }
 
-  private OmKeyLocationInfo createKeyLocationInfo(ReplicationConfig repConf,
+  private BlockLocationInfo createKeyLocationInfo(ReplicationConfig repConf,
       long blockLength, Map<DatanodeDetails, Integer> dnMap) {
 
     Pipeline pipeline = Pipeline.newBuilder()
@@ -89,7 +86,7 @@ public class TestBlockInputStreamFactoryImpl {
         .setReplicationConfig(repConf)
         .build();
 
-    OmKeyLocationInfo keyInfo = new OmKeyLocationInfo.Builder()
+    BlockLocationInfo keyInfo = new BlockLocationInfo.Builder()
         .setBlockID(new BlockID(1, 1))
         .setLength(blockLength)
         .setOffset(0)
@@ -99,7 +96,7 @@ public class TestBlockInputStreamFactoryImpl {
     return keyInfo;
   }
 
-  private OmKeyLocationInfo createKeyLocationInfo(ReplicationConfig repConf,
+  private BlockLocationInfo createKeyLocationInfo(ReplicationConfig repConf,
       int nodeCount, long blockLength) {
     Map<DatanodeDetails, Integer> datanodes = new HashMap<>();
     for (int i = 0; i < nodeCount; i++) {
