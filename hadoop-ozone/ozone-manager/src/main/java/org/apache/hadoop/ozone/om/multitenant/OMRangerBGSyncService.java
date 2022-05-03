@@ -22,6 +22,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -65,7 +67,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
  */
 public class OMRangerBGSyncService extends BackgroundService {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OMRangerBGSyncService.class);
   private static final ClientId CLIENT_ID = ClientId.randomId();
   private static final long ONE_HOUR_IN_MILLIS = 3600 * 1000;
@@ -241,6 +243,10 @@ public class OMRangerBGSyncService extends BackgroundService {
       // TODO: Acquire lock
       long currentOzoneServiceVerInDB = getOMDBRangerServiceVersion();
       long proposedOzoneServiceVerInDB = retrieveRangerServiceVersion();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Database version: {}, Ranger version: {}",
+            currentOzoneServiceVerInDB, proposedOzoneServiceVerInDB);
+      }
       while (currentOzoneServiceVerInDB != proposedOzoneServiceVerInDB) {
         // TODO: Release lock
         if (++attempt > MAX_ATTEMPT) {
@@ -326,8 +332,14 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   long getOMDBRangerServiceVersion() throws IOException {
-    return ozoneManager.getMetadataManager().getOmRangerStateTable()
+    final Long dbValue = ozoneManager.getMetadataManager()
+        .getOmRangerStateTable()
         .get(OmMetadataManagerImpl.RANGER_OZONE_SERVICE_VERSION_KEY);
+    if (dbValue == null) {
+      return -1;
+    } else {
+      return dbValue;
+    }
   }
 
   private void executeOMDBToRangerSync(long baseVersion) throws IOException {
@@ -379,6 +391,8 @@ public class OMRangerBGSyncService extends BackgroundService {
             newPolicy.get("name").getAsString());  // TODO: Reduce to debug?
         continue;
       }
+      // Temporarily put the policy in the to-delete list,
+      // valid entries will be removed later
       mtRangerPoliciesToBeDeleted.put(
           newPolicy.get("name").getAsString(),
           newPolicy.get("id").getAsString());
@@ -466,6 +480,14 @@ public class OMRangerBGSyncService extends BackgroundService {
           + "OM can't fix this automatically", policyName);
     }
 
+    // Note: Using a TreeSet here as a hack so AdminRole is ahead of
+    // UserRole (alphabetically), a proper solution would require dependency
+    // graph building and BFS.
+    // Ranger roles that are depended by other roles must be deleted AFTER these
+    // roles. Could the Ranger client handle this
+    // TODO: Remove? Does not seem necessary here anymore
+    final Set<String> rolesTobeDeleted = new TreeSet<>();
+
     for (Map.Entry<String, String> entry :
         mtRangerPoliciesToBeDeleted.entrySet()) {
       // TODO: Its best to not create these policies automatically and the
@@ -481,13 +503,16 @@ public class OMRangerBGSyncService extends BackgroundService {
           (accessPolicy.getPolicyLastUpdateTime() + ONE_HOUR_IN_MILLIS)) {
         LOG.warn("Deleting policy from Ranger: {}", policyName);
         authorizer.deletePolicybyName(policyName);
-        for (String deletedRole : accessPolicy.getRoleList()) {
-          authorizer.deleteRole(new JsonParser()
-              .parse(authorizer.getRole(deletedRole))
-              .getAsJsonObject().get("id").getAsString());
-        }
+        rolesTobeDeleted.addAll(accessPolicy.getRoleList());
       }
     }
+
+//    for (String deletedRole : rolesTobeDeleted) {
+//      LOG.warn("Deleting role from Ranger: {}", deletedRole);
+//      authorizer.deleteRole(new JsonParser()
+//          .parse(authorizer.getRole(deletedRole))
+//          .getAsJsonObject().get("id").getAsString());
+//    }
   }
 
   /**
@@ -500,8 +525,6 @@ public class OMRangerBGSyncService extends BackgroundService {
     } else {
       final HashSet<String> usersInTheRole = mtOMDBRoles.get(roleName);
       usersInTheRole.add(userPrincipal);
-      // TODO: Most likely unnecessary. Got reference above. Double check
-//      mtOMDBRoles.put(roleName, usersInTheRole);
     }
   }
 
@@ -529,7 +552,9 @@ public class OMRangerBGSyncService extends BackgroundService {
         final CachedTenantState cachedTenantState = e1.getValue();
 
         final String userRoleName = cachedTenantState.getTenantUserRoleName();
+        mtOMDBRoles.computeIfAbsent(userRoleName, any -> new HashSet<>());
         final String adminRoleName = cachedTenantState.getTenantAdminRoleName();
+        mtOMDBRoles.computeIfAbsent(adminRoleName, any -> new HashSet<>());
 
         final Map<String, CachedAccessIdInfo> accessIdInfoMap =
             cachedTenantState.getAccessIdInfoMap();
@@ -577,21 +602,23 @@ public class OMRangerBGSyncService extends BackgroundService {
       final String userPrincipal = dbAccessIdInfo.getUserPrincipal();
 
       final OmDBTenantState dbTenantState = tenantStateTable.get(tenantId);
-      final String userRole = dbTenantState.getUserRoleName();
+      final String userRoleName = dbTenantState.getUserRoleName();
+      mtOMDBRoles.computeIfAbsent(userRoleName, any -> new HashSet<>());
+      final String adminRoleName = dbTenantState.getAdminRoleName();
+      mtOMDBRoles.computeIfAbsent(adminRoleName, any -> new HashSet<>());
 
       // Every tenant user should be in the tenant's userRole
-      addUserToMtOMDBRoles(userRole, userPrincipal);
+      addUserToMtOMDBRoles(userRoleName, userPrincipal);
 
       // If the accessId has admin flag set, add to adminRole as well
       if (dbAccessIdInfo.getIsAdmin()) {
-        final String adminRole = dbTenantState.getAdminRoleName();
-        addUserToMtOMDBRoles(adminRole, userPrincipal);
+        addUserToMtOMDBRoles(adminRoleName, userPrincipal);
       }
     }
   }
 
   private void processAllRolesFromOMDB() throws IOException {
-    // Lets First make sure that all the Roles in OMDB are present in Ranger
+    // Lets First make sure that all the Roles in OM DB are present in Ranger
     // as well as the corresponding userlist matches matches.
     for (Map.Entry<String, HashSet<String>> entry : mtOMDBRoles.entrySet()) {
       final String roleName = entry.getKey();
@@ -604,8 +631,8 @@ public class OMRangerBGSyncService extends BackgroundService {
           if (rangerUserList.contains(userPrincipal)) {
             rangerUserList.remove(userPrincipal);
           } else {
-            // We found a user in OMDB Role that doesn't exist in Ranger Role.
-            // Lets just push the role from OMDB to Ranger.
+            // We found a user in OM DB Role that doesn't exist in Ranger Role.
+            // Lets just push the role from OM DB to Ranger
             pushRoleToRanger = true;
             break;
           }
@@ -621,17 +648,32 @@ public class OMRangerBGSyncService extends BackgroundService {
         pushRoleToRanger = true;
       }
       if (pushRoleToRanger) {
+        LOG.info("Updating role in Ranger: {}", roleName);
         pushOMDBRoleToRanger(roleName);
       }
-      // We have processed this role in OMDB now. Lets remove it from
+      // We have processed this role in OM DB now. Lets remove it from
       // mtRangerRoles. Eventually whatever is left in mtRangerRoles
       // are extra entries, that should not have been in Ranger.
       mtRangerRoles.remove(roleName);
     }
 
-    for (String roleName : mtRangerRoles.keySet()) {
-      authorizer.deleteRole(new JsonParser().parse(authorizer.getRole(roleName))
-          .getAsJsonObject().get("id").getAsString());
+    // A hack (for now) to delete UserRole before AdminRole
+    final Set<String> rolesToDelete = new TreeSet<>(Collections.reverseOrder());
+    rolesToDelete.addAll(mtRangerRoles.keySet());
+
+    for (String roleName : rolesToDelete) {
+      LOG.warn("Deleting role from Ranger: {}", roleName);
+      try {
+        final String roleObj = authorizer.getRole(roleName);
+        authorizer.deleteRole(new JsonParser().parse(roleObj)
+            .getAsJsonObject().get("id").getAsString());
+      } catch (IOException e) {
+        LOG.error("Failed to delete role: {}. Already deleted or is depended?",
+            roleName);
+        throw e;
+      }
+      // TODO: Server returned HTTP response code: 400
+      //  if already deleted or is depended on
     }
   }
 

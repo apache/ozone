@@ -135,9 +135,9 @@ public interface MultiTenantAccessAuthorizer extends IAccessAuthorizer {
    * @return
    * @throws IOException
    */
-  String createUser(String userName,
-                           String password)
+  String createUser(String userName, String password)
       throws IOException;
+
   /**
    * Delete the group groupID in MultiTenantGateKeeper plugin.
    * @param groupID : unique opaque ID that was returned by

@@ -539,10 +539,15 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         "GET", false);
     String policyInfo = getResponseData(conn);
     JsonArray jArry = new JsonParser().parse(policyInfo).getAsJsonArray();
-    JsonObject jsonObject = jArry.get(0).getAsJsonObject();
-    AccessPolicy policy = new RangerAccessPolicy(policyName);
-    policy.deserializePolicyFromJsonString(jsonObject);
-    return policy;
+    if (jArry.size() > 0) {
+      JsonObject jsonObject = jArry.get(0).getAsJsonObject();
+      AccessPolicy policy = new RangerAccessPolicy(policyName);
+      policy.deserializePolicyFromJsonString(jsonObject);
+      return policy;
+    } else {
+      // Returns null when policyInfo is an empty array
+      return null;
+    }
   }
 
   @Override
@@ -691,9 +696,23 @@ public class MultiTenantAccessAuthorizerRangerPlugin implements
         response.append(responseLine.trim());
       }
       LOG.debug("Got response: {}", response);
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw e;
+    } catch (IOException e) {
+      // Common exceptions:
+      // 1. Server returned HTTP response code: 401
+      //   - Possibly incorrect Ranger credentials
+      // 2. Server returned HTTP response code: 400
+      //   - Policy or role does not exist
+      switch (urlConnection.getResponseCode()) {
+      case 400:
+        LOG.error("The policy or role likely does not exist in Ranger");
+        return null;
+      case 401:
+        LOG.error("Check Ranger credentials");
+//        break;
+      default:
+        e.printStackTrace();
+        throw e;
+      }
     }
     return response.toString();
   }
