@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DATACENTER_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODEGROUP_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.REGION_SCHEMA;
@@ -44,6 +45,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
+
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -189,6 +192,13 @@ public class TestNetworkTopologyImpl {
     assertEquals(cluster.getNode(""), cluster.getNode("/"));
     assertEquals(null, cluster.getNode("/switch1/node1"));
     assertEquals(null, cluster.getNode("/switch1"));
+
+    if (cluster.getNode("/d1") != null) {
+      List<String> excludedScope = new ArrayList<>();
+      excludedScope.add("/d");
+      Node n = cluster.getNode(0, "/d1", excludedScope, null, null, 0);
+      assertNotNull(n);
+    }
   }
 
   @Test
@@ -410,7 +420,7 @@ public class TestNetworkTopologyImpl {
         scope = "~" + path;
         frequency = pickNodesAtRandom(100, scope, null, 0);
         for (Node key : dataNodes) {
-          if (key.getNetworkFullPath().startsWith(path)) {
+          if (key.isDescendant(path)) {
             assertTrue(frequency.get(key) == 0);
           }
         }
@@ -544,8 +554,7 @@ public class TestNetworkTopologyImpl {
             List<Node> ancestorList = NetUtils.getAncestorList(cluster,
                 excludedList, ancestorGen);
             for (Node key : dataNodes) {
-              if (excludedList.contains(key) ||
-                  key.getNetworkFullPath().startsWith(path) ||
+              if (excludedList.contains(key) || key.isDescendant(path) ||
                   (ancestorList.size() > 0 &&
                       ancestorList.stream()
                           .map(a -> (InnerNode) a)
@@ -650,8 +659,7 @@ public class TestNetworkTopologyImpl {
                       excludedList.contains(key)) {
                     continue;
                   } else if (pathList != null &&
-                      pathList.stream().anyMatch(path ->
-                          key.getNetworkFullPath().startsWith(path))) {
+                      pathList.stream().anyMatch(key::isDescendant)) {
                     continue;
                   } else if (key.getNetworkFullPath().equals(
                       affinityNode.getNetworkFullPath())) {
@@ -903,6 +911,36 @@ public class TestNetworkTopologyImpl {
     chosenNode = newCluster.chooseRandom(NetConstants.ROOT,
         Arrays.asList(node.getNetworkFullPath()), Arrays.asList(node), node, 0);
     assertNull(chosenNode);
+  }
+
+  @Test
+  public void testIsAncestor() {
+    NodeImpl r1 = new NodeImpl("r1", "/", NODE_COST_DEFAULT);
+    NodeImpl r12 = new NodeImpl("r12", "/", NODE_COST_DEFAULT);
+    NodeImpl dc = new NodeImpl("dc", "/r12", NODE_COST_DEFAULT);
+    Assert.assertFalse(r1.isAncestor(dc));
+    Assert.assertFalse(r1.isAncestor("/r12/dc2"));
+    Assert.assertFalse(dc.isDescendant(r1));
+    Assert.assertFalse(dc.isDescendant("/r1"));
+
+    Assert.assertTrue(r12.isAncestor(dc));
+    Assert.assertTrue(r12.isAncestor("/r12/dc2"));
+    Assert.assertTrue(dc.isDescendant(r12));
+    Assert.assertTrue(dc.isDescendant("/r12"));
+  }
+
+  @Test
+  public void testGetLeafOnLeafParent() {
+    InnerNodeImpl root = new InnerNodeImpl("", "", null, 0, 0);
+    InnerNodeImpl r12 = new InnerNodeImpl("r12", "/", root, 1, 0);
+    InnerNodeImpl dc = new InnerNodeImpl("dc", "/r12", r12, 2, 0);
+    NodeImpl n1 = new NodeImpl("n1", "/r12/dc", dc, 2, 0);
+    dc.add(n1);
+
+    List<String> excludedScope = new ArrayList<>();
+    excludedScope.add("/r1");
+    Assert.assertFalse(n1.isDescendant("/r1"));
+    Assert.assertEquals(n1, dc.getLeaf(0, excludedScope, null, 0));
   }
 
   private static Node createDatanode(String name, String path) {
