@@ -265,6 +265,7 @@ public class ReplicationManager implements SCMService {
     } catch (Throwable t) {
       if (t instanceof InterruptedException) {
         LOG.info("Replication Monitor Thread is stopped");
+        Thread.currentThread().interrupt();
       } else {
         // When we get runtime exception, we should terminate SCM.
         LOG.error("Exception in Replication Monitor Thread.", t);
