@@ -16,7 +16,57 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.container;
+package org.apache.hadoop.hdds.scm.container.replication;
+
+import com.google.protobuf.GeneratedMessage;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
+import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
@@ -35,80 +85,22 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import static org.apache.hadoop.hdds.protocol.proto.
-    SCMRatisProtocol.RequestType.MOVE;
-import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
-import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.util.ExitUtil;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
-
-import com.google.protobuf.GeneratedMessage;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
-
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.apache.ratis.util.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.MOVE;
 
 /**
- * Replication Manager (RM) is the one which is responsible for making sure
- * that the containers are properly replicated. Replication Manager deals only
- * with Quasi Closed / Closed container.
+ * Legacy Replication Manager (RM) is a legacy , which is used to process
+ * non-EC container, and hopefully to be replaced int the future.
  */
-public class ReplicationManager implements SCMService {
+public class LegacyReplicationManager {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(ReplicationManager.class);
-
-  public static final String METRICS_SOURCE_NAME = "SCMReplicationManager";
+      LoggerFactory.getLogger(LegacyReplicationManager.class);
 
   /**
    * Reference to the ContainerManager.
@@ -212,38 +204,17 @@ public class ReplicationManager implements SCMService {
   private final ReplicationManagerConfiguration rmConf;
 
   /**
-   * ReplicationMonitor thread is the one which wakes up at configured
-   * interval and processes all the containers.
-   */
-  private Thread replicationMonitor;
-
-  /**
-   * Flag used for checking if the ReplicationMonitor thread is running or
-   * not.
-   */
-  private volatile boolean running;
-
-  /**
    * Minimum number of replica in a healthy state for maintenance.
    */
   private int minHealthyForMaintenance;
+
+  private final Clock clock;
 
   /**
    * Current container size as a bound for choosing datanodes with
    * enough space for a replica.
    */
   private long currentContainerSize;
-
-  /**
-   * SCMService related variables.
-   * After leaving safe mode, replicationMonitor needs to wait for a while
-   * before really take effect.
-   */
-  private final Lock serviceLock = new ReentrantLock();
-  private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
-  private final long waitTimeInMillis;
-  private long lastTimeToBeReadyInMillis = 0;
-  private final Clock clock;
 
   /**
    * Replication progress related metrics.
@@ -255,10 +226,6 @@ public class ReplicationManager implements SCMService {
    */
   private final MoveScheduler moveScheduler;
 
-  /**
-   * Report object that is refreshed each time replication Manager runs.
-   */
-  private ReplicationManagerReport containerReport;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -269,16 +236,15 @@ public class ReplicationManager implements SCMService {
    * @param eventPublisher EventPublisher
    */
   @SuppressWarnings("parameternumber")
-  public ReplicationManager(final ConfigurationSource conf,
-             final ContainerManager containerManager,
-             final PlacementPolicy containerPlacement,
-             final EventPublisher eventPublisher,
-             final SCMContext scmContext,
-             final SCMServiceManager serviceManager,
-             final NodeManager nodeManager,
-             final java.time.Clock clock,
-             final SCMHAManager scmhaManager,
-             final Table<ContainerID, MoveDataNodePair> moveTable)
+  public LegacyReplicationManager(final ConfigurationSource conf,
+            final ContainerManager containerManager,
+            final PlacementPolicy containerPlacement,
+            final EventPublisher eventPublisher,
+            final SCMContext scmContext,
+            final NodeManager nodeManager,
+            final SCMHAManager scmhaManager,
+            final Clock clock,
+            final Table<ContainerID, MoveDataNodePair> moveTable)
              throws IOException {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
@@ -286,18 +252,12 @@ public class ReplicationManager implements SCMService {
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
     this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
-    this.running = false;
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
     this.inflightMoveFuture = new ConcurrentHashMap<>();
     this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
     this.clock = clock;
-    this.containerReport = new ReplicationManagerReport();
 
-    this.waitTimeInMillis = conf.getTimeDuration(
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
-        TimeUnit.MILLISECONDS);
     this.currentContainerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
@@ -308,109 +268,16 @@ public class ReplicationManager implements SCMService {
         .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setRatisServer(scmhaManager.getRatisServer())
         .setMoveTable(moveTable).build();
-
-    // register ReplicationManager to SCMServiceManager.
-    serviceManager.register(this);
-
-    // start ReplicationManager.
-    start();
   }
 
-  /**
-   * Starts Replication Monitor thread.
-   */
-  @Override
-  public synchronized void start() {
-    if (!isRunning()) {
-      metrics = ReplicationManagerMetrics.create(this);
-      LOG.info("Starting Replication Monitor Thread.");
-      running = true;
-      replicationMonitor = new Thread(this::run);
-      replicationMonitor.setName("ReplicationMonitor");
-      replicationMonitor.setDaemon(true);
-      replicationMonitor.start();
-    } else {
-      LOG.info("Replication Monitor Thread is already running.");
-    }
+
+  protected synchronized void clearInflightActions() {
+    inflightReplication.clear();
+    inflightDeletion.clear();
   }
 
-  /**
-   * Returns true if the Replication Monitor Thread is running.
-   *
-   * @return true if running, false otherwise
-   */
-  public boolean isRunning() {
-    if (!running) {
-      synchronized (this) {
-        return replicationMonitor != null
-            && replicationMonitor.isAlive();
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Stops Replication Monitor thread.
-   */
-  public synchronized void stop() {
-    if (running) {
-      LOG.info("Stopping Replication Monitor Thread.");
-      inflightReplication.clear();
-      inflightDeletion.clear();
-      running = false;
-      metrics.unRegister();
-      notifyAll();
-    } else {
-      LOG.info("Replication Monitor Thread is not running.");
-    }
-  }
-
-  /**
-   * Process all the containers now, and wait for the processing to complete.
-   * This in intended to be used in tests.
-   */
-  public synchronized void processAll() {
-    if (!shouldRun()) {
-      LOG.info("Replication Manager is not ready to run until {}ms after " +
-          "safemode exit", waitTimeInMillis);
-      return;
-    }
-    final long start = clock.millis();
-    final List<ContainerInfo> containers =
-        containerManager.getContainers();
-    ReplicationManagerReport report = new ReplicationManagerReport();
-    for (ContainerInfo c : containers) {
-      processContainer(c, report);
-    }
-    report.setComplete();
-    containerReport = report;
-    LOG.info("Replication Monitor Thread took {} milliseconds for" +
-            " processing {} containers.", clock.millis() - start,
-        containers.size());
-  }
-
-  public ReplicationManagerReport getContainerReport() {
-    return containerReport;
-  }
-
-  /**
-   * ReplicationMonitor thread runnable. This wakes up at configured
-   * interval and processes all the containers in the system.
-   */
-  private synchronized void run() {
-    try {
-      while (running) {
-        processAll();
-        wait(rmConf.getInterval());
-      }
-    } catch (Throwable t) {
-      // When we get runtime exception, we should terminate SCM.
-      LOG.error("Exception in Replication Monitor Thread.", t);
-      if (t instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      ExitUtil.terminate(1, t);
-    }
+  protected synchronized void setMetrics(ReplicationManagerMetrics metrics) {
+    this.metrics = metrics;
   }
 
   /**
@@ -419,11 +286,8 @@ public class ReplicationManager implements SCMService {
    * @param container ContainerInfo
    */
   @SuppressWarnings("checkstyle:methodlength")
-  private void processContainer(ContainerInfo container,
+  protected void processContainer(ContainerInfo container,
       ReplicationManagerReport report) {
-    if (!shouldRun()) {
-      return;
-    }
     final ContainerID id = container.containerID();
     try {
       // synchronize on the containerInfo object to solve container
@@ -492,14 +356,14 @@ public class ReplicationManager implements SCMService {
          * list, if the operation is completed or if it has timed out.
          */
         updateInflightAction(container, inflightReplication,
-            action -> replicas.stream()
-                .anyMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
+            action -> replicas.stream().anyMatch(
+                r -> r.getDatanodeDetails().equals(action.getDatanode())),
             () -> metrics.incrNumReplicationCmdsTimeout(),
             action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
-            action -> replicas.stream()
-                .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)),
+            action -> replicas.stream().noneMatch(
+                r -> r.getDatanodeDetails().equals(action.getDatanode())),
             () -> metrics.incrNumDeletionCmdsTimeout(),
             action -> updateCompletedDeletionMetrics(container, action));
 
@@ -601,14 +465,14 @@ public class ReplicationManager implements SCMService {
       InflightAction action) {
     metrics.incrNumReplicationCmdsCompleted();
     metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
-    metrics.addReplicationTime(clock.millis() - action.time);
+    metrics.addReplicationTime(clock.millis() - action.getTime());
   }
 
   private void updateCompletedDeletionMetrics(ContainerInfo container,
       InflightAction action) {
     metrics.incrNumDeletionCmdsCompleted();
     metrics.incrNumDeletionBytesCompleted(container.getUsedBytes());
-    metrics.addDeletionTime(clock.millis() - action.time);
+    metrics.addDeletionTime(clock.millis() - action.getTime());
   }
 
   /**
@@ -634,10 +498,10 @@ public class ReplicationManager implements SCMService {
       while (iter.hasNext()) {
         try {
           InflightAction a = iter.next();
-          NodeStatus status = nodeManager.getNodeStatus(a.datanode);
+          NodeStatus status = nodeManager.getNodeStatus(a.getDatanode());
           boolean isUnhealthy = status.getHealth() != NodeState.HEALTHY;
           boolean isCompleted = filter.test(a);
-          boolean isTimeout = a.time < deadline;
+          boolean isTimeout = a.getTime() < deadline;
           boolean isNotInService = status.getOperationalState() !=
               NodeOperationalState.IN_SERVICE;
           if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
@@ -650,7 +514,7 @@ public class ReplicationManager implements SCMService {
             }
 
             updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
-                isNotInService, container, a.datanode, inflightActions);
+                isNotInService, container, a.getDatanode(), inflightActions);
           }
         } catch (NodeNotFoundException | ContainerNotFoundException e) {
           // Should not happen, but if it does, just remove the action as the
@@ -781,14 +645,10 @@ public class ReplicationManager implements SCMService {
    * @param cid Container to move
    * @param mp MoveDataNodePair which contains source and target datanodes
    */
-  public CompletableFuture<MoveResult> move(ContainerID cid,
+  private CompletableFuture<MoveResult> move(ContainerID cid,
       MoveDataNodePair mp)
       throws ContainerNotFoundException, NodeNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
-    if (!isRunning()) {
-      ret.complete(MoveResult.FAIL_NOT_RUNNING);
-      return ret;
-    }
 
     if (!scmContext.isLeader()) {
       ret.complete(MoveResult.FAIL_NOT_LEADER);
@@ -1096,7 +956,7 @@ public class ReplicationManager implements SCMService {
       final List<DatanodeDetails> deletionInFlight = inflightDeletion
           .getOrDefault(container.containerID(), Collections.emptyList())
           .stream()
-          .map(action -> action.datanode)
+          .map(action -> action.getDatanode())
           .collect(Collectors.toList());
       Set<ContainerReplica> filteredReplicas = replicas.stream().filter(
           r -> !deletionInFlight.contains(r.getDatanodeDetails()))
@@ -1175,12 +1035,12 @@ public class ReplicationManager implements SCMService {
       final List<DatanodeDetails> deletionInFlight = inflightDeletion
           .getOrDefault(id, Collections.emptyList())
           .stream()
-          .map(action -> action.datanode)
+          .map(action -> action.getDatanode())
           .collect(Collectors.toList());
       final List<DatanodeDetails> replicationInFlight = inflightReplication
           .getOrDefault(id, Collections.emptyList())
           .stream()
-          .map(action -> action.datanode)
+          .map(action -> action.getDatanode())
           .collect(Collectors.toList());
       final List<DatanodeDetails> source = replicas.stream()
           .filter(r ->
@@ -1314,7 +1174,7 @@ public class ReplicationManager implements SCMService {
       // also many not be available
       eligibleReplicas.removeIf(r ->
           r.getDatanodeDetails().getPersistedOpState() !=
-              HddsProtos.NodeOperationalState.IN_SERVICE);
+              NodeOperationalState.IN_SERVICE);
 
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()
@@ -1704,32 +1564,12 @@ public class ReplicationManager implements SCMService {
       ContainerInfo container, Set<ContainerReplica> replicas) {
     LifeCycleState state = container.getState();
     return replicas.stream()
-        .allMatch(r -> ReplicationManager.compareState(state, r.getState()));
+        .allMatch(r -> compareState(state, r.getState()));
   }
 
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
     return inflightReplication.containsKey(containerID) ||
         inflightDeletion.containsKey(containerID);
-  }
-
-  /**
-   * Wrapper class to hold the InflightAction with its start time.
-   */
-  static final class InflightAction {
-
-    private final DatanodeDetails datanode;
-    private final long time;
-
-    private InflightAction(final DatanodeDetails datanode,
-                           final long time) {
-      this.datanode = datanode;
-      this.time = time;
-    }
-
-    @VisibleForTesting
-    public DatanodeDetails getDatanode() {
-      return datanode;
-    }
   }
 
   /**
@@ -1803,49 +1643,10 @@ public class ReplicationManager implements SCMService {
     }
   }
 
-  @Override
-  public void notifyStatusChanged() {
-    serviceLock.lock();
-    try {
-      // 1) SCMContext#isLeaderReady returns true.
-      // 2) not in safe mode.
-      if (scmContext.isLeaderReady() && !scmContext.isInSafeMode()) {
-        // transition from PAUSING to RUNNING
-        if (serviceStatus != ServiceStatus.RUNNING) {
-          LOG.info("Service {} transitions to RUNNING.", getServiceName());
-          lastTimeToBeReadyInMillis = clock.millis();
-          serviceStatus = ServiceStatus.RUNNING;
-        }
-        //now, as the current scm is leader and it`s state is up-to-date,
-        //we need to take some action about replicated inflight move options.
-        onLeaderReadyAndOutOfSafeMode();
-      } else {
-        serviceStatus = ServiceStatus.PAUSING;
-      }
-    } finally {
-      serviceLock.unlock();
-    }
-  }
-
-  @Override
-  public boolean shouldRun() {
-    serviceLock.lock();
-    try {
-      // If safe mode is off, then this SCMService starts to run with a delay.
-      return serviceStatus == ServiceStatus.RUNNING &&
-          clock.millis() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
-    } finally {
-      serviceLock.unlock();
-    }
-  }
-
-  @Override
-  public String getServiceName() {
-    return ReplicationManager.class.getSimpleName();
-  }
-
-  public ReplicationManagerMetrics getMetrics() {
-    return this.metrics;
+  protected void notifyStatusChanged() {
+    //now, as the current scm is leader and it`s state is up-to-date,
+    //we need to take some action about replicated inflight move options.
+    onLeaderReadyAndOutOfSafeMode();
   }
 
   public Map<ContainerID, List<InflightAction>> getInflightReplication() {
