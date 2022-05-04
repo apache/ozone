@@ -210,7 +210,7 @@ public class ReplicationManager implements SCMService {
       running = false;
       legacyReplicationManager.clearInflightActions();
       metrics.unRegister();
-      notifyAll();
+      replicationMonitor.interrupt();
     } else {
       LOG.info("Replication Monitor Thread is not running.");
     }
@@ -263,12 +263,13 @@ public class ReplicationManager implements SCMService {
         wait(rmConf.getInterval());
       }
     } catch (Throwable t) {
-      // When we get runtime exception, we should terminate SCM.
-      LOG.error("Exception in Replication Monitor Thread.", t);
       if (t instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
+        LOG.info("Replication Monitor Thread is stopped");
+      } else {
+        // When we get runtime exception, we should terminate SCM.
+        LOG.error("Exception in Replication Monitor Thread.", t);
+        ExitUtil.terminate(1, t);
       }
-      ExitUtil.terminate(1, t);
     }
   }
 
