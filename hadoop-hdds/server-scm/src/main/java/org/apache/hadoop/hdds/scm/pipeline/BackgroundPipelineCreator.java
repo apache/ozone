@@ -30,11 +30,11 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -84,13 +84,15 @@ public class BackgroundPipelineCreator implements SCMService {
   private static final String THREAD_NAME = "RatisPipelineUtilsThread";
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final long intervalInMillis;
+  private final Clock clock;
 
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
-      ConfigurationSource conf, SCMContext scmContext) {
+      ConfigurationSource conf, SCMContext scmContext, Clock clock) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scmContext = scmContext;
+    this.clock = clock;
 
     this.createPipelineInSafeMode = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
@@ -247,7 +249,7 @@ public class BackgroundPipelineCreator implements SCMService {
         // transition from PAUSING to RUNNING
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
-          lastTimeToBeReadyInMillis = Time.monotonicNow();
+          lastTimeToBeReadyInMillis = clock.millis();
           serviceStatus = ServiceStatus.RUNNING;
         }
       } else {
@@ -295,7 +297,7 @@ public class BackgroundPipelineCreator implements SCMService {
       // If safe mode is off, then this SCMService starts to run with a delay.
       return serviceStatus == ServiceStatus.RUNNING && (
           createPipelineInSafeMode ||
-          Time.monotonicNow() - lastTimeToBeReadyInMillis >= waitTimeInMillis);
+          clock.millis() - lastTimeToBeReadyInMillis >= waitTimeInMillis);
     } finally {
       serviceLock.unlock();
     }

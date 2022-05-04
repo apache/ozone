@@ -21,11 +21,14 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -43,19 +46,20 @@ public class TestBackgroundPipelineScrubber {
   private SCMContext scmContext;
   private PipelineManager pipelineManager;
   private OzoneConfiguration conf;
+  private TestClock testClock;
 
   @Before
   public void setup() throws IOException {
+    testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     this.scmContext = SCMContext.emptyContext();
     this.pipelineManager = mock(PipelineManager.class);
     doNothing().when(pipelineManager).scrubPipelines();
 
-    // no initial delay after exit safe mode
     this.conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0ms");
+    conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "50s");
 
     this.scrubber = new BackgroundPipelineScrubber(pipelineManager, conf,
-        scmContext);
+        scmContext, testClock);
   }
 
   @After
@@ -77,6 +81,10 @@ public class TestBackgroundPipelineScrubber {
 
     // out of safe mode, PAUSING -> RUNNING
     scrubber.notifyStatusChanged();
+    // Still cannot run, as the safemode delay has not passed.
+    assertFalse(scrubber.shouldRun());
+
+    testClock.fastForward(60000);
     assertTrue(scrubber.shouldRun());
 
     // go into safe mode, RUNNING -> PAUSING
@@ -91,6 +99,8 @@ public class TestBackgroundPipelineScrubber {
     // kick a run
     synchronized (scrubber) {
       scrubber.notifyStatusChanged();
+      assertFalse(scrubber.shouldRun());
+      testClock.fastForward(60000);
       assertTrue(scrubber.shouldRun());
       scrubber.runImmediately();
     }
