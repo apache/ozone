@@ -84,7 +84,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
   public OMBucketCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
-
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
@@ -136,8 +135,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-                                                 long transactionLogIndex,
-                                                 OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex,
+      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketCreates();
 
@@ -277,7 +276,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
    * @param omVolumeArgs
    */
   private void addDefaultAcls(OmBucketInfo omBucketInfo,
-                              OmVolumeArgs omVolumeArgs) {
+      OmVolumeArgs omVolumeArgs) {
     // Add default acls for bucket creator.
     List<OzoneAcl> acls = new ArrayList<>();
     if (omBucketInfo.getAcls() != null) {
@@ -326,8 +325,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
    * Check namespace quota.
    */
   private void checkQuotaInNamespace(OmVolumeArgs omVolumeArgs,
-                                     long allocatedNamespace)
-      throws IOException {
+      long allocatedNamespace) throws IOException {
     if (omVolumeArgs.getQuotaInNamespace() > 0) {
       long usedNamespace = omVolumeArgs.getUsedNamespace();
       long quotaInNamespace = omVolumeArgs.getQuotaInNamespace();
@@ -343,9 +341,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   }
 
   public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
-                                      OmVolumeArgs omVolumeArgs,
-                                      OmBucketInfo omBucketInfo,
-                                      String volumeKey)
+      OmVolumeArgs omVolumeArgs, OmBucketInfo omBucketInfo, String volumeKey)
       throws IOException {
     long quotaInBytes = omBucketInfo.getQuotaInBytes();
     long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
@@ -357,7 +353,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       return false;
     }
 
-    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
+    List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
