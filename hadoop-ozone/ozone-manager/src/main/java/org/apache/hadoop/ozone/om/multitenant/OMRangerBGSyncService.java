@@ -36,12 +36,14 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -175,7 +177,7 @@ public class OMRangerBGSyncService extends BackgroundService {
           !(authorizer instanceof MultiTenantAccessAuthorizerDummyPlugin)) {
         throw new OMException("Unsupported MultiTenantAccessAuthorizer: " +
             authorizer.getClass().getSimpleName(),
-            OMException.ResultCodes.INTERNAL_ERROR);
+            ResultCodes.INTERNAL_ERROR);
       }
     } else {
       // authorizer can be null for unit tests
@@ -387,8 +389,11 @@ public class OMRangerBGSyncService extends BackgroundService {
       JsonObject newPolicy = policyArray.get(i).getAsJsonObject();
       if (!newPolicy.getAsJsonArray("policyLabels").get(0)
           .getAsString().equals("OzoneMultiTenant")) {
-        LOG.warn("Apache Ranger BG Sync: received non Multi-Tenant policy: {}",
-            newPolicy.get("name").getAsString());  // TODO: Reduce to debug?
+        // Shouldn't get policies without the tag here very often as it is
+        // specified in the query param, unless a user removed the tag during
+        // the sync
+        LOG.warn("Received a Ranger policy without OzoneMultiTenant tag: {}",
+            newPolicy.get("name").getAsString());
         continue;
       }
       // Temporarily put the policy in the to-delete list,
@@ -396,8 +401,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       mtRangerPoliciesToBeDeleted.put(
           newPolicy.get("name").getAsString(),
           newPolicy.get("id").getAsString());
-      JsonArray policyItems = newPolicy
-          .getAsJsonArray("policyItems");
+
+      final JsonArray policyItems = newPolicy.getAsJsonArray("policyItems");
       for (int j = 0; j < policyItems.size(); ++j) {
         JsonObject policy = policyItems.get(j).getAsJsonObject();
         JsonArray roles = policy.getAsJsonArray("roles");
@@ -412,9 +417,23 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
   }
 
+  /**
+   * Helper function to throw benign exception if the current OM is no longer
+   * the leader in case a leader transition happened during the sync. So the
+   * sync run can abort earlier.
+   *
+   * Note: EACH Ranger request can take 3-7 seconds as tested in UT.
+   */
+  private void checkLeader() throws IOException {
+    if (!ozoneManager.isLeaderReady()) {
+      throw new OMException("Not leader. Abort", ResultCodes.INTERNAL_ERROR);
+    }
+  }
+
   private void loadAllRolesFromRanger() throws IOException {
     for (Map.Entry<String, BGRole> entry: mtRangerRoles.entrySet()) {
       final String roleName = entry.getKey();
+      checkLeader();
       final String roleDataString = authorizer.getRole(roleName);
       final JsonObject roleObject =
           new JsonParser().parse(roleDataString).getAsJsonObject();
@@ -473,27 +492,15 @@ public class OMRangerBGSyncService extends BackgroundService {
     for (Map.Entry<String, String> entry :
         mtRangerPoliciesToBeCreated.entrySet()) {
       final String policyName = entry.getKey();
-      // TODO: Currently we are not maintaining enough information in OM DB
-      //  to recreate the policies as-is.
-      //  Maybe recreate the policy with its initial value?
-      LOG.warn("Policy name not found in Ranger: '{}'. "
-          + "OM can't fix this automatically", policyName);
+      LOG.warn("Expected policy not found in Ranger: {}", policyName);
+      // Attempt to recreate the default volume/bucket policy if it's missing
+      attemptToRecreateDefaultPolicy(policyName);
     }
-
-    // Note: Using a TreeSet here as a hack so AdminRole is ahead of
-    // UserRole (alphabetically), a proper solution would require dependency
-    // graph building and BFS.
-    // Ranger roles that are depended by other roles must be deleted AFTER these
-    // roles. Could the Ranger client handle this
-    // TODO: Remove? Does not seem necessary here anymore
-    final Set<String> rolesTobeDeleted = new TreeSet<>();
 
     for (Map.Entry<String, String> entry :
         mtRangerPoliciesToBeDeleted.entrySet()) {
-      // TODO: Its best to not create these policies automatically and the
-      //  let the user delete the tenant and recreate the tenant.
-      String policyName = entry.getKey();
-
+      final String policyName = entry.getKey();
+      checkLeader();
       // TODO: Use AccessController instead of AccessPolicy
 //      MultiTenantAccessController accessController =
 //          authorizer.getMultiTenantAccessController();
@@ -503,16 +510,70 @@ public class OMRangerBGSyncService extends BackgroundService {
           (accessPolicy.getPolicyLastUpdateTime() + ONE_HOUR_IN_MILLIS)) {
         LOG.warn("Deleting policy from Ranger: {}", policyName);
         authorizer.deletePolicybyName(policyName);
-        rolesTobeDeleted.addAll(accessPolicy.getRoleList());
       }
     }
 
-//    for (String deletedRole : rolesTobeDeleted) {
-//      LOG.warn("Deleting role from Ranger: {}", deletedRole);
-//      authorizer.deleteRole(new JsonParser()
-//          .parse(authorizer.getRole(deletedRole))
-//          .getAsJsonObject().get("id").getAsString());
-//    }
+  }
+
+  private String getTenantIdFromPolicyName(
+      String policyName, String policySuffix) {
+    return policyName.substring(0, policyName.length() - policySuffix.length());
+  }
+
+  /**
+   * Takes a policy name (e.g. tenant1-VolumeAccess), attempts to (re)create
+   * the policy in Ranger by the policy name alone.
+   */
+  private void attemptToRecreateDefaultPolicy(String policyName)
+      throws IOException {
+    String policySuffix, tenantId;
+
+    policySuffix = OzoneConsts.DEFAULT_TENANT_BUCKET_NAMESPACE_POLICY_SUFFIX;
+    if (policyName.endsWith(policySuffix)) {
+      // Recreate default VolumeAccess policy
+      tenantId = getTenantIdFromPolicyName(policyName, policySuffix);
+      LOG.info("Recovering VolumeAccess policy for tenant: {}", tenantId);
+
+      final String volumeName =
+          multiTenantManager.getTenantVolumeName(tenantId);
+      final String userRoleName =
+          multiTenantManager.getTenantUserRoleName(tenantId);
+      final String adminRoleName =
+          multiTenantManager.getTenantAdminRoleName(tenantId);
+
+      final AccessPolicy tenantVolumeAccessPolicy =
+          multiTenantManager.newDefaultVolumeAccessPolicy(volumeName,
+              new OzoneTenantRolePrincipal(userRoleName),
+              new OzoneTenantRolePrincipal(adminRoleName));
+
+      String id = authorizer.createAccessPolicy(tenantVolumeAccessPolicy);
+      LOG.info("Created policy, ID: {}", id);
+
+      return;
+    }
+
+    policySuffix = OzoneConsts.DEFAULT_TENANT_BUCKET_POLICY_SUFFIX;
+    if (policyName.endsWith(policySuffix)) {
+      // Recreate default BucketAccess policy
+      tenantId = getTenantIdFromPolicyName(policyName, policySuffix);
+      LOG.info("Recovering BucketAccess policy for tenant: {}", tenantId);
+
+      final String volumeName =
+          multiTenantManager.getTenantVolumeName(tenantId);
+      final String userRoleName =
+          multiTenantManager.getTenantUserRoleName(tenantId);
+
+      final AccessPolicy tenantBucketCreatePolicy =
+          multiTenantManager.newDefaultBucketAccessPolicy(volumeName,
+              new OzoneTenantRolePrincipal(userRoleName));
+
+      String id = authorizer.createAccessPolicy(tenantBucketCreatePolicy);
+      LOG.info("Created policy, ID: {}", id);
+
+      return;
+    }
+
+    LOG.error("Unable to recover Ranger policy: {}", policyName);
   }
 
   /**
@@ -643,12 +704,22 @@ public class OMRangerBGSyncService extends BackgroundService {
           pushRoleToRanger = true;
         }
       } else {
-        // This role is missing from Ranger, we need to push this in Ranger.
-        authorizer.createRole(roleName, null);
+        // 1. The role is missing from Ranger, or;
+        // 2. A policy (that uses this role) is missing from Ranger, causing
+        // mtRangerRoles to be populated incorrectly. In this case the roles
+        // are there just fine. If not, will be corrected in the next run anyway
+        checkLeader();
+        try {
+          authorizer.createRole(roleName, null);
+        } catch (IOException e) {
+          // Tolerate create role failure, possibly due to role already exists
+          LOG.error(e.getMessage());
+        }
         pushRoleToRanger = true;
       }
       if (pushRoleToRanger) {
         LOG.info("Updating role in Ranger: {}", roleName);
+        checkLeader();
         pushOMDBRoleToRanger(roleName);
       }
       // We have processed this role in OM DB now. Lets remove it from
@@ -663,6 +734,7 @@ public class OMRangerBGSyncService extends BackgroundService {
 
     for (String roleName : rolesToDelete) {
       LOG.warn("Deleting role from Ranger: {}", roleName);
+      checkLeader();
       try {
         final String roleObj = authorizer.getRole(roleName);
         authorizer.deleteRole(new JsonParser().parse(roleObj)

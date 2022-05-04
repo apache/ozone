@@ -617,7 +617,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
   }
 
-  private AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,
+  public AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,
       OzoneTenantRolePrincipal userRole, OzoneTenantRolePrincipal adminRole)
       throws IOException {
 
@@ -636,7 +636,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return policy;
   }
 
-  private AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
+  public AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
       OzoneTenantRolePrincipal userRole) throws IOException {
 
     final String bucketAccessPolicyName =
@@ -789,6 +789,44 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     }
 
     return volumeName;
+  }
+
+  @Override
+  public String getTenantUserRoleName(String tenantId) throws IOException {
+
+    tenantCacheLock.readLock().lock();
+
+    try {
+      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+
+      if (cachedTenantState == null) {
+        throw new OMException("Tenant not found in cache: " + tenantId,
+            TENANT_NOT_FOUND);
+      }
+
+      return cachedTenantState.getTenantUserRoleName();
+    } finally {
+      tenantCacheLock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public String getTenantAdminRoleName(String tenantId) throws IOException {
+
+    tenantCacheLock.readLock().lock();
+
+    try {
+      final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+
+      if (cachedTenantState == null) {
+        throw new OMException("Tenant not found in cache: " + tenantId,
+            TENANT_NOT_FOUND);
+      }
+
+      return cachedTenantState.getTenantAdminRoleName();
+    } finally {
+      tenantCacheLock.readLock().unlock();
+    }
   }
 
   @Override

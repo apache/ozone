@@ -22,7 +22,9 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.om.multitenant.OzoneTenantRolePrincipal;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.auth.BasicUserPrincipal;
@@ -236,6 +238,20 @@ public interface OMMultiTenantManager {
    */
   String getTenantVolumeName(String tenantId) throws IOException;
 
+  /**
+   * Retrieve user role name of the given tenant.
+   * @param tenantId tenant name
+   * @return tenant user role name
+   */
+  String getTenantUserRoleName(String tenantId) throws IOException;
+
+  /**
+   * Retrieve admin role name of the given tenant.
+   * @param tenantId tenant name
+   * @return tenant user role name
+   */
+  String getTenantAdminRoleName(String tenantId) throws IOException;
+
   boolean isUserAccessIdPrincipalOrTenantAdmin(String accessId,
       UserGroupInformation ugi) throws IOException;
 
@@ -247,4 +263,17 @@ public interface OMMultiTenantManager {
    * @throws IOException
    */
   boolean isTenantEmpty(String tenantId) throws IOException;
+
+  /**
+   * Returns default VolumeAccess policy given tenant and role names.
+   */
+  AccessPolicy newDefaultVolumeAccessPolicy(String tenantId,
+      OzoneTenantRolePrincipal userRole, OzoneTenantRolePrincipal adminRole)
+      throws IOException;
+
+  /**
+   * Returns default BucketAccess policy given tenant and user role name.
+   */
+  AccessPolicy newDefaultBucketAccessPolicy(String tenantId,
+      OzoneTenantRolePrincipal userRole) throws IOException;
 }
