@@ -25,10 +25,10 @@ Setup Cluster Data
 
 Test Info Compat
     [Tags]  test-bucket-layout-compat
-    ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix}default-fso
+    ${result} =     Execute and checkrc                     ozone sh bucket info /${prefix}vol1/${prefix}default-fso    255
                     Should Contain  ${result}   NOT_SUPPORTED_OPERATION
 
-    ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix}default-obs
+    ${result} =     Execute and checkrc                     ozone sh bucket info /${prefix}vol1/${prefix}default-obs    255
                     Should Contain  ${result}   NOT_SUPPORTED_OPERATION
 
     ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix}default-legacy | grep name
@@ -42,5 +42,5 @@ Test Bucket Create
     [Tags] test-bucket-layout-compat
     ${random} =         Generate Random String  5  [NUMBERS]
     ${result} =     Execute                     ozone sh bucket create /${prefix}vol1/${prefix}-create-${random}
-    ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix-_create-${random}
+    ${result} =     Execute                     ozone sh bucket info /${prefix}vol1/${prefix-}_create-${random}
                     Should Not Contain  ${result}   NOT_SUPPORTED_OPERATION
