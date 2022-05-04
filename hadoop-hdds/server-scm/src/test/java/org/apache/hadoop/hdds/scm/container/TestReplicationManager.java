@@ -31,12 +31,14 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager
     .ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.MoveResult;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -127,7 +129,8 @@ public class TestReplicationManager {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
 
-    scmLogs = GenericTestUtils.LogCapturer.captureLogs(ReplicationManager.LOG);
+    scmLogs = GenericTestUtils.LogCapturer.
+        captureLogs(LegacyReplicationManager.LOG);
     containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
@@ -1479,8 +1482,7 @@ public class TestReplicationManager {
         new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
     CompletableFuture<MoveResult> cf =
-        replicationManager.move(id,
-            new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+        replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(scmLogs.getOutput().contains(
         "receive a move request about container"));
     Thread.sleep(100L);
@@ -1521,8 +1523,7 @@ public class TestReplicationManager {
     addReplica(container,
         new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
-    replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(scmLogs.getOutput().contains(
         "receive a move request about container"));
     Thread.sleep(100L);
@@ -1617,8 +1618,7 @@ public class TestReplicationManager {
         new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     DatanodeDetails dn4 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
     CompletableFuture<MoveResult> cf =
-        replicationManager.move(id,
-            new MoveDataNodePair(dn1.getDatanodeDetails(), dn4));
+        replicationManager.move(id, dn1.getDatanodeDetails(), dn4);
     Assert.assertTrue(scmLogs.getOutput().contains(
         "receive a move request about container"));
     Thread.sleep(100L);
@@ -1659,8 +1659,7 @@ public class TestReplicationManager {
         new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
     DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
     CompletableFuture<MoveResult> cf =
-        replicationManager.move(id,
-            new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+        replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(scmLogs.getOutput().contains(
         "receive a move request about container"));
 
@@ -1672,8 +1671,7 @@ public class TestReplicationManager {
         MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
 
     nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     addReplicaToDn(container, dn3, CLOSED);
     replicationManager.processAll();
     eventQueue.processAll(1000);
@@ -1712,30 +1710,26 @@ public class TestReplicationManager {
     //we don't need a running replicationManamger now
     replicationManager.stop();
     Thread.sleep(100L);
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.FAIL_NOT_RUNNING);
     replicationManager.start();
     Thread.sleep(100L);
 
     //container in not in OPEN state
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
     //open -> closing
     containerStateManager.updateContainerState(id.getProtobuf(),
         LifeCycleEvent.FINALIZE);
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
     //closing -> quasi_closed
     containerStateManager.updateContainerState(id.getProtobuf(),
         LifeCycleEvent.QUASI_CLOSE);
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
 
@@ -1750,12 +1744,10 @@ public class TestReplicationManager {
       if (state != HEALTHY) {
         nodeManager.setNodeStatus(dn3,
             new NodeStatus(IN_SERVICE, state));
-        cf = replicationManager.move(id,
-            new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+        cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
         Assert.assertTrue(cf.isDone() && cf.get() ==
             MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
-        cf = replicationManager.move(id,
-            new MoveDataNodePair(dn3, dn1.getDatanodeDetails()));
+        cf = replicationManager.move(id, dn3, dn1.getDatanodeDetails());
         Assert.assertTrue(cf.isDone() && cf.get() ==
             MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
       }
@@ -1768,12 +1760,10 @@ public class TestReplicationManager {
       if (state != IN_SERVICE) {
         nodeManager.setNodeStatus(dn3,
             new NodeStatus(state, HEALTHY));
-        cf = replicationManager.move(id,
-            new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+        cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
         Assert.assertTrue(cf.isDone() && cf.get() ==
             MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
-        cf = replicationManager.move(id,
-            new MoveDataNodePair(dn3, dn1.getDatanodeDetails()));
+        cf = replicationManager.move(id, dn3, dn1.getDatanodeDetails());
         Assert.assertTrue(cf.isDone() && cf.get() ==
             MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
       }
@@ -1781,14 +1771,13 @@ public class TestReplicationManager {
     nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
 
     //container exists in target datanode
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(),
-        dn2.getDatanodeDetails()));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(),
+        dn2.getDatanodeDetails());
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET);
 
     //container does not exist in source datanode
-    cf = replicationManager.move(id, new MoveDataNodePair(dn3, dn3));
+    cf = replicationManager.move(id, dn3, dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
 
@@ -1799,8 +1788,7 @@ public class TestReplicationManager {
     replicationManager.processAll();
     //waiting for inflightDeletion generation
     eventQueue.processAll(1000);
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION);
     resetReplicationManager();
@@ -1813,8 +1801,7 @@ public class TestReplicationManager {
     replicationManager.processAll();
     //waiting for inflightReplication generation
     eventQueue.processAll(1000);
-    cf = replicationManager.move(id,
-        new MoveDataNodePair(dn1.getDatanodeDetails(), dn3));
+    cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
     Assert.assertTrue(cf.isDone() && cf.get() ==
         MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION);
   }
