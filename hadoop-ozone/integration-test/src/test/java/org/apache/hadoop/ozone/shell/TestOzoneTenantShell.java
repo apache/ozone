@@ -450,9 +450,9 @@ public class TestOzoneTenantShell {
     checkOutput(out, "dev\nfinance\nresearch\n", true);
     checkOutput(err, "", true);
 
-    executeHA(tenantShell, new String[] {"list", "--long", "--header"});
-    // Not checking the entire output here yet
-    checkOutput(out, "Policy", false);
+    executeHA(tenantShell, new String[] {"list", "--json"});
+    // Not checking the full output here
+    checkOutput(out, "\"tenantId\": \"dev\",", false);
     checkOutput(err, "", true);
 
     // Attempt user getsecret before assignment, should fail
