@@ -520,6 +520,21 @@ public class TestOzoneTenantShell {
     checkOutput(out, "Tenant 'dev' delegated admin with accessId", false);
     checkOutput(err, "", true);
 
+    executeHA(tenantShell, new String[] {
+        "user", "info", "--json", "bob"});
+    checkOutput(out, "{\n" + "  \"user\": \"bob\",\n" + "  \"tenants\": [\n"
+        + "    {\n" + "      \"accessId\": \"research$bob\",\n"
+        + "      \"tenantId\": \"research\",\n" + "      \"isAdmin\": false,\n"
+        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
+        + "      \"accessId\": \"finance$bob\",\n"
+        + "      \"tenantId\": \"finance\",\n" + "      \"isAdmin\": false,\n"
+        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
+        + "      \"accessId\": \"dev$bob\",\n"
+        + "      \"tenantId\": \"dev\",\n" + "      \"isAdmin\": true,\n"
+        + "      \"isDelegatedAdmin\": true\n" + "    }\n" + "  ]\n" + "}\n",
+        true);
+    checkOutput(err, "", true);
+
     // Revoke admin
     executeHA(tenantShell, new String[] {
         "user", "revoke-admin", "dev$bob", "--tenant=dev"});
