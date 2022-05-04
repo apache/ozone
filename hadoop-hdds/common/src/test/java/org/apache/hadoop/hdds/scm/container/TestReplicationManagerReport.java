@@ -200,6 +200,35 @@ public class TestReplicationManagerReport {
     }
   }
 
+  @Test
+  public void testDeSerializeCanHandleUnknownMetric() {
+    HddsProtos.ReplicationManagerReportProto.Builder proto =
+        HddsProtos.ReplicationManagerReportProto.newBuilder();
+    proto.setTimestamp(12345);
+
+    proto.addStat(HddsProtos.KeyIntValue.newBuilder()
+        .setKey("unknownValue")
+        .setValue(15)
+        .build());
+
+    proto.addStat(HddsProtos.KeyIntValue.newBuilder()
+        .setKey(ReplicationManagerReport.HealthState.UNDER_REPLICATED
+            .toString())
+        .setValue(20)
+        .build());
+
+    HddsProtos.KeyContainerIDList.Builder sample
+        = HddsProtos.KeyContainerIDList.newBuilder();
+    sample.setKey("unknownValue");
+    sample.addContainer(ContainerID.valueOf(1).getProtobuf());
+    proto.addStatSample(sample.build());
+    // Ensure no exception is thrown
+    ReplicationManagerReport newReport =
+        ReplicationManagerReport.fromProtobuf(proto.build());
+    Assert.assertEquals(20, newReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
   @Test(expected = IllegalStateException.class)
   public void testStatCannotBeSetTwice() {
     report.setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10);

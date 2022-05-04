@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -88,9 +87,7 @@ public class BackgroundPipelineCreator implements SCMService {
 
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
-                              ConfigurationSource conf,
-                              SCMServiceManager serviceManager,
-                              SCMContext scmContext) {
+      ConfigurationSource conf, SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scmContext = scmContext;
@@ -108,9 +105,6 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    // register BackgroundPipelineCreator to SCMServiceManager
-    serviceManager.register(this);
 
     // start RatisPipelineUtilsThread
     start();
@@ -154,9 +148,7 @@ public class BackgroundPipelineCreator implements SCMService {
     LOG.info("Stopping {}.", THREAD_NAME);
 
     // in case RatisPipelineUtilsThread is sleeping
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    thread.interrupt();
 
     try {
       thread.join();
@@ -181,6 +173,7 @@ public class BackgroundPipelineCreator implements SCMService {
         }
       } catch (InterruptedException e) {
         LOG.warn("{} is interrupted.", THREAD_NAME);
+        running.set(false);
         Thread.currentThread().interrupt();
       }
     }
@@ -223,13 +216,6 @@ public class BackgroundPipelineCreator implements SCMService {
         continue;
       }
       list.add(replicationConfig);
-      if (!pipelineManager.getSafeModeStatus()) {
-        try {
-          pipelineManager.scrubPipeline(replicationConfig);
-        } catch (IOException e) {
-          LOG.error("Error while scrubbing pipelines.", e);
-        }
-      }
     }
 
     LoopingIterator it = new LoopingIterator(list);

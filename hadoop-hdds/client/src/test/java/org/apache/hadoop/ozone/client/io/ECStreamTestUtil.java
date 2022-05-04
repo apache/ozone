@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc.read;
+package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -26,10 +26,9 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
@@ -57,7 +56,7 @@ public final class ECStreamTestUtil {
   private ECStreamTestUtil() {
   }
 
-  public static OmKeyLocationInfo createKeyInfo(ReplicationConfig repConf,
+  public static BlockLocationInfo createKeyInfo(ReplicationConfig repConf,
       long blockLength, Map<DatanodeDetails, Integer> dnMap) {
 
     Pipeline pipeline = Pipeline.newBuilder()
@@ -68,7 +67,7 @@ public final class ECStreamTestUtil {
         .setReplicationConfig(repConf)
         .build();
 
-    OmKeyLocationInfo keyInfo = new OmKeyLocationInfo.Builder()
+    BlockLocationInfo keyInfo = new BlockLocationInfo.Builder()
         .setBlockID(new BlockID(1, 1))
         .setLength(blockLength)
         .setOffset(0)
@@ -78,7 +77,7 @@ public final class ECStreamTestUtil {
     return keyInfo;
   }
 
-  public static OmKeyLocationInfo createKeyInfo(ReplicationConfig repConf,
+  public static BlockLocationInfo createKeyInfo(ReplicationConfig repConf,
       int nodeCount, long blockLength) {
     Map<DatanodeDetails, Integer> datanodes = new HashMap<>();
     for (int i = 0; i < nodeCount; i++) {
@@ -257,7 +256,7 @@ public final class ECStreamTestUtil {
 
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig,
-        OmKeyLocationInfo blockInfo, Pipeline pipeline,
+        BlockLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
         XceiverClientFactory xceiverFactory,
         Function<BlockID, Pipeline> refreshFunction) {

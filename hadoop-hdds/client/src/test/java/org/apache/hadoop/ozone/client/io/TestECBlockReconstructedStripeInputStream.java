@@ -15,18 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc.read;
+package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
-import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
-import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
-import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputStreamFactory;
-import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputStream;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStreamFactory;
+import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStream;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -46,7 +43,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateParity;
+import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
 
 /**
  * Test for the ECBlockReconstructedStripeInputStream.
@@ -82,7 +79,7 @@ public class TestECBlockReconstructedStripeInputStream {
   @Test
   public void testSufficientLocations() throws IOException {
     // One chunk, only 1 location.
-    OmKeyLocationInfo keyInfo = ECStreamTestUtil
+    BlockLocationInfo keyInfo = ECStreamTestUtil
         .createKeyInfo(repConfig, 1, ONEMB);
     try (ECBlockInputStream ecb = createInputStream(keyInfo)) {
       Assert.assertTrue(ecb.hasSufficientLocations());
@@ -168,7 +165,7 @@ public class TestECBlockReconstructedStripeInputStream {
       streamFactory = new TestBlockInputStreamFactory();
       addDataStreamsToFactory(dataBufs, parity);
 
-      OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+      BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
           stripeSize() * 3 + partialStripeSize, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -223,7 +220,7 @@ public class TestECBlockReconstructedStripeInputStream {
     // from the parity and padded blocks 2 and 3.
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(4, 5);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
     dataGen = new SplittableRandom(randomSeed);
@@ -265,7 +262,7 @@ public class TestECBlockReconstructedStripeInputStream {
     // from the parity and padded blocks 2 and 3.
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(4, 5);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
     dataGen = new SplittableRandom(randomSeed);
@@ -322,7 +319,7 @@ public class TestECBlockReconstructedStripeInputStream {
       addDataStreamsToFactory(dataBufs, parity);
       ByteBuffer[] bufs = allocateByteBuffers(repConfig);
 
-      OmKeyLocationInfo keyInfo =
+      BlockLocationInfo keyInfo =
           ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
       dataGen = new SplittableRandom(randomSeed);
@@ -365,7 +362,7 @@ public class TestECBlockReconstructedStripeInputStream {
     // from the parity and padded blocks 2 and 3.
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(4, 5);
-    OmKeyLocationInfo keyInfo =
+    BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
     try (ECBlockReconstructedStripeInputStream ecb =
@@ -407,7 +404,7 @@ public class TestECBlockReconstructedStripeInputStream {
       streamFactory = new TestBlockInputStreamFactory();
       addDataStreamsToFactory(dataBufs, parity);
 
-      OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+      BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
           stripeSize() * 3 + partialStripeSize, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -461,7 +458,7 @@ public class TestECBlockReconstructedStripeInputStream {
   public void testSeekToPartialOffsetFails() {
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 4, 5);
-    OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
         stripeSize() * 3, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -503,7 +500,7 @@ public class TestECBlockReconstructedStripeInputStream {
       // Data block index 3 is missing and needs recovered initially.
       Map<DatanodeDetails, Integer> dnMap =
           ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
-      OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+      BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
           stripeSize() * 3 + partialStripeSize, dnMap);
       streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -583,7 +580,7 @@ public class TestECBlockReconstructedStripeInputStream {
     // when containers are reported by SCM.
     Map<DatanodeDetails, Integer> dnMap =
           ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
         blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -609,7 +606,7 @@ public class TestECBlockReconstructedStripeInputStream {
 
     Map<DatanodeDetails, Integer> dnMap =
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
-    OmKeyLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig,
         stripeSize() * 3 + partialStripeSize, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
 
@@ -643,7 +640,7 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   private ECBlockReconstructedStripeInputStream createInputStream(
-      OmKeyLocationInfo keyInfo) {
+      BlockLocationInfo keyInfo) {
     return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
         null, null, streamFactory, bufferPool, ecReconstructExecutor);
   }

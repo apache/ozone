@@ -218,8 +218,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void scrubPipeline(ReplicationConfig replicationConfig)
-      throws IOException {
+  public void scrubPipelines() {
 
   }
 
