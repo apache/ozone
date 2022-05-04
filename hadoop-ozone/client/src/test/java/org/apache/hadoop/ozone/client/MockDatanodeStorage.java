@@ -94,5 +94,4 @@ public class MockDatanodeStorage {
   public String getFullBlockData(BlockID blockID) {
     return this.fullBlockData.get(blockID);
   }
-
 }
