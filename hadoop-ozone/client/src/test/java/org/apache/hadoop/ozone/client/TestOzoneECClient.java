@@ -389,8 +389,8 @@ public class TestOzoneECClient {
                 .equals(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK))
                 .collect(Collectors.toList());
 
-        Assert.assertEquals(3 * chunkSize,
-            Long.valueOf(metadataList.get(0).getValue()).longValue());
+        Assert.assertEquals(3L * chunkSize,
+            Long.parseLong(metadataList.get(0).getValue()));
       }
     }
   }
