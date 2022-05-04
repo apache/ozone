@@ -158,11 +158,3 @@ check_ec_is_disabled() {
 check_ec_is_enabled() {
   execute_robot_test scm --include post-finalized-ec-tests ec/upgrade-ec-check.robot
 }
-
-check_bucket_layout_is_disabled() {
-  execute_robot_test scm --include pre-finalized-bucket-layout-tests bucketlayout/upgrade-bucket-layout-check.robot
-}
-
-check_bucket_layout_is_enabled() {
-  execute_robot_test scm --include post-finalized-bucket-layout-tests bucketlayout/upgrade-bucket-layout-check.robot
-}

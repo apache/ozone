@@ -84,6 +84,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   public OMBucketCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
@@ -130,13 +131,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
-       .setCreateBucketRequest(newCreateBucketRequest.build()).build();
+        .setCreateBucketRequest(newCreateBucketRequest.build()).build();
   }
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+                                                 long transactionLogIndex,
+                                                 OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketCreates();
 
@@ -271,11 +272,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
   /**
    * Add default acls for bucket. These acls are inherited from volume
    * default acl list.
+   *
    * @param omBucketInfo
    * @param omVolumeArgs
    */
   private void addDefaultAcls(OmBucketInfo omBucketInfo,
-      OmVolumeArgs omVolumeArgs) {
+                              OmVolumeArgs omVolumeArgs) {
     // Add default acls for bucket creator.
     List<OzoneAcl> acls = new ArrayList<>();
     if (omBucketInfo.getAcls() != null) {
@@ -324,7 +326,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
    * Check namespace quota.
    */
   private void checkQuotaInNamespace(OmVolumeArgs omVolumeArgs,
-      long allocatedNamespace) throws IOException {
+                                     long allocatedNamespace)
+      throws IOException {
     if (omVolumeArgs.getQuotaInNamespace() > 0) {
       long usedNamespace = omVolumeArgs.getUsedNamespace();
       long quotaInNamespace = omVolumeArgs.getQuotaInNamespace();
@@ -340,7 +343,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
   }
 
   public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
-      OmVolumeArgs omVolumeArgs, OmBucketInfo omBucketInfo, String volumeKey)
+                                      OmVolumeArgs omVolumeArgs,
+                                      OmBucketInfo omBucketInfo,
+                                      String volumeKey)
       throws IOException {
     long quotaInBytes = omBucketInfo.getQuotaInBytes();
     long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
@@ -352,7 +357,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       return false;
     }
 
-    List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
+    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
@@ -413,30 +418,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
             + " a non LEGACY bucket type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
-      }
-    }
-    return req;
-  }
-
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
-      processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateBucket
-  )
-  public static OMRequest disallowCreateBucketWithBucketLayoutFromOlderClient(
-      OMRequest req, ValidationContext ctx) throws OMException {
-    if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
-      if (req.getCreateBucketRequest()
-          .getBucketInfo().hasBucketLayout()
-          &&
-          !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
-              .getBucketLayout()).isLegacy()) {
-        throw new OMException("Cluster does not have the Bucket Layout"
-            + " support feature finalized yet, but the request contains"
-            + " a non LEGACY bucket type. Rejecting the request,"
-            + " please finalize the cluster upgrade and then try again.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
       }
     }
     return req;

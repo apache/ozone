@@ -387,36 +387,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
-      processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.InfoBucket
-  )
-  public static OMResponse disallowInfoBucketResponseWithBucketLayout(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
-      throws ServiceException {
-    if (!resp.hasInfoBucketResponse()) {
-      return resp;
-    }
-    if (resp.getInfoBucketResponse().getBucketInfo().hasBucketLayout() &&
-        !BucketLayout.fromProto(
-                resp.getInfoBucketResponse().getBucketInfo().getBucketLayout())
-            .isLegacy()) {
-      resp = resp.toBuilder()
-          .setStatus(Status.NOT_SUPPORTED_OPERATION)
-          .setMessage("Requested bucket uses Bucket Layout feature, which"
-              + " the client can not understand.\n" +
-              "Please upgrade the client before trying to read this bucket's" +
-              " information: "
-              + req.getInfoBucketRequest().getVolumeName()
-              + "/" + req.getInfoBucketRequest().getBucketName()
-              + ".")
-          .clearInfoBucketResponse()
-          .build();
-    }
-    return resp;
-  }
-
   private LookupKeyResponse lookupKey(LookupKeyRequest request,
       int clientVersion) throws IOException {
     LookupKeyResponse.Builder resp =

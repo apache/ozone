@@ -55,7 +55,6 @@ with_new_version_pre_finalized() {
   validate new1
 
   check_ec_is_disabled
-  check_bucket_layout_is_disabled
 }
 
 with_old_version_downgraded() {
@@ -82,5 +81,4 @@ with_new_version_finalized() {
   validate new2
 
   check_ec_is_enabled
-  check_bucket_layout_is_enabled
 }
