@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.protobuf.GeneratedMessage;
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -42,36 +38,24 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.container.replication.MoveScheduler.MoveResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.Proxy;
-import java.time.Clock;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -84,14 +68,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
-import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
-import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.MOVE;
 
 /**
  * Legacy Replication Manager (RM) is a legacy , which is used to process
@@ -128,98 +105,14 @@ public class LegacyReplicationManager {
    */
   private final NodeManager nodeManager;
 
-  /**
-   * This is used for tracking container replication commands which are issued
-   * by ReplicationManager and not yet complete.
-   */
-  private final Map<ContainerID, List<InflightAction>> inflightReplication;
 
-  /**
-   * This is used for tracking container deletion commands which are issued
-   * by ReplicationManager and not yet complete.
-   */
-  private final Map<ContainerID, List<InflightAction>> inflightDeletion;
-
-
-  /**
-   * This is used for indicating the result of move option and
-   * the corresponding reason. this is useful for tracking
-   * the result of move option
-   */
-  public enum MoveResult {
-    // both replication and deletion are completed
-    COMPLETED,
-    // RM is not running
-    FAIL_NOT_RUNNING,
-    // RM is not ratis leader
-    FAIL_NOT_LEADER,
-    // replication fail because the container does not exist in src
-    REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
-    // replication fail because the container exists in target
-    REPLICATION_FAIL_EXIST_IN_TARGET,
-    // replication fail because the container is not cloesed
-    REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
-    // replication fail because the container is in inflightDeletion
-    REPLICATION_FAIL_INFLIGHT_DELETION,
-    // replication fail because the container is in inflightReplication
-    REPLICATION_FAIL_INFLIGHT_REPLICATION,
-    // replication fail because of timeout
-    REPLICATION_FAIL_TIME_OUT,
-    // replication fail because of node is not in service
-    REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication fail because node is unhealthy
-    REPLICATION_FAIL_NODE_UNHEALTHY,
-    // deletion fail because of node is not in service
-    DELETION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication succeed, but deletion fail because of timeout
-    DELETION_FAIL_TIME_OUT,
-    // replication succeed, but deletion fail because because
-    // node is unhealthy
-    DELETION_FAIL_NODE_UNHEALTHY,
-    // replication succeed, but if we delete the container from
-    // the source datanode , the policy(eg, replica num or
-    // rack location) will not be satisfied, so we should not delete
-    // the container
-    DELETE_FAIL_POLICY,
-    //  replicas + target - src does not satisfy placement policy
-    PLACEMENT_POLICY_NOT_SATISFIED,
-    //unexpected action, remove src at inflightReplication
-    UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION,
-    //unexpected action, remove target at inflightDeletion
-    UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION,
-    //write DB error
-    FAIL_CAN_NOT_RECORD_TO_DB
-  }
-
-  /**
-   * This is used for tracking container move commands
-   * which are not yet complete.
-   */
-  private final Map<ContainerID,
-      CompletableFuture<MoveResult>> inflightMoveFuture;
-
-  /**
-   * ReplicationManager specific configuration.
-   */
-  private final ReplicationManagerConfiguration rmConf;
-
-  /**
-   * Minimum number of replica in a healthy state for maintenance.
-   */
-  private int minHealthyForMaintenance;
-
-  private final Clock clock;
+  private final InflightActionManager inflightActionManager;
 
   /**
    * Current container size as a bound for choosing datanodes with
    * enough space for a replica.
    */
   private long currentContainerSize;
-
-  /**
-   * Replication progress related metrics.
-   */
-  private ReplicationManagerMetrics metrics;
 
   /**
    * scheduler move option.
@@ -229,55 +122,34 @@ public class LegacyReplicationManager {
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
-   *
-   * @param conf OzoneConfiguration
+   *  @param conf OzoneConfiguration
    * @param containerManager ContainerManager
    * @param containerPlacement PlacementPolicy
    * @param eventPublisher EventPublisher
    */
   @SuppressWarnings("parameternumber")
-  public LegacyReplicationManager(final ConfigurationSource conf,
-            final ContainerManager containerManager,
-            final PlacementPolicy containerPlacement,
-            final EventPublisher eventPublisher,
-            final SCMContext scmContext,
-            final NodeManager nodeManager,
-            final SCMHAManager scmhaManager,
-            final Clock clock,
-            final Table<ContainerID, MoveDataNodePair> moveTable)
-             throws IOException {
+  public LegacyReplicationManager(
+      final ConfigurationSource conf,
+      final ContainerManager containerManager,
+      final PlacementPolicy containerPlacement,
+      final EventPublisher eventPublisher,
+      final SCMContext scmContext,
+      final NodeManager nodeManager,
+      final MoveScheduler moveScheduler,
+      final InflightActionManager inflightActionManager) throws IOException {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
-    this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
-    this.inflightReplication = new ConcurrentHashMap<>();
-    this.inflightDeletion = new ConcurrentHashMap<>();
-    this.inflightMoveFuture = new ConcurrentHashMap<>();
-    this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
-    this.clock = clock;
+    this.inflightActionManager = inflightActionManager;
 
     this.currentContainerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
-    this.metrics = null;
 
-    moveScheduler = new MoveSchedulerImpl.Builder()
-        .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
-        .setRatisServer(scmhaManager.getRatisServer())
-        .setMoveTable(moveTable).build();
-  }
-
-
-  protected synchronized void clearInflightActions() {
-    inflightReplication.clear();
-    inflightDeletion.clear();
-  }
-
-  protected synchronized void setMetrics(ReplicationManagerMetrics metrics) {
-    this.metrics = metrics;
+    this.moveScheduler = moveScheduler;
   }
 
   /**
@@ -355,17 +227,7 @@ public class LegacyReplicationManager {
          * We remove the entry from inflightReplication and inflightDeletion
          * list, if the operation is completed or if it has timed out.
          */
-        updateInflightAction(container, inflightReplication,
-            action -> replicas.stream().anyMatch(
-                r -> r.getDatanodeDetails().equals(action.getDatanode())),
-            () -> metrics.incrNumReplicationCmdsTimeout(),
-            action -> updateCompletedReplicationMetrics(container, action));
-
-        updateInflightAction(container, inflightDeletion,
-            action -> replicas.stream().noneMatch(
-                r -> r.getDatanodeDetails().equals(action.getDatanode())),
-            () -> metrics.incrNumDeletionCmdsTimeout(),
-            action -> updateCompletedDeletionMetrics(container, action));
+        inflightActionManager.updateContainerInflightActions(container);
 
         /*
          * If container is under deleting and all it's replicas are deleted,
@@ -386,9 +248,10 @@ public class LegacyReplicationManager {
         }
 
         ContainerReplicaCount replicaSet =
-            getContainerReplicaCount(container, replicas);
-        ContainerPlacementStatus placementStatus = getPlacementStatus(
-            replicas, container.getReplicationConfig().getRequiredNodes());
+            inflightActionManager.getContainerReplicaCount(container, replicas);
+        ContainerPlacementStatus placementStatus = inflightActionManager
+            .getPlacementStatus(replicas,
+                container.getReplicationConfig().getRequiredNodes());
 
         /*
          * We don't have to take any action if the container is healthy.
@@ -461,171 +324,6 @@ public class LegacyReplicationManager {
     }
   }
 
-  private void updateCompletedReplicationMetrics(ContainerInfo container,
-      InflightAction action) {
-    metrics.incrNumReplicationCmdsCompleted();
-    metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
-    metrics.addReplicationTime(clock.millis() - action.getTime());
-  }
-
-  private void updateCompletedDeletionMetrics(ContainerInfo container,
-      InflightAction action) {
-    metrics.incrNumDeletionCmdsCompleted();
-    metrics.incrNumDeletionBytesCompleted(container.getUsedBytes());
-    metrics.addDeletionTime(clock.millis() - action.getTime());
-  }
-
-  /**
-   * Reconciles the InflightActions for a given container.
-   *
-   * @param container Container to update
-   * @param inflightActions inflightReplication (or) inflightDeletion
-   * @param filter filter to check if the operation is completed
-   * @param timeoutCounter update timeout metrics
-   * @param completedCounter update completed metrics
-   */
-  private void updateInflightAction(final ContainerInfo container,
-      final Map<ContainerID, List<InflightAction>> inflightActions,
-      final Predicate<InflightAction> filter,
-      final Runnable timeoutCounter,
-      final Consumer<InflightAction> completedCounter) {
-    final ContainerID id = container.containerID();
-    final long deadline = clock.millis() - rmConf.getEventTimeout();
-    if (inflightActions.containsKey(id)) {
-      final List<InflightAction> actions = inflightActions.get(id);
-
-      Iterator<InflightAction> iter = actions.iterator();
-      while (iter.hasNext()) {
-        try {
-          InflightAction a = iter.next();
-          NodeStatus status = nodeManager.getNodeStatus(a.getDatanode());
-          boolean isUnhealthy = status.getHealth() != NodeState.HEALTHY;
-          boolean isCompleted = filter.test(a);
-          boolean isTimeout = a.getTime() < deadline;
-          boolean isNotInService = status.getOperationalState() !=
-              NodeOperationalState.IN_SERVICE;
-          if (isCompleted || isUnhealthy || isTimeout || isNotInService) {
-            iter.remove();
-
-            if (isTimeout) {
-              timeoutCounter.run();
-            } else if (isCompleted) {
-              completedCounter.accept(a);
-            }
-
-            updateMoveIfNeeded(isUnhealthy, isCompleted, isTimeout,
-                isNotInService, container, a.getDatanode(), inflightActions);
-          }
-        } catch (NodeNotFoundException | ContainerNotFoundException e) {
-          // Should not happen, but if it does, just remove the action as the
-          // node somehow does not exist;
-          iter.remove();
-        }
-      }
-      if (actions.isEmpty()) {
-        inflightActions.remove(id);
-      }
-    }
-  }
-
-  /**
-   * update inflight move if needed.
-   *
-   * @param isUnhealthy is the datanode unhealthy
-   * @param isCompleted is the action completed
-   * @param isTimeout is the action timeout
-   * @param container Container to update
-   * @param dn datanode which is removed from the inflightActions
-   * @param inflightActions inflightReplication (or) inflightDeletion
-   */
-  private void updateMoveIfNeeded(final boolean isUnhealthy,
-                   final boolean isCompleted, final boolean isTimeout,
-                   final boolean isNotInService,
-                   final ContainerInfo container, final DatanodeDetails dn,
-                   final Map<ContainerID,
-                       List<InflightAction>> inflightActions)
-      throws ContainerNotFoundException {
-    // make sure inflightMove contains the container
-    ContainerID id = container.containerID();
-
-    // make sure the datanode , which is removed from inflightActions,
-    // is source or target datanode.
-    MoveDataNodePair kv = moveScheduler.getMoveDataNodePair(id);
-    if (kv == null) {
-      return;
-    }
-    final boolean isSource = kv.getSrc().equals(dn);
-    final boolean isTarget = kv.getTgt().equals(dn);
-    if (!isSource && !isTarget) {
-      return;
-    }
-    final boolean isInflightReplication =
-        inflightActions.equals(inflightReplication);
-
-    /*
-     * there are some case:
-     **********************************************************
-     *              * InflightReplication  * InflightDeletion *
-     **********************************************************
-     *source removed*     unexpected       *    expected      *
-     **********************************************************
-     *target removed*      expected        *   unexpected     *
-     **********************************************************
-     * unexpected action may happen somehow. to make it deterministic,
-     * if unexpected action happens, we just fail the completableFuture.
-     */
-
-    if (isSource && isInflightReplication) {
-      //if RM is reinitialize, inflightMove will be restored,
-      //but inflightMoveFuture not. so there will be a case that
-      //container is in inflightMove, but not in inflightMoveFuture.
-      compleleteMoveFutureWithResult(id,
-          MoveResult.UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION);
-      moveScheduler.completeMove(id.getProtobuf());
-      return;
-    }
-
-    if (isTarget && !isInflightReplication) {
-      compleleteMoveFutureWithResult(id,
-          MoveResult.UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION);
-      moveScheduler.completeMove(id.getProtobuf());
-      return;
-    }
-
-    if (!(isInflightReplication && isCompleted)) {
-      if (isInflightReplication) {
-        if (isUnhealthy) {
-          compleleteMoveFutureWithResult(id,
-              MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
-        } else if (isNotInService) {
-          compleleteMoveFutureWithResult(id,
-              MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
-        } else {
-          compleleteMoveFutureWithResult(id,
-              MoveResult.REPLICATION_FAIL_TIME_OUT);
-        }
-      } else {
-        if (isUnhealthy) {
-          compleleteMoveFutureWithResult(id,
-              MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
-        } else if (isTimeout) {
-          compleleteMoveFutureWithResult(id,
-              MoveResult.DELETION_FAIL_TIME_OUT);
-        } else if (isNotInService) {
-          compleleteMoveFutureWithResult(id,
-              MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE);
-        } else {
-          compleleteMoveFutureWithResult(id,
-              MoveResult.COMPLETED);
-        }
-      }
-      moveScheduler.completeMove(id.getProtobuf());
-    } else {
-      deleteSrcDnForMove(container,
-          containerManager.getContainerReplicas(id));
-    }
-  }
-
   /**
    * add a move action for a given container.
    *
@@ -633,8 +331,8 @@ public class LegacyReplicationManager {
    * @param src source datanode
    * @param tgt target datanode
    */
-  public CompletableFuture<MoveResult> move(ContainerID cid,
-             DatanodeDetails src, DatanodeDetails tgt)
+  public CompletableFuture<MoveResult> move(
+      ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws ContainerNotFoundException, NodeNotFoundException {
     return move(cid, new MoveDataNodePair(src, tgt));
   }
@@ -646,7 +344,7 @@ public class LegacyReplicationManager {
    * @param mp MoveDataNodePair which contains source and target datanodes
    */
   private CompletableFuture<MoveResult> move(ContainerID cid,
-      MoveDataNodePair mp)
+                                                           MoveDataNodePair mp)
       throws ContainerNotFoundException, NodeNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
 
@@ -726,11 +424,11 @@ public class LegacyReplicationManager {
       * this option for this time.
       * */
 
-      if (inflightReplication.containsKey(cid)) {
+      if (inflightActionManager.getInflightReplication().containsKey(cid)) {
         ret.complete(MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION);
         return ret;
       }
-      if (inflightDeletion.containsKey(cid)) {
+      if (inflightActionManager.getInflightDeletion().containsKey(cid)) {
         ret.complete(MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION);
         return ret;
       }
@@ -767,8 +465,9 @@ public class LegacyReplicationManager {
         return ret;
       }
 
-      inflightMoveFuture.putIfAbsent(cid, ret);
-      sendReplicateCommand(cif, targetDn, Collections.singletonList(srcDn));
+      moveScheduler.addMoveCompleteFuture(cid, ret);
+      inflightActionManager.sendReplicateCommand(
+          cif, targetDn, Collections.singletonList(srcDn));
     }
     LOG.info("receive a move request about container {} , from {} to {}",
         cid, srcDn.getUuid(), targetDn.getUuid());
@@ -794,30 +493,12 @@ public class LegacyReplicationManager {
         .setDatanodeDetails(targetDn)
         .setContainerID(cif.containerID())
         .setContainerState(State.CLOSED).build());
-    ContainerPlacementStatus placementStatus = getPlacementStatus(
-        movedReplicas, cif.getReplicationConfig().getRequiredNodes());
+    ContainerPlacementStatus placementStatus = inflightActionManager
+        .getPlacementStatus(movedReplicas,
+            cif.getReplicationConfig().getRequiredNodes());
     return placementStatus.isPolicySatisfied();
   }
 
-  /**
-   * Returns the number replica which are pending creation for the given
-   * container ID.
-   * @param id The ContainerID for which to check the pending replica
-   * @return The number of inflight additions or zero if none
-   */
-  private int getInflightAdd(final ContainerID id) {
-    return inflightReplication.getOrDefault(id, Collections.emptyList()).size();
-  }
-
-  /**
-   * Returns the number replica which are pending delete for the given
-   * container ID.
-   * @param id The ContainerID for which to check the pending replica
-   * @return The number of inflight deletes or zero if none
-   */
-  private int getInflightDel(final ContainerID id) {
-    return inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
-  }
 
   /**
    * Returns true if the container is empty and CLOSED.
@@ -837,61 +518,6 @@ public class LegacyReplicationManager {
             r -> r.getState() == State.CLOSED && r.getKeyCount() == 0);
   }
 
-  /**
-   * Given a ContainerID, lookup the ContainerInfo and then return a
-   * ContainerReplicaCount object for the container.
-   * @param containerID The ID of the container
-   * @return ContainerReplicaCount for the given container
-   * @throws ContainerNotFoundException
-   */
-  public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
-      throws ContainerNotFoundException {
-    ContainerInfo container = containerManager.getContainer(containerID);
-    return getContainerReplicaCount(container);
-  }
-
-  /**
-   * Given a container, obtain the set of known replica for it, and return a
-   * ContainerReplicaCount object. This object will contain the set of replica
-   * as well as all information required to determine if the container is over
-   * or under replicated, including the delta of replica required to repair the
-   * over or under replication.
-   *
-   * @param container The container to create a ContainerReplicaCount for
-   * @return ContainerReplicaCount representing the replicated state of the
-   *         container.
-   * @throws ContainerNotFoundException
-   */
-  public ContainerReplicaCount getContainerReplicaCount(ContainerInfo container)
-      throws ContainerNotFoundException {
-    // TODO: using a RW lock for only read
-    synchronized (container) {
-      final Set<ContainerReplica> replica = containerManager
-          .getContainerReplicas(container.containerID());
-      return getContainerReplicaCount(container, replica);
-    }
-  }
-
-  /**
-   * Given a container and its set of replicas, create and return a
-   * ContainerReplicaCount representing the container.
-   *
-   * @param container The container for which to construct a
-   *                  ContainerReplicaCount
-   * @param replica The set of existing replica for this container
-   * @return ContainerReplicaCount representing the current state of the
-   *         container
-   */
-  private ContainerReplicaCount getContainerReplicaCount(
-      ContainerInfo container, Set<ContainerReplica> replica) {
-    return new ContainerReplicaCount(
-        container,
-        replica,
-        getInflightAdd(container.containerID()),
-        getInflightDel(container.containerID()),
-        container.getReplicationConfig().getRequiredNodes(),
-        minHealthyForMaintenance);
-  }
 
   /**
    * Returns true if more than 50% of the container replicas with unique
@@ -931,7 +557,8 @@ public class LegacyReplicationManager {
     replicas.stream().forEach(rp -> {
       Preconditions.assertTrue(rp.getState() == State.CLOSED);
       Preconditions.assertTrue(rp.getKeyCount() == 0);
-      sendDeleteCommand(container, rp.getDatanodeDetails(), false);
+      inflightActionManager.sendDeleteCommand(
+          container, rp.getDatanodeDetails(), false);
     });
     containerManager.updateContainerState(container.containerID(),
         HddsProtos.LifeCycleEvent.DELETE);
@@ -953,7 +580,8 @@ public class LegacyReplicationManager {
       LOG.debug("Container {} state changes to DELETED", container);
     } else {
       // Check whether to resend the delete replica command
-      final List<DatanodeDetails> deletionInFlight = inflightDeletion
+      final List<DatanodeDetails> deletionInFlight =
+          inflightActionManager.getInflightDeletion()
           .getOrDefault(container.containerID(), Collections.emptyList())
           .stream()
           .map(action -> action.getDatanode())
@@ -963,9 +591,9 @@ public class LegacyReplicationManager {
           .collect(Collectors.toSet());
       // Resend the delete command
       if (filteredReplicas.size() > 0) {
-        filteredReplicas.stream().forEach(rp -> {
-          sendDeleteCommand(container, rp.getDatanodeDetails(), false);
-        });
+        filteredReplicas.stream().forEach(rp ->
+            inflightActionManager.sendDeleteCommand(
+                container, rp.getDatanodeDetails(), false));
         LOG.debug("Resend delete Container command for {}", container);
       }
     }
@@ -1032,15 +660,13 @@ public class LegacyReplicationManager {
       }
       int repDelta = replicaSet.additionalReplicaNeeded();
       final ContainerID id = container.containerID();
-      final List<DatanodeDetails> deletionInFlight = inflightDeletion
-          .getOrDefault(id, Collections.emptyList())
-          .stream()
-          .map(action -> action.getDatanode())
+      final List<DatanodeDetails> deletionInFlight = inflightActionManager
+          .getInflightDeletion().getOrDefault(id, Collections.emptyList())
+          .stream().map(action -> action.getDatanode())
           .collect(Collectors.toList());
-      final List<DatanodeDetails> replicationInFlight = inflightReplication
-          .getOrDefault(id, Collections.emptyList())
-          .stream()
-          .map(action -> action.getDatanode())
+      final List<DatanodeDetails> replicationInFlight = inflightActionManager
+          .getInflightReplication().getOrDefault(id, Collections.emptyList())
+          .stream().map(action -> action.getDatanode())
           .collect(Collectors.toList());
       final List<DatanodeDetails> source = replicas.stream()
           .filter(r ->
@@ -1109,7 +735,8 @@ public class LegacyReplicationManager {
           // creating new replicas for mis-replicated containers unless it
           // improves things.
           for (DatanodeDetails datanode : selectedDatanodes) {
-            sendReplicateCommand(container, datanode, source);
+            inflightActionManager.sendReplicateCommand(
+                container, datanode, source);
           }
         } else {
           LOG.warn("Container {} is mis-replicated, requiring {} additional " +
@@ -1187,7 +814,8 @@ public class LegacyReplicationManager {
       // mis-replicated container will be seen as under-replicated.
       for (ContainerReplica r : unhealthyReplicas) {
         if (excess > 0) {
-          sendDeleteCommand(container, r.getDatanodeDetails(), true);
+          inflightActionManager.sendDeleteCommand(
+              container, r.getDatanodeDetails(), true);
           excess -= 1;
         } else {
           break;
@@ -1195,58 +823,6 @@ public class LegacyReplicationManager {
       }
       eligibleReplicas.removeAll(unhealthyReplicas);
       removeExcessReplicasIfNeeded(excess, container, eligibleReplicas);
-    }
-  }
-
-  /**
-   * if the container is in inflightMove, handle move.
-   * This function assumes replication has been completed
-   *
-   * @param cif ContainerInfo
-   * @param replicaSet An Set of replicas, which may have excess replicas
-   */
-  private void deleteSrcDnForMove(final ContainerInfo cif,
-                   final Set<ContainerReplica> replicaSet) {
-    final ContainerID cid = cif.containerID();
-    MoveDataNodePair movePair = moveScheduler.getMoveDataNodePair(cid);
-    if (movePair == null) {
-      return;
-    }
-    final DatanodeDetails srcDn = movePair.getSrc();
-    ContainerReplicaCount replicaCount =
-        getContainerReplicaCount(cif, replicaSet);
-
-    if (!replicaSet.stream()
-        .anyMatch(r -> r.getDatanodeDetails().equals(srcDn))) {
-      // if the target is present but source disappears somehow,
-      // we can consider move is successful.
-      compleleteMoveFutureWithResult(cid, MoveResult.COMPLETED);
-      moveScheduler.completeMove(cid.getProtobuf());
-      return;
-    }
-
-    int replicationFactor =
-        cif.getReplicationConfig().getRequiredNodes();
-    ContainerPlacementStatus currentCPS =
-        getPlacementStatus(replicaSet, replicationFactor);
-    Set<ContainerReplica> newReplicaSet = replicaSet.
-        stream().collect(Collectors.toSet());
-    newReplicaSet.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
-    ContainerPlacementStatus newCPS =
-        getPlacementStatus(newReplicaSet, replicationFactor);
-
-    if (replicaCount.isOverReplicated() &&
-        isPlacementStatusActuallyEqual(currentCPS, newCPS)) {
-      sendDeleteCommand(cif, srcDn, true);
-    } else {
-      // if source and target datanode are both in the replicaset,
-      // but we can not delete source datanode for now (e.g.,
-      // there is only 3 replicas or not policy-statisfied , etc.),
-      // we just complete the future without sending a delete command.
-      LOG.info("can not remove source replica after successfully " +
-          "replicated to target datanode");
-      compleleteMoveFutureWithResult(cid, MoveResult.DELETE_FAIL_POLICY);
-      moveScheduler.completeMove(cid.getProtobuf());
     }
   }
 
@@ -1270,8 +846,8 @@ public class LegacyReplicationManager {
       Set<ContainerReplica> eligibleSet = new HashSet<>(eligibleReplicas);
       final int replicationFactor =
           container.getReplicationConfig().getRequiredNodes();
-      ContainerPlacementStatus ps =
-          getPlacementStatus(eligibleSet, replicationFactor);
+      ContainerPlacementStatus ps = inflightActionManager
+          .getPlacementStatus(eligibleSet, replicationFactor);
 
       for (ContainerReplica r : eligibleReplicas) {
         if (excess <= 0) {
@@ -1280,13 +856,14 @@ public class LegacyReplicationManager {
         // First remove the replica we are working on from the set, and then
         // check if the set is now mis-replicated.
         eligibleSet.remove(r);
-        ContainerPlacementStatus nowPS =
-            getPlacementStatus(eligibleSet, replicationFactor);
-        if (isPlacementStatusActuallyEqual(ps, nowPS)) {
+        ContainerPlacementStatus nowPS = inflightActionManager
+            .getPlacementStatus(eligibleSet, replicationFactor);
+        if (inflightActionManager.isPlacementStatusActuallyEqual(ps, nowPS)) {
           // Remove the replica if the container was already unsatisfied
           // and losing this replica keep actual placement count unchanged.
           // OR if losing this replica still keep satisfied
-          sendDeleteCommand(container, r.getDatanodeDetails(), true);
+          inflightActionManager.sendDeleteCommand(
+              container, r.getDatanodeDetails(), true);
           excess -= 1;
           continue;
         }
@@ -1299,36 +876,6 @@ public class LegacyReplicationManager {
             "violating the placement policy", container, excess);
       }
     }
-  }
-
-  /**
-   * whether the given two ContainerPlacementStatus are actually equal.
-   *
-   * @param cps1 ContainerPlacementStatus
-   * @param cps2 ContainerPlacementStatus
-   */
-  private boolean isPlacementStatusActuallyEqual(
-                      ContainerPlacementStatus cps1,
-                      ContainerPlacementStatus cps2) {
-    return (!cps1.isPolicySatisfied() &&
-        cps1.actualPlacementCount() == cps2.actualPlacementCount()) ||
-        cps1.isPolicySatisfied() && cps2.isPolicySatisfied();
-  }
-
-  /**
-   * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
-   * and then check if the list meets the container placement policy.
-   * @param replicas List of containerReplica
-   * @param replicationFactor Expected Replication Factor of the containe
-   * @return ContainerPlacementStatus indicating if the policy is met or not
-   */
-  private ContainerPlacementStatus getPlacementStatus(
-      Set<ContainerReplica> replicas, int replicationFactor) {
-    List<DatanodeDetails> replicaDns = replicas.stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList());
-    return containerPlacement.validateContainerPlacement(
-        replicaDns, replicationFactor);
   }
 
   /**
@@ -1386,7 +933,8 @@ public class LegacyReplicationManager {
      */
 
     unhealthyReplicas.stream().findFirst().ifPresent(replica ->
-        sendDeleteCommand(container, replica.getDatanodeDetails(), true));
+        inflightActionManager.sendDeleteCommand(
+            container, replica.getDatanodeDetails(), true));
 
   }
 
@@ -1429,87 +977,6 @@ public class LegacyReplicationManager {
       return scm.getContainerTokenGenerator().generateEncodedToken(containerID);
     }
     return ""; // unit test
-  }
-
-  /**
-   * Sends replicate container command for the given container to the given
-   * datanode.
-   *
-   * @param container Container to be replicated
-   * @param datanode The destination datanode to replicate
-   * @param sources List of source nodes from where we can replicate
-   */
-  private void sendReplicateCommand(final ContainerInfo container,
-                                    final DatanodeDetails datanode,
-                                    final List<DatanodeDetails> sources) {
-
-    LOG.info("Sending replicate container command for container {}" +
-            " to datanode {} from datanodes {}",
-        container.containerID(), datanode, sources);
-
-    final ContainerID id = container.containerID();
-    final ReplicateContainerCommand replicateCommand =
-        new ReplicateContainerCommand(id.getId(), sources);
-    inflightReplication.computeIfAbsent(id, k -> new ArrayList<>());
-    sendAndTrackDatanodeCommand(datanode, replicateCommand,
-        action -> inflightReplication.get(id).add(action));
-
-    metrics.incrNumReplicationCmdsSent();
-    metrics.incrNumReplicationBytesTotal(container.getUsedBytes());
-  }
-
-  /**
-   * Sends delete container command for the given container to the given
-   * datanode.
-   *
-   * @param container Container to be deleted
-   * @param datanode The datanode on which the replica should be deleted
-   * @param force Should be set to true to delete an OPEN replica
-   */
-  private void sendDeleteCommand(final ContainerInfo container,
-                                 final DatanodeDetails datanode,
-                                 final boolean force) {
-
-    LOG.info("Sending delete container command for container {}" +
-            " to datanode {}", container.containerID(), datanode);
-
-    final ContainerID id = container.containerID();
-    final DeleteContainerCommand deleteCommand =
-        new DeleteContainerCommand(id.getId(), force);
-    inflightDeletion.computeIfAbsent(id, k -> new ArrayList<>());
-    sendAndTrackDatanodeCommand(datanode, deleteCommand,
-        action -> inflightDeletion.get(id).add(action));
-
-    metrics.incrNumDeletionCmdsSent();
-    metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
-  }
-
-  /**
-   * Creates CommandForDatanode with the given SCMCommand and fires
-   * DATANODE_COMMAND event to event queue.
-   *
-   * Tracks the command using the given tracker.
-   *
-   * @param datanode Datanode to which the command has to be sent
-   * @param command SCMCommand to be sent
-   * @param tracker Tracker which tracks the inflight actions
-   * @param <T> Type of SCMCommand
-   */
-  private <T extends GeneratedMessage> void sendAndTrackDatanodeCommand(
-      final DatanodeDetails datanode,
-      final SCMCommand<T> command,
-      final Consumer<InflightAction> tracker) {
-    try {
-      command.setTerm(scmContext.getTermOfLeader());
-    } catch (NotLeaderException nle) {
-      LOG.warn("Skip sending datanode command,"
-          + " since current SCM is not leader.", nle);
-      return;
-    }
-    final CommandForDatanode<T> datanodeCommand =
-        new CommandForDatanode<>(datanode.getUuid(), command);
-    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-    tracker.accept(new InflightAction(datanode, clock.millis()));
   }
 
   /**
@@ -1567,277 +1034,10 @@ public class LegacyReplicationManager {
         .allMatch(r -> compareState(state, r.getState()));
   }
 
-  public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
-    return inflightReplication.containsKey(containerID) ||
-        inflightDeletion.containsKey(containerID);
-  }
-
-  /**
-   * Configuration used by the Replication Manager.
-   */
-  @ConfigGroup(prefix = "hdds.scm.replication")
-  public static class ReplicationManagerConfiguration {
-    /**
-     * The frequency in which ReplicationMonitor thread should run.
-     */
-    @Config(key = "thread.interval",
-        type = ConfigType.TIME,
-        defaultValue = "300s",
-        tags = {SCM, OZONE},
-        description = "There is a replication monitor thread running inside " +
-            "SCM which takes care of replicating the containers in the " +
-            "cluster. This property is used to configure the interval in " +
-            "which that thread runs."
-    )
-    private long interval = Duration.ofSeconds(300).toMillis();
-
-    /**
-     * Timeout for container replication & deletion command issued by
-     * ReplicationManager.
-     */
-    @Config(key = "event.timeout",
-        type = ConfigType.TIME,
-        defaultValue = "30m",
-        tags = {SCM, OZONE},
-        description = "Timeout for the container replication/deletion commands "
-            + "sent  to datanodes. After this timeout the command will be "
-            + "retried.")
-    private long eventTimeout = Duration.ofMinutes(30).toMillis();
-    public void setInterval(Duration interval) {
-      this.interval = interval.toMillis();
-    }
-
-    public void setEventTimeout(Duration timeout) {
-      this.eventTimeout = timeout.toMillis();
-    }
-
-    /**
-     * The number of container replica which must be available for a node to
-     * enter maintenance.
-     */
-    @Config(key = "maintenance.replica.minimum",
-        type = ConfigType.INT,
-        defaultValue = "2",
-        tags = {SCM, OZONE},
-        description = "The minimum number of container replicas which must " +
-            " be available for a node to enter maintenance. If putting a " +
-            " node into maintenance reduces the available replicas for any " +
-            " container below this level, the node will remain in the " +
-            " entering maintenance state until a new replica is created.")
-    private int maintenanceReplicaMinimum = 2;
-
-    public void setMaintenanceReplicaMinimum(int replicaCount) {
-      this.maintenanceReplicaMinimum = replicaCount;
-    }
-
-    public long getInterval() {
-      return interval;
-    }
-
-    public long getEventTimeout() {
-      return eventTimeout;
-    }
-
-    public int getMaintenanceReplicaMinimum() {
-      return maintenanceReplicaMinimum;
-    }
-  }
-
   protected void notifyStatusChanged() {
     //now, as the current scm is leader and it`s state is up-to-date,
     //we need to take some action about replicated inflight move options.
     onLeaderReadyAndOutOfSafeMode();
-  }
-
-  public Map<ContainerID, List<InflightAction>> getInflightReplication() {
-    return inflightReplication;
-  }
-
-  public Map<ContainerID, List<InflightAction>> getInflightDeletion() {
-    return inflightDeletion;
-  }
-
-  public Map<ContainerID, CompletableFuture<MoveResult>> getInflightMove() {
-    return inflightMoveFuture;
-  }
-
-  /**
-  * make move option HA aware.
-  */
-  public interface MoveScheduler {
-    /**
-     * completeMove a move action for a given container.
-     *
-     * @param contianerIDProto Container to which the move option is finished
-     */
-    @Replicate
-    void completeMove(HddsProtos.ContainerID contianerIDProto);
-
-    /**
-     * start a move action for a given container.
-     *
-     * @param contianerIDProto Container to move
-     * @param mp encapsulates the source and target datanode infos
-     */
-    @Replicate
-    void startMove(HddsProtos.ContainerID contianerIDProto,
-              HddsProtos.MoveDataNodePairProto mp) throws IOException;
-
-    /**
-     * get the MoveDataNodePair of the giver container.
-     *
-     * @param cid Container to move
-     * @return null if cid is not found in MoveScheduler,
-     *          or the corresponding MoveDataNodePair
-     */
-    MoveDataNodePair getMoveDataNodePair(ContainerID cid);
-
-    /**
-     * Reinitialize the MoveScheduler with DB if become leader.
-     */
-    void reinitialize(Table<ContainerID,
-        MoveDataNodePair> moveTable) throws IOException;
-
-    /**
-     * get all the inflight move info.
-     */
-    Map<ContainerID, MoveDataNodePair> getInflightMove();
-  }
-
-  /**
-   * @return the moveScheduler of RM
-   */
-  public MoveScheduler getMoveScheduler() {
-    return moveScheduler;
-  }
-
-  /**
-   * Ratis based MoveScheduler, db operations are stored in
-   * DBTransactionBuffer until a snapshot is taken.
-   */
-  public static final class MoveSchedulerImpl implements MoveScheduler {
-    private Table<ContainerID, MoveDataNodePair> moveTable;
-    private final DBTransactionBuffer transactionBuffer;
-    /**
-     * This is used for tracking container move commands
-     * which are not yet complete.
-     */
-    private final Map<ContainerID, MoveDataNodePair> inflightMove;
-
-    private MoveSchedulerImpl(Table<ContainerID, MoveDataNodePair> moveTable,
-                DBTransactionBuffer transactionBuffer) throws IOException {
-      this.moveTable = moveTable;
-      this.transactionBuffer = transactionBuffer;
-      this.inflightMove = new ConcurrentHashMap<>();
-      initialize();
-    }
-
-    @Override
-    public void completeMove(HddsProtos.ContainerID contianerIDProto) {
-      ContainerID cid = null;
-      try {
-        cid = ContainerID.getFromProtobuf(contianerIDProto);
-        transactionBuffer.removeFromBuffer(moveTable, cid);
-      } catch (IOException e) {
-        LOG.warn("Exception while completing move {}", cid);
-      }
-      inflightMove.remove(cid);
-    }
-
-    @Override
-    public void startMove(HddsProtos.ContainerID contianerIDProto,
-                          HddsProtos.MoveDataNodePairProto mdnpp)
-        throws IOException {
-      ContainerID cid = null;
-      MoveDataNodePair mp = null;
-      try {
-        cid = ContainerID.getFromProtobuf(contianerIDProto);
-        mp = MoveDataNodePair.getFromProtobuf(mdnpp);
-        if (!inflightMove.containsKey(cid)) {
-          transactionBuffer.addToBuffer(moveTable, cid, mp);
-          inflightMove.putIfAbsent(cid, mp);
-        }
-      } catch (IOException e) {
-        LOG.warn("Exception while completing move {}", cid);
-      }
-    }
-
-    @Override
-    public MoveDataNodePair getMoveDataNodePair(ContainerID cid) {
-      return inflightMove.get(cid);
-    }
-
-    @Override
-    public void reinitialize(Table<ContainerID,
-        MoveDataNodePair> mt) throws IOException {
-      moveTable = mt;
-      inflightMove.clear();
-      initialize();
-    }
-
-    private void initialize() throws IOException {
-      TableIterator<ContainerID,
-          ? extends Table.KeyValue<ContainerID, MoveDataNodePair>>
-          iterator = moveTable.iterator();
-
-      while (iterator.hasNext()) {
-        Table.KeyValue<ContainerID, MoveDataNodePair> kv = iterator.next();
-        final ContainerID cid = kv.getKey();
-        final MoveDataNodePair mp = kv.getValue();
-        Preconditions.assertNotNull(cid,
-            "moved container id should not be null");
-        Preconditions.assertNotNull(mp,
-            "MoveDataNodePair container id should not be null");
-        inflightMove.put(cid, mp);
-      }
-    }
-
-    @Override
-    public Map<ContainerID, MoveDataNodePair> getInflightMove() {
-      return inflightMove;
-    }
-
-    /**
-     * Builder for Ratis based MoveSchedule.
-     */
-    public static class Builder {
-      private Table<ContainerID, MoveDataNodePair> moveTable;
-      private DBTransactionBuffer transactionBuffer;
-      private SCMRatisServer ratisServer;
-
-      public Builder setRatisServer(final SCMRatisServer scmRatisServer) {
-        ratisServer = scmRatisServer;
-        return this;
-      }
-
-      public Builder setMoveTable(
-          final Table<ContainerID, MoveDataNodePair> mt) {
-        moveTable = mt;
-        return this;
-      }
-
-      public Builder setDBTransactionBuffer(DBTransactionBuffer trxBuffer) {
-        transactionBuffer = trxBuffer;
-        return this;
-      }
-
-      public MoveScheduler build() throws IOException {
-        Preconditions.assertNotNull(moveTable, "moveTable is null");
-        Preconditions.assertNotNull(transactionBuffer,
-            "transactionBuffer is null");
-
-        final MoveScheduler impl =
-            new MoveSchedulerImpl(moveTable, transactionBuffer);
-
-        final SCMHAInvocationHandler invocationHandler
-            = new SCMHAInvocationHandler(MOVE, impl, ratisServer);
-
-        return (MoveScheduler) Proxy.newProxyInstance(
-            SCMHAInvocationHandler.class.getClassLoader(),
-            new Class<?>[]{MoveScheduler.class},
-            invocationHandler);
-      }
-    }
   }
 
   /**
@@ -1868,11 +1068,11 @@ public class LegacyReplicationManager {
         if (isTgtExist) {
           //the former scm leader may or may not send the deletion command
           //before reelection.here, we just try to send the command again.
-          deleteSrcDnForMove(cif, replicas);
+          inflightActionManager.deleteSrcDnForMove(cif, replicas);
         } else {
           // resenting replication command is ok , no matter whether there is an
           // on-going replication
-          sendReplicateCommand(cif, v.getTgt(),
+          inflightActionManager.sendReplicateCommand(cif, v.getTgt(),
               Collections.singletonList(v.getSrc()));
         }
       } else {
@@ -1884,17 +1084,6 @@ public class LegacyReplicationManager {
     });
 
     needToRemove.forEach(moveScheduler::completeMove);
-  }
-
-  /**
-   * complete the CompletableFuture of the container in the given Map with
-   * a given MoveResult.
-   */
-  private void compleleteMoveFutureWithResult(ContainerID cid, MoveResult mr) {
-    if (inflightMoveFuture.containsKey(cid)) {
-      inflightMoveFuture.get(cid).complete(mr);
-      inflightMoveFuture.remove(cid);
-    }
   }
 }
 
