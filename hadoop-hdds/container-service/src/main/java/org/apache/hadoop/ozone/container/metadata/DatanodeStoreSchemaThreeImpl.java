@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -73,5 +74,16 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore {
     return new KeyValueBlockIterator(containerID,
         getBlockDataTableWithIterator()
             .iterator(getContainerKeyPrefix(containerID)), filter);
+  }
+
+  public void dropAllWithPrefix(long containerID) throws IOException {
+    String prefix = getContainerKeyPrefix(containerID);
+    try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
+      getMetadataTable().deleteBatchWithPrefix(batch, prefix);
+      getBlockDataTable().deleteBatchWithPrefix(batch, prefix);
+      getDeletedBlocksTable().deleteBatchWithPrefix(batch, prefix);
+      getDeleteTransactionTable().deleteBatchWithPrefix(batch, prefix);
+      getBatchHandler().commitBatchOperation(batch);
+    }
   }
 }

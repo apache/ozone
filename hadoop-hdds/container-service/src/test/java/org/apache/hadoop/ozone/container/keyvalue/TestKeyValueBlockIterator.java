@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -50,10 +48,10 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 
 import org.junit.After;
+
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -77,27 +75,30 @@ public class TestKeyValueBlockIterator {
   private File testRoot;
   private DBHandle db;
   private final ContainerLayoutVersion layout;
+  private String schemaVersion;
+  private String datanodeID = UUID.randomUUID().toString();
+  private String clusterID = UUID.randomUUID().toString();
 
-  public TestKeyValueBlockIterator(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
   @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        {FILE_PER_CHUNK},
-        {FILE_PER_BLOCK}
-    });
+  public static Iterable<Object[]> data() {
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Before
   public void setUp() throws Exception {
     testRoot = GenericTestUtils.getRandomizedTestDir();
-    conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null,
+    volumeSet = new MutableVolumeSet(datanodeID, clusterID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterID, clusterID, conf);
 
     containerData = new KeyValueContainerData(105L,
             layout,
@@ -105,8 +106,8 @@ public class TestKeyValueBlockIterator {
             UUID.randomUUID().toString());
     // Init the container.
     container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
-            .randomUUID().toString());
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterID);
     db = BlockUtils.getDB(containerData, conf);
   }
 
@@ -115,6 +116,7 @@ public class TestKeyValueBlockIterator {
   public void tearDown() throws Exception {
     db.close();
     db.cleanup();
+    BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }

@@ -132,6 +132,12 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
+      throws IOException {
+    table.deleteBatchWithPrefix(batch, prefix);
+  }
+
+  @Override
   public void close() throws Exception {
     table.close();
   }

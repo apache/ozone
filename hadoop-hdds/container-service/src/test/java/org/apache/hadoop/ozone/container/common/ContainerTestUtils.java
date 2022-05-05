@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -37,6 +38,9 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -137,5 +141,20 @@ public final class ContainerTestUtils {
     DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
     dc.setContainerSchemaV3Enabled(false);
     conf.setFromObject(dc);
+  }
+
+  public static void createDbInstancesForTestIfNeeded(
+      MutableVolumeSet hddsVolumeSet, String scmID, String clusterID,
+      ConfigurationSource conf) {
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    if (!dc.getContainerSchemaV3Enabled()) {
+      return;
+    }
+
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList())) {
+      StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf,
+          null, null);
+    }
   }
 }

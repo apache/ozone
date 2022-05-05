@@ -109,6 +109,10 @@ public final class KeyValueContainerUtil {
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf, dbFile.getAbsolutePath(),
           false);
+    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      // We don't create per-container store for schema v3 containers,
+      // they should use per-volume db store.
+      return;
     } else {
       throw new IllegalArgumentException(
               "Unrecognized schema version for container: " + schemaVersion);
@@ -138,8 +142,12 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
-    // Close the DB connection and remove the DB handler from cache
-    BlockUtils.removeDB(containerData, conf);
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      BlockUtils.removeContainerFromDB(containerData, conf);
+    } else {
+      // Close the DB connection and remove the DB handler from cache
+      BlockUtils.removeDB(containerData, conf);
+    }
 
     // Delete the Container MetaData path.
     FileUtils.deleteDirectory(containerMetaDataPath);
@@ -163,13 +171,18 @@ public final class KeyValueContainerUtil {
       ConfigurationSource config) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
-    File metadataPath = new File(kvContainerData.getMetadataPath());
 
     // Verify Checksum
     ContainerUtils.verifyChecksum(kvContainerData, config);
 
+    if (kvContainerData.getSchemaVersion() == null) {
+      // If this container has not specified a schema version, it is in the old
+      // format with one default column family.
+      kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
+    }
+
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
-        metadataPath, containerID);
+        kvContainerData);
     if (!dbFile.exists()) {
       LOG.error("Container DB file is missing for ContainerID {}. " +
           "Skipping loading of this container.", containerID);
@@ -178,13 +191,13 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
-    if (kvContainerData.getSchemaVersion() == null) {
-      // If this container has not specified a schema version, it is in the old
-      // format with one default column family.
-      kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
+    if (kvContainerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
+        populateContainerMetadata(kvContainerData, db.getStore());
+      }
+      return;
     }
 
-    boolean isBlockMetadataSet = false;
     DBHandle cachedDB = null;
     DatanodeStore store = null;
     try {
@@ -203,70 +216,7 @@ public final class KeyValueContainerUtil {
             "instance was retrieved from the cache. This should only happen " +
             "in tests");
       }
-      Table<String, Long> metadataTable = store.getMetadataTable();
-
-      // Set pending deleted block count.
-      Long pendingDeleteBlockCount =
-          metadataTable.get(kvContainerData.pendingDeleteBlockCountKey());
-      if (pendingDeleteBlockCount != null) {
-        kvContainerData.incrPendingDeletionBlocks(
-                pendingDeleteBlockCount);
-      } else {
-        // Set pending deleted block count.
-        MetadataKeyFilters.KeyPrefixFilter filter =
-                kvContainerData.getDeletingBlockKeyFilter();
-        int numPendingDeletionBlocks =
-            store.getBlockDataTable()
-            .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
-                Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter)
-            .size();
-        kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
-      }
-
-      // Set delete transaction id.
-      Long delTxnId =
-          metadataTable.get(kvContainerData.latestDeleteTxnKey());
-      if (delTxnId != null) {
-        kvContainerData
-            .updateDeleteTransactionId(delTxnId);
-      }
-
-      // Set BlockCommitSequenceId.
-      Long bcsId = metadataTable.get(kvContainerData.bcsIdKey());
-      if (bcsId != null) {
-        kvContainerData
-            .updateBlockCommitSequenceId(bcsId);
-      }
-
-      // Set bytes used.
-      // commitSpace for Open Containers relies on usedBytes
-      Long bytesUsed =
-          metadataTable.get(kvContainerData.bytesUsedKey());
-      if (bytesUsed != null) {
-        isBlockMetadataSet = true;
-        kvContainerData.setBytesUsed(bytesUsed);
-      }
-
-      // Set block count.
-      Long blockCount = metadataTable.get(kvContainerData.blockCountKey());
-      if (blockCount != null) {
-        isBlockMetadataSet = true;
-        kvContainerData.setBlockCount(blockCount);
-      }
-      if (!isBlockMetadataSet) {
-        initializeUsedBytesAndBlockCount(store, kvContainerData);
-      }
-
-      // If the container is missing a chunks directory, possibly due to the
-      // bug fixed by HDDS-6235, create it here.
-      File chunksDir = new File(kvContainerData.getChunksPath());
-      if (!chunksDir.exists()) {
-        Files.createDirectories(chunksDir.toPath());
-      }
-      // Run advanced container inspection/repair operations if specified on
-      // startup. If this method is called but not as a part of startup,
-      // The inspectors will be unloaded and this will be a no-op.
-      ContainerInspectorUtil.process(kvContainerData, store);
+      populateContainerMetadata(kvContainerData, store);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
@@ -285,6 +235,78 @@ public final class KeyValueContainerUtil {
         }
       }
     }
+  }
+
+  private static void populateContainerMetadata(
+      KeyValueContainerData kvContainerData, DatanodeStore store)
+      throws IOException {
+    boolean isBlockMetadataSet = false;
+    Table<String, Long> metadataTable = store.getMetadataTable();
+
+    // Set pending deleted block count.
+    Long pendingDeleteBlockCount =
+        metadataTable.get(kvContainerData
+            .pendingDeleteBlockCountKey());
+    if (pendingDeleteBlockCount != null) {
+      kvContainerData.incrPendingDeletionBlocks(
+          pendingDeleteBlockCount);
+    } else {
+      // Set pending deleted block count.
+      MetadataKeyFilters.KeyPrefixFilter filter =
+          kvContainerData.getDeletingBlockKeyFilter();
+      int numPendingDeletionBlocks = store.getBlockDataTable()
+              .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
+                  Integer.MAX_VALUE, kvContainerData.containerPrefix(),
+                  filter).size();
+      kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
+    }
+
+    // Set delete transaction id.
+    Long delTxnId =
+        metadataTable.get(kvContainerData.latestDeleteTxnKey());
+    if (delTxnId != null) {
+      kvContainerData
+          .updateDeleteTransactionId(delTxnId);
+    }
+
+    // Set BlockCommitSequenceId.
+    Long bcsId = metadataTable.get(
+        kvContainerData.bcsIdKey());
+    if (bcsId != null) {
+      kvContainerData
+          .updateBlockCommitSequenceId(bcsId);
+    }
+
+    // Set bytes used.
+    // commitSpace for Open Containers relies on usedBytes
+    Long bytesUsed =
+        metadataTable.get(kvContainerData.bytesUsedKey());
+    if (bytesUsed != null) {
+      isBlockMetadataSet = true;
+      kvContainerData.setBytesUsed(bytesUsed);
+    }
+
+    // Set block count.
+    Long blockCount = metadataTable.get(
+        kvContainerData.blockCountKey());
+    if (blockCount != null) {
+      isBlockMetadataSet = true;
+      kvContainerData.setBlockCount(blockCount);
+    }
+    if (!isBlockMetadataSet) {
+      initializeUsedBytesAndBlockCount(store, kvContainerData);
+    }
+
+    // If the container is missing a chunks directory, possibly due to the
+    // bug fixed by HDDS-6235, create it here.
+    File chunksDir = new File(kvContainerData.getChunksPath());
+    if (!chunksDir.exists()) {
+      Files.createDirectories(chunksDir.toPath());
+    }
+    // Run advanced container inspection/repair operations if specified on
+    // startup. If this method is called but not as a part of startup,
+    // The inspectors will be unloaded and this will be a no-op.
+    ContainerInspectorUtil.process(kvContainerData, store);
   }
 
   /**

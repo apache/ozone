@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -54,6 +55,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
+import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -113,12 +115,13 @@ public class KeyValueContainerData extends ContainerData {
     this.deleteTransactionId = 0;
   }
 
-  public KeyValueContainerData(ContainerData source) {
+  public KeyValueContainerData(KeyValueContainerData source) {
     super(source);
     Preconditions.checkArgument(source.getContainerType()
         == ContainerProtos.ContainerType.KeyValueContainer);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
+    this.schemaVersion = source.getSchemaVersion();
   }
 
   /**
@@ -375,6 +378,9 @@ public class KeyValueContainerData extends ContainerData {
    * @return
    */
   public String startKeyEmpty() {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      return getContainerKeyPrefix(getContainerID());
+    }
     return null;
   }
 
@@ -384,7 +390,10 @@ public class KeyValueContainerData extends ContainerData {
    * @return
    */
   public String containerPrefix() {
-    return null;
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      return getContainerKeyPrefix(getContainerID());
+    }
+    return "";
   }
 
   /**
@@ -395,6 +404,9 @@ public class KeyValueContainerData extends ContainerData {
    * @return formatted key
    */
   private String formatKey(String key) {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      key = getContainerKeyPrefix(getContainerID()) + key;
+    }
     return key;
   }
 }
