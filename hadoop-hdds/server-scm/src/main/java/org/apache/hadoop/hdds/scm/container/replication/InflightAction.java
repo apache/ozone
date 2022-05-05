@@ -15,21 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 /**
-* InflightAction is a Wrapper class to hold the InflightAction
-* with its start time and the target datanode.
-*/
+ * InflightAction is a Wrapper class to hold the InflightAction
+ * with its start time and the target datanode.
+ */
 public class InflightAction {
   private final DatanodeDetails datanode;
   private final long time;
 
   public InflightAction(final DatanodeDetails datanode,
-                         final long time) {
+                        final long time) {
     this.datanode = datanode;
     this.time = time;
   }
