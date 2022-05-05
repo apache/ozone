@@ -151,17 +151,12 @@ public final class BlockUtils {
       ConfigurationSource conf) {
     Preconditions.checkNotNull(container);
     Preconditions.checkNotNull(container.getDbFile());
+    Preconditions.checkState(!container.getSchemaVersion()
+        .equals(OzoneConsts.SCHEMA_V3));
 
-    String containerDBPath = container.getDbFile().getAbsolutePath();
-    if (container.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-      Preconditions.checkNotNull(cache);
-      cache.removeDB(containerDBPath);
-    } else {
-      ContainerCache cache = ContainerCache.getInstance(conf);
-      Preconditions.checkNotNull(cache);
-      cache.removeDB(containerDBPath);
-    }
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    Preconditions.checkNotNull(cache);
+    cache.removeDB(container.getDbFile().getAbsolutePath());
   }
 
   /**
