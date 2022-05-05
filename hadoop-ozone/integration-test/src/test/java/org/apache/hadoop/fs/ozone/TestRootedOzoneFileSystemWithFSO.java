@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.junit.Assert;
@@ -222,6 +223,21 @@ public class TestRootedOzoneFileSystemWithFSO
     Assert.assertTrue(getFs().delete(volumePath1, true));
     long deletes = getOMMetrics().getNumKeyDeletes();
     Assert.assertTrue(deletes == prevDeletes + 1);
+  }
+
+  @Test
+  public void testListStatusFSO() throws Exception {
+    Path parent = new Path(getBucketPath(), "testListStatusFSO");
+    for (int i = 0; i < 1300; i++) {
+      Path key = new Path(parent, "tempKey" + i);
+      ContractTestUtils.touch(getFs(), key);
+      // To add keys to the cache
+      getFs().rename(key, new Path(parent, "key" + i));
+    }
+
+    FileStatus[] fileStatuses = getFs().listStatus(
+        new Path(getBucketPath() + "/testListStatusFSO"));
+    Assert.assertEquals(1300, fileStatuses.length);
   }
 
 }

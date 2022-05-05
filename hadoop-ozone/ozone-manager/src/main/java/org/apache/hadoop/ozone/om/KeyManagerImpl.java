@@ -1740,8 +1740,7 @@ public class KeyManagerImpl implements KeyManager {
             bucketName);
       }
       countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet,
-          iterator);
+          prefixPath, prefixKeyInDB, numEntries, deletedKeySet, iterator);
 
     } else {
       /*
@@ -1831,8 +1830,7 @@ public class KeyManagerImpl implements KeyManager {
 
           // 1. Seek the given key in key table.
           countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-              prefixPath, prefixKeyInDB, countEntries, numEntries,
-              deletedKeySet, iterator);
+              prefixPath, prefixKeyInDB, numEntries, deletedKeySet, iterator);
         }
       } else {
         // TODO: HDDS-4364: startKey can be a non-existed key
@@ -1857,7 +1855,7 @@ public class KeyManagerImpl implements KeyManager {
     // 2. Seek the given key in dir table.
     if (countEntries < numEntries) {
       getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-          prefixKeyInDB, countEntries, numEntries, recursive,
+          prefixKeyInDB, numEntries, recursive,
           volumeName, bucketName, deletedKeySet);
     }
 
@@ -1948,16 +1946,15 @@ public class KeyManagerImpl implements KeyManager {
   protected int getDirectories(
       TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekDirInDB, String prefixPath, long prefixKeyInDB,
-      int countEntries, long numEntries, boolean recursive,
-      String volumeName, String bucketName, Set<String> deletedKeySet)
-      throws IOException {
+      long numEntries, boolean recursive, String volumeName,
+      String bucketName, Set<String> deletedKeySet) throws IOException {
 
     Table dirTable = metadataManager.getDirectoryTable();
     TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator();
 
     iterator.seek(seekDirInDB);
-    countEntries = 0;
+    int countEntries = 0;
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
@@ -1990,12 +1987,11 @@ public class KeyManagerImpl implements KeyManager {
   private int getFilesFromDirectory(
       TreeMap<String, OzoneFileStatus> cacheKeyMap,
       String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
-      int countEntries, long numEntries, Set<String> deletedKeySet,
+      long numEntries, Set<String> deletedKeySet,
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          iterator)
-      throws IOException {
+          iterator) throws IOException {
     iterator.seek(seekKeyInDB);
-    countEntries = 0;
+    int countEntries = 0;
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
       OmKeyInfo keyInfo = entry.getValue();
