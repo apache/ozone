@@ -40,7 +40,8 @@ import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDe
  * - All keys have containerID as prefix.
  * - The table 3 has String as key instead of Long since we want to use prefix.
  */
-public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore {
+public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
+    implements DeleteTransactionStore<String> {
 
   private final Table<String, DeletedBlocksTransaction> deleteTransactionTable;
 
@@ -52,6 +53,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore {
         .getDeleteTransactionsColumnFamily().getTable(getStore());
   }
 
+  @Override
   public Table<String, DeletedBlocksTransaction> getDeleteTransactionTable() {
     return this.deleteTransactionTable;
   }
