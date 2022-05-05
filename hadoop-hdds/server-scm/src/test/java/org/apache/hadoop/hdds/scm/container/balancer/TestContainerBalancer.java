@@ -28,16 +28,15 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.MoveScheduler.MoveResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -869,7 +868,7 @@ public class TestContainerBalancer {
     }
   }
 
-  private CompletableFuture<LegacyReplicationManager.MoveResult>
+  private CompletableFuture<MoveResult>
       genCompletableFuture(int sleepMilSec) {
     return CompletableFuture.supplyAsync(() -> {
       try {
@@ -877,7 +876,7 @@ public class TestContainerBalancer {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-      return LegacyReplicationManager.MoveResult.COMPLETED;
+      return MoveResult.COMPLETED;
     });
   }
 

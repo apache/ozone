@@ -27,11 +27,11 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.MoveScheduler.MoveResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -107,7 +107,7 @@ public class ContainerBalancer implements SCMService {
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection,
-      CompletableFuture<LegacyReplicationManager.MoveResult>>
+      CompletableFuture<MoveResult>>
       moveSelectionToFutureMap;
   private IterationResult iterationResult;
 
@@ -586,7 +586,7 @@ public class ContainerBalancer implements SCMService {
   private boolean moveContainer(DatanodeDetails source,
                                 ContainerMoveSelection moveSelection) {
     ContainerID containerID = moveSelection.getContainerID();
-    CompletableFuture<LegacyReplicationManager.MoveResult> future;
+    CompletableFuture<MoveResult> future;
     try {
       ContainerInfo containerInfo = containerManager.getContainer(containerID);
       future = replicationManager
@@ -599,7 +599,7 @@ public class ContainerBalancer implements SCMService {
                   source.getUuidString(),
                   moveSelection.getTargetNode().getUuidString(), ex);
             } else {
-              if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
+              if (result == MoveResult.COMPLETED) {
                 metrics.incrementDataSizeMovedGBInLatestIteration(
                     containerInfo.getUsedBytes() / OzoneConsts.GB);
                 metrics.incrementNumContainerMovesCompletedInLatestIteration(1);
@@ -630,9 +630,9 @@ public class ContainerBalancer implements SCMService {
       if (future.isCompletedExceptionally()) {
         return false;
       } else {
-        LegacyReplicationManager.MoveResult result = future.join();
+        MoveResult result = future.join();
         moveSelectionToFutureMap.put(moveSelection, future);
-        return result == LegacyReplicationManager.MoveResult.COMPLETED;
+        return result == MoveResult.COMPLETED;
       }
     } else {
       moveSelectionToFutureMap.put(moveSelection, future);
