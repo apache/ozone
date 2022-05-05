@@ -336,7 +336,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
             .build());
     RaftClient client = RaftClient.newBuilder()
         .setClientId(clientId)
-        .setProperties(new RaftProperties(true))
+        .setProperties(new RaftProperties())
         .setRaftGroup(group)
         .build();
 
