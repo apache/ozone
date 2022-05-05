@@ -19,7 +19,9 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -48,6 +50,11 @@ public class DatanodeSchemaV3FinalizeAction
     // Create RocksDB for each HddsVolume, no matter
     // hdds.datanode.container.schema.v3.enabled is true or false.
     LOG.info("Upgrading Datanode volume layout for Schema V3 support.");
+    dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(dsm.getco).isEmpty() ? null :
+        new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+            context, StorageVolume.VolumeType.DB_VOLUME, volumeChecker);
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
+
     MutableVolumeSet hddsVolumeSet = dsm.getContainer().getVolumeSet();
     MutableVolumeSet dbVolumeSet = dsm.getContainer().getDbVolumeSet();
 

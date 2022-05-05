@@ -130,87 +130,113 @@ public class TestDatanodeUpgradeToSchemaV3 {
   }
 
   @Test
-  public void testRocksDBCreatedOnHddsVolume() throws Exception {
+  public void testDBOnHddsVolume() throws Exception {
     // start DN and SCM
     startScmServer();
     addHddsVolume();
 
     startPreFinalizedDatanode();
-    Assert.assertNull(dsm.getContainer().getDbVolumeSet());
-    Assert.assertEquals(1,
-        dsm.getContainer().getVolumeSet().getVolumesList().size());
     HddsVolume volume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     Assert.assertNull(volume.getDbVolume());
     Assert.assertNull(volume.getDbParentDir());
 
     dsm.finalizeUpgrade();
+    // HddsVolume has DB Dir set with no DbVolume
     Assert.assertNull(volume.getDbVolume());
     Assert.assertNotNull(volume.getDbParentDir());
   }
 
   @Test
-  public void testRocksDBCreatedOnDbVolume() throws Exception {
+  public void testDBOnDbVolume() throws Exception {
     // start DN and SCM
     startScmServer();
     File vol = addHddsVolume();
     addDbVolume();
 
     startPreFinalizedDatanode();
-    Assert.assertEquals(1,
-        dsm.getContainer().getDbVolumeSet().getVolumesList().size());
-    Assert.assertEquals(1,
-        dsm.getContainer().getVolumeSet().getVolumesList().size());
-
-    DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
+    HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertEquals(0, dbVolume.getHddsVolumeIDs().size());
-
-    HddsVolume volume = (HddsVolume) dsm.getContainer().getVolumeSet()
-        .getVolumesList().get(0);
-    Assert.assertNull(volume.getDbVolume());
-    Assert.assertNull(volume.getDbParentDir());
+    Assert.assertNull(dataVolume.getDbVolume());
+    Assert.assertNull(dataVolume.getDbParentDir());
 
     dsm.finalizeUpgrade();
+    DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
+        .getVolumesList().get(0);
+    Assert.assertEquals(1, dbVolume.getHddsVolumeIDs().size());
+
+    // RocksDB for dataVolume is created on dbVolume
+    Assert.assertEquals(dbVolume, dataVolume.getDbVolume());
     Assert.assertTrue(
-        dbVolume.getHddsVolumeIDs().contains(vol.getAbsolutePath()));
-    Assert.assertEquals(dbVolume, volume.getDbVolume());
-    Assert.assertNotNull(volume.getDbParentDir());
+        dbVolume.getHddsVolumeIDs().contains(vol.getName()));
+    Assert.assertNotNull(dataVolume.getDbParentDir().getAbsolutePath()
+        .startsWith(dbVolume.getStorageDir().toString()));
   }
 
   @Test
   public void testFinalizeTwice() throws Exception {
     // start DN and SCM
     startScmServer();
+    // add one HddsVolume and two DbVolume
     addHddsVolume();
+    addDbVolume();
     addDbVolume();
 
     startPreFinalizedDatanode();
     dsm.finalizeUpgrade();
 
-    HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
-        .getVolumesList().get(0);
-    File dbDir = hddsVolume.getDbParentDir();
+    File dbDir = ((HddsVolume) dsm.getContainer().getVolumeSet()
+        .getVolumesList().get(0)).getDbParentDir();
     Assert.assertNotNull(dbDir);
 
     dsm.finalizeUpgrade();
-    hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
-        .getVolumesList().get(0);
-   Assert.assertEquals(dbDir, hddsVolume.getDbParentDir());
+    // DB Dir should be the same.
+    Assert.assertEquals(dbDir, ((HddsVolume) dsm.getContainer().getVolumeSet()
+       .getVolumesList().get(0)).getDbParentDir());
   }
 
   @Test
-  public void testAddNewVolumeAfterFinalize() throws Exception {
+  public void testAddHddsVolumeAfterFinalize() throws Exception {
     // start DN and SCM
     startScmServer();
     addHddsVolume();
 
     startPreFinalizedDatanode();
     dsm.finalizeUpgrade();
-    addHddsVolume();
     restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
 
-    for(StorageVolume vol:dsm.getContainer().getVolumeSet().getVolumesList()) {
+    // All HddsVolume should have RocksDB created.
+    for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
+      HddsVolume hddsVolume = (HddsVolume) vol;
+      File dbDir = hddsVolume.getDbParentDir();
+      Assert.assertNotNull(dbDir);
+      Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
+          hddsVolume.getStorageDir().getAbsolutePath()));
+    }
+
+    addHddsVolume();
+    // New HddsVolume should have RocksDB created too.
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
+      HddsVolume hddsVolume = (HddsVolume) vol;
+      Assert.assertNotNull(hddsVolume.getDbParentDir());
+      Assert.assertTrue(hddsVolume.getDbParentDir().getAbsolutePath()
+          .startsWith(hddsVolume.getStorageDir().getAbsolutePath()));
+    }
+  }
+
+  @Test
+  public void testAddDbVolumeAfterFinalize() throws Exception {
+    // start DN and SCM
+    startScmServer();
+    addHddsVolume();
+
+    startPreFinalizedDatanode();
+    dsm.finalizeUpgrade();
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+
+    // All HddsVolume should have RocksDB created
+    for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
       File dbDir = hddsVolume.getDbParentDir();
       Assert.assertNotNull(dbDir);
@@ -448,6 +474,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
     Assert.assertEquals(
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(),
         actualMlv);
+    if (dsm != null) {
+      dsm.close();
+    }
     dsm = newDsm;
 
     callVersionEndpointTask();
