@@ -334,20 +334,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void quasiClose() throws StorageContainerException {
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      closeWithoutFlush(containerData::quasiCloseContainer);
-    } else {
-      closeWithFlush(containerData::quasiCloseContainer);
-    }
+    closeAndFlushIfNeeded(containerData::quasiCloseContainer,
+        !containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3));
   }
 
   @Override
   public void close() throws StorageContainerException {
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      closeWithoutFlush(containerData::closeContainer);
-    } else {
-      closeWithFlush(containerData::closeContainer);
-    }
+    closeAndFlushIfNeeded(containerData::closeContainer,
+        !containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3));
     LOG.info("Container {} is closed with bcsId {}.",
         containerData.getContainerID(),
         containerData.getBlockCommitSequenceId());
@@ -365,37 +359,28 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   /**
-   * For db-per-container schemas, we need to do flush and sync on close.
+   * For db-per-container schemas, the DB must be synced during
+   * close operation.
+   * For db-per-volume schemas, don't sync the whole db on closing
+   * of a single container.
+   *
    * @param closer
+   * @param flush
    * @throws StorageContainerException
    */
-  private void closeWithFlush(Runnable closer)
+  private void closeAndFlushIfNeeded(Runnable closer, boolean flush)
       throws StorageContainerException {
-    // The DB must be synced during close operation
-    flushAndSyncDB();
-
-    writeLock();
-    try {
-      // Second sync should be a very light operation as sync has already
-      // been done outside the lock.
+    if (flush) {
       flushAndSyncDB();
-      updateContainerData(closer);
-      clearPendingPutBlockCache();
-    } finally {
-      writeUnlock();
     }
-  }
 
-  /**
-   * For db-per-volume schemas, we don't flush and sync the whole db
-   * on closing of a single container.
-   * @param closer
-   * @throws StorageContainerException
-   */
-  private void closeWithoutFlush(Runnable closer)
-      throws StorageContainerException {
     writeLock();
     try {
+      if (flush) {
+        // Second sync should be a very light operation as sync has already
+        // been done outside the lock.
+        flushAndSyncDB();
+      }
       updateContainerData(closer);
       clearPendingPutBlockCache();
     } finally {
