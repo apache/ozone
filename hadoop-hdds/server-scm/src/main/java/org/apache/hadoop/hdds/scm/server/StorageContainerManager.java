@@ -56,6 +56,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -275,6 +277,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SCMHANodeDetails scmHANodeDetails;
 
   private ContainerBalancer containerBalancer;
+  private StatefulServiceStateManager statefulServiceStateManager;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -659,6 +662,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         containerManager, scmContext, eventQueue, replicationManager);
+
+    statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
+        .setStatefulServiceConfig(
+            scmMetadataStore.getStatefulServiceConfigTable())
+        .setSCMDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+        .setRatisServer(scmHAManager.getRatisServer())
+        .build();
   }
 
   /**
@@ -1823,6 +1833,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public NetworkTopology getClusterMap() {
     return this.clusterMap;
+  }
+
+  public StatefulServiceStateManager getStatefulServiceStateManager() {
+    return statefulServiceStateManager;
   }
 
   /**
