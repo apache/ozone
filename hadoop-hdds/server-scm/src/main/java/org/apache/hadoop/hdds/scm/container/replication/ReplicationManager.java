@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.container.replication.MoveScheduler.MoveResult;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -124,6 +125,10 @@ public class ReplicationManager implements SCMService {
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
   private final Clock clock;
+  
+  private final InflightActionManager inflightActionManager;
+
+  private final MoveScheduler moveScheduler;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -156,9 +161,20 @@ public class ReplicationManager implements SCMService {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
+
+    this.moveScheduler = new MoveSchedulerImpl.Builder()
+        .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setMoveTable(moveTable).build();
+
+    this.inflightActionManager = new InflightActionManager(containerManager,
+        nodeManager, rmConf.getEventTimeout(), clock, moveScheduler,
+        rmConf.getMaintenanceReplicaMinimum(), containerPlacement,
+        eventPublisher, scmContext);
+
     this.legacyReplicationManager = new LegacyReplicationManager(
         conf, containerManager, containerPlacement, eventPublisher,
-        scmContext, nodeManager, scmhaManager, clock, moveTable);
+        scmContext, nodeManager, moveScheduler, inflightActionManager);
 
     // register ReplicationManager to SCMServiceManager.
     serviceManager.register(this);
@@ -176,7 +192,8 @@ public class ReplicationManager implements SCMService {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
       metrics = ReplicationManagerMetrics.create(this);
-      legacyReplicationManager.setMetrics(metrics);
+      inflightActionManager.setMetrics(metrics);
+
       replicationMonitor = new Thread(this::run);
       replicationMonitor.setName("ReplicationMonitor");
       replicationMonitor.setDaemon(true);
@@ -208,7 +225,7 @@ public class ReplicationManager implements SCMService {
     if (running) {
       LOG.info("Stopping Replication Monitor Thread.");
       running = false;
-      legacyReplicationManager.clearInflightActions();
+      inflightActionManager.clearInflightActions();
       metrics.unRegister();
       replicationMonitor.interrupt();
     } else {
@@ -283,7 +300,7 @@ public class ReplicationManager implements SCMService {
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
       throws ContainerNotFoundException {
-    return legacyReplicationManager.getContainerReplicaCount(containerID);
+    return inflightActionManager.getContainerReplicaCount(containerID);
   }
 
   /**
@@ -381,6 +398,7 @@ public class ReplicationManager implements SCMService {
     }
   }
 
+
   @Override
   public boolean shouldRun() {
     serviceLock.lock();
@@ -402,17 +420,16 @@ public class ReplicationManager implements SCMService {
     return metrics;
   }
 
-
   /**
   * following functions will be refactored in a seperate jira.
   */
-  public CompletableFuture<LegacyReplicationManager.MoveResult> move(
+  public CompletableFuture<MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws NodeNotFoundException, ContainerNotFoundException {
-    CompletableFuture<LegacyReplicationManager.MoveResult> ret =
+    CompletableFuture<MoveResult> ret =
         new CompletableFuture<>();
     if (!isRunning()) {
-      ret.complete(LegacyReplicationManager.MoveResult.FAIL_NOT_RUNNING);
+      ret.complete(MoveResult.FAIL_NOT_RUNNING);
       return ret;
     }
 
@@ -420,21 +437,19 @@ public class ReplicationManager implements SCMService {
   }
 
   public Map<ContainerID, List<InflightAction>>  getInflightReplication() {
-    return legacyReplicationManager.getInflightReplication();
+    return inflightActionManager.getInflightReplication();
   }
 
   public Map<ContainerID, List<InflightAction>> getInflightDeletion() {
-    return legacyReplicationManager.getInflightDeletion();
+    return inflightActionManager.getInflightDeletion();
   }
 
-  public Map<ContainerID,
-      CompletableFuture<LegacyReplicationManager.MoveResult>>
-      getInflightMove() {
-    return legacyReplicationManager.getInflightMove();
+  public Map<ContainerID, MoveDataNodePair> getInflightMove() {
+    return moveScheduler.getInflightMove();
   }
 
-  public LegacyReplicationManager.MoveScheduler getMoveScheduler() {
-    return legacyReplicationManager.getMoveScheduler();
+  public MoveScheduler getMoveScheduler() {
+    return moveScheduler;
   }
 
   @VisibleForTesting
@@ -443,8 +458,7 @@ public class ReplicationManager implements SCMService {
   }
 
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
-    return legacyReplicationManager
-        .isContainerReplicatingOrDeleting(containerID);
+    return inflightActionManager.isContainerReplicatingOrDeleting(containerID);
   }
 }
 
