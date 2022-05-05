@@ -15,18 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc.read;
+package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
-import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
-import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
-import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputStreamFactory;
-import org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.TestBlockInputStream;
+import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStreamFactory;
+import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStream;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -46,7 +43,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateParity;
+import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
 
 /**
  * Test for the ECBlockReconstructedStripeInputStream.
