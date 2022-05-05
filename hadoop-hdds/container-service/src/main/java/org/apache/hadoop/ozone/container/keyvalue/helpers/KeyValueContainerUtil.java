@@ -143,7 +143,7 @@ public final class KeyValueContainerUtil {
     File chunksPath = new File(containerData.getChunksPath());
 
     if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      BlockUtils.dropAllFromDB(containerData, conf);
+      BlockUtils.removeContainerFromDB(containerData, conf);
     } else {
       // Close the DB connection and remove the DB handler from cache
       BlockUtils.removeDB(containerData, conf);

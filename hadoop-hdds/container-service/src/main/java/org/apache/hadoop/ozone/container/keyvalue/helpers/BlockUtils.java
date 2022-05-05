@@ -244,7 +244,7 @@ public final class BlockUtils {
    * @param conf
    * @throws IOException
    */
-  public static void dropAllFromDB(KeyValueContainerData containerData,
+  public static void removeContainerFromDB(KeyValueContainerData containerData,
       ConfigurationSource conf) throws IOException {
     try (DBHandle db = getDB(containerData, conf)) {
       Preconditions.checkState(db.getStore()

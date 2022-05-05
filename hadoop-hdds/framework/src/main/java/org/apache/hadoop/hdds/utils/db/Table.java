@@ -272,12 +272,13 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
           throws IOException, IllegalArgumentException;
 
   /**
-   * Delete all keys with a prefix.
+   * Deletes all keys with the specified prefix from the metadata store
+   * as part of a batch operation.
    * @param batch
    * @param prefix
    * @return
    */
-  void deleteAllWithPrefix(BatchOperation batch, KEY prefix)
+  void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException;
 
   /**

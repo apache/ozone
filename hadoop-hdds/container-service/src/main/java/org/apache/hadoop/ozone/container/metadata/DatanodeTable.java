@@ -132,9 +132,9 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void deleteAllWithPrefix(BatchOperation batch, KEY prefix)
+  public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException {
-    table.deleteAllWithPrefix(batch, prefix);
+    table.deleteBatchWithPrefix(batch, prefix);
   }
 
   @Override

@@ -261,7 +261,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void deleteAllWithPrefix(BatchOperation batch, byte[] prefix)
+  public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
       throws IOException {
     try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix)) {
       while (iter.hasNext()) {

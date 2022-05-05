@@ -79,10 +79,10 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore {
   public void dropAllWithPrefix(long containerID) throws IOException {
     String prefix = getContainerKeyPrefix(containerID);
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
-      getMetadataTable().deleteAllWithPrefix(batch, prefix);
-      getBlockDataTable().deleteAllWithPrefix(batch, prefix);
-      getDeletedBlocksTable().deleteAllWithPrefix(batch, prefix);
-      getDeleteTransactionTable().deleteAllWithPrefix(batch, prefix);
+      getMetadataTable().deleteBatchWithPrefix(batch, prefix);
+      getBlockDataTable().deleteBatchWithPrefix(batch, prefix);
+      getDeletedBlocksTable().deleteBatchWithPrefix(batch, prefix);
+      getDeleteTransactionTable().deleteBatchWithPrefix(batch, prefix);
       getBatchHandler().commitBatchOperation(batch);
     }
   }
