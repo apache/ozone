@@ -944,11 +944,8 @@ public class KeyValueHandler extends Handler {
     Preconditions.checkState(originalContainerData instanceof
         KeyValueContainerData, "Should be KeyValueContainerData instance");
 
-    KeyValueContainerData containerData =
-        new KeyValueContainerData(originalContainerData);
-    // schemaVersion should be used to decide the container db path
-    containerData.setSchemaVersion(
-        ((KeyValueContainerData) originalContainerData).getSchemaVersion());
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
 
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);

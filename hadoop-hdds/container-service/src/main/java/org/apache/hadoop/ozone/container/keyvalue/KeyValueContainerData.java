@@ -115,12 +115,13 @@ public class KeyValueContainerData extends ContainerData {
     this.deleteTransactionId = 0;
   }
 
-  public KeyValueContainerData(ContainerData source) {
+  public KeyValueContainerData(KeyValueContainerData source) {
     super(source);
     Preconditions.checkArgument(source.getContainerType()
         == ContainerProtos.ContainerType.KeyValueContainer);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
+    this.schemaVersion = source.getSchemaVersion();
   }
 
   /**
