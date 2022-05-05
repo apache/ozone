@@ -43,15 +43,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -67,36 +66,44 @@ public class TestKeyValueContainerIntegrityChecks {
   private OzoneConfiguration conf;
   private File testRoot;
   private ChunkManager chunkManager;
+  private String datanodeID = UUID.randomUUID().toString();
+  private String clusterID = UUID.randomUUID().toString();
 
   protected static final int UNIT_LEN = 1024;
   protected static final int CHUNK_LEN = 3 * UNIT_LEN;
   protected static final int CHUNKS_PER_BLOCK = 4;
 
-  public TestKeyValueContainerIntegrityChecks(ContainerLayoutTestInfo
-      containerLayoutTestInfo) {
-    this.containerLayoutTestInfo = containerLayoutTestInfo;
+  public TestKeyValueContainerIntegrityChecks(
+      ContainerTestVersionInfo versionInfo) {
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(
+        versionInfo.getSchemaVersion(), conf);
+    if (versionInfo.getLayout()
+        .equals(ContainerLayoutVersion.FILE_PER_BLOCK)) {
+      containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_BLOCK;
+    } else {
+      containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_CHUNK;
+    }
   }
 
-  @Parameterized.Parameters public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        {ContainerLayoutTestInfo.FILE_PER_CHUNK},
-        {ContainerLayoutTestInfo.FILE_PER_BLOCK}
-    });
+  @Parameterized.Parameters public static Iterable<Object[]> data() {
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Before public void setUp() throws Exception {
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
-    conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     containerLayoutTestInfo.updateConfig(conf);
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), clusterID,
+        conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterID, clusterID, conf);
     chunkManager = containerLayoutTestInfo.createChunkManager(true, null);
   }
 
   @After public void teardown() {
+    BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }
@@ -138,7 +145,7 @@ public class TestKeyValueContainerIntegrityChecks {
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-        UUID.randomUUID().toString());
+        clusterID);
     try (DBHandle metadataStore = BlockUtils.getDB(containerData,
         conf)) {
       assertNotNull(containerData.getChunksPath());

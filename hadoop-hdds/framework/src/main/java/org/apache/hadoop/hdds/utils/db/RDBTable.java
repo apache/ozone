@@ -260,6 +260,16 @@ class RDBTable implements Table<byte[], byte[]> {
     return getRangeKVs(startKey, count, true, prefix, filters);
   }
 
+  @Override
+  public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
+      throws IOException {
+    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix)) {
+      while (iter.hasNext()) {
+        deleteWithBatch(batch, iter.next().getValue());
+      }
+    }
+  }
+
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
       int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)

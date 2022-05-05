@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -52,6 +53,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
@@ -89,6 +92,7 @@ import static org.mockito.Mockito.when;
  * {@link TestDB}, which is used by these tests to load a pre created schema
  * version 1 RocksDB instance from test resources.
  */
+@RunWith(Parameterized.class)
 public class TestSchemaOneBackwardsCompatibility {
   private OzoneConfiguration conf;
 
@@ -98,9 +102,21 @@ public class TestSchemaOneBackwardsCompatibility {
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
+  public TestSchemaOneBackwardsCompatibility(String schemaVersion) {
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return Arrays.asList(new Object[][]{
+        {OzoneConsts.SCHEMA_V2},
+        {OzoneConsts.SCHEMA_V3}
+    });
+  }
+
   @Before
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
     TestDB testDB = new TestDB();
 
     // Copy data to the temporary folder so it can be safely modified.

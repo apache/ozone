@@ -151,17 +151,12 @@ public final class BlockUtils {
       ConfigurationSource conf) {
     Preconditions.checkNotNull(container);
     Preconditions.checkNotNull(container.getDbFile());
+    Preconditions.checkState(!container.getSchemaVersion()
+        .equals(OzoneConsts.SCHEMA_V3));
 
-    String containerDBPath = container.getDbFile().getAbsolutePath();
-    if (container.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-      Preconditions.checkNotNull(cache);
-      cache.removeDB(containerDBPath);
-    } else {
-      ContainerCache cache = ContainerCache.getInstance(conf);
-      Preconditions.checkNotNull(cache);
-      cache.removeDB(containerDBPath);
-    }
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    Preconditions.checkNotNull(cache);
+    cache.removeDB(container.getDbFile().getAbsolutePath());
   }
 
   /**
@@ -235,6 +230,23 @@ public final class BlockUtils {
           "Unable to find the block with bcsID " + bcsId + " .Container "
               + container.getContainerData().getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
+    }
+  }
+
+  /**
+   * Remove container KV metadata from per-disk db store.
+   * @param containerData
+   * @param conf
+   * @throws IOException
+   */
+  public static void removeContainerFromDB(KeyValueContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    try (DBHandle db = getDB(containerData, conf)) {
+      Preconditions.checkState(db.getStore()
+          instanceof DatanodeStoreSchemaThreeImpl);
+
+      ((DatanodeStoreSchemaThreeImpl) db.getStore()).dropAllWithPrefix(
+          containerData.getContainerID());
     }
   }
 }

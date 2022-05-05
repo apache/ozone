@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.slf4j.Logger;
@@ -203,7 +204,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
       // Build DB metadata values.
       Table<String, Long> metadataTable = store.getMetadataTable();
-      JsonObject dBMetadata = getDBMetadataJson(metadataTable);
+      JsonObject dBMetadata = getDBMetadataJson(metadataTable, containerData);
       containerJson.add("dBMetadata", dBMetadata);
 
       // Build aggregate values.
@@ -223,20 +224,20 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return containerJson;
   }
 
-  private JsonObject getDBMetadataJson(Table<String, Long> metadataTable)
-      throws IOException {
+  private JsonObject getDBMetadataJson(Table<String, Long> metadataTable,
+      KeyValueContainerData containerData) throws IOException {
     JsonObject dBMetadata = new JsonObject();
 
     dBMetadata.addProperty(OzoneConsts.BLOCK_COUNT,
-        metadataTable.get(OzoneConsts.BLOCK_COUNT));
+        metadataTable.get(containerData.blockCountKey()));
     dBMetadata.addProperty(OzoneConsts.CONTAINER_BYTES_USED,
-        metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
+        metadataTable.get(containerData.bytesUsedKey()));
     dBMetadata.addProperty(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
-        metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT));
+        metadataTable.get(containerData.pendingDeleteBlockCountKey()));
     dBMetadata.addProperty(OzoneConsts.DELETE_TRANSACTION_KEY,
-        metadataTable.get(OzoneConsts.DELETE_TRANSACTION_KEY));
+        metadataTable.get(containerData.latestDeleteTxnKey()));
     dBMetadata.addProperty(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
-        metadataTable.get(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID));
+        metadataTable.get(containerData.bcsIdKey()));
 
     return dBMetadata;
   }
@@ -277,6 +278,11 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           (DatanodeStoreSchemaTwoImpl) store;
       pendingDeleteBlockCountTotal =
           countPendingDeletesSchemaV2(schemaTwoStore);
+    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      DatanodeStoreSchemaThreeImpl schemaThreeStore =
+          (DatanodeStoreSchemaThreeImpl) store;
+      pendingDeleteBlockCountTotal =
+          countPendingDeletesSchemaV3(schemaThreeStore, containerData);
     } else {
       throw new IOException("Failed to process deleted blocks for unknown " +
               "container schema " + schemaVersion);
@@ -308,8 +314,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return chunksDirectory;
   }
 
-  private boolean checkAndRepair(JsonObject parent, ContainerData containerData,
-      DatanodeStore store) {
+  private boolean checkAndRepair(JsonObject parent,
+      KeyValueContainerData containerData, DatanodeStore store) {
     JsonArray errors = new JsonArray();
     boolean passed = true;
 
@@ -335,7 +341,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       BooleanSupplier keyRepairAction = () -> {
         boolean repaired = false;
         try {
-          metadataTable.put(OzoneConsts.BLOCK_COUNT,
+          metadataTable.put(containerData.blockCountKey(),
               blockCountAggregate.getAsLong());
           repaired = true;
         } catch (IOException ex) {
@@ -370,7 +376,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       BooleanSupplier keyRepairAction = () -> {
         boolean repaired = false;
         try {
-          metadataTable.put(OzoneConsts.CONTAINER_BYTES_USED,
+          metadataTable.put(containerData.bytesUsedKey(),
               usedBytesAggregate.getAsLong());
           repaired = true;
         } catch (IOException ex) {
@@ -449,6 +455,23 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     return pendingDeleteBlockCountTotal;
+  }
+
+  private long countPendingDeletesSchemaV3(
+      DatanodeStoreSchemaThreeImpl schemaThreeStore,
+      KeyValueContainerData containerData) throws IOException {
+    long pendingDeleteBlockCountTotal = 0;
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String,
+            DeletedBlocksTransaction>>
+            iter = schemaThreeStore.getDeleteTransactionTable()
+            .iterator(containerData.containerPrefix())) {
+      while (iter.hasNext()) {
+        DeletedBlocksTransaction delTx = iter.next().getValue();
+        pendingDeleteBlockCountTotal += delTx.getLocalIDList().size();
+      }
+      return pendingDeleteBlockCountTotal;
+    }
   }
 
   private static long getBlockLength(BlockData block) {
