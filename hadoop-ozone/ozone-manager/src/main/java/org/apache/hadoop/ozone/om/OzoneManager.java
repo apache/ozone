@@ -3297,6 +3297,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (canProceed) {
       // Stop RPC server before stop metadataManager
       omRpcServer.stop();
+      omRpcServer.join();
       isOmRpcServerRunning = false;
       omRpcServerStopped = true;
       LOG.info("RPC server is stopped. Spend " +
