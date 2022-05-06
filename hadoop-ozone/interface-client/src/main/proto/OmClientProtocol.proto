@@ -1032,7 +1032,7 @@ message OpenKeyBucket {
 
 message OpenKey {
   required string name = 1;
-  optional uint64 clientID = 2; // TODO: remove
+  optional uint64 clientID = 2; // TODO: to be removed
 }
 
 message OMTokenProto {
