@@ -38,7 +38,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -47,6 +46,7 @@ import java.util.TreeSet;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
@@ -638,22 +638,10 @@ public class TestOmMetadataManager {
   }
 
   private List<String> flatten(List<OpenKeyBucket> openKeyBuckets) {
-    List<String> openKeyNames = new ArrayList<>();
-    for (OpenKeyBucket openKeyBucket: openKeyBuckets) {
-      for (OpenKey openKey : openKeyBucket.getKeysList()) {
-        final String openKeyName;
-        if (openKey.hasParentID()) {
-          openKeyName = omMetadataManager.getOpenFileName(
-              openKey.getParentID(), openKey.getName(), openKey.getClientID());
-        } else {
-          openKeyName = omMetadataManager.getOpenKey(
-              openKeyBucket.getVolumeName(), openKeyBucket.getBucketName(),
-              openKey.getName(), openKey.getClientID());
-        }
-        openKeyNames.add(openKeyName);
-      }
-    }
-    return openKeyNames;
+    return openKeyBuckets.stream()
+        .flatMap(openKeyBucket -> openKeyBucket.getKeysList().stream())
+        .map(OpenKey::getName)
+        .collect(Collectors.toList());
   }
 
   private void addKeysToOM(String volumeName, String bucketName,
