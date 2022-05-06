@@ -155,16 +155,15 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
+
+      long correctedSpace = omKeyInfo.getReplicatedSize();
+
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        // Subtract the size of blocks to be overwritten.
+        correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
-      }
-
-      long correctedSpace = omKeyInfo.getReplicatedSize();
-      // Subtract the size of blocks to be overwritten.
-      if (keyToDelete != null) {
-        correctedSpace -= keyToDelete.getReplicatedSize();
       } else {
         // if keyToDelete isn't null, usedNamespace shouldn't check and
         // increase.
