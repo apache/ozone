@@ -209,16 +209,11 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private void encodeAndWriteParityCells() throws IOException {
     final long dataSize = ecChunkBufferCache.getDataSize();
-    final int parityCellSize = (int) Math.min(dataSize, ecChunkSize);
     ECBlockOutputStreamEntry currentStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
-    boolean shouldClose = currentStreamEntry.getRemaining() <= 0;
-    if (isPartialStripe(dataSize)) {
-      addPadding(parityCellSize);
-      // partial stripe must be the last stripe of a block
-      shouldClose = true;
-    }
-    generateParityCells(parityCellSize);
+    boolean shouldClose = currentStreamEntry.getRemaining() <= 0 ||
+        isPartialStripe(dataSize);
+    generateParityCells();
     if (handleParityWrites(shouldClose)
         == StripeWriteStatus.FAILED) {
       handleStripeFailure(dataSize, shouldClose);
@@ -281,15 +276,25 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         && t instanceof ContainerNotOpenException;
   }
 
-  private void generateParityCells(int parityCellSize) throws IOException {
-    final ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
+  private void generateParityCells() throws IOException {
+    final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
+
+    // parityCellSize = min(ecChunkSize, stripeSize)
+    //                = min(cellSize, sum(dataBuffer positions))
+    //                = min(dataBuffer[0].limit(), dataBuffer[0].position())
+    //                = dataBuffer[0].position()
+    final int parityCellSize = dataBuffers[0].position();
+
+    // Duplicate dataBuffers and add padding
+    final ByteBuffer[] buffers = Arrays.stream(dataBuffers)
+        .map(ByteBuffer::duplicate)
+        .peek(b -> padBufferToLimit(b, parityCellSize))
+        .peek(ByteBuffer::flip)
+        .toArray(ByteBuffer[]::new);
 
     for (ByteBuffer b : parityBuffers) {
       b.limit(parityCellSize);
-    }
-    for (ByteBuffer b : buffers) {
-      b.flip();
     }
     encoder.encode(buffers, parityBuffers);
   }
@@ -470,18 +475,6 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     throw new IOException("Completed max allowed retries " + this.config
         .getMaxECStripeWriteRetries() + " on stripe failures.");
 
-  }
-
-  private void addPadding(int parityCellSize) {
-    ByteBuffer[] buffers = ecChunkBufferCache.getDataBuffers();
-
-    for (int i = 1; i < numDataBlks; i++) {
-      final int position = buffers[i].position();
-      assert position <= parityCellSize : "If an internal block is smaller"
-          + " than parity block, then its last cell should be small than last"
-          + " parity cell";
-      padBufferToLimit(buffers[i], parityCellSize);
-    }
   }
 
   public static void padBufferToLimit(ByteBuffer buf, int limit) {
