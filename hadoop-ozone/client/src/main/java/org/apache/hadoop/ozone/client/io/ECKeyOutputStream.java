@@ -153,9 +153,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       throw new IndexOutOfBoundsException();
     }
     try {
-      int i = 0;
-      while (i + off < len) {
-        i += handleWrite(b, off + i, len - i);
+      int writtenLen = 0;
+      while (off + writtenLen < len) {
+        writtenLen += handleWrite(b, off + writtenLen, len - writtenLen);
       }
     } catch (Exception e) {
       markStreamClosed();
