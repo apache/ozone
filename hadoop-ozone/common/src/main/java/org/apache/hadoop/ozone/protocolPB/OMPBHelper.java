@@ -21,6 +21,11 @@ import com.google.protobuf.ByteString;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -140,6 +145,55 @@ public final class OMPBHelper {
     String keyName = proto.getKeyName();
     return new FileEncryptionInfo(suite, version, key, iv, keyName,
         ezKeyVersionName);
+  }
+
+  public static DefaultReplicationConfig convert(
+      HddsProtos.DefaultReplicationConfig defaultReplicationConfig) {
+    if (defaultReplicationConfig == null) {
+      throw new IllegalArgumentException(
+          "Invalid argument: default replication config" + " is null");
+    }
+
+    final ReplicationType type =
+        ReplicationType.fromProto(defaultReplicationConfig.getType());
+    DefaultReplicationConfig defaultReplicationConfigObj = null;
+    switch (type) {
+    case EC:
+      defaultReplicationConfigObj = new DefaultReplicationConfig(type,
+          new ECReplicationConfig(
+              defaultReplicationConfig.getEcReplicationConfig()));
+      break;
+    default:
+      final ReplicationFactor factor =
+          ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
+      defaultReplicationConfigObj = new DefaultReplicationConfig(type, factor);
+    }
+    return defaultReplicationConfigObj;
+  }
+
+  public static HddsProtos.DefaultReplicationConfig convert(
+      DefaultReplicationConfig defaultReplicationConfig) {
+    if (defaultReplicationConfig == null) {
+      throw new IllegalArgumentException(
+          "Invalid argument: default replication config" + " is null");
+    }
+
+    final HddsProtos.DefaultReplicationConfig.Builder builder =
+        HddsProtos.DefaultReplicationConfig.newBuilder();
+    builder.setType(
+        ReplicationType.toProto(defaultReplicationConfig.getType()));
+
+    if (defaultReplicationConfig.getFactor() != null) {
+      builder.setFactor(ReplicationFactor
+          .toProto(defaultReplicationConfig.getFactor()));
+    }
+
+    if (defaultReplicationConfig.getEcReplicationConfig() != null) {
+      builder.setEcReplicationConfig(
+          defaultReplicationConfig.getEcReplicationConfig().toProto());
+    }
+
+    return builder.build();
   }
 
   public static CipherSuite convert(CipherSuiteProto proto) {

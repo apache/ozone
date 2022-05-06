@@ -17,15 +17,21 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+
+import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
 
 /**
  * Tests for the ReplicationManagerReport class.
@@ -62,6 +68,54 @@ public class TestReplicationManagerReport {
         report.getStat(HddsProtos.LifeCycleState.CLOSED));
     Assert.assertEquals(0,
         report.getStat(HddsProtos.LifeCycleState.QUASI_CLOSED));
+  }
+
+
+  @Test
+  public void testJsonOutput() throws IOException {
+    report.increment(HddsProtos.LifeCycleState.OPEN);
+    report.increment(HddsProtos.LifeCycleState.CLOSED);
+    report.increment(HddsProtos.LifeCycleState.CLOSED);
+
+    report.incrementAndSample(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
+        new ContainerID(1));
+    report.incrementAndSample(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
+        new ContainerID(2));
+    report.incrementAndSample(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED,
+        new ContainerID(3));
+    report.setComplete();
+
+    String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(report);
+
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode json = mapper.readTree(jsonString);
+
+    Assert.assertTrue(json.get("reportTimeStamp").longValue() > 0);
+    JsonNode stats = json.get("stats");
+    Assert.assertEquals(1, stats.get("OPEN").longValue());
+    Assert.assertEquals(0, stats.get("CLOSING").longValue());
+    Assert.assertEquals(0, stats.get("QUASI_CLOSED").longValue());
+    Assert.assertEquals(2, stats.get("CLOSED").longValue());
+    Assert.assertEquals(0, stats.get("DELETING").longValue());
+    Assert.assertEquals(0, stats.get("DELETED").longValue());
+
+    Assert.assertEquals(2, stats.get("UNDER_REPLICATED").longValue());
+    Assert.assertEquals(1, stats.get("OVER_REPLICATED").longValue());
+    Assert.assertEquals(0, stats.get("MIS_REPLICATED").longValue());
+    Assert.assertEquals(0, stats.get("MISSING").longValue());
+    Assert.assertEquals(0, stats.get("UNHEALTHY").longValue());
+    Assert.assertEquals(0, stats.get("EMPTY").longValue());
+    Assert.assertEquals(0, stats.get("OPEN_UNHEALTHY").longValue());
+    Assert.assertEquals(0, stats.get("QUASI_CLOSED_STUCK").longValue());
+
+    JsonNode samples = json.get("samples");
+    Assert.assertEquals(ARRAY, samples.get("UNDER_REPLICATED").getNodeType());
+    Assert.assertEquals(1, samples.get("UNDER_REPLICATED").get(0).longValue());
+    Assert.assertEquals(2, samples.get("UNDER_REPLICATED").get(1).longValue());
+    Assert.assertEquals(3, samples.get("OVER_REPLICATED").get(0).longValue());
   }
 
   @Test
@@ -144,6 +198,35 @@ public class TestReplicationManagerReport {
         ReplicationManagerReport.HealthState.values()) {
       Assert.assertTrue(report.getSample(s).equals(newReport.getSample(s)));
     }
+  }
+
+  @Test
+  public void testDeSerializeCanHandleUnknownMetric() {
+    HddsProtos.ReplicationManagerReportProto.Builder proto =
+        HddsProtos.ReplicationManagerReportProto.newBuilder();
+    proto.setTimestamp(12345);
+
+    proto.addStat(HddsProtos.KeyIntValue.newBuilder()
+        .setKey("unknownValue")
+        .setValue(15)
+        .build());
+
+    proto.addStat(HddsProtos.KeyIntValue.newBuilder()
+        .setKey(ReplicationManagerReport.HealthState.UNDER_REPLICATED
+            .toString())
+        .setValue(20)
+        .build());
+
+    HddsProtos.KeyContainerIDList.Builder sample
+        = HddsProtos.KeyContainerIDList.newBuilder();
+    sample.setKey("unknownValue");
+    sample.addContainer(ContainerID.valueOf(1).getProtobuf());
+    proto.addStatSample(sample.build());
+    // Ensure no exception is thrown
+    ReplicationManagerReport newReport =
+        ReplicationManagerReport.fromProtobuf(proto.build());
+    Assert.assertEquals(20, newReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
   @Test(expected = IllegalStateException.class)

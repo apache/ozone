@@ -268,7 +268,7 @@ public class TestPermissionCheck {
   public void testPutKey() throws IOException {
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket)
-        .createKey(anyString(), anyLong(), any(), any(), any());
+        .createKey(anyString(), anyLong(), any(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
@@ -304,8 +304,7 @@ public class TestPermissionCheck {
   @Test
   public void testMultiUploadKey() throws IOException {
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket)
-        .initiateMultipartUpload(anyString(), any(), any());
+    doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
