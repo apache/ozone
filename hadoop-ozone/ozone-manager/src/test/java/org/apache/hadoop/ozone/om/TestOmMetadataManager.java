@@ -616,7 +616,7 @@ public class TestOmMetadataManager {
     List<OpenKeyBucket> someExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
             numExpiredOpenKeys - 1, bucketLayout);
-    List<String> names = flatten(someExpiredKeys);
+    List<String> names = getOpenKeyNames(someExpiredKeys);
     Assert.assertEquals(numExpiredOpenKeys - 1, names.size());
     Assert.assertTrue(expiredKeys.containsAll(names));
 
@@ -624,7 +624,7 @@ public class TestOmMetadataManager {
     List<OpenKeyBucket> allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
             numExpiredOpenKeys + 1, bucketLayout);
-    names = flatten(allExpiredKeys);
+    names = getOpenKeyNames(allExpiredKeys);
     Assert.assertEquals(numExpiredOpenKeys, names.size());
     Assert.assertTrue(expiredKeys.containsAll(names));
 
@@ -632,14 +632,15 @@ public class TestOmMetadataManager {
     allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
             numExpiredOpenKeys, bucketLayout);
-    names = flatten(allExpiredKeys);
+    names = getOpenKeyNames(allExpiredKeys);
     Assert.assertEquals(numExpiredOpenKeys, names.size());
     Assert.assertTrue(expiredKeys.containsAll(names));
   }
 
-  private List<String> flatten(List<OpenKeyBucket> openKeyBuckets) {
+  private List<String> getOpenKeyNames(List<OpenKeyBucket> openKeyBuckets) {
     return openKeyBuckets.stream()
-        .flatMap(openKeyBucket -> openKeyBucket.getKeysList().stream())
+        .map(OpenKeyBucket::getKeysList)
+        .flatMap(List::stream)
         .map(OpenKey::getName)
         .collect(Collectors.toList());
   }
