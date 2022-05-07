@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.slf4j.Logger;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 /**
@@ -62,17 +63,6 @@ public final class ConfUtils {
       return null;
     }
     return Joiner.on(".").skipNulls().join(suffixes);
-  }
-
-  /**
-   * Match input address to local address.
-   * Return true if it matches, false otherwsie.
-   */
-  public static boolean isAddressLocal(InetSocketAddress addr) {
-    if (addr.getAddress() == null) {
-      return false;
-    }
-    return NetUtils.isLocalAddress(addr.getAddress());
   }
 
   /**

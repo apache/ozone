@@ -2905,7 +2905,7 @@
   </property>
 
   <property>
-    <name>ozone.flexible.fqdn.resolution.enabled</name>
+    <name>ozone.network.flexible.fqdn.resolution.enabled</name>
     <tag>OZONE, SCM, OM</tag>
     <value>false</value>
     <description>SCM, OM hosts will be able to resolve itself based on its host
@@ -2916,7 +2916,7 @@
   </property>
 
   <property>
-    <name>ozone.jvm.network.address.cache.enabled</name>
+    <name>ozone.network.jvm.address.cache.enabled</name>
     <tag>OZONE, SCM, OM, DATANODE</tag>
     <value>true</value>
     <description>Disable the jvm network address cache. In environment such as

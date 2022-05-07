@@ -449,12 +449,12 @@ public final class OzoneConfigKeys {
       true;
 
   public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
-          "ozone.flexible.fqdn.resolution.enabled";
+          "ozone.network.flexible.fqdn.resolution.enabled";
   public static final boolean OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT =
           false;
 
   public static final String OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED =
-          "ozone.jvm.network.address.cache.enabled";
+          "ozone.network.jvm.address.cache.enabled";
   public static final boolean OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT =
           true;
 

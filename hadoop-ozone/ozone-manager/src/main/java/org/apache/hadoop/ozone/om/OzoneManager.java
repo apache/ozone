@@ -70,7 +70,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
-import org.apache.hadoop.ozone.ha.FlexibleFQDNResolution;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -1033,7 +1033,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
     if (flexibleFqdnResolutionEnabled && omNodeRpcAddr.getAddress() == null) {
       omNodeRpcAddr =
-              FlexibleFQDNResolution.getAddressWithHostName(omNodeRpcAddr);
+              OzoneNetUtils.getAddressWithHostName(omNodeRpcAddr);
     }
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
@@ -2050,7 +2050,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean addressResolved = omRpcAdd != null && omRpcAdd.getAddress() != null;
     if (flexibleFqdnResolutionEnabled && !addressResolved && omRpcAdd != null) {
       InetSocketAddress omRpcAddWithHostName =
-              FlexibleFQDNResolution.getAddressWithHostName(omRpcAdd);
+              OzoneNetUtils.getAddressWithHostName(omRpcAdd);
       if (omRpcAddWithHostName != null
               && omRpcAddWithHostName.getAddress() != null) {
         addressResolved = true;

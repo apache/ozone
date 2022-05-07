@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +40,6 @@ import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.ha.FlexibleFQDNResolution.isAddressHostNameLocal;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
@@ -175,19 +175,15 @@ public class OMHANodeDetails {
         boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
                 OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
                 OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
-        if (!flexibleFqdnResolutionEnabled && addr.isUnresolved()
-                || flexibleFqdnResolutionEnabled
-                && !isAddressHostNameLocal(addr)) {
+        if (OzoneNetUtils.isUnresolved(flexibleFqdnResolutionEnabled, addr)) {
           LOG.error("Address for OM {} : {} couldn't be resolved. Proceeding " +
                   "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 
-        if (!isPeer && (!flexibleFqdnResolutionEnabled
-                && !addr.isUnresolved()
-                && ConfUtils.isAddressLocal(addr)
-                || flexibleFqdnResolutionEnabled
-                && isAddressHostNameLocal(addr))) {
+        if (!isPeer
+                && OzoneNetUtils
+                .isAddressLocal(flexibleFqdnResolutionEnabled, addr)) {
           localRpcAddress = addr;
           localOMServiceId = serviceId;
           localOMNodeId = nodeId;

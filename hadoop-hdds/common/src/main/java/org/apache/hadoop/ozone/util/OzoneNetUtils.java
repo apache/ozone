@@ -14,13 +14,14 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.ha;
+package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.Security;
 
@@ -28,16 +29,16 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT;
 
 /**
- * FQDN related utils. Provides methods related to local host name and
+ * Ozone Network related utils. Provides methods related to local host name and
  * jvm network address cache. This utils is mainly used in kubernetes where
  * the FQDN [pod_name].[service_name] is not resolvable at the service
  * starting time.
  */
-public final class FlexibleFQDNResolution {
+public final class OzoneNetUtils {
   private static final Logger LOG =
-          LoggerFactory.getLogger(FlexibleFQDNResolution.class);
+          LoggerFactory.getLogger(OzoneNetUtils.class);
 
-  private FlexibleFQDNResolution() {
+  private OzoneNetUtils() {
   }
 
   public static void disableJvmNetworkAddressCacheIfRequired(
@@ -85,5 +86,32 @@ public final class FlexibleFQDNResolution {
 
   private static String getHostNameWithoutDomain(final String fqdn) {
     return fqdn.split("\\.")[0];
+  }
+
+
+  /**
+   * Match input address to local address.
+   * Return true if it matches, false otherwsie.
+   */
+  public static boolean isAddressLocal(InetSocketAddress addr) {
+    InetAddress inetAddress = addr.getAddress();
+    return inetAddress != null && NetUtils.isLocalAddress(inetAddress);
+  }
+
+
+  public static boolean isUnresolved(boolean flexibleFqdnResolutionEnabled,
+                                      InetSocketAddress addr) {
+    return !flexibleFqdnResolutionEnabled && addr.isUnresolved()
+            || flexibleFqdnResolutionEnabled
+            && !isAddressHostNameLocal(addr);
+  }
+
+  public static boolean isAddressLocal(boolean flexibleFqdnResolutionEnabled,
+                                        InetSocketAddress addr) {
+    return !flexibleFqdnResolutionEnabled
+            && !addr.isUnresolved()
+            && OzoneNetUtils.isAddressLocal(addr)
+            || flexibleFqdnResolutionEnabled
+            && isAddressHostNameLocal(addr);
   }
 }

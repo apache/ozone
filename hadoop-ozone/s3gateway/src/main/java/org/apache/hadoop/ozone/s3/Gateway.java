@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -57,6 +58,8 @@ public class Gateway extends GenericCli {
   private OzoneConfiguration ozoneConfiguration;
 
   public static void main(String[] args) throws Exception {
+    OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
+            new OzoneConfiguration());
     new Gateway().run(args);
   }
 
