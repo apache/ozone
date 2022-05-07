@@ -1027,7 +1027,6 @@ message OpenKeyBucket {
   required string volumeName = 1;
   required string bucketName = 2;
   repeated OpenKey keys = 3;
-  optional BucketLayoutProto bucketLayout = 4;
 }
 
 message OpenKey {

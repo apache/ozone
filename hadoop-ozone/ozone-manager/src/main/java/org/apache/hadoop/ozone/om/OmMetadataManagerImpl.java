@@ -1224,8 +1224,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             expiredKeys.put(mapKey,
                 OpenKeyBucket.newBuilder()
                     .setVolumeName(volume)
-                    .setBucketName(bucket)
-                    .setBucketLayout(bucketLayout.toProto()));
+                    .setBucketName(bucket));
           }
           expiredKeys.get(mapKey)
               .addKeys(builder.setName(dbOpenKeyName).build());
