@@ -30,6 +30,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -54,9 +55,9 @@ public class TestOMFailovers {
 
     testException = new AccessControlException();
 
-    GenericTestUtils.setLogLevel(OMFailoverProxyProvider.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMFailoverProxyProvider.LOG);
+        .captureLogs(OMFailoverProxyProviderBase.LOG);
 
     MockFailoverProxyProvider failoverProxyProvider =
         new MockFailoverProxyProvider(conf);
@@ -143,7 +144,7 @@ public class TestOMFailovers {
         omProxyInfos.put(nodeId, null);
         omNodeIDList.add(nodeId);
       }
-      setProxies(omProxies, omProxyInfos, omNodeIDList);
+      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList);
     }
 
     @Override
