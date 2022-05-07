@@ -20,11 +20,7 @@ import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.net.NetUtils;
 import org.slf4j.Logger;
-
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 
 /**
  * Utilities related to configuration.
