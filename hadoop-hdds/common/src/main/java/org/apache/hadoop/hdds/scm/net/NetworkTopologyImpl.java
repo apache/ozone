@@ -117,7 +117,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
   }
 
   /**
-   * Update a leaf node. This will be called when a datanode needs to be updated.
+   * Update a leaf node. It is called when a datanode needs to be updated.
    * If the old datanode does not exist, then just add the new datanode.
    * @param oldNode node to be updated; can be null
    * @param newNode node to update to; cannot be null

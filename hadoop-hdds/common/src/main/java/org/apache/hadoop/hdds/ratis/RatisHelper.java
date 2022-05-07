@@ -102,11 +102,14 @@ public final class RatisHelper {
 
   private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
     if (datanodeUseHostName()) {
-      final String address = id.getHostName() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using hostname for raft peer address: {}", address);
+      final String address =
+              id.getHostName() + ":" + id.getPort(port).getValue();
+      LOG.debug("Datanode is using hostname for raft peer address: {}",
+              address);
       return address;
     } else {
-      final String address = id.getIpAddress() + ":" + id.getPort(port).getValue();
+      final String address =
+              id.getIpAddress() + ":" + id.getPort(port).getValue();
       LOG.debug("Datanode is using IP for raft peer address: {}", address);
       return address;
     }

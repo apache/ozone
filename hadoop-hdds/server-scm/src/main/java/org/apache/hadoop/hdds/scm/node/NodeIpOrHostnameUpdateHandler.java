@@ -39,7 +39,8 @@ public class NodeIpOrHostnameUpdateHandler
   private final SCMServiceManager serviceManager;
 
   public NodeIpOrHostnameUpdateHandler(PipelineManager pipelineManager,
-                                       NodeDecommissionManager decommissionManager,
+                                       NodeDecommissionManager
+                                               decommissionManager,
                                        SCMServiceManager serviceManager) {
     this.pipelineManager = pipelineManager;
     this.decommissionManager = decommissionManager;
