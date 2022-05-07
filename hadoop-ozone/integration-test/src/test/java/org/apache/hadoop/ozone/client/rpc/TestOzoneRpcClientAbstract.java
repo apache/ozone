@@ -949,9 +949,9 @@ public abstract class TestOzoneRpcClientAbstract {
     // blocks will succeed，while the later block will fail.
     bucket.setQuota(OzoneQuota.parseQuota(
         4 * blockSize + " B", "100"));
-
     try {
-      OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
+      String keyName = UUID.randomUUID().toString();
+      OzoneOutputStream out = bucket.createKey(keyName,
           valueLength, RATIS, ONE, new HashMap<>());
       for (int i = 0; i <= (4 * blockSize) / value.length(); i++) {
         out.write(value.getBytes(UTF_8));
@@ -961,14 +961,14 @@ public abstract class TestOzoneRpcClientAbstract {
       countException++;
       GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
     }
-    // AllocateBlock failed, bucket usedBytes should be 4 * blockSize
-    Assert.assertEquals(4 * blockSize,
+    // AllocateBlock failed, bucket usedBytes should not update.
+    Assert.assertEquals(0L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     // Reset bucket quota, the original usedBytes needs to remain the same
     bucket.setQuota(OzoneQuota.parseQuota(
         100 + " GB", "100"));
-    Assert.assertEquals(4 * blockSize,
+    Assert.assertEquals(0,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     Assert.assertEquals(3, countException);
@@ -979,7 +979,17 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
         valueLength, RATIS, ONE, new HashMap<>());
     out.close();
-    Assert.assertEquals(4 * blockSize,
+    Assert.assertEquals(0,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+
+    // key write success,bucket usedBytes should update.
+    bucket.setQuota(OzoneQuota.parseQuota(
+        5 * blockSize + " B", "100"));
+    OzoneOutputStream out2 = bucket.createKey(UUID.randomUUID().toString(),
+        valueLength, RATIS, ONE, new HashMap<>());
+    out2.write(value.getBytes(UTF_8));
+    out2.close();
+    Assert.assertEquals(valueLength,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
   }
 
@@ -1057,25 +1067,24 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     byte[] value = new byte[keyLength];
-    int dataGroupSize = repConfig instanceof ECReplicationConfig ?
-        ((ECReplicationConfig) repConfig).getData() : 1;
-    long preAllocatedBlocks = Math.min(ozoneManager.getPreallocateBlocksMax(),
-        (keyLength - 1) / (blockSize * dataGroupSize) + 1);
-    long preAllocatedSpace = preAllocatedBlocks * blockSize
-        * repConfig.getRequiredNodes();
     long keyQuota = QuotaUtil.getReplicatedSize(keyLength, repConfig);
 
     OzoneOutputStream out = bucket.createKey(keyName, keyLength,
         repConfig, new HashMap<>());
-    Assert.assertEquals(preAllocatedSpace,
+    // Write a new key and do not update Bucket UsedBytes until commit.
+    Assert.assertEquals(0,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
     out.write(value);
     out.close();
+    // After committing the new key, the Bucket UsedBytes must be updated to
+    // keyQuota.
     Assert.assertEquals(keyQuota,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     out = bucket.createKey(keyName, keyLength, repConfig, new HashMap<>());
-    Assert.assertEquals(keyQuota + preAllocatedSpace,
+    // Overwrite an old key. The Bucket UsedBytes are not updated before the
+    // commit. So the Bucket UsedBytes remain unchanged.
+    Assert.assertEquals(keyQuota,
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
     out.write(value);
     out.close();
