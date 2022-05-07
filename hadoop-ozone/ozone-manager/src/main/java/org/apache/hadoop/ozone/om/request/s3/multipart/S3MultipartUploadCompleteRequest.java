@@ -229,6 +229,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               trxnLogIndex, ozoneManager.isRatisEnabled());
           long numCopy = keyToDelete.getReplicationConfig().getRequiredNodes();
           usedBytesDiff -= keyToDelete.getDataSize() * numCopy;
+        } else {
+          checkBucketQuotaInNamespace(omBucketInfo, 1L);
+          omBucketInfo.incrUsedNamespace(1L);
         }
 
         String dbBucketKey = null;
