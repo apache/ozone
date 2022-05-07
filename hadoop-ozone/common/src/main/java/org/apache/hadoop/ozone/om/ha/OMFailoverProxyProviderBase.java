@@ -210,8 +210,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         if (failovers < maxFailovers) {
           return new RetryAction(fallbackAction, getWaitTime());
         } else {
-/*          LOG.error("Failed to connect to OMs: {}. Attempted {} failovers.",
-              getOMProxyInfos(), maxFailovers);*/
+          LOG.error("Failed to connect to OMs: {}. Attempted {} failovers.",
+              omNodeIDList, maxFailovers);
           return RetryAction.FAIL;
         }
       }
