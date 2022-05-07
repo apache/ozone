@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
@@ -46,7 +47,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
  * Response for Multipart Abort Request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE,
-    MULTIPARTINFO_TABLE})
+    MULTIPARTINFO_TABLE, BUCKET_TABLE})
 public class S3MultipartUploadAbortResponse extends OmKeyResponse {
 
   private String multipartKey;

@@ -14,32 +14,35 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test read-replicas in case of one datanode is unavailable
+Documentation       Test read-replicas in case of one datanode is stale
 Library             OperatingSystem
 Resource            ../lib/os.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 *** Variables ***
-${VOLUME}           cli-debug-volume
+${PREFIX}           ${EMPTY}
+${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
+${STALE_DATANODE}   ozone_datanode_1.ozone_default
 
 *** Test Cases ***
 Test ozone debug read-replicas with one datanode STALE
-    ${directory} =                      Execute read-replicas CLI tool
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     7
-    ${corrupted_block1} =               Get File Size   ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default
-    ${corrupted_block2} =               Get File Size   ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default
-    Should Be Equal As Integers         ${corrupted_block1}     0
-    Should Be Equal As Integers         ${corrupted_block2}     0
-    ${dn1_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_1.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_1.ozone_default | md5sum | awk '{print $1}'
-    ${dn3_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_3.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_3.ozone_default | md5sum | awk '{print $1}'
-    ${testfile_md5sum} =                Execute     md5sum testfile | awk '{print $1}'
-    Should Be Equal                     ${dn1_md5sum}   ${testfile_md5sum}
-    Should Be Equal                     ${dn3_md5sum}   ${testfile_md5sum}
-    ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
-    ${json} =                           Evaluate        json.loads('''${manifest}''')        json
-    Compare JSON                        ${json}
-    Check for all datanodes             ${json}
-    Check unavailable datanode error    ${json}         ozone_datanode_2.ozone_default
+    ${directory} =                 Execute read-replicas CLI tool
+    Set Test Variable    ${DIR}         ${directory}
+
+    ${count_files} =               Count Files In Directory    ${directory}
+    Should Be Equal As Integers    ${count_files}     7
+
+    ${json} =                      Read Replicas Manifest
+    ${md5sum} =                    Execute     md5sum testfile | awk '{print $1}'
+
+    FOR    ${replica}    IN RANGE    3
+        ${datanode} =    Set Variable    ${json}[blocks][0][replicas][${replica}][hostname]
+
+        IF    '${datanode}' == '${STALE_DATANODE}'
+            Verify Stale Replica     ${json}    ${replica}
+        ELSE
+            Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
+        END
+    END

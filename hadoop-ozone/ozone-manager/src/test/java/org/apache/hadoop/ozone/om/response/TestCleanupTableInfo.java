@@ -21,6 +21,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -135,6 +136,8 @@ public class TestCleanupTableInfo {
         );
     when(om.getAclsEnabled()).thenReturn(false);
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
+    when(om.getDefaultReplicationConfig()).thenReturn(ReplicationConfig
+        .getDefault(new OzoneConfiguration()));
     addVolumeToMetaTable(aVolumeArgs());
     addBucketToMetaTable(aBucketInfo());
   }
@@ -286,7 +289,8 @@ public class TestCleanupTableInfo {
     when(protoRequest.getCreateFileRequest()).thenReturn(aCreateFileRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateFile);
     when(protoRequest.getTraceID()).thenReturn("");
-    return new OMFileCreateRequest(protoRequest);
+    return new OMFileCreateRequest(protoRequest,
+        aBucketInfo().getBucketLayout());
   }
 
   private OMKeyCreateRequest anOMKeyCreateRequest() {
@@ -294,7 +298,8 @@ public class TestCleanupTableInfo {
     when(protoRequest.getCreateKeyRequest()).thenReturn(aKeyCreateRequest());
     when(protoRequest.getCmdType()).thenReturn(Type.CreateKey);
     when(protoRequest.getTraceID()).thenReturn("");
-    return new OMKeyCreateRequest(protoRequest);
+    return new OMKeyCreateRequest(protoRequest,
+        aBucketInfo().getBucketLayout());
   }
 
   private OmBucketInfo aBucketInfo() {

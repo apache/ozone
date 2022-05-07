@@ -69,7 +69,7 @@ import static org.junit.Assert.fail;
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Ignore
+@Ignore("HDDS-3260")
 public class TestScmSafeMode {
 
   private static final Logger LOG = LoggerFactory

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -75,6 +76,12 @@ public final class StandaloneReplicationConfig implements
   @Override
   public int getRequiredNodes() {
     return replicationFactor.getNumber();
+  }
+
+  @Override
+  @JsonIgnore
+  public String getReplication() {
+    return String.valueOf(this.replicationFactor);
   }
 
   @Override

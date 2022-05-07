@@ -20,8 +20,10 @@ Resource            ../lib/os.robot
 Resource            ozone-debug.robot
 Test Timeout        5 minute
 Suite Setup         Write keys
+
 *** Variables ***
-${VOLUME}           cli-debug-volume
+${PREFIX}           ${EMPTY}
+${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${DEBUGKEY}         debugKey
 ${TESTFILE}         testfile
@@ -30,29 +32,20 @@ ${TESTFILE}         testfile
 Write keys
     Execute             ozone sh volume create o3://om/${VOLUME} --space-quota 100TB --namespace-quota 100
     Execute             ozone sh bucket create o3://om/${VOLUME}/${BUCKET}
-    Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${DEBUGKEY} /opt/hadoop/NOTICE.txt
-    Execute             dd if=/dev/urandom of=testfile bs=100000 count=15
-    Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} testfile
+    Execute             dd if=/dev/urandom of=${TESTFILE} bs=100000 count=15
+    Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} ${TESTFILE}
 
 *** Test Cases ***
-Test ozone debug chunkinfo
-    ${result} =     Execute             ozone debug chunkinfo o3://om/${VOLUME}/${BUCKET}/${DEBUGKEY} | jq -r '.KeyLocations[0][0].Locations'
-                    Should contain      ${result}       files
-    ${result} =     Execute             ozone debug chunkinfo o3://om/${VOLUME}/${BUCKET}/${DEBUGKEY} | jq -r '.KeyLocations[0][0].Locations.files[0]'
-                    File Should Exist   ${result}
-
 Test ozone debug read-replicas
     ${directory} =                      Execute read-replicas CLI tool
+    Set Test Variable    ${DIR}         ${directory}
+
     ${count_files} =                    Count Files In Directory    ${directory}
     Should Be Equal As Integers         ${count_files}     7
-    ${dn1_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_1.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_1.ozone_default | md5sum | awk '{print $1}'
-    ${dn2_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_2.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_2.ozone_default | md5sum | awk '{print $1}'
-    ${dn3_md5sum} =                     Execute     cat ${directory}/${TESTFILE}_block1_ozone_datanode_3.ozone_default ${directory}/${TESTFILE}_block2_ozone_datanode_3.ozone_default | md5sum | awk '{print $1}'
-    ${testfile_md5sum} =                Execute     md5sum testfile | awk '{print $1}'
-    Should Be Equal                     ${dn1_md5sum}   ${testfile_md5sum}
-    Should Be Equal                     ${dn2_md5sum}   ${testfile_md5sum}
-    Should Be Equal                     ${dn3_md5sum}   ${testfile_md5sum}
-    ${manifest} =                       Get File        ${directory}/${TESTFILE}_manifest
-    ${json} =                           Evaluate        json.loads('''${manifest}''')        json
-    Compare JSON                        ${json}
-    Check for all datanodes             ${json}
+
+    ${json} =                           Read Replicas Manifest
+    ${md5sum} =                         Execute     md5sum ${TESTFILE} | awk '{print $1}'
+
+    FOR    ${replica}    IN RANGE    3
+        Verify Healthy Replica   ${json}    ${replica}    ${md5sum}
+    END

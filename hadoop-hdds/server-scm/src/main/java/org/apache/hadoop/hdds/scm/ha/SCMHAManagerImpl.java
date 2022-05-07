@@ -334,10 +334,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
    * {@inheritDoc}
    */
   @Override
-  public void shutdown() throws IOException {
+  public void stop() throws IOException {
     if (ratisServer != null) {
       ratisServer.stop();
-      ratisServer.getSCMStateMachine().close();
       grpcServer.stop();
     }
   }
@@ -376,6 +375,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
         metadataStore.getDeletedBlocksTXTable());
     scm.getReplicationManager().getMoveScheduler()
         .reinitialize(metadataStore.getMoveTable());
+    scm.getStatefulServiceStateManager().reinitialize(
+        metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       if (scm.getRootCertificateServer() != null) {
         scm.getRootCertificateServer().reinitialize(metadataStore);

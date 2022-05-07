@@ -27,6 +27,7 @@
   <version>1.3.0-SNAPSHOT</version>
 
   <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
 
@@ -50,6 +51,10 @@
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>log4j</groupId>
@@ -140,6 +145,12 @@
                     <include>com.github.joshelser.**.*</include>
                     <include>com.twitter.**.*</include>
                   </includes>
+                </relocation>
+                <relocation>
+                  <pattern>kotlin</pattern>
+                  <shadedPattern>
+                    ${shaded.prefix}.kotlin
+                  </shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>picocli</pattern>

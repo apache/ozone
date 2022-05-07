@@ -31,10 +31,12 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -53,7 +55,6 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -92,6 +93,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
+  private final AtomicInteger statePausedCount = new AtomicInteger(0);
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -118,6 +120,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
 
+
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
     this.executorService = HadoopExecutors.newSingleThreadExecutor(build);
@@ -138,12 +141,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void reinitialize() throws IOException {
-    getLifeCycle().startAndTransition(() -> {
-      loadSnapshotInfoFromDB();
-      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-    });
+  public synchronized void reinitialize() throws IOException {
+    loadSnapshotInfoFromDB();
+    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+      unpause(getLastAppliedTermIndex().getIndex(),
+          getLastAppliedTermIndex().getTerm());
+    }
   }
 
   @Override
@@ -308,6 +311,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       CompletableFuture<Message> ratisFuture =
           new CompletableFuture<>();
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
+
+      //if there are too many pending requests, wait for doubleBuffer flushing
+      ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
+
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);
       future.thenApply(omResponse -> {
@@ -373,7 +380,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void pause() {
+  public synchronized void pause() {
+    LOG.info("OzoneManagerStateMachine is pausing");
+    statePausedCount.incrementAndGet();
+    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+      return;
+    }
     getLifeCycle().transition(LifeCycle.State.PAUSING);
     getLifeCycle().transition(LifeCycle.State.PAUSED);
     ozoneManagerDoubleBuffer.stop();
@@ -384,20 +396,27 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * lastAppliedIndex. This should be done after uploading new state to the
    * StateMachine.
    */
-  public void unpause(long newLastAppliedSnaphsotIndex,
+  public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    getLifeCycle().startAndTransition(() -> {
-      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-      this.setLastAppliedTermIndex(TermIndex.valueOf(
-          newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
-    });
+    LOG.info("OzoneManagerStateMachine is un-pausing");
+    if (statePausedCount.decrementAndGet() == 0) {
+      getLifeCycle().startAndTransition(() -> {
+        this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+        handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
+        this.setLastAppliedTermIndex(TermIndex.valueOf(
+            newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
+      });
+    }
   }
 
   public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+    int maxUnflushedTransactionSize = ozoneManager.getConfiguration()
+        .getInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT,
+            OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT);
     return new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
         .setIndexToTerm(this::getTermForIndex)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
@@ -470,8 +489,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // OM should be shutdown as the StateMachine has shutdown.
     LOG.info("StateMachine has shutdown. Shutdown OzoneManager if not " +
         "already shutdown.");
-    ozoneManager.shutdown(new RaftException("RaftServer called shutdown on " +
-        "StateMachine"));
+    if (!ozoneManager.isStopped()) {
+      ozoneManager.shutDown("OM state machine is shutdown by Ratis server");
+    } else {
+      stop();
+    }
   }
 
   /**

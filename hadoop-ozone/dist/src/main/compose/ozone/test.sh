@@ -26,10 +26,12 @@ export OZONE_REPLICATION_FACTOR=3
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env
+start_docker_env 5
 
 execute_robot_test scm lib
 execute_robot_test scm ozone-lib
+
+execute_robot_test om auditparser
 
 execute_robot_test scm basic
 
@@ -37,7 +39,7 @@ execute_robot_test scm gdpr
 
 execute_robot_test scm security/ozone-secure-token.robot
 
-for bucket in link generated; do
+for bucket in erasure link generated; do
   execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket} s3
 done
 
@@ -52,8 +54,10 @@ execute_robot_test scm admincli
 
 execute_debug_tests
 
-execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-fso-ofs-link ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-fso-o3fs-bucket ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
+
+execute_robot_test scm ec/basic.robot
 
 stop_docker_env
 

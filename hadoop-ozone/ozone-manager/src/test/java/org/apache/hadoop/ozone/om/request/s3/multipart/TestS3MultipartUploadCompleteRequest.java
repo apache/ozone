@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.Assert;
@@ -59,7 +58,8 @@ public class TestS3MultipartUploadCompleteRequest
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
-    addVolumeAndBucket(volumeName, bucketName);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName);
     checkDeleteTableCount(volumeName, bucketName, keyName, 0);
@@ -153,7 +153,7 @@ public class TestS3MultipartUploadCompleteRequest
   protected void addVolumeAndBucket(String volumeName, String bucketName)
       throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, BucketLayout.DEFAULT);
+        omMetadataManager, getBucketLayout());
   }
 
   @Test
@@ -163,7 +163,7 @@ public class TestS3MultipartUploadCompleteRequest
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+            omMetadataManager, getBucketLayout());
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
             bucketName, keyName);
@@ -273,7 +273,7 @@ public class TestS3MultipartUploadCompleteRequest
     String keyName = UUID.randomUUID().toString();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
     List<Part> partList = new ArrayList<>();
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,

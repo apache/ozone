@@ -349,6 +349,7 @@ public interface ClientProtocol {
    * @param keyMap The key is original key name nad value is new key name.
    * @throws IOException
    */
+  @Deprecated
   void renameKeys(String volumeName, String bucketName,
                   Map<String, String> keyMap) throws IOException;
 
@@ -740,6 +741,17 @@ public interface ClientProtocol {
    */
   void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException;
+
+  /**
+   * Set Bucket replication configuration.
+   *
+   * @param volumeName        Name of the Volume.
+   * @param bucketName        Name of the Bucket.
+   * @param replicationConfig The replication config to set on bucket.
+   * @throws IOException
+   */
+  void setReplicationConfig(String volumeName, String bucketName,
+      ReplicationConfig replicationConfig) throws IOException;
 
   /**
    * Returns OzoneKey that contains the application generated/visible

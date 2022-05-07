@@ -49,36 +49,32 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.test.TestGenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
-import org.junit.After;
-import org.junit.AfterClass;
+
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.yaml.snakeyaml.Yaml;
 
 /**
  * Test cases for mini ozone cluster.
  */
+@Timeout(300)
 public class TestMiniOzoneCluster {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -87,7 +83,7 @@ public class TestMiniOzoneCluster {
   private static final File WRITE_TMP = new File(TEST_ROOT, "write");
   private static final File READ_TMP = new File(TEST_ROOT, "read");
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, TEST_ROOT.toString());
@@ -97,20 +93,21 @@ public class TestMiniOzoneCluster {
     READ_TMP.mkdirs();
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @AfterClass
+  @AfterAll
   public static void afterClass() {
     FileUtils.deleteQuietly(WRITE_TMP);
     FileUtils.deleteQuietly(READ_TMP);
   }
 
-  @Test(timeout = 60000)
+  @Test
+  @Flaky("HDDS-6112")
   public void testStartMultipleDatanodes() throws Exception {
     final int numberOfNodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -305,7 +302,8 @@ public class TestMiniOzoneCluster {
    * Test that a DN can register with SCM even if it was started before the SCM.
    * @throws Exception
    */
-  @Test (timeout = 100000)
+  @Test @Timeout(100)
+  @Flaky("HDDS-6111")
   public void testDNstartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -351,7 +349,7 @@ public class TestMiniOzoneCluster {
    * Test that multiple datanode directories are created in MiniOzoneCluster.
    * @throws Exception
    */
-  @Test (timeout = 60000)
+  @Test @Timeout(60)
   public void testMultipleDataDirs() throws Exception {
     // Start a cluster with 3 DN and configure reserved space in each DN
     String reservedSpace = "1B";

@@ -89,8 +89,3 @@ aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /
 ```bash
 aws s3 --endpoint http://localhost:9878 ls s3://bucket1/testfile
 ```
-
-<div class="alert alert-info" role="alert"> 你也可以点击下面的链接，通过 Ozone S3 网关自带的浏览器去查看桶内的文件。
-<br>
-</div>
-http://localhost:9878/bucket1?browser

@@ -89,7 +89,7 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
 
   @Override
   public int hashCode() {
-    return Objects.hash(updatedKey, action);
+    return Objects.hash(updatedKey, table, action);
   }
 
   /**

@@ -48,6 +48,8 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
@@ -376,16 +378,21 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     startRecon();
   }
 
-  private void waitForHddsDatanodesStop() throws TimeoutException,
-      InterruptedException {
+  private void waitForHddsDatanodeToStop(DatanodeDetails dn)
+      throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
-      final int healthy = scm.getNodeCount(HEALTHY);
-      boolean isReady = healthy == hddsDatanodes.size();
-      if (!isReady) {
-        LOG.info("Waiting on {} datanodes out of {} to be marked unhealthy.",
-            healthy, hddsDatanodes.size());
+      NodeStatus status;
+      try {
+        status = scm.getScmNodeManager().getNodeStatus(dn);
+      } catch (NodeNotFoundException e) {
+        return true;
       }
-      return isReady;
+      if (status.equals(NodeStatus.inServiceHealthy())) {
+        LOG.info("Waiting on datanode to be marked stale.");
+        return false;
+      } else {
+        return true;
+      }
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
@@ -410,7 +417,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     hddsDatanodes.remove(i);
     if (waitForDatanode) {
       // wait for node to be removed from SCM healthy node list.
-      waitForHddsDatanodesStop();
+      waitForHddsDatanodeToStop(datanodeService.getDatanodeDetails());
     }
     String[] args = new String[] {};
     HddsDatanodeService service =
@@ -678,8 +685,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           streamBufferSizeUnit.get());
       // MiniOzoneCluster should have global pipeline upper limit.
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
-          pipelineNumLimit >= DEFAULT_PIPELIME_LIMIT ?
-              pipelineNumLimit : DEFAULT_PIPELIME_LIMIT);
+          pipelineNumLimit >= DEFAULT_PIPELINE_LIMIT ?
+              pipelineNumLimit : DEFAULT_PIPELINE_LIMIT);
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);

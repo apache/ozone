@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -41,9 +42,11 @@ public final class OmTestManagers {
   private OzoneManager om;
   private KeyManager keyManager;
   private OMMetadataManager metadataManager;
+  private KeyProviderCryptoExtension kmsProvider;
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private PrefixManager prefixManager;
+  private ScmBlockLocationProtocol scmBlockClient;
 
   public OzoneManager getOzoneManager() {
     return om;
@@ -66,6 +69,9 @@ public final class OmTestManagers {
   public KeyManager getKeyManager() {
     return keyManager;
   }
+  public ScmBlockLocationProtocol getScmBlockClient() {
+    return scmBlockClient;
+  }
 
   public OmTestManagers(OzoneConfiguration conf)
       throws AuthenticationException, IOException {
@@ -80,10 +86,8 @@ public final class OmTestManagers {
       containerClient =
           Mockito.mock(StorageContainerLocationProtocol.class);
     }
-    if (blockClient == null) {
-      blockClient =
-          new ScmBlockLocationTestingClient(null, null, 0);
-    }
+    scmBlockClient = blockClient != null ? blockClient :
+        new ScmBlockLocationTestingClient(null, null, 0);
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);
@@ -97,7 +101,7 @@ public final class OmTestManagers {
 
     keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "keyManager");
-    ScmClient scmClient = new ScmClient(blockClient, containerClient);
+    ScmClient scmClient = new ScmClient(scmBlockClient, containerClient);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
@@ -116,7 +120,16 @@ public final class OmTestManagers {
         .getInternalState(om, "bucketManager");
     prefixManager = (PrefixManagerImpl)HddsWhiteboxTestUtils
         .getInternalState(om, "prefixManager");
+  }
 
+  //initializing and returning a mock kmsProvider
+  public KeyProviderCryptoExtension kmsProviderInit() {
+    kmsProvider = Mockito.mock(KeyProviderCryptoExtension.class);
+
+    HddsWhiteboxTestUtils.setInternalState(om,
+            "kmsProvider", kmsProvider);
+
+    return kmsProvider;
   }
 
 }

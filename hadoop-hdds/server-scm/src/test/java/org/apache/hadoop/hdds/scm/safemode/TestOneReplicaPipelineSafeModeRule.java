@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +51,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
+import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -97,7 +100,8 @@ public class TestOneReplicaPipelineSafeModeRule {
         scmMetadataStore.getPipelineTable(),
         eventQueue,
         scmContext,
-        serviceManager);
+        serviceManager,
+        new TestClock(Instant.now(), ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,

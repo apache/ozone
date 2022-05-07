@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
@@ -85,28 +84,29 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.tag.Slow;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test SCM and DataNode Upgrade sequence.
  */
+@Timeout(11000)
+@Flaky({"HDDS-6028", "HDDS-6049"})
+@Slow
 public class TestHDDSUpgrade {
 
   /**
    * Set a timeout for each test.
    */
-  @Rule
-  public Timeout timeout = new Timeout(11000000);
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHDDSUpgrade.class);
   private static final int NUM_DATA_NODES = 3;
@@ -131,23 +131,22 @@ public class TestHDDSUpgrade {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     init();
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     shutdown();
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void initClass() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
     conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(NUM_DATA_NODES)
@@ -165,7 +164,7 @@ public class TestHDDSUpgrade {
     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 100);
   }
 
-  @AfterClass
+  @AfterAll
   public static void afterClass() throws InterruptedException {
     clusterProvider.shutdown();
   }
@@ -854,7 +853,6 @@ public class TestHDDSUpgrade {
    * Upgrade execution points as defined in
    * UpgradeFinalizer:UpgradeTestInjectionPoints.
    */
-  @Ignore
   @Test
   public void testDataNodeFailuresDuringDataNodeUpgrade()
       throws Exception {
@@ -899,7 +897,6 @@ public class TestHDDSUpgrade {
    * through upgrade-finalization. This test covers all the combinations of
    * SCM-Upgrade-execution points and DataNode-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testAllPossibleDataNodeFailuresAndSCMFailures()
       throws Exception {
@@ -959,7 +956,6 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * SCM-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringSCMUpgrade()
       throws Exception {
@@ -998,7 +994,6 @@ public class TestHDDSUpgrade {
    * through upgrade. This test covers all the combinations of
    * DataNode-Upgrade-execution points.
    */
-  @Ignore
   @Test
   public void testDataNodeAndSCMFailuresTogetherDuringDataNodeUpgrade()
       throws Exception {

@@ -24,10 +24,13 @@ Test Timeout        5 minutes
 
 
 *** Test Cases ***
-Create a volume, bucket and key
+Create a volume and bucket
+    [Tags]    create-volume-and-bucket
     ${output} =         Execute          ozone sh volume create ${PREFIX}-volume
                         Should not contain  ${output}       Failed
     ${output} =         Execute          ozone sh bucket create /${PREFIX}-volume/${PREFIX}-bucket
                         Should not contain  ${output}       Failed
+
+Create key
     ${output} =         Execute          ozone sh key put /${PREFIX}-volume/${PREFIX}-bucket/${PREFIX}-key /opt/hadoop/NOTICE.txt
                         Should not contain  ${output}       Failed

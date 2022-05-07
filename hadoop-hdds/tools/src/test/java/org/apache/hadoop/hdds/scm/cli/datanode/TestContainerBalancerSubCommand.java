@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
@@ -115,8 +116,12 @@ public class TestContainerBalancerSubCommand {
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
     Mockito.when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null))
-        .thenAnswer(invocation -> true);
+            null, null, null, null, null, null))
+        .thenReturn(
+            StorageContainerLocationProtocolProtos
+                .StartContainerBalancerResponseProto.newBuilder()
+                .setStart(true)
+                .build());
     startCmd.execute(scmClient);
 
     Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
@@ -130,13 +135,16 @@ public class TestContainerBalancerSubCommand {
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
     Mockito.when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null))
-        .thenAnswer(invocation -> false);
+            null, null, null, null, null, null))
+        .thenReturn(StorageContainerLocationProtocolProtos
+            .StartContainerBalancerResponseProto.newBuilder()
+            .setStart(false)
+            .setMessage("")
+            .build());
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Container\\sBalancer\\sis\\seither" +
-        "\\salready\\srunning\\sor\\sfailed\\sto\\sstart.\\nPlease\\scheck" +
-        "\\sthe\\slogs\\sfor\\smore\\sinfo.");
+    Pattern p = Pattern.compile("^Failed\\sto\\sstart\\sContainer" +
+        "\\sBalancer.");
 
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());

@@ -25,10 +25,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -47,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.After;
 import org.junit.Assert;
@@ -56,10 +60,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
@@ -87,9 +96,11 @@ public class TestPipelineManagerImpl {
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
   private StorageContainerManager scm;
+  private TestClock testClock;
 
   @Before
   public void init() throws Exception {
+    testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
         TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
@@ -127,7 +138,8 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         scmContext,
-        serviceManager);
+        serviceManager,
+        testClock);
   }
 
   private PipelineManagerImpl createPipelineManager(
@@ -138,7 +150,8 @@ public class TestPipelineManagerImpl {
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         SCMContext.emptyContext(),
-        serviceManager);
+        serviceManager,
+        new TestClock(Instant.now(), ZoneOffset.UTC));
   }
 
   @Test
@@ -228,12 +241,18 @@ public class TestPipelineManagerImpl {
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    Assert.assertEquals(1, pipelineManager.getPipelineCount(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.DORMANT));
 
     pipelineManager.activatePipeline(pipeline.getId());
     Assert.assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
+    Assert.assertEquals(1, pipelineManager.getPipelineCount(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN));
     buffer.flush();
     Assert.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
     pipelineManager.close();
@@ -528,45 +547,73 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testScrubPipeline() throws Exception {
-    // No timeout for pipeline scrubber.
+  public void testScrubPipelines() throws Exception {
+    // Allocated pipelines should not be scrubbed for 50 seconds.
     conf.setTimeDuration(
-        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
-        TimeUnit.MILLISECONDS);
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     pipelineManager.setScmContext(scmContext);
-    Pipeline pipeline = pipelineManager
+    Pipeline allocatedPipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
     // At this point, pipeline is not at OPEN stage.
-    assertEquals(Pipeline.PipelineState.ALLOCATED,
-        pipeline.getPipelineState());
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        allocatedPipeline.getPipelineState());
 
     // pipeline should be seen in pipelineManager as ALLOCATED.
     Assert.assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.ALLOCATED).contains(pipeline));
-    pipelineManager
-        .scrubPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE));
+            Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
 
-    // pipeline should be scrubbed.
-    Assert.assertFalse(pipelineManager
+    Pipeline closedPipeline = pipelineManager
+        .createPipeline(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE));
+    pipelineManager.openPipeline(closedPipeline.getId());
+    pipelineManager.closePipeline(closedPipeline, true);
+
+    // pipeline should be seen in pipelineManager as CLOSED.
+    Assert.assertTrue(pipelineManager
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
+
+    // Set the clock to "now". All pipelines were created before this.
+    testClock.set(Instant.now());
+
+    pipelineManager.scrubPipelines();
+
+    // The allocatedPipeline should not be scrubbed as the interval has not
+    // yet passed.
+    Assert.assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.ALLOCATED).contains(pipeline));
+            Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
+
+    // The closedPipeline should be scrubbed, as they are scrubbed immediately
+    Assert.assertFalse(pipelineManager
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
+
+    testClock.fastForward((60000));
+
+    pipelineManager.scrubPipelines();
+
+    // The allocatedPipeline should now be scrubbed as the interval has passed
+    Assert.assertFalse(pipelineManager
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
 
     pipelineManager.close();
   }
 
   @Test
-  public void testScrubPipelineShouldFailOnFollower() throws Exception {
-    // No timeout for pipeline scrubber.
+  public void testScrubPipelinesShouldFailOnFollower() throws Exception {
     conf.setTimeDuration(
-        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
-        TimeUnit.MILLISECONDS);
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     pipelineManager.setScmContext(scmContext);
@@ -587,10 +634,9 @@ public class TestPipelineManagerImpl {
     assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
     ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
 
+    testClock.fastForward(20000);
     try {
-      pipelineManager
-          .scrubPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
+      pipelineManager.scrubPipelines();
     } catch (NotLeaderException ex) {
       pipelineManager.close();
       return;
@@ -801,6 +847,41 @@ public class TestPipelineManagerImpl {
     assertEquals(pipelines.get(3), pipelineList2.get(1));
   }
 
+  public void testCreatePipelineForRead() throws IOException {
+    PipelineManager pipelineManager = createPipelineManager(true);
+    List<DatanodeDetails> dns = nodeManager
+        .getNodes(NodeStatus.inServiceHealthy())
+        .stream()
+        .limit(3)
+        .collect(Collectors.toList());
+    Set<ContainerReplica> replicas = createContainerReplicasList(dns);
+    Pipeline pipeline = pipelineManager.createPipelineForRead(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), replicas);
+    Assert.assertEquals(3, pipeline.getNodes().size());
+    for (DatanodeDetails dn : pipeline.getNodes())  {
+      Assert.assertTrue(dns.contains(dn));
+    }
+  }
+
+  private Set<ContainerReplica> createContainerReplicasList(
+      List <DatanodeDetails> dns) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (DatanodeDetails dn : dns) {
+      ContainerReplica r = ContainerReplica.newBuilder()
+          .setBytesUsed(1)
+          .setContainerID(ContainerID.valueOf(1))
+          .setContainerState(StorageContainerDatanodeProtocolProtos
+              .ContainerReplicaProto.State.CLOSED)
+          .setKeyCount(1)
+          .setOriginNodeId(UUID.randomUUID())
+          .setSequenceId(1)
+          .setReplicaIndex(0)
+          .setDatanodeDetails(dn)
+          .build();
+      replicas.add(r);
+    }
+    return replicas;
+  }
 
   private void sendPipelineReport(
       DatanodeDetails dn, Pipeline pipeline,
