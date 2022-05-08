@@ -47,7 +47,7 @@ import java.util.Set;
 
 /**
  * A failover proxy provider base abstract class.
- * Provides common methods for failover proxy provider.
+ * Provides common methods for failover proxy provider
  * implementations. Failover proxy provider allows clients to configure
  * multiple OMs to connect to. In case of OM failover, client can try
  * connecting to another OM node from the list of proxies.
@@ -59,18 +59,18 @@ public abstract class OMFailoverProxyProviderBase<T> implements
       LoggerFactory.getLogger(OMFailoverProxyProviderBase.class);
 
   private final ConfigurationSource conf;
-  private Class<T> protocolClass;
   private final String omServiceId;
-
-  private String currentProxyOMNodeId;
-  private int currentProxyIndex;
+  private final Class<T> protocolClass;
 
   // Map of OMNodeID to its proxy
   private Map<String, ProxyInfo<T>> omProxies;
   private List<String> omNodeIDList;
 
+  private String currentProxyOMNodeId;
+  private int currentProxyIndex;
   private String nextProxyOMNodeId;
   private int nextProxyIndex;
+
   // OMFailoverProxyProvider, on encountering certain exception, tries each OM
   // once in a round robin fashion. After that it waits for configured time
   // before attempting to contact all the OMs again. For other exceptions
@@ -80,7 +80,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private String lastAttemptedOM;
   private int numAttemptsOnSameOM = 0;
   private final long waitBetweenRetries;
-  // check if necessary for both
   private Set<String> accessControlExceptionOMs = new HashSet<>();
   private boolean performFailoverDone;
 
@@ -110,7 +109,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
                                               String omSvcId)
       throws IOException;
 
-//  protected abstract boolean shouldFailover(Exception ex);
   protected synchronized boolean shouldFailover(Exception ex) {
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
     if (unwrappedException instanceof AccessControlException ||
@@ -224,6 +222,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   public final Class<T> getInterface() {
     return protocolClass;
   }
+
   /**
    * Called whenever an error warrants failing over. It is determined by the
    * retry policy. This method is supposed to called only once in a

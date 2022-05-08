@@ -61,11 +61,8 @@ public class OMFailoverProxyProvider<T> extends
 
   private final long omVersion;
   private final Text delegationTokenService;
-
   private final UserGroupInformation ugi;
-
   private Map<String, OMProxyInfo> omProxyInfos;
-
   private List<String> retryExceptions = new ArrayList<>();
 
   // OMFailoverProxyProvider, on encountering certain exception, tries each OM

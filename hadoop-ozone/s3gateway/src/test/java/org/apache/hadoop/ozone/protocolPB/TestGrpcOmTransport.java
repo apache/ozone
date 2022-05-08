@@ -66,10 +66,9 @@ public class TestGrpcOmTransport {
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
+    omTransport.close();
     Assert.assertEquals(GrpcOmTransport.class.getSimpleName(),
         omTransport.getClass().getSimpleName());
-    omTransport.close();
-
   }
 
   @Test
@@ -83,9 +82,9 @@ public class TestGrpcOmTransport {
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
     // OmTransport should be Hadoop Rpc and
     // fail equality GrpcOmTransport equality test
+    omTransport.close();
     Assert.assertNotEquals(GrpcOmTransport.class.getSimpleName(),
         omTransport.getClass().getSimpleName());
-    omTransport.close();
   }
 
   @Test

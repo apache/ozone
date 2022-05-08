@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -60,7 +59,6 @@ public class GrpcOMFailoverProxyProvider<T> extends
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
-                                     UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
     super(configuration, omServiceId, protocol);
@@ -118,11 +116,14 @@ public class GrpcOMFailoverProxyProvider<T> extends
     return (T) RPC.getProxy(getInterface(), 0, addr, hadoopConf);
   }
 
+  /**
+   * Get the proxy object which should be used until the next failover event
+   * occurs. RPC proxy object is intialized lazily.
+   * @return the OM proxy object to invoke methods upon
+   */
   @Override
   public synchronized ProxyInfo<T> getProxy() {
-
     return getOMProxyMap().get(getCurrentProxyOMNodeId());
-
   }
 
   @Override
