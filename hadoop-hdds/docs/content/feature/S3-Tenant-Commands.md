@@ -141,13 +141,13 @@ ozone tenant user assignadmin 'tenantone$testuser2' --tenant=tenantone
 ### List users in a tenant
 
 ```shell
-ozone tenant user list --tenant=<TENANT_NAME>
+ozone tenant user list <TENANT_NAME>
 ```
 
 Example:
 
 ```shell
-bash-4.2$ ozone tenant user list --tenant=tenantone
+bash-4.2$ ozone tenant user list tenantone
 - User 'testuser' with accessId 'tenantone$testuser'
 ```
 

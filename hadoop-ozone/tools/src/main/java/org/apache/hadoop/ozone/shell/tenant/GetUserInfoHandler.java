@@ -59,7 +59,6 @@ public class GetUserInfoHandler extends TenantHandler {
       return;
     }
 
-
     try {
       final TenantUserInfoValue tenantUserInfo =
           objStore.tenantGetUserInfo(userPrincipal);
