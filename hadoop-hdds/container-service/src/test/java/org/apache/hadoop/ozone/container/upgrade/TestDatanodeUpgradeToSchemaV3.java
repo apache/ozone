@@ -381,7 +381,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * Test data write after finalization.
    */
   @Test
-  public void testWriteWithV3Disabled() throws Exception{
+  public void testWriteWithV3Disabled() throws Exception {
     testWrite(true, OzoneConsts.SCHEMA_V3);
   }
 
