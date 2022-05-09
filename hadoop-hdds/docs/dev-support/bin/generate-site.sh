@@ -33,5 +33,6 @@ fi
 
 DESTDIR="$DOCDIR/target/classes/docs"
 mkdir -p "$DESTDIR"
+cd "$DOCDIR"
 hugo "${ENABLE_GIT_INFO}" -d "$DESTDIR" "$@"
 cd -
