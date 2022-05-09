@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -55,8 +56,11 @@ public class TestRequestValidations {
   private final ValidationListenerImpl validationListener =
       new ValidationListenerImpl();
 
+  private OMMetadataManager metadataManager;
+
   @Before
   public void setup() {
+    metadataManager = mock(OMMetadataManager.class);
     startValidatorTest();
     validationListener.attach();
   }
@@ -71,7 +75,7 @@ public class TestRequestValidations {
   public void testUsingRegistryWithoutLoading() throws Exception {
     new RequestValidations()
         .fromPackage(PACKAGE)
-        .withinContext(of(aFinalizedVersionManager()))
+        .withinContext(of(aFinalizedVersionManager(), metadataManager))
         .validateRequest(aCreateKeyRequest(currentClientVersion()));
   }
 
@@ -86,7 +90,7 @@ public class TestRequestValidations {
   @Test
   public void testUsingRegistryWithoutPackage() throws Exception {
     new RequestValidations()
-        .withinContext(of(aFinalizedVersionManager()))
+        .withinContext(of(aFinalizedVersionManager(), metadataManager))
         .load()
         .validateRequest(aCreateKeyRequest(currentClientVersion()));
 
@@ -97,7 +101,7 @@ public class TestRequestValidations {
   public void testNoPreValidationsWithoutValidationMethods()
       throws Exception {
     int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadEmptyValidations(ctx);
 
     validations.validateRequest(aCreateKeyRequest(omVersion));
@@ -108,7 +112,7 @@ public class TestRequestValidations {
   @Test
   public void testNoPostValidationsWithoutValidationMethods()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadEmptyValidations(ctx);
 
     validations.validateResponse(
@@ -120,7 +124,7 @@ public class TestRequestValidations {
   @Test
   public void testNoPreValidationsRunningForRequestTypeWithoutValidators()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateRequest(aRenameKeyRequest(currentClientVersion()));
@@ -131,7 +135,7 @@ public class TestRequestValidations {
   @Test
   public void testNoPostValidationsAreRunningForRequestTypeWithoutValidators()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
@@ -142,7 +146,7 @@ public class TestRequestValidations {
 
   @Test
   public void testPreProcessorExceptionHandling() throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     try {
@@ -157,7 +161,7 @@ public class TestRequestValidations {
 
   @Test
   public void testPostProcessorExceptionHandling() {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     try {
@@ -174,7 +178,7 @@ public class TestRequestValidations {
   @Test
   public void testOldClientConditionIsRecognizedAndPreValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
@@ -187,7 +191,7 @@ public class TestRequestValidations {
   @Test
   public void testOldClientConditionIsRecognizedAndPostValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
@@ -202,7 +206,7 @@ public class TestRequestValidations {
   @Test
   public void testPreFinalizedWithOldClientConditionPreProcValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(anUnfinalizedVersionManager());
+    ValidationContext ctx = of(anUnfinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
@@ -216,7 +220,7 @@ public class TestRequestValidations {
   @Test
   public void testPreFinalizedWithOldClientConditionPostProcValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(anUnfinalizedVersionManager());
+    ValidationContext ctx = of(anUnfinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(

@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
@@ -35,17 +36,32 @@ public interface ValidationContext {
   LayoutVersionManager versionManager();
 
   /**
+   * Gets the {@link OMMetadataManager} of the cluster, so that a pre/post
+   * finalization hook can look into the DB state to make sure a request is
+   * valid or not.
+   *
+   * @return {@link OMMetadataManager} instance.
+   */
+  OMMetadataManager omMetadataManager();
+
+  /**
    * Creates a context object based on the given parameters.
    *
    * @param versionManager the {@link LayoutVersionManager} of the service
    * @return the {@link ValidationContext} specified by the parameters.
    */
-  static ValidationContext of(LayoutVersionManager versionManager) {
+  static ValidationContext of(LayoutVersionManager versionManager,
+                              OMMetadataManager omMetadataManager) {
 
     return new ValidationContext() {
       @Override
       public LayoutVersionManager versionManager() {
         return versionManager;
+      }
+
+      @Override
+      public OMMetadataManager omMetadataManager() {
+        return omMetadataManager;
       }
     };
   }
