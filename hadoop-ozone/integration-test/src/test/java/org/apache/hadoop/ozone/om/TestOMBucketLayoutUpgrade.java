@@ -85,7 +85,7 @@ public class TestOMBucketLayoutUpgrade {
       };
   private static final String VOLUME_NAME = "vol-" + UUID.randomUUID();
   private int fromLayoutVersion;
-  private static OzoneManagerProtocol omClient;
+  private OzoneManagerProtocol omClient;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOMBucketLayoutUpgrade.class);
