@@ -32,9 +32,8 @@ import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_CONDITION_IS_EMPTY;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST;
+import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_THIRD_PARAM_HAS_TO_BE_VALIDATION_CONTEXT;
-import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_LAST_PARAM_HAS_TO_BE_METADATA_MANAGER;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_UNEXPECTED_PARAMETER_COUNT;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST;
@@ -70,8 +69,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions("ServiceException"));
 
     assertThat(compile(source)).succeeded();
@@ -83,8 +81,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
-        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
         exceptions("ServiceException"));
 
     assertThat(compile(source)).succeeded();
@@ -96,8 +93,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source)).succeeded();
@@ -109,8 +105,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source))
@@ -123,8 +118,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public", "static", "final"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source)).succeeded();
@@ -136,8 +130,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("private", "static"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source)).succeeded();
@@ -149,8 +142,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("static"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source)).succeeded();
@@ -162,8 +154,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("protected", "static"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source)).succeeded();
@@ -192,7 +183,7 @@ public class TestRequestFeatureValidatorProcessor {
 
     assertThat(compile(source))
         .hadErrorContaining(
-            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 3, 1));
+            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 2, 1));
   }
 
   @Test
@@ -201,13 +192,12 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source))
         .hadErrorContaining(
-            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 3, 4));
+            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 2, 3));
   }
 
   @Test
@@ -216,12 +206,12 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
-        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
+        parameters("OMRequest rq", "OMResponse rp"),
         exceptions());
 
     assertThat(compile(source))
         .hadErrorContaining(
-            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 4, 3));
+            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 3, 2));
   }
 
   @Test
@@ -231,12 +221,12 @@ public class TestRequestFeatureValidatorProcessor {
         modifiers("public", "static"),
         returnValue("OMResponse"),
         parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx",
-            "OMMetadataManager mgr", "String name"),
+            "String name"),
         exceptions());
 
     assertThat(compile(source))
         .hadErrorContaining(
-            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 4, 5));
+            String.format(ERROR_UNEXPECTED_PARAMETER_COUNT, 3, 4));
   }
 
   @Test
@@ -245,8 +235,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("String"),
-        parameters("OMRequest rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source))
@@ -259,8 +248,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("String"),
-        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source))
@@ -273,8 +261,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
-        parameters("String rq", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("String rq", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source))
@@ -287,8 +274,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
-        parameters("String rq", "OMResponse rp", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("String rq", "OMResponse rp", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source))
@@ -301,24 +287,11 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), preProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMRequest"),
-        parameters("OMRequest rq", "String ctx", "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "String ctx"),
         exceptions());
 
     assertThat(compile(source))
-        .hadErrorContaining(ERROR_THIRD_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
-  }
-
-  @Test
-  public void testWrongThirdArgumentForPreProcess() {
-    List<String> source = generateSourceOfValidatorMethodWith(
-        annotationOf(someConditions(), preProcess(), aReqType()),
-        modifiers("public", "static"),
-        returnValue("OMRequest"),
-        parameters("OMRequest rq", "ValidationContext ctx", "String mgr"),
-        exceptions());
-
-    assertThat(compile(source))
-        .hadErrorContaining(ERROR_LAST_PARAM_HAS_TO_BE_METADATA_MANAGER);
+        .hadErrorContaining(ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
   }
 
   @Test
@@ -327,8 +300,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
-        parameters("OMRequest rq", "String rp", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "String rp", "ValidationContext ctx"),
         exceptions());
 
     assertThat(compile(source))
@@ -341,22 +313,20 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(someConditions(), postProcess(), aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
-        parameters("OMRequest rq", "OMResponse rp", "String ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "OMResponse rp", "String ctx"),
         exceptions());
 
     assertThat(compile(source))
-        .hadErrorContaining(ERROR_THIRD_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
+        .hadErrorContaining(ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
   }
-
+  
   @Test
   public void testInvalidProcessingPhase() {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(someConditions(), "INVALID", aReqType()),
         modifiers("public", "static"),
         returnValue("OMResponse"),
-        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx",
-            "OMMetadataManager mgr"),
+        parameters("OMRequest rq", "OMResponse rp", "ValidationContext ctx"),
         exceptions("ServiceException"));
 
     assertThat(compile(source)).failed();
@@ -368,8 +338,7 @@ public class TestRequestFeatureValidatorProcessor {
         annotationOf(emptyConditions(), postProcess(), aReqType()),
         modifiers(),
         returnValue("String"),
-        parameters("String rq", "int rp", "String ctx",
-            "String mgr"),
+        parameters("String rq", "int rp", "String ctx"),
         exceptions());
 
     Compilation compilation = compile(source);
@@ -383,9 +352,7 @@ public class TestRequestFeatureValidatorProcessor {
     assertThat(compilation)
         .hadErrorContaining(ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE);
     assertThat(compilation)
-        .hadErrorContaining(ERROR_THIRD_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
-    assertThat(compilation)
-        .hadErrorContaining(ERROR_LAST_PARAM_HAS_TO_BE_METADATA_MANAGER);
+        .hadErrorContaining(ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
   }
 
   private Compilation compile(List<String> source) {
@@ -498,7 +465,6 @@ public class TestRequestFeatureValidatorProcessor {
         + ".OzoneManagerProtocolProtos.OMResponse;");
     imports.add("import org.apache.hadoop.ozone.om.request.validation"
         + ".ValidationContext;");
-    imports.add("import org.apache.hadoop.ozone.om.OMMetadataManager;");
     imports.add("import com.google.protobuf.ServiceException;");
     for (ValidationCondition condition : ValidationCondition.values()) {
       imports.add("import static org.apache.hadoop.ozone.om.request.validation"

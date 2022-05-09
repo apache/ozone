@@ -401,8 +401,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       requestType = Type.CreateDirectory
   )
   public static OMRequest disallowCreateDirectoryWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
-      throws OMException {
+      OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager().
         isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateDirectoryRequest().getKeyArgs()

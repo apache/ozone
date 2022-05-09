@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om.request.validation.testvalidatorset1;
 
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.TestRequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
@@ -94,7 +93,7 @@ public final class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest preFinalizePreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager) {
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("preFinalizePreProcessCreateKeyValidator");
     return req;
   }
@@ -104,8 +103,7 @@ public final class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse preFinalizePostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx,
-      OMMetadataManager metadataManager) {
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("preFinalizePostProcessCreateKeyValidator");
     return resp;
   }
@@ -115,7 +113,7 @@ public final class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest oldClientPreProcessCreateKeyValidator(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager) {
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("oldClientPreProcessCreateKeyValidator");
     return req;
   }
@@ -125,8 +123,7 @@ public final class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse oldClientPostProcessCreateKeyValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx,
-      OMMetadataManager metadataManager) {
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("oldClientPostProcessCreateKeyValidator");
     return resp;
   }
@@ -136,7 +133,7 @@ public final class GeneralValidatorsForTesting {
       processingPhase = PRE_PROCESS,
       requestType = CreateVolume)
   public static OMRequest multiPurposePreProcessCreateVolumeValidator(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager) {
+      OMRequest req, ValidationContext ctx) {
     fireValidationEvent("multiPurposePreProcessCreateVolumeValidator");
     return req;
   }
@@ -146,8 +143,7 @@ public final class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateVolume)
   public static OMResponse multiPurposePostProcessCreateVolumeValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx,
-      OMMetadataManager metadataManager) {
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("multiPurposePostProcessCreateVolumeValidator");
     return resp;
   }
@@ -157,8 +153,7 @@ public final class GeneralValidatorsForTesting {
       processingPhase = POST_PROCESS,
       requestType = CreateKey)
   public static OMResponse oldClientPostProcessCreateKeyValidator2(
-      OMRequest req, OMResponse resp, ValidationContext ctx,
-      OMMetadataManager metadataManager) {
+      OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("oldClientPostProcessCreateKeyValidator2");
     return resp;
   }
@@ -169,8 +164,7 @@ public final class GeneralValidatorsForTesting {
       requestType = DeleteKeys
   )
   public static OMRequest throwingPreProcessValidator(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
-      throws IOException {
+      OMRequest req, ValidationContext ctx) throws IOException {
     fireValidationEvent("throwingPreProcessValidator");
     if (validatorTestsRunning) {
       throw new IOException("IOException: fail for testing...");
@@ -184,8 +178,7 @@ public final class GeneralValidatorsForTesting {
       requestType = DeleteKeys
   )
   public static OMResponse throwingPostProcessValidator(
-      OMRequest req, OMResponse resp, ValidationContext ctx,
-      OMMetadataManager metadataManager)
+      OMRequest req, OMResponse resp, ValidationContext ctx)
       throws IOException {
     fireValidationEvent("throwingPostProcessValidator");
     if (validatorTestsRunning) {

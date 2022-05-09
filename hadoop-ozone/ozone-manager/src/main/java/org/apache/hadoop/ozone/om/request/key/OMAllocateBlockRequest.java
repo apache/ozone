@@ -271,8 +271,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       requestType = Type.AllocateBlock
   )
   public static OMRequest disallowAllocateBlockWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
-      throws OMException {
+      OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getAllocateBlockRequest().getKeyArgs().hasEcReplicationConfig()) {

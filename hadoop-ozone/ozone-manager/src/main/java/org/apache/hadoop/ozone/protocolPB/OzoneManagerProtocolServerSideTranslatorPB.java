@@ -123,7 +123,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
             .fromPackage(OM_REQUESTS_PACKAGE)
             .withinContext(
                 ValidationContext.of(ozoneManager.getVersionManager()))
-            .withMetadataManager(ozoneManager.getMetadataManager())
             .load();
   }
 

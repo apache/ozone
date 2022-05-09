@@ -74,15 +74,12 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
   public static final String ERROR_FIRST_PARAM_HAS_TO_BE_OMREQUEST =
       "First parameter of a RequestFeatureValidator method has to be an"
           + " OMRequest object.";
+  public static final String ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT =
+      "Last parameter of a RequestFeatureValidator method has to be"
+          + " ValidationContext object.";
   public static final String ERROR_SECOND_PARAM_HAS_TO_BE_OMRESPONSE =
       "Second parameter of a RequestFeatureValidator method has to be an"
           + " OMResponse object.";
-  public static final String ERROR_THIRD_PARAM_HAS_TO_BE_VALIDATION_CONTEXT =
-      "Last parameter of a RequestFeatureValidator method has to be"
-          + " ValidationContext object.";
-  public static final String ERROR_LAST_PARAM_HAS_TO_BE_METADATA_MANAGER =
-      "Last parameter of a RequestFeatureValidator method has to be"
-          + " OMMetadataManager object.";
 
   public static final String OM_REQUEST_CLASS_NAME =
       "org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos"
@@ -92,8 +89,6 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
           + ".OMResponse";
   public static final String VALIDATION_CONTEXT_CLASS_NAME =
       "org.apache.hadoop.ozone.om.request.validation.ValidationContext";
-  public static final String METADATA_MANAGER_CLASS_NAME =
-      "org.apache.hadoop.ozone.om.OMMetadataManager";
 
   public static final String ANNOTATION_SIMPLE_NAME = "RequestFeatureValidator";
   public static final String ANNOTATION_CONDITIONS_PROPERTY_NAME = "conditions";
@@ -150,17 +145,13 @@ public class RequestFeatureValidatorProcessor extends AbstractProcessor {
     int contextOrder = isPreprocessor ? 1 : 2;
     ensureParameterRequirements(paramTypes, contextOrder,
         VALIDATION_CONTEXT_CLASS_NAME,
-        ERROR_THIRD_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
-    contextOrder = isPreprocessor ? 2 : 3;
-    ensureParameterRequirements(paramTypes, contextOrder,
-        METADATA_MANAGER_CLASS_NAME,
-        ERROR_LAST_PARAM_HAS_TO_BE_METADATA_MANAGER);
+        ERROR_LAST_PARAM_HAS_TO_BE_VALIDATION_CONTEXT);
   }
 
   private void ensureParameterCount(boolean isPreprocessor,
       List<? extends TypeMirror> paramTypes) {
     int realParamCount = paramTypes.size();
-    int expectedParamCount = isPreprocessor ? 3 : 4;
+    int expectedParamCount = isPreprocessor ? 2 : 3;
     if (realParamCount != expectedParamCount) {
       emitErrorMsg(String.format(ERROR_UNEXPECTED_PARAMETER_COUNT,
           expectedParamCount, realParamCount));

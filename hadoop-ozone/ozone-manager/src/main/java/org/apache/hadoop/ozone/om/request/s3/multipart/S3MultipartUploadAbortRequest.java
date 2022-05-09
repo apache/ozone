@@ -268,8 +268,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       requestType = Type.AbortMultiPartUpload
   )
   public static OMRequest disallowAbortMultiPartUploadWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
-      throws OMException {
+      OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager().isAllowed(
         OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getAbortMultiPartUploadRequest().getKeyArgs()

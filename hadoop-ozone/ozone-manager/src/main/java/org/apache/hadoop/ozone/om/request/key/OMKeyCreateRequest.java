@@ -382,8 +382,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       requestType = Type.CreateKey
   )
   public static OMRequest disallowCreateKeyWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
-      throws OMException {
+      OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateKeyRequest().getKeyArgs().hasEcReplicationConfig()) {

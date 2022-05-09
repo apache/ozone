@@ -395,8 +395,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       requestType = CreateFile
   )
   public static OMRequest disallowCreateFileWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
-      throws OMException {
+      OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateFileRequest().getKeyArgs().hasEcReplicationConfig()) {
