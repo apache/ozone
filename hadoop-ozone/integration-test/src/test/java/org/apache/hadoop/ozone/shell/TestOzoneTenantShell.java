@@ -575,7 +575,7 @@ public class TestOzoneTenantShell {
         "user", "assign", "bob", "--tenant=research",
         "--accessId=research$bob"});
     checkOutput(out, "", false);
-    checkOutput(err, "Failed to assign 'bob' to 'research'\n", true);
+    checkOutput(err, "accessId 'research$bob' already exists!\n", true);
 
     // Attempt to assign the user to the tenant with a custom accessId
     executeHA(tenantShell, new String[] {
@@ -583,7 +583,9 @@ public class TestOzoneTenantShell {
         "--accessId=research$bob42"});
     checkOutput(out, "", false);
     // HDDS-6366: Disallow specifying custom accessId.
-    checkOutput(err, "Failed to assign 'bob' to 'research'\n", true);
+    checkOutput(err, "Invalid accessId 'research$bob42'. "
+        + "Specifying a custom access ID disallowed. "
+        + "Expected accessId to be assigned is 'research$bob'\n", true);
 
     executeHA(tenantShell, new String[] {"list"});
     checkOutput(out, "dev\nfinance\nresearch\n", true);
@@ -622,7 +624,9 @@ public class TestOzoneTenantShell {
     int exitCode = executeHA(tenantShell, new String[] {"delete", "dev"});
     Assert.assertTrue("Tenant delete should fail!", exitCode != 0);
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to delete tenant 'dev'", false);
+    checkOutput(err, "Tenant 'dev' is not empty. All accessIds associated "
+        + "to this tenant must be revoked before the tenant can be deleted. "
+        + "See `ozone tenant user revoke`\n", true);
 
     // Delete dev volume should fail because the volume reference count > 0L
     exitCode = execute(ozoneSh, new String[] {"volume", "delete", "dev"});
@@ -703,9 +707,7 @@ public class TestOzoneTenantShell {
         "user", "list", "unknown"});
     Assert.assertTrue("Expected non-zero exit code", exitCode != 0);
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to Get Users in tenant 'unknown'\n", true);
-    // Note: Actual Ozone CLI prints below in stderr:
-    // TENANT_NOT_FOUND Tenant 'unknown' doesn't exist.
+    checkOutput(err, "Tenant 'unknown' doesn't exist.\n", true);
 
     // Clean up
     executeHA(tenantShell, new String[] {
@@ -743,8 +745,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "set-secret", tenantName + "$alice", "--secret=somesecret0"});
     checkOutput(out, "", true);
-    checkOutput(err, "AccessId '" + tenantName + "$alice' doesn't exist\n",
-        true);
+    checkOutput(err, "accessId '" + tenantName + "$alice' not found.\n", true);
 
     // Assign a user to the tenant so that we have an accessId entry
     executeHA(tenantShell, new String[] {
@@ -990,20 +991,23 @@ public class TestOzoneTenantShell {
           tenantName + "$carol",
           "--tenant=" + tenantName, "--delegated=true"});
       checkOutput(out, "", true);
-      checkOutput(err, "Failed to assign admin", false);
+      checkOutput(err, "User 'bob' is neither an Ozone admin "
+          + "nor a delegated admin of tenant", false);
 
       // Attempt to make carol a tenant non-delegated tenant admin, should fail
       executeHA(tenantShell, new String[] {"user", "assign-admin",
           tenantName + "$carol",
           "--tenant=" + tenantName, "--delegated=false"});
       checkOutput(out, "", true);
-      checkOutput(err, "Failed to assign admin", false);
+      checkOutput(err, "User 'bob' is neither an Ozone admin "
+          + "nor a delegated admin of tenant", false);
 
       // Attempt to revoke tenant admin, should fail at the permission check
       executeHA(tenantShell, new String[] {"user", "revoke-admin",
           tenantName + "$carol"});
       checkOutput(out, "", true);
-      checkOutput(err, "Failed to revoke admin role of", false);
+      checkOutput(err, "User 'bob' is neither an Ozone admin "
+          + "nor a delegated admin of tenant", false);
 
       // Revoke carol's accessId from this tenant
       executeHA(tenantShell, new String[] {

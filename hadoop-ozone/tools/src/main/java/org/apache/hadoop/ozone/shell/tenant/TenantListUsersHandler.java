@@ -57,29 +57,25 @@ public class TenantListUsersHandler extends S3Handler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    try {
-      final TenantUserList usersInTenant =
-          client.getObjectStore().listUsersInTenant(tenantId, prefix);
+    final TenantUserList usersInTenant =
+        client.getObjectStore().listUsersInTenant(tenantId, prefix);
 
-      if (!printJson) {
-        usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
-          out().println("- User '" + accessIdInfo.getUserPrincipal() +
-              "' with accessId '" + accessIdInfo.getAccessId() + "'");
-        });
-      } else {
-        final JsonArray resArray = new JsonArray();
-        usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
-          final JsonObject obj = new JsonObject();
-          obj.addProperty("user", accessIdInfo.getUserPrincipal());
-          obj.addProperty("accessId", accessIdInfo.getAccessId());
-          resArray.add(obj);
-        });
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        out().println(gson.toJson(resArray));
-      }
-    } catch (IOException e) {
-      throw new IOException("Failed to Get Users in tenant '" + tenantId + "'",
-          e);
+    if (!printJson) {
+      usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
+        out().println("- User '" + accessIdInfo.getUserPrincipal() +
+            "' with accessId '" + accessIdInfo.getAccessId() + "'");
+      });
+    } else {
+      final JsonArray resArray = new JsonArray();
+      usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
+        final JsonObject obj = new JsonObject();
+        obj.addProperty("user", accessIdInfo.getUserPrincipal());
+        obj.addProperty("accessId", accessIdInfo.getAccessId());
+        resArray.add(obj);
+      });
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(resArray));
     }
+
   }
 }

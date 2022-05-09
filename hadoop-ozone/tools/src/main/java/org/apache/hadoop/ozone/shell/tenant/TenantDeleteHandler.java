@@ -42,36 +42,32 @@ public class TenantDeleteHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    try {
-      final DeleteTenantState resp =
-          client.getObjectStore().deleteTenant(tenantId);
+    final DeleteTenantState resp =
+        client.getObjectStore().deleteTenant(tenantId);
 
-      out().println("Deleted tenant '" + tenantId + "'.");
-      long volumeRefCount = resp.getVolRefCount();
-      assert (volumeRefCount >= 0L);
-      final String volumeName = resp.getVolumeName();
-      final String extraPrompt =
-          "But the associated volume '" + volumeName + "' is not removed. ";
-      if (volumeRefCount == 0L) {
-        out().println(extraPrompt + "To delete it, run"
-            + "\n    ozone sh volume delete " + volumeName + "\n");
-      } else {
-        out().println(extraPrompt + "And it is still referenced by some "
-            + "other Ozone features (refCount is " + volumeRefCount + ").");
-      }
-
-      if (isVerbose()) {
-        final JsonObject obj = new JsonObject();
-        obj.addProperty("tenantId", tenantId);
-        obj.addProperty("volumeName", resp.getVolumeName());
-        obj.addProperty("volumeRefCount", resp.getVolRefCount());
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        // Print raw response to stderr if verbose
-        err().println(gson.toJson(obj));
-      }
-    } catch (IOException e) {
-      // Throw exception to make client exit code non-zero
-      throw new IOException("Failed to delete tenant '" + tenantId + "'", e);
+    out().println("Deleted tenant '" + tenantId + "'.");
+    long volumeRefCount = resp.getVolRefCount();
+    assert (volumeRefCount >= 0L);
+    final String volumeName = resp.getVolumeName();
+    final String extraPrompt =
+        "But the associated volume '" + volumeName + "' is not removed. ";
+    if (volumeRefCount == 0L) {
+      out().println(extraPrompt + "To delete it, run"
+          + "\n    ozone sh volume delete " + volumeName + "\n");
+    } else {
+      out().println(extraPrompt + "And it is still referenced by some "
+          + "other Ozone features (refCount is " + volumeRefCount + ").");
     }
+
+    if (isVerbose()) {
+      final JsonObject obj = new JsonObject();
+      obj.addProperty("tenantId", tenantId);
+      obj.addProperty("volumeName", resp.getVolumeName());
+      obj.addProperty("volumeRefCount", resp.getVolRefCount());
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      // Print raw response to stderr if verbose
+      err().println(gson.toJson(obj));
+    }
+
   }
 }

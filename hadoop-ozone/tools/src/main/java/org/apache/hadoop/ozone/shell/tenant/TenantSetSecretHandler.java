@@ -17,16 +17,12 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 import java.io.IOException;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_ID_NOT_FOUND;
 
 /**
  * ozone tenant user set-secret.
@@ -51,28 +47,16 @@ public class TenantSetSecretHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException {
 
-    final ObjectStore objectStore = client.getObjectStore();
-
-    try {
-      final S3SecretValue accessIdSecretKeyPair =
-              objectStore.setS3Secret(accessId, secretKey);
-      if (export) {
-        out().println("export AWS_ACCESS_KEY_ID='" +
-                accessIdSecretKeyPair.getAwsAccessKey() + "'");
-        out().println("export AWS_SECRET_ACCESS_KEY='" +
-                accessIdSecretKeyPair.getAwsSecret() + "'");
-      } else {
-        out().println(accessIdSecretKeyPair);
-      }
-    } catch (OMException omEx) {
-      if (omEx.getResult().equals(ACCESS_ID_NOT_FOUND)) {
-        // Print to stderr here in order not to contaminate stdout just in
-        // case -e is specified.
-        throw new IOException("AccessId '" + accessId + "' doesn't exist",
-            omEx);
-      } else {
-        throw omEx;
-      }
+    final S3SecretValue accessIdSecretKeyPair =
+        client.getObjectStore().setS3Secret(accessId, secretKey);
+    if (export) {
+      out().println("export AWS_ACCESS_KEY_ID='" +
+              accessIdSecretKeyPair.getAwsAccessKey() + "'");
+      out().println("export AWS_SECRET_ACCESS_KEY='" +
+              accessIdSecretKeyPair.getAwsSecret() + "'");
+    } else {
+      out().println(accessIdSecretKeyPair);
     }
+
   }
 }

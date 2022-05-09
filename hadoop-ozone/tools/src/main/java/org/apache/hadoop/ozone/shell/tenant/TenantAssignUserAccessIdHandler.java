@@ -66,22 +66,17 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
       accessId = getDefaultAccessId(userPrincipal);
     }
 
-    try {
-      final S3SecretValue resp = client.getObjectStore()
-          .tenantAssignUserAccessId(userPrincipal, tenantId, accessId);
+    final S3SecretValue resp = client.getObjectStore()
+        .tenantAssignUserAccessId(userPrincipal, tenantId, accessId);
 
-      out().println(
-          "export AWS_ACCESS_KEY_ID='" + resp.getAwsAccessKey() + "'");
-      out().println(
-          "export AWS_SECRET_ACCESS_KEY='" + resp.getAwsSecret() + "'");
+    out().println(
+        "export AWS_ACCESS_KEY_ID='" + resp.getAwsAccessKey() + "'");
+    out().println(
+        "export AWS_SECRET_ACCESS_KEY='" + resp.getAwsSecret() + "'");
 
-      if (isVerbose()) {
-        err().println("Assigned '" + userPrincipal + "' to '" + tenantId +
-            "' with accessId '" + accessId + "'.");
-      }
-    } catch (IOException e) {
-      throw new IOException("Failed to assign '" + userPrincipal + "' to '" +
-          tenantId + "'", e);
+    if (isVerbose()) {
+      err().println("Assigned '" + userPrincipal + "' to '" + tenantId +
+          "' with accessId '" + accessId + "'.");
     }
 
   }

@@ -22,7 +22,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
@@ -51,66 +50,61 @@ public class GetUserInfoHandler extends TenantHandler {
   private boolean printJson;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objStore = client.getObjectStore();
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
     if (StringUtils.isEmpty(userPrincipal)) {
       GenericCli.missingSubcommand(spec);
       return;
     }
 
-    try {
-      final TenantUserInfoValue tenantUserInfo =
-          objStore.tenantGetUserInfo(userPrincipal);
-      final List<ExtendedUserAccessIdInfo> accessIdInfoList =
-          tenantUserInfo.getAccessIdInfoList();
-      if (accessIdInfoList.size() == 0) {
-        err().println("User '" + userPrincipal +
-            "' is not assigned to any tenant.");
-        return;
-      }
-
-      if (!printJson) {
-        out().println("User '" + userPrincipal + "' is assigned to:");
-        accessIdInfoList.forEach(accessIdInfo -> {
-          // Get admin info
-          final String adminInfoString;
-          if (accessIdInfo.getIsAdmin()) {
-            adminInfoString = accessIdInfo.getIsDelegatedAdmin() ?
-                " delegated admin" : " admin";
-          } else {
-            adminInfoString = "";
-          }
-          out().format("- Tenant '%s'%s with accessId '%s'%n",
-              accessIdInfo.getTenantId(),
-              adminInfoString,
-              accessIdInfo.getAccessId());
-        });
-      } else {
-
-        final JsonObject resObj = new JsonObject();
-        resObj.addProperty("user", userPrincipal);
-
-        final JsonArray arr = new JsonArray();
-        accessIdInfoList.forEach(accessIdInfo -> {
-          final JsonObject tenantObj = new JsonObject();
-          tenantObj.addProperty("accessId", accessIdInfo.getAccessId());
-          tenantObj.addProperty("tenantId", accessIdInfo.getTenantId());
-          tenantObj.addProperty("isAdmin", accessIdInfo.getIsAdmin());
-          tenantObj.addProperty("isDelegatedAdmin",
-              accessIdInfo.getIsDelegatedAdmin());
-          arr.add(tenantObj);
-        });
-
-        resObj.add("tenants", arr);
-
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        out().println(gson.toJson(resObj));
-      }
-
-    } catch (IOException e) {
-      err().println("Failed to GetUserInfo of user '" + userPrincipal
-          + "': " + e.getMessage());
+    final TenantUserInfoValue tenantUserInfo =
+        client.getObjectStore().tenantGetUserInfo(userPrincipal);
+    final List<ExtendedUserAccessIdInfo> accessIdInfoList =
+        tenantUserInfo.getAccessIdInfoList();
+    if (accessIdInfoList.size() == 0) {
+      err().println("User '" + userPrincipal +
+          "' is not assigned to any tenant.");
+      return;
     }
+
+    if (!printJson) {
+      out().println("User '" + userPrincipal + "' is assigned to:");
+      accessIdInfoList.forEach(accessIdInfo -> {
+        // Get admin info
+        final String adminInfoString;
+        if (accessIdInfo.getIsAdmin()) {
+          adminInfoString = accessIdInfo.getIsDelegatedAdmin() ?
+              " delegated admin" : " admin";
+        } else {
+          adminInfoString = "";
+        }
+        out().format("- Tenant '%s'%s with accessId '%s'%n",
+            accessIdInfo.getTenantId(),
+            adminInfoString,
+            accessIdInfo.getAccessId());
+      });
+    } else {
+
+      final JsonObject resObj = new JsonObject();
+      resObj.addProperty("user", userPrincipal);
+
+      final JsonArray arr = new JsonArray();
+      accessIdInfoList.forEach(accessIdInfo -> {
+        final JsonObject tenantObj = new JsonObject();
+        tenantObj.addProperty("accessId", accessIdInfo.getAccessId());
+        tenantObj.addProperty("tenantId", accessIdInfo.getTenantId());
+        tenantObj.addProperty("isAdmin", accessIdInfo.getIsAdmin());
+        tenantObj.addProperty("isDelegatedAdmin",
+            accessIdInfo.getIsDelegatedAdmin());
+        arr.add(tenantObj);
+      });
+
+      resObj.add("tenants", arr);
+
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(resObj));
+    }
+
   }
 }

@@ -51,21 +51,16 @@ public class TenantAssignAdminHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    try {
-      client.getObjectStore().tenantAssignAdmin(accessId, tenantId, delegated);
+    client.getObjectStore().tenantAssignAdmin(accessId, tenantId, delegated);
 
-      if (isVerbose()) {
-        final JsonObject obj = new JsonObject();
-        obj.addProperty("accessId", accessId);
-        obj.addProperty("tenantId", tenantId);
-        obj.addProperty("isAdmin", true);
-        obj.addProperty("isDelegatedAdmin", delegated);
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        out().println(gson.toJson(obj));
-      }
-    } catch (IOException e) {
-      throw new IOException("Failed to assign admin to '" + accessId +
-          (tenantId != null ? "' in tenant '" + tenantId : "") + "'", e);
+    if (isVerbose()) {
+      final JsonObject obj = new JsonObject();
+      obj.addProperty("accessId", accessId);
+      obj.addProperty("tenantId", tenantId);
+      obj.addProperty("isAdmin", true);
+      obj.addProperty("isDelegatedAdmin", delegated);
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(obj));
     }
 
   }

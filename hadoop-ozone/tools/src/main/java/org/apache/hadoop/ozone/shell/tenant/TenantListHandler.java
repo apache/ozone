@@ -21,7 +21,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -42,35 +41,32 @@ public class TenantListHandler extends TenantHandler {
   private boolean printJson;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objStore = client.getObjectStore();
-    try {
-      TenantStateList tenantStateList = objStore.listTenant();
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-      if (!printJson) {
-        tenantStateList.getTenantStateList().forEach(tenantState ->
-            out().println(tenantState.getTenantId()));
-      } else {
-        final JsonArray resArray = new JsonArray();
-        tenantStateList.getTenantStateList().forEach(tenantState -> {
-          final JsonObject obj = new JsonObject();
-          obj.addProperty("tenantId", tenantState.getTenantId());
-          obj.addProperty("bucketNamespaceName",
-              tenantState.getBucketNamespaceName());
-          obj.addProperty("userRoleName", tenantState.getUserRoleName());
-          obj.addProperty("adminRoleName", tenantState.getAdminRoleName());
-          obj.addProperty("bucketNamespacePolicyName",
-              tenantState.getBucketNamespacePolicyName());
-          obj.addProperty("bucketPolicyName",
-              tenantState.getBucketPolicyName());
-          resArray.add(obj);
-        });
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        out().println(gson.toJson(resArray));
-      }
+    TenantStateList tenantStateList = client.getObjectStore().listTenant();
 
-    } catch (IOException e) {
-      LOG.error("Failed to list tenants: {}", e.getMessage());
+    if (!printJson) {
+      tenantStateList.getTenantStateList().forEach(tenantState ->
+          out().println(tenantState.getTenantId()));
+    } else {
+      final JsonArray resArray = new JsonArray();
+      tenantStateList.getTenantStateList().forEach(tenantState -> {
+        final JsonObject obj = new JsonObject();
+        obj.addProperty("tenantId", tenantState.getTenantId());
+        obj.addProperty("bucketNamespaceName",
+            tenantState.getBucketNamespaceName());
+        obj.addProperty("userRoleName", tenantState.getUserRoleName());
+        obj.addProperty("adminRoleName", tenantState.getAdminRoleName());
+        obj.addProperty("bucketNamespacePolicyName",
+            tenantState.getBucketNamespacePolicyName());
+        obj.addProperty("bucketPolicyName",
+            tenantState.getBucketPolicyName());
+        resArray.add(obj);
+      });
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(resArray));
     }
+
   }
 }

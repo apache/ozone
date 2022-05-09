@@ -43,7 +43,7 @@ public class TenantCreateHandler extends TenantHandler {
 
     try {
       client.getObjectStore().createTenant(tenantId);
-      // RpcClient#createTenant prints volume name in INFO level log
+      // RpcClient#createTenant prints INFO level log of tenant and volume name
 
       if (isVerbose()) {
         final JsonObject obj = new JsonObject();

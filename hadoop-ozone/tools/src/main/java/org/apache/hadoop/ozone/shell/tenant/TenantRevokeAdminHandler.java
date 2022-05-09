@@ -45,21 +45,16 @@ public class TenantRevokeAdminHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    try {
-      client.getObjectStore().tenantRevokeAdmin(accessId, tenantId);
+    client.getObjectStore().tenantRevokeAdmin(accessId, tenantId);
 
-      if (isVerbose()) {
-        final JsonObject obj = new JsonObject();
-        obj.addProperty("accessId", accessId);
-        obj.addProperty("tenantId", tenantId);
-        obj.addProperty("isAdmin", false);
-        obj.addProperty("isDelegatedAdmin", false);
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        out().println(gson.toJson(obj));
-      }
-    } catch (IOException e) {
-      throw new IOException("Failed to revoke admin role of '" + accessId +
-          (tenantId != null ? "' from tenant '" + tenantId : "") + "'", e);
+    if (isVerbose()) {
+      final JsonObject obj = new JsonObject();
+      obj.addProperty("accessId", accessId);
+      obj.addProperty("tenantId", tenantId);
+      obj.addProperty("isAdmin", false);
+      obj.addProperty("isDelegatedAdmin", false);
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(obj));
     }
 
   }

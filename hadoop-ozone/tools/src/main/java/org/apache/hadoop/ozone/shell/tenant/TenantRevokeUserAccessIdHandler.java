@@ -37,13 +37,9 @@ public class TenantRevokeUserAccessIdHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    try {
-      client.getObjectStore().tenantRevokeUserAccessId(accessId);
-      if (isVerbose()) {
-        err().format("Revoked accessId '%s'.%n", accessId);
-      }
-    } catch (IOException e) {
-      throw new IOException("Failed to revoke accessId '" + accessId + "'", e);
+    client.getObjectStore().tenantRevokeUserAccessId(accessId);
+    if (isVerbose()) {
+      err().format("Revoked accessId '%s'.%n", accessId);
     }
   }
 }
