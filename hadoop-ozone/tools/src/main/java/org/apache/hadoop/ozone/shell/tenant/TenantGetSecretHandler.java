@@ -43,10 +43,6 @@ public class TenantGetSecretHandler extends TenantHandler {
   @CommandLine.Parameters(description = "List of accessIds", arity = "1..")
   private List<String> accessIds = new ArrayList<>();
 
-  @CommandLine.Option(names = {"-e", "--export"},
-      description = "Print out variables together with 'export' prefix")
-  private boolean export;
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
@@ -57,14 +53,11 @@ public class TenantGetSecretHandler extends TenantHandler {
       try {
         final S3SecretValue accessIdSecretKeyPair =
             objectStore.getS3Secret(accessId, false);
-        if (export) {
-          out().println("export AWS_ACCESS_KEY_ID='" +
-              accessIdSecretKeyPair.getAwsAccessKey() + "'");
-          out().println("export AWS_SECRET_ACCESS_KEY='" +
-              accessIdSecretKeyPair.getAwsSecret() + "'");
-        } else {
-          out().println(accessIdSecretKeyPair);
-        }
+        // Always print export format
+        out().println("export AWS_ACCESS_KEY_ID='" +
+            accessIdSecretKeyPair.getAwsAccessKey() + "'");
+        out().println("export AWS_SECRET_ACCESS_KEY='" +
+            accessIdSecretKeyPair.getAwsSecret() + "'");
       } catch (OMException omEx) {
         if (omEx.getResult().equals(ACCESS_ID_NOT_FOUND)) {
           // Print to stderr here in order not to contaminate stdout just in
