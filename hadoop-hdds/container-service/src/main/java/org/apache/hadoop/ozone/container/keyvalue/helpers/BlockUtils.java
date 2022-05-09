@@ -245,7 +245,7 @@ public final class BlockUtils {
       Preconditions.checkState(db.getStore()
           instanceof DatanodeStoreSchemaThreeImpl);
 
-      ((DatanodeStoreSchemaThreeImpl) db.getStore()).dropAllWithPrefix(
+      ((DatanodeStoreSchemaThreeImpl) db.getStore()).removeKVContainerData(
           containerData.getContainerID());
     }
   }

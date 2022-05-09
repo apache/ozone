@@ -78,7 +78,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             .iterator(getContainerKeyPrefix(containerID)), filter);
   }
 
-  public void dropAllWithPrefix(long containerID) throws IOException {
+  public void removeKVContainerData(long containerID) throws IOException {
     String prefix = getContainerKeyPrefix(containerID);
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       getMetadataTable().deleteBatchWithPrefix(batch, prefix);
