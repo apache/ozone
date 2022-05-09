@@ -43,8 +43,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
@@ -71,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
  * Handle block deletion commands.
@@ -229,10 +229,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
               markBlocksForDeletionSchemaV2(containerData, tx,
                   newDeletionBlocks, tx.getTxID());
+            } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+              markBlocksForDeletionSchemaV3(containerData, tx,
+                  newDeletionBlocks, tx.getTxID());
             } else {
               throw new UnsupportedOperationException(
-                  "Only schema version 1 and schema version 2 are "
-                      + "supported.");
+                  "Only schema version 1,2,3 are supported.");
             }
           } finally {
             cont.writeUnlock();
@@ -326,6 +328,34 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
+  private void markBlocksForDeletionSchemaV3(
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
+      int newDeletionBlocks, long txnID)
+      throws IOException {
+    DeletionMarker schemaV3Marker = (table, batch, tid, txn) -> {
+      Table<String, DeletedBlocksTransaction> delTxTable =
+          (Table<String, DeletedBlocksTransaction>) table;
+      delTxTable.putWithBatch(batch, containerData.deleteTxnKey(tid), txn);
+    };
+
+    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
+        txnID, schemaV3Marker);
+  }
+
+  private void markBlocksForDeletionSchemaV2(
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
+      int newDeletionBlocks, long txnID)
+      throws IOException {
+    DeletionMarker schemaV2Marker = (table, batch, tid, txn) -> {
+      Table<Long, DeletedBlocksTransaction> delTxTable =
+          (Table<Long, DeletedBlocksTransaction>) table;
+      delTxTable.putWithBatch(batch, tid, txn);
+    };
+
+    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
+        txnID, schemaV2Marker);
+  }
+
   /**
    * Move a bunch of blocks from a container to deleting state. This is a meta
    * update, the actual deletes happen in async mode.
@@ -334,23 +364,22 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    * @param delTX a block deletion transaction.
    * @throws IOException if I/O error occurs.
    */
-
-  private void markBlocksForDeletionSchemaV2(
+  private void markBlocksForDeletionTransaction(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
-      int newDeletionBlocks, long txnID) throws IOException {
+      int newDeletionBlocks, long txnID, DeletionMarker marker)
+      throws IOException {
     long containerId = delTX.getContainerID();
     if (!isTxnIdValid(containerId, containerData, delTX)) {
       return;
     }
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
-      DatanodeStore ds = containerDB.getStore();
-      DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-          (DatanodeStoreSchemaTwoImpl) ds;
-      Table<Long, DeletedBlocksTransaction> delTxTable =
-          dnStoreTwoImpl.getDeleteTransactionTable();
+      DeleteTransactionStore<?> store =
+          (DeleteTransactionStore<?>) containerDB.getStore();
+      Table<?, DeletedBlocksTransaction> delTxTable =
+          store.getDeleteTransactionTable();
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
-        delTxTable.putWithBatch(batch, txnID, delTX);
+        marker.apply(delTxTable, batch, txnID, delTX);
         newDeletionBlocks += delTX.getLocalIDList().size();
         updateMetaData(containerData, delTX, newDeletionBlocks, containerDB,
             batch);
@@ -509,5 +538,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  private interface DeletionMarker {
+    void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
+        BatchOperation batch, long txnID, DeletedBlocksTransaction delTX)
+        throws IOException;
   }
 }

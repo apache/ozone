@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -59,7 +58,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -70,6 +68,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
@@ -79,9 +78,9 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -91,9 +90,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
-import static org.junit.Assume.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -105,20 +105,21 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @RunWith(Parameterized.class)
 public class TestBlockDeletingService {
 
-  private static File testRoot;
-  private static String scmId;
-  private static String clusterID;
-  private static String datanodeUuid;
-  private static OzoneConfiguration conf;
+  private File testRoot;
+  private String scmId;
+  private String clusterID;
+  private String datanodeUuid;
+  private OzoneConfiguration conf;
 
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;
   private int blockLimitPerInterval;
-  private static VolumeSet volumeSet;
+  private MutableVolumeSet volumeSet;
 
   public TestBlockDeletingService(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
+    conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
@@ -127,8 +128,8 @@ public class TestBlockDeletingService {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @BeforeClass
-  public static void init() throws IOException {
+  @Before
+  public void init() throws IOException {
     testRoot = GenericTestUtils
         .getTestDir(TestBlockDeletingService.class.getSimpleName());
     if (testRoot.exists()) {
@@ -136,16 +137,17 @@ public class TestBlockDeletingService {
     }
     scmId = UUID.randomUUID().toString();
     clusterID = UUID.randomUUID().toString();
-    conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     datanodeUuid = UUID.randomUUID().toString();
-    volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
+    volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
   }
 
-  @AfterClass
-  public static void cleanup() throws IOException {
+  @After
+  public void cleanup() throws IOException {
+    BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
   }
 
@@ -193,14 +195,14 @@ public class TestBlockDeletingService {
       if (schemaVersion.equals(SCHEMA_V1)) {
         createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
             containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-      } else if (schemaVersion.equals(SCHEMA_V2)) {
-        createPendingDeleteBlocksSchema2(numOfBlocksPerContainer, txnID,
-            containerID, numOfChunksPerBlock, buffer, chunkManager, container,
-            data);
+      } else if (schemaVersion.equals(SCHEMA_V2)
+          || schemaVersion.equals(SCHEMA_V3)) {
+        createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
+            containerID, numOfChunksPerBlock, buffer, chunkManager,
+            container, data);
       } else {
         throw new UnsupportedOperationException(
-            "Only schema version 1 and schema version 2 are "
-                + "supported.");
+            "Only schema version 1,2,3 are supported.");
       }
     }
   }
@@ -232,7 +234,7 @@ public class TestBlockDeletingService {
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
-  private void createPendingDeleteBlocksSchema2(int numOfBlocksPerContainer,
+  private void createPendingDeleteBlocksViaTxn(int numOfBlocksPerContainer,
       int txnID, long containerID, int numOfChunksPerBlock, ChunkBuffer buffer,
       ChunkManager chunkManager, KeyValueContainer container,
       KeyValueContainerData data) {
@@ -276,10 +278,18 @@ public class TestBlockDeletingService {
       try (BatchOperation batch = metadata.getStore().getBatchHandler()
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();
-        DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-            (DatanodeStoreSchemaTwoImpl) ds;
-        dnStoreTwoImpl.getDeleteTransactionTable()
-            .putWithBatch(batch, (long) txnID, dtx);
+
+        if (schemaVersion.equals(SCHEMA_V3)) {
+          DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
+              (DatanodeStoreSchemaThreeImpl) ds;
+          dnStoreThreeImpl.getDeleteTransactionTable()
+              .putWithBatch(batch, data.deleteTxnKey(txnID), dtx);
+        } else {
+          DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
+              (DatanodeStoreSchemaTwoImpl) ds;
+          dnStoreTwoImpl.getDeleteTransactionTable()
+              .putWithBatch(batch, (long) txnID, dtx);
+        }
         metadata.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     } catch (IOException exception) {
@@ -372,17 +382,32 @@ public class TestBlockDeletingService {
         }
       }
       return pendingBlocks;
+    } else if (data.getSchemaVersion().equals(SCHEMA_V3)) {
+      int pendingBlocks = 0;
+      DatanodeStore ds = meta.getStore();
+      DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
+          (DatanodeStoreSchemaThreeImpl) ds;
+      try (
+          TableIterator<String, ? extends Table.KeyValue<String,
+              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
+              iter = dnStoreThreeImpl.getDeleteTransactionTable()
+              .iterator(data.containerPrefix())) {
+        while (iter.hasNext()) {
+          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+              delTx = iter.next().getValue();
+          pendingBlocks += delTx.getLocalIDList().size();
+        }
+      }
+      return pendingBlocks;
     } else {
       throw new UnsupportedOperationException(
-          "Only schema version 1 and schema version 2 are supported.");
+          "Only schema version 1,2,3 are supported.");
     }
   }
 
 
   @Test
   public void testBlockDeletion() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
@@ -462,8 +487,6 @@ public class TestBlockDeletingService {
   @Test
   @SuppressWarnings("java:S2699") // waitFor => assertion with timeout
   public void testShutdownService() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
@@ -492,8 +515,6 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletionTimeout() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionLimit(3);
     blockLimitPerInterval = dnConf.getBlockDeletionLimit();
@@ -581,8 +602,6 @@ public class TestBlockDeletingService {
   @Test(timeout = 30000)
   @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     // Properties :
     //  - Number of containers : 2
     //  - Number of blocks per container : 1
@@ -657,8 +676,6 @@ public class TestBlockDeletingService {
 
   @Test(timeout = 30000)
   public void testBlockThrottle() throws Exception {
-    assumeFalse(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
-
     // Properties :
     //  - Number of containers : 5
     //  - Number of blocks per container : 3
