@@ -312,6 +312,10 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT
       = 10000;
 
+  public static final String OZONE_OM_MULTITENANCY_ENABLED =
+      "ozone.om.multitenancy.enabled";
+  public static final boolean OZONE_OM_MULTITENANCY_ENABLED_DEFAULT = false;
+
   /**
    * Temporary configuration properties for Ranger REST use in multitenancy.
    */

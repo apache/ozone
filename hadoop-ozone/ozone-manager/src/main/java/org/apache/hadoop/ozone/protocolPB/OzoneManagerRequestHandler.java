@@ -230,21 +230,25 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       case GetS3VolumeContext:
+        impl.checkS3MultiTenancyEnabled();
         GetS3VolumeContextResponse s3VolumeContextResponse =
             getS3VolumeContext();
         responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
         break;
       case TenantGetUserInfo:
+        impl.checkS3MultiTenancyEnabled();
         TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
             request.getTenantGetUserInfoRequest());
         responseBuilder.setTenantGetUserInfoResponse(getUserInfoResponse);
         break;
       case ListTenant:
+        impl.checkS3MultiTenancyEnabled();
         ListTenantResponse listTenantResponse = listTenant(
             request.getListTenantRequest());
         responseBuilder.setListTenantResponse(listTenantResponse);
         break;
       case TenantListUser:
+        impl.checkS3MultiTenancyEnabled();
         TenantListUserResponse listUserResponse = tenantListUsers(
             request.getTenantListUserRequest());
         responseBuilder.setTenantListUserResponse(listUserResponse);

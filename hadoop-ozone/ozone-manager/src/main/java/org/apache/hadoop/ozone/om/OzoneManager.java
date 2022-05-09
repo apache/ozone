@@ -243,12 +243,17 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -371,6 +376,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
   private final String defaultBucketLayout;
+
+  private boolean isS3MultiTenancyEnabled;
 
   private boolean isNativeAuthorizerEnabled;
 
@@ -534,6 +541,49 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       blockTokenMgr = createBlockTokenSecretManager(configuration);
     }
 
+    // Get S3 multi-tenancy enabled flag
+    this.isS3MultiTenancyEnabled = conf.getBoolean(
+        OZONE_OM_MULTITENANCY_ENABLED, OZONE_OM_MULTITENANCY_ENABLED_DEFAULT);
+
+    if (isS3MultiTenancyEnabled) {
+      // Validate required configs to enable S3 multi-tenancy
+      if (!isSecurityEnabled()) {
+        this.isS3MultiTenancyEnabled = false;
+        LOG.warn("Ozone security is required to enable S3 Multi-Tenancy");
+      } else if (!SecurityUtil.getAuthenticationMethod(conf).equals(
+          AuthenticationMethod.KERBEROS)) {
+        this.isS3MultiTenancyEnabled = false;
+        LOG.warn("Kerberos authentication is required to enable S3 "
+            + "Multi-Tenancy");
+      }
+      // TODO: Validate accessAuthorizer later. We can't do that for now:
+      //  1. Tenant acceptance test env (ozonesecure) uses native authorizer
+      //  2. RangerOzoneAuthorizer is external class
+      final String rangerAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
+      if (StringUtils.isBlank(rangerAddress)) {
+        this.isS3MultiTenancyEnabled = false;
+        LOG.warn("{} is required to enable S3 Multi-Tenancy but not set",
+            OZONE_RANGER_HTTPS_ADDRESS_KEY);
+      }
+      // TODO: Do not check Ranger user/passwd if Ranger Java client is enabled
+      final String rangerUser = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+      if (StringUtils.isBlank(rangerUser)) {
+        this.isS3MultiTenancyEnabled = false;
+        LOG.warn("{} is required to enable S3 Multi-Tenancy but not set",
+            OZONE_OM_RANGER_HTTPS_ADMIN_API_USER);
+      }
+      final String rangerPw = conf.get(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+      if (StringUtils.isBlank(rangerPw)) {
+        this.isS3MultiTenancyEnabled = false;
+        LOG.warn("{} is required to enable S3 Multi-Tenancy but not set",
+            OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD);
+      }
+      if (!isS3MultiTenancyEnabled) {
+        LOG.warn("Failed to meet one or more requirements to enable "
+            + "S3 Multi-Tenancy, disabling S3 Multi-Tenancy");
+      }
+    }
+
     // Get admin list
     omAdminUsernames = getOzoneAdminsFromConfig(configuration);
     instantiateServices(false);
@@ -653,8 +703,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     metadataManager = new OmMetadataManagerImpl(configuration);
-    multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
-    OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
+    LOG.info("S3 Multi-Tenancy is {}",
+        isS3MultiTenancyEnabled ? "enabled" : "disabled");
+    if (isS3MultiTenancyEnabled) {
+      multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
+      OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
+    }
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
@@ -754,6 +808,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isGrpcBlockTokenEnabled() {
     return grpcBlockTokenEnabled;
+  }
+
+  /**
+   * Return config value of {@link OMConfigKeys#OZONE_OM_MULTITENANCY_ENABLED}.
+   */
+  public boolean isS3MultiTenancyEnabled() {
+    return isS3MultiTenancyEnabled;
+  }
+
+  /**
+   * Throws OMException if S3 multi-tenancy is not enabled.
+   */
+  public void checkS3MultiTenancyEnabled() throws OMException {
+    if (isS3MultiTenancyEnabled) {
+      return;
+    }
+
+    throw new OMException("S3 multi-tenancy feature is not enabled. Please "
+        + "set ozone.om.multitenancy.enabled to true and restart all OMs.",
+        ResultCodes.FEATURE_NOT_ENABLED);
   }
 
   /**
