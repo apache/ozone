@@ -25,12 +25,40 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 @InterfaceAudience.Private
 public interface OzoneManagerLockMXBean {
 
+  /**
+   * Returns readLockWaitingTimeMsStat. Provides information on the total number
+   * of samples, minimum value, maximum value, arithmetic mean, standard
+   * deviation of all the samples added.
+   *
+   * @return String representation of readLockWaitingTimeMsStat
+   */
   String getReadLockWaitingTimeMsStat();
 
+  /**
+   * Returns readLockHeldTimeMsStat. Provides information on the total number of
+   * samples, minimum value, maximum value, arithmetic mean, standard deviation
+   * of all the samples added.
+   *
+   * @return String representation of readLockHeldTimeMsStat
+   */
   String getReadLockHeldTimeMsStat();
 
+  /**
+   * Returns writeLockWaitingTimeMsStat. Provides information on the total
+   * number of samples, minimum value, maximum value, arithmetic mean, standard
+   * deviation of all the samples added.
+   *
+   * @return String representation of writeLockWaitingTimeMsStat
+   */
   String getWriteLockWaitingTimeMsStat();
 
+  /**
+   * Returns writeLockHeldTimeMsStat. Provides information on the total number
+   * of samples, minimum value, maximum value, arithmetic mean, standard
+   * deviation of all the samples added.
+   *
+   * @return String representation of writeLockHeldTimeMsStat
+   */
   String getWriteLockHeldTimeMsStat();
 
 }
