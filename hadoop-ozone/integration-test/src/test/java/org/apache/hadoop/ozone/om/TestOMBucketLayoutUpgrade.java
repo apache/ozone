@@ -188,8 +188,7 @@ public class TestOMBucketLayoutUpgrade {
   }
 
   /**
-   * Tests that OM blocks all requests to create any buckets with a new bucket
-   * layout.
+   * Tests that OM allows requests to create legacy buckets.
    *
    * @throws Exception
    */
