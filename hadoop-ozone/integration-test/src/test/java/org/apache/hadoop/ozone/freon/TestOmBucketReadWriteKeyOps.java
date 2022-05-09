@@ -105,12 +105,33 @@ public class TestOmBucketReadWriteKeyOps {
       out.close();
 
       verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
-              .setNumOfReadOperations(3).setNumOfWriteOperations(5)
-              .setKeyCountForRead(2).setKeyCountForWrite(1));
-      verifyFreonCommand(new ParameterBuilder().setVolumeName("vol2")
-          .setBucketName("bucket1").setTotalThreadCount(10)
-          .setNumOfReadOperations(2).setNumOfWriteOperations(1)
-          .setKeyCountForRead(1).setKeyCountForWrite(3));
+          .setNumOfReadOperations(10).setNumOfWriteOperations(5)
+          .setKeyCountForRead(10).setKeyCountForWrite(5));
+      verifyFreonCommand(
+          new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
+              .setTotalThreadCount(10).setNumOfReadOperations(10)
+              .setNumOfWriteOperations(5).setKeyCountForRead(10)
+              .setKeyCountForWrite(5));
+      verifyFreonCommand(
+          new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
+              .setTotalThreadCount(15).setNumOfReadOperations(5)
+              .setNumOfWriteOperations(3).setKeyCountForRead(5)
+              .setKeyCountForWrite(3));
+      verifyFreonCommand(
+          new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
+              .setTotalThreadCount(10).setNumOfReadOperations(5)
+              .setNumOfWriteOperations(3).setKeyCountForRead(5)
+              .setKeyCountForWrite(3).setKeySizeInBytes(64)
+              .setBufferSize(16));
+      verifyFreonCommand(
+          new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
+              .setTotalThreadCount(10).setNumOfReadOperations(5)
+              .setNumOfWriteOperations(0).setKeyCountForRead(5));
+      verifyFreonCommand(
+          new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
+              .setTotalThreadCount(20).setNumOfReadOperations(0)
+              .setNumOfWriteOperations(5).setKeyCountForRead(0)
+              .setKeyCountForWrite(5));
 
     } finally {
       shutdown();
