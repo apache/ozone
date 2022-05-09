@@ -31,7 +31,8 @@ import java.io.IOException;
  * 2. A metadata table.
  * 3. A Delete Transaction Table.
  */
-public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
+public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore
+    implements DeleteTransactionStore<Long> {
 
   private final Table<Long, DeletedBlocksTransaction>
       deleteTransactionTable;
@@ -50,6 +51,7 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
         .getDeleteTransactionsColumnFamily().getTable(getStore());
   }
 
+  @Override
   public Table<Long, DeletedBlocksTransaction> getDeleteTransactionTable() {
     return deleteTransactionTable;
   }
