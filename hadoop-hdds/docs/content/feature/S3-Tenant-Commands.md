@@ -53,7 +53,7 @@ Apart from adding new OM DB entries, creating a tenant also does the following i
 3. Creates new Ranger policies that allows all tenant users to list and create buckets by default under the tenant volume, but only bucket owners and tenant admins are allowed to access the bucket contents.
 
 ```shell
-ozone tenant create <TENANT_NAME>
+ozone tenant [--verbose] create <TENANT_NAME>
 ```
 
 Example:
@@ -62,6 +62,17 @@ Example:
 bash-4.2$ kinit -kt /etc/security/keytabs/om.keytab om/om@EXAMPLE.COM
 bash-4.2$ ozone tenant create tenantone
 2022-02-16 00:00:00,000 [main] INFO rpc.RpcClient: Creating Tenant: 'tenantone', with new volume: 'tenantone'
+```
+
+Verbose output example:
+
+```shell
+bash-4.2$ kinit -kt /etc/security/keytabs/om.keytab om/om@EXAMPLE.COM
+bash-4.2$ ozone tenant --verbose create tenantone
+2022-02-16 00:00:00,000 [main] INFO rpc.RpcClient: Creating Tenant: 'tenantone', with new volume: 'tenantone'
+{
+  "tenantId": "tenantone"
+}
 ```
 
 
