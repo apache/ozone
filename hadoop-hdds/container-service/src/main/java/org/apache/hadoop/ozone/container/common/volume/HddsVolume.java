@@ -22,12 +22,15 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
@@ -69,6 +72,10 @@ public class HddsVolume extends StorageVolume {
   // container db path. This is initialized only once together with dbVolume,
   // and stored as a member to prevent spawning lots of File objects.
   private File dbParentDir;
+  private AtomicBoolean dbLoaded = new AtomicBoolean(false);
+
+  // For test
+  private boolean isTest = false;
 
   /**
    * Builder for HddsVolume.
@@ -114,7 +121,8 @@ public class HddsVolume extends StorageVolume {
       MutableVolumeSet dbVolumeSet) throws IOException {
     super.createWorkingDir(workingDirName, dbVolumeSet);
 
-    if (SchemaV3.isFinalizedAndEnabled(getConf())) {
+    // Create DB store for a newly added volume
+    if (!isTest) {
       createDbStore(dbVolumeSet);
     }
   }
@@ -144,9 +152,7 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
-    if (SchemaV3.isFinalizedAndEnabled(getConf())) {
-      closeDbStore();
-    }
+    closeDbStore();
   }
 
   /**
@@ -178,10 +184,26 @@ public class HddsVolume extends StorageVolume {
     return this.dbParentDir;
   }
 
+  public boolean isDbLoaded() {
+    return dbLoaded.get();
+  }
+
+  @VisibleForTesting
+  public void setTest(boolean test) {
+    this.isTest = test;
+  }
+
   public void loadDbStore() throws IOException {
     // DN startup for the first time, not registered yet,
     // so the DbVolume is not formatted.
     if (!getStorageState().equals(VolumeState.NORMAL)) {
+      return;
+    }
+
+    // DB is already loaded
+    if (dbLoaded.get()) {
+      LOG.info("Db is already loaded from {} for volume {}", getDbParentDir(),
+          getStorageID());
       return;
     }
 
@@ -214,6 +236,9 @@ public class HddsVolume extends StorageVolume {
     }
 
     dbParentDir = storageIdDir;
+    dbLoaded.set(true);
+    LOG.info("SchemaV3 db is loaded at {} for volume {}", containerDBPath,
+        getStorageID());
   }
 
   /**
@@ -251,14 +276,22 @@ public class HddsVolume extends StorageVolume {
           + getStorageID());
     }
 
-    // Init the db instance for HddsVolume under the subdir above.
+    // Create the db instance for HddsVolume under the subdir above.
     String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
         .getAbsolutePath();
     try {
-      initPerDiskDBStore(containerDBPath, getConf());
+       if (isTest) {
+         throw new IOException("Can't init db instance.");
+       }
+       HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf());
+       dbLoaded.set(true);
+       LOG.info("SchemaV3 db is created and loaded at {} for volume {}",
+           containerDBPath, getStorageID());
     } catch (IOException e) {
-      throw new IOException("Can't init db instance under path "
-          + containerDBPath + " for volume " + getStorageID());
+      String errMsg = "Can't create db instance under path "
+          + containerDBPath + " for volume " + getStorageID();
+      LOG.error(errMsg, e);
+      throw new IOException(errMsg);
     }
 
     // Set the dbVolume and dbParentDir of the HddsVolume for db path lookup.
@@ -267,15 +300,23 @@ public class HddsVolume extends StorageVolume {
     if (chosenDbVolume != null) {
       chosenDbVolume.addHddsDbStorePath(getStorageID(), containerDBPath);
     }
+
+    // If SchemaV3 is disabled, close the DB instance
+    if (!SchemaV3.isFinalizedAndEnabled(getConf())) {
+      closeDbStore();
+    }
   }
 
   private void closeDbStore() {
-    if (dbParentDir == null) {
+    if (!dbLoaded.get()) {
       return;
     }
 
     String containerDBPath = new File(dbParentDir, CONTAINER_DB_NAME)
         .getAbsolutePath();
     DatanodeStoreCache.getInstance().removeDB(containerDBPath);
+    dbLoaded.set(false);
+    LOG.info("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
+        getStorageID());
   }
 }

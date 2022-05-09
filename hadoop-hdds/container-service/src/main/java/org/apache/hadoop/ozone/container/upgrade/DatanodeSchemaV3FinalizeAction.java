@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -47,32 +47,35 @@ public class DatanodeSchemaV3FinalizeAction
 
   @Override
   public void execute(DatanodeStateMachine dsm) throws Exception {
-    // Create RocksDB for each HddsVolume, no matter
-    // hdds.datanode.container.schema.v3.enabled is true or false.
     LOG.info("Upgrading Datanode volume layout for Schema V3 support.");
-    dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(dsm.getco).isEmpty() ? null :
-        new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
-            context, StorageVolume.VolumeType.DB_VOLUME, volumeChecker);
-    HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
 
-    MutableVolumeSet hddsVolumeSet = dsm.getContainer().getVolumeSet();
+    // Load RocksDB for each HddsVolume, build the relationship between
+    // HddsVolume and DbVolume if DbVolume is configured.
+    MutableVolumeSet dataVolumeSet = dsm.getContainer().getVolumeSet();
     MutableVolumeSet dbVolumeSet = dsm.getContainer().getDbVolumeSet();
-
-    Preconditions.assertNotNull(hddsVolumeSet, "Data Volume should be null");
-    hddsVolumeSet.writeLock();
+    Preconditions.assertNotNull(dataVolumeSet, "Data Volume should be null");
+    Preconditions.assertNotNull(dataVolumeSet, "Data Volume should be null");
+    dataVolumeSet.writeLock();
     try {
-      for (StorageVolume hddsVolume : hddsVolumeSet.getVolumesList()) {
+      for (StorageVolume hddsVolume : dataVolumeSet.getVolumesList()) {
         HddsVolume dataVolume = (HddsVolume) hddsVolume;
         if (dataVolume.getDbParentDir() != null) {
-          // The RocksDB for this hddsVolume is already created(In upgrade
-          // retry case).
+          // The RocksDB for this hddsVolume is already created(newly added
+          // volume case).
           continue;
         }
         dataVolume.createDbStore(dbVolumeSet);
       }
     } finally {
-      hddsVolumeSet.writeUnlock();
+      dataVolumeSet.writeUnlock();
     }
+    DatanodeConfiguration dcf =
+        dsm.getConf().getObject(DatanodeConfiguration.class);
+    if (!dcf.getContainerSchemaV3Enabled()) {
+      LOG.info("SchemaV3 is disabled. Don't load RocksDB in upgrade.");
+      return;
+    }
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(dataVolumeSet, dbVolumeSet, LOG);
   }
 }
 

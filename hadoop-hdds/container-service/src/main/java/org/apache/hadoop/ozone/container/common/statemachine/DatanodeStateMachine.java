@@ -683,4 +683,8 @@ public class DatanodeStateMachine implements Closeable {
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;
   }
+
+  public ConfigurationSource getConf() {
+    return conf;
+  }
 }

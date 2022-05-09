@@ -84,11 +84,9 @@ public class VersionEndpointTask implements
           Preconditions.checkNotNull(clusterId,
               "Reply from SCM: clusterId cannot be null");
 
-          // Check DbVolumes
-          if (VersionedDatanodeFeatures.isFinalized(
-              HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
-            checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
-          }
+          // Check DbVolumes, format DbVolume at first register time.
+          checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
+
           // Check HddsVolumes
           checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
 

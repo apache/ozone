@@ -39,16 +39,12 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
-import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
-import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -59,10 +55,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -101,11 +94,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
     return parameters;
   }
 
-  public TestDatanodeUpgradeToSchemaV3(boolean enabled) {
-    this.schemaV3Enabled = enabled;
+  public TestDatanodeUpgradeToSchemaV3(Boolean enable) {
+    this.schemaV3Enabled = enable;
     conf = new OzoneConfiguration();
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
-        schemaV3Enabled);
+        this.schemaV3Enabled);
   }
 
   @Before
@@ -116,6 +109,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     address = SCMTestUtils.getReuseableAddress();
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        tempFolder.getRoot().getAbsolutePath());
   }
 
   @After
@@ -129,6 +124,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
     }
   }
 
+  /**
+   * Test RocksDB is created on data volume, not matter Schema V3 is
+   * enabled or not.
+   * If Schema V3 is enabled, RocksDB will be loaded.
+   */
   @Test
   public void testDBOnHddsVolume() throws Exception {
     // start DN and SCM
@@ -136,43 +136,109 @@ public class TestDatanodeUpgradeToSchemaV3 {
     addHddsVolume();
 
     startPreFinalizedDatanode();
-    HddsVolume volume = (HddsVolume) dsm.getContainer().getVolumeSet()
+    HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertNull(volume.getDbVolume());
-    Assert.assertNull(volume.getDbParentDir());
+    File dbFile = new File(dataVolume.getStorageDir().getAbsolutePath() + "/" +
+        dataVolume.getClusterID() + "/" + dataVolume.getStorageID());
+    // RocksDB is created at first startup, but not loaded
+    Assert.assertTrue(dbFile.exists());
+    Assert.assertNull(dataVolume.getDbVolume());
+    Assert.assertFalse(dataVolume.isDbLoaded());
 
     dsm.finalizeUpgrade();
-    // HddsVolume has DB Dir set with no DbVolume
-    Assert.assertNull(volume.getDbVolume());
-    Assert.assertNotNull(volume.getDbParentDir());
+    // RocksDB loaded when SchemaV3 is enabled
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      Assert.assertNotNull(dataVolume.getDbParentDir().getAbsolutePath()
+          .startsWith(dataVolume.getStorageDir().toString()));
+    } else {
+      // RocksDB is not loaded when SchemaV3 is disabled.
+      Assert.assertFalse(dataVolume.isDbLoaded());
+    }
   }
 
+  /**
+   * Test RocksDB is created on DB volume when configured, not matter
+   * Schema V3 is enabled or not.
+   * If Schema V3 is enabled, RocksDB will be loaded.
+   */
   @Test
   public void testDBOnDbVolume() throws Exception {
     // start DN and SCM
     startScmServer();
-    File vol = addHddsVolume();
+    addHddsVolume();
     addDbVolume();
 
     startPreFinalizedDatanode();
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertNull(dataVolume.getDbVolume());
-    Assert.assertNull(dataVolume.getDbParentDir());
+    Assert.assertNotNull(dataVolume.getDbParentDir());
 
-    dsm.finalizeUpgrade();
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertEquals(1, dbVolume.getHddsVolumeIDs().size());
-
-    // RocksDB for dataVolume is created on dbVolume
+    File dbFile = new File(dbVolume.getStorageDir().getAbsolutePath() + "/" +
+        dbVolume.getClusterID() + "/" + dataVolume.getStorageID());
+    // RocksDB is created at first startup, but not loaded
+    Assert.assertTrue(dbFile.exists());
     Assert.assertEquals(dbVolume, dataVolume.getDbVolume());
     Assert.assertTrue(
-        dbVolume.getHddsVolumeIDs().contains(vol.getName()));
-    Assert.assertNotNull(dataVolume.getDbParentDir().getAbsolutePath()
-        .startsWith(dbVolume.getStorageDir().toString()));
+        dbVolume.getHddsVolumeIDs().contains(dataVolume.getStorageID()));
+    Assert.assertFalse(dataVolume.isDbLoaded());
+
+    dsm.finalizeUpgrade();
+    // RocksDB loaded when SchemaV3 is enabled
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      Assert.assertTrue(dataVolume.getDbParentDir().getAbsolutePath()
+          .startsWith(dbVolume.getStorageDir().toString()));
+    } else {
+      // RocksDB is not loaded when SchemaV3 is disabled.
+      Assert.assertFalse(dataVolume.isDbLoaded());
+    }
   }
 
+  /**
+   * Test RocksDB in created in Finalize action for an existing hddsVolume.
+   * This mimics the real cluster upgrade situation.
+   */
+  @Test
+  public void testDBCreatedInFinalize() throws Exception {
+    // start DN and SCM
+    startScmServer();
+    // add one HddsVolume
+    addHddsVolume();
+    // Let HddsVolume be formatted to mimic the real cluster upgrade
+    // Set layout version.
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+    layoutStorage.initialize();
+    dsm = new DatanodeStateMachine(
+        ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
+    HddsVolume dataVolume = (
+        HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
+    dataVolume.setTest(true);
+    StorageVolumeUtil.checkVolume(dataVolume, CLUSTER_ID, CLUSTER_ID, conf,
+        null, null);
+    // Make sure no RocksDB exits
+    Assert.assertNull(dataVolume.getDbParentDir());
+
+    restartDatanode(
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
+    dsm.finalizeUpgrade();
+
+    // RocksDB is created by upgrade action
+    dataVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
+        .getVolumesList().get(0));
+    Assert.assertNotNull(dataVolume.getDbParentDir());
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      Assert.assertTrue(dataVolume.isDbLoaded());
+    } else {
+      Assert.assertFalse(dataVolume.isDbLoaded());
+    }
+  }
+
+  /**
+   * Test finalize twice won't recreate any RocksDB for HddsVolume.
+   */
   @Test
   public void testFinalizeTwice() throws Exception {
     // start DN and SCM
@@ -185,16 +251,19 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startPreFinalizedDatanode();
     dsm.finalizeUpgrade();
 
-    File dbDir = ((HddsVolume) dsm.getContainer().getVolumeSet()
-        .getVolumesList().get(0)).getDbParentDir();
-    Assert.assertNotNull(dbDir);
+    DbVolume dbVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
+        .getVolumesList().get(0)).getDbVolume();
+    Assert.assertNotNull(dbVolume);
 
     dsm.finalizeUpgrade();
     // DB Dir should be the same.
-    Assert.assertEquals(dbDir, ((HddsVolume) dsm.getContainer().getVolumeSet()
-       .getVolumesList().get(0)).getDbParentDir());
+    Assert.assertEquals(dbVolume, ((HddsVolume) dsm.getContainer()
+        .getVolumeSet().getVolumesList().get(0)).getDbVolume());
   }
 
+  /**
+   * For a finalized cluster, add a new HddsVolume.
+   */
   @Test
   public void testAddHddsVolumeAfterFinalize() throws Exception {
     // start DN and SCM
@@ -203,144 +272,118 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     startPreFinalizedDatanode();
     dsm.finalizeUpgrade();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
 
-    // All HddsVolume should have RocksDB created.
-    for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
-      HddsVolume hddsVolume = (HddsVolume) vol;
-      File dbDir = hddsVolume.getDbParentDir();
-      Assert.assertNotNull(dbDir);
-      Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
-          hddsVolume.getStorageDir().getAbsolutePath()));
-    }
-
+    // Add a new HddsVolume. It should have DB created after DN restart.
     addHddsVolume();
-    // New HddsVolume should have RocksDB created too.
     restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
     for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
-      Assert.assertNotNull(hddsVolume.getDbParentDir());
-      Assert.assertTrue(hddsVolume.getDbParentDir().getAbsolutePath()
-          .startsWith(hddsVolume.getStorageDir().getAbsolutePath()));
+      if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+        Assert.assertTrue(hddsVolume.isDbLoaded());
+        Assert.assertTrue(hddsVolume.getDbParentDir().getAbsolutePath()
+            .startsWith(hddsVolume.getStorageDir().getAbsolutePath()));
+      } else {
+        Assert.assertFalse(hddsVolume.isDbLoaded());
+      }
     }
   }
 
+  /**
+   * For a finalized cluster, add a new DbVolume.
+   */
   @Test
   public void testAddDbVolumeAfterFinalize() throws Exception {
+    startScmServer();
+    addHddsVolume();
+
+    startPreFinalizedDatanode();
+    HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
+        .getVolumesList().get(0);
+    File dbDir = hddsVolume.getDbParentDir();
+    // DB is created before finalize
+    Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
+        hddsVolume.getStorageDir().getAbsolutePath()));
+    Assert.assertFalse(hddsVolume.isDbLoaded());
+    dsm.finalizeUpgrade();
+
+    // Add a new DbVolume
+    addDbVolume();
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+
+    // HddsVolume should still use the rocksDB under it's volume
+    DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
+        .getVolumesList().get(0);
+    Assert.assertEquals(0, dbVolume.getHddsVolumeIDs().size());
+
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
+          .getVolumesList().get(0);
+      Assert.assertEquals(dbDir, hddsVolume.getDbParentDir());
+      Assert.assertTrue(hddsVolume.isDbLoaded());
+    }
+  }
+
+  /**
+   * For a finalized cluster, add a new DbVolume and a new HddsVolume.
+   */
+  @Test
+  public void testAddDbAndHddsVolumeAfterFinalize() throws Exception {
     // start DN and SCM
     startScmServer();
     addHddsVolume();
 
     startPreFinalizedDatanode();
     dsm.finalizeUpgrade();
+
+    addDbVolume();
+    File newDataVolume = addHddsVolume();
     restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
 
-    // All HddsVolume should have RocksDB created
+    DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
+        .getVolumesList().get(0);
+
     for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
-      File dbDir = hddsVolume.getDbParentDir();
-      Assert.assertNotNull(dbDir);
-      Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
-          hddsVolume.getStorageDir().getAbsolutePath()));
-    }
-
-    File dbVolume = addDbVolume();
-    File newHddsVolume = addHddsVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
-    for(StorageVolume vol:dsm.getContainer().getVolumeSet().getVolumesList()) {
-      HddsVolume hddsVolume = (HddsVolume) vol;
-      if (hddsVolume.getStorageDir() == newHddsVolume) {
-        Assert.assertTrue(hddsVolume.getDbParentDir().getAbsolutePath()
-            .startsWith(dbVolume.getAbsolutePath()));
+      File dbFile;
+      if (hddsVolume.getStorageDir().getAbsolutePath().startsWith(
+          newDataVolume.getAbsolutePath())) {
+        Assert.assertEquals(dbVolume, hddsVolume.getDbVolume());
+        // RocksDB of newly added HddsVolume is created on the newly added
+        // DbVolume
+        dbFile = new File(dbVolume.getStorageDir() + "/" +
+            hddsVolume.getClusterID() + "/" + hddsVolume.getStorageID());
       } else {
-        File dbDir = hddsVolume.getDbParentDir();
-        Assert.assertNotNull(dbDir);
-        Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
-            hddsVolume.getStorageDir().getAbsolutePath()));
+        Assert.assertNull(hddsVolume.getDbVolume());
+        dbFile = new File(hddsVolume.getStorageDir() + "/" +
+            hddsVolume.getClusterID() + "/" + hddsVolume.getStorageID());
+      }
+      if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+        Assert.assertTrue(hddsVolume.isDbLoaded());
+        Assert.assertTrue(hddsVolume.getDbParentDir().exists());
+        Assert.assertTrue(dbFile.exists());
+        Assert.assertEquals(dbFile, hddsVolume.getDbParentDir());
       }
     }
   }
 
+  /**
+   * Test data write after finalization.
+   */
   @Test
-  public void testWriteBeforeAndAfterFinalizeWithV3Disabled() throws Exception {
-    testWriteBeforeAndAfterFinalize(false, OzoneConsts.SCHEMA_V2);
+  public void testWriteWithV3Enabled() throws Exception {
+    testWrite(false, OzoneConsts.SCHEMA_V2);
   }
 
+  /**
+   * Test data write after finalization.
+   */
   @Test
-  public void testWriteBeforeAndAfterFinalizeWithV3Enabled() throws Exception{
-    testWriteBeforeAndAfterFinalize(true, OzoneConsts.SCHEMA_V3);
+  public void testWriteWithV3Disabled() throws Exception{
+    testWrite(true, OzoneConsts.SCHEMA_V3);
   }
 
-  private void testWriteBeforeAndAfterFinalize(boolean schemaV3Enabled,
-      String expectedSchemaVersion) throws Exception{
-    // start DN and SCM
-    startScmServer();
-    addHddsVolume();
-    // Disable Schema V3
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
-        schemaV3Enabled);
-    startPreFinalizedDatanode();
-    final Pipeline pipeline = getPipeline();
-
-    // Pre-export a container to continuously import and delete.
-    final long exportContainerID = addContainer(pipeline);
-    ContainerProtos.WriteChunkRequestProto exportWriteChunk =
-        putBlock(exportContainerID, pipeline);
-    closeContainer(exportContainerID, pipeline);
-    File exportedContainerFile = exportContainer(exportContainerID);
-    deleteContainer(exportContainerID, pipeline);
-
-    // Export another container to import while pre-finalized and read
-    // finalized.
-    final long exportContainerID2 = addContainer(pipeline);
-    ContainerProtos.WriteChunkRequestProto exportWriteChunk2 =
-        putBlock(exportContainerID2, pipeline);
-    closeContainer(exportContainerID2, pipeline);
-    File exportedContainerFile2 = exportContainer(exportContainerID2);
-    deleteContainer(exportContainerID2, pipeline);
-
-    // Make sure we can import and read a container pre-finalized.
-    importContainer(exportContainerID2, exportedContainerFile2);
-    readChunk(exportWriteChunk2, pipeline);
-    KeyValueContainer container = (KeyValueContainer)
-        dsm.getContainer().getContainerSet().getContainer(exportContainerID2);
-    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
-        container.getContainerData().getSchemaVersion());
-
-    // Create thread to keep importing containers during the upgrade.
-    ExecutorService executor = Executors.newFixedThreadPool(1);
-    Future<Void> importFuture = executor.submit(() -> {
-      // Layout version check should be thread safe.
-      while (!dsm.getLayoutVersionManager()
-          .isAllowed(HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
-        importContainer(exportContainerID, exportedContainerFile);
-        readChunk(exportWriteChunk, pipeline);
-        deleteContainer(exportContainerID, pipeline);
-      }
-      // Make sure we can import after finalizing too.
-      importContainer(exportContainerID, exportedContainerFile);
-      readChunk(exportWriteChunk, pipeline);
-
-      return null;
-    });
-
-    dsm.finalizeUpgrade();
-    // Wait the last importContainer to finish
-    importFuture.get();
-    container = (KeyValueContainer)
-        dsm.getContainer().getContainerSet().getContainer(exportContainerID);
-    // According to Schema V3 is enabled or not, the imported container after
-    // finalization should have the expected schema version.
-    Assert.assertEquals(expectedSchemaVersion,
-        container.getContainerData().getSchemaVersion());
-
-    // Make sure we can read the container that was imported while
-    // pre-finalized after finalizing.
-    readChunk(exportWriteChunk2, pipeline);
-  }
-
-  @Test
-  public void testWriteBeforeAndAfterSchemaV3Enabled() throws Exception {
+  public void testWrite(boolean schemaV3Enabled, String expectedVersion)
+      throws Exception {
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -356,23 +399,32 @@ public class TestDatanodeUpgradeToSchemaV3 {
     closeContainer(containerID1, pipeline);
     KeyValueContainer container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID1);
+    // When SchemaV3 is disabled, new data should be saved as SchemaV2.
     Assert.assertEquals(OzoneConsts.SCHEMA_V2,
         container.getContainerData().getSchemaVersion());
 
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, true);
+    // Set SchemaV3 enable status
+    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
+        schemaV3Enabled);
     restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
 
+    // Write new data
     final long containerID2 = addContainer(pipeline);
     putBlock(containerID2, pipeline);
     closeContainer(containerID2, pipeline);
     container = (KeyValueContainer)
-        dsm.getContainer().getContainerSet().getContainer(containerID1);
-    Assert.assertEquals(OzoneConsts.SCHEMA_V3,
+        dsm.getContainer().getContainerSet().getContainer(containerID2);
+    // If SchemaV3 is enabled, new data should be saved as SchemaV3
+    // If SchemaV3 is still disabled, new data should still be saved as SchemaV2
+    Assert.assertEquals(expectedVersion,
         container.getContainerData().getSchemaVersion());
   }
 
+  /**
+   * Test data read during and after finalization.
+   */
   @Test
-  public void testReadsDuringFinalization() throws Exception {
+  public void testReadsDuringFinalize() throws Exception {
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -390,7 +442,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     Future<Void> readFuture = executor.submit(() -> {
       // Layout version check should be thread safe.
       while (!dsm.getLayoutVersionManager()
-          .isAllowed(HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+          .isAllowed(HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
         readChunk(writeChunk, pipeline);
       }
       // Make sure we can read after finalizing too.
@@ -404,30 +456,72 @@ public class TestDatanodeUpgradeToSchemaV3 {
     readFuture.get();
   }
 
+  /**
+   * Test finalization failure.
+   */
   @Test
-  public void testDbConfigureAndSchemaV3Together() throws Exception {
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
+  public void testFinalizeFailure() throws Exception {
+    // start DN and SCM
     startScmServer();
     addHddsVolume();
-    startPreFinalizedDatanode();
+    // Let HddsVolume be formatted to mimic the real cluster upgrade
+    // Set layout version.
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+    layoutStorage.initialize();
+    dsm = new DatanodeStateMachine(
+        ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
+    HddsVolume dataVolume = (
+        HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
+    dataVolume.setTest(true);
+    StorageVolumeUtil.checkVolume(dataVolume, CLUSTER_ID, CLUSTER_ID, conf,
+        null, null);
+    // Make sure no RocksDB exits
+    Assert.assertNull(dataVolume.getDbParentDir());
+    restartDatanode(
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
 
-    HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
-        .getVolumesList().get(0);
-    File dbDir = hddsVolume.getDbParentDir();
-    Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
-        hddsVolume.getStorageDir().getAbsolutePath()));
+    // Write some data.
+    final Pipeline pipeline = getPipeline();
+    final long containerID = addContainer(pipeline);
+    ContainerProtos.WriteChunkRequestProto writeChunk = putBlock(containerID,
+        pipeline);
+    closeContainer(containerID, pipeline);
+    KeyValueContainer container = (KeyValueContainer)
+        dsm.getContainer().getContainerSet().getContainer(containerID);
+    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
+        container.getContainerData().getSchemaVersion());
 
-    addDbVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
-    hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
-        .getVolumesList().get(0);
-    dbDir = hddsVolume.getDbParentDir();
-    // HddsVolume should still use the rocksDB under it's volume
-    Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
-        hddsVolume.getStorageDir().getAbsolutePath()));
-    DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
-        .getVolumesList().get(0);
-    Assert.assertEquals(0, dbVolume.getHddsVolumeIDs().size());
+
+    dataVolume = (
+        HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
+    dataVolume.setTest(true);
+    // Finalize will fail because DB create failure
+    try {
+      dsm.finalizeUpgrade();
+    } catch (Exception e) {
+      // Currently there will be retry if finalization failed.
+      // Let's assume retry is terminated by user.
+    }
+
+    // Check that old data is readable
+    container = (KeyValueContainer)
+        dsm.getContainer().getContainerSet().getContainer(containerID);
+    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
+        container.getContainerData().getSchemaVersion());
+    readChunk(writeChunk, pipeline);
+
+    // SchemaV3 is not finalized
+    restartDatanode(
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
+
+    // Old data is readable after DN restart
+    container = (KeyValueContainer)
+        dsm.getContainer().getContainerSet().getContainer(containerID);
+    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
+        container.getContainerData().getSchemaVersion());
+    readChunk(writeChunk, pipeline);
   }
 
   public void checkContainerPathID(long containerID, String expectedID) {
@@ -584,40 +678,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
     ContainerProtos.ContainerCommandRequestProto closeContainerRequest =
         ContainerTestHelper.getCloseContainer(pipeline, containerID);
     dispatchRequest(closeContainerRequest, expectedResult);
-  }
-
-  /**
-   * Exports the specified container to a temporary file and returns the file.
-   */
-  public File exportContainer(long containerId) throws Exception {
-    final ContainerReplicationSource replicationSource =
-        new OnDemandContainerReplicationSource(
-            dsm.getContainer().getController());
-
-    replicationSource.prepare(containerId);
-
-    File destination = tempFolder.newFile();
-    try (FileOutputStream fos = new FileOutputStream(destination)) {
-      replicationSource.copyData(containerId, fos);
-    }
-    return destination;
-  }
-
-  /**
-   * Imports the container found in {@code source} to the datanode with the ID
-   * {@code containerID}.
-   */
-  public void importContainer(long containerID, File source) throws Exception {
-    DownloadAndImportReplicator replicator =
-        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
-            dsm.getContainer().getController(),
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
-
-    File tempFile = tempFolder.newFile();
-    Files.copy(source.toPath(), tempFile.toPath(),
-        StandardCopyOption.REPLACE_EXISTING);
-    replicator.importContainer(containerID, tempFile.toPath());
   }
 
   public void dispatchRequest(
