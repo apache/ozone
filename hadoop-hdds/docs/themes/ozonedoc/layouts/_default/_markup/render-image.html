@@ -15,5 +15,4 @@
   limitations under the License.
 -->
 
-{{- $img := .Page.Resources.GetMatch .Destination -}}
-<img src="{{ .Destination | safeURL }}" alt='{{ .Text }}' class="img-responsive"/>
+<img src="{{ .Destination | safeURL }}" alt='{{ .Text }}' {{ with .Title}} title="{{ . }}"{{ end }} class="img-responsive" />
