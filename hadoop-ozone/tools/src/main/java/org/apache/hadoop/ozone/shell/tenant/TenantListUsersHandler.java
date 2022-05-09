@@ -24,9 +24,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -57,18 +54,12 @@ public class TenantListUsersHandler extends S3Handler {
   private boolean printJson;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) {
-    final ObjectStore objStore = client.getObjectStore();
-
-    if (StringUtils.isEmpty(tenantId)) {
-      err().println("Please specify a tenant name");
-      GenericCli.missingSubcommand(spec);
-      return;
-    }
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
     try {
       final TenantUserList usersInTenant =
-          objStore.listUsersInTenant(tenantId, prefix);
+          client.getObjectStore().listUsersInTenant(tenantId, prefix);
 
       if (!printJson) {
         usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
@@ -81,13 +72,14 @@ public class TenantListUsersHandler extends S3Handler {
           final JsonObject obj = new JsonObject();
           obj.addProperty("user", accessIdInfo.getUserPrincipal());
           obj.addProperty("accessId", accessIdInfo.getAccessId());
+          resArray.add(obj);
         });
         final Gson gson = new GsonBuilder().setPrettyPrinting().create();
         out().println(gson.toJson(resArray));
       }
     } catch (IOException e) {
-      err().println("Failed to Get Users in tenant '" + tenantId
-          + "': " + e.getMessage());
+      throw new IOException("Failed to Get Users in tenant '" + tenantId + "'",
+          e);
     }
   }
 }

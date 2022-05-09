@@ -50,8 +50,6 @@ public class TenantBucketLinkHandler extends TenantHandler {
       converter = BucketUri.class)
   private OzoneAddress target;
 
-  // TODO: HDDS-6340. Add an option to print JSON result
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
