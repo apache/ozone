@@ -21,12 +21,14 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -82,10 +84,9 @@ public class VersionEndpointTask implements
           Preconditions.checkNotNull(clusterId,
               "Reply from SCM: clusterId cannot be null");
 
-          // Check DbVolumes
-          if (SchemaV3.isFinalizedAndEnabled(configuration)) {
-            checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
-          }
+          // Check DbVolumes, format DbVolume at first register time.
+          checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
+
           // Check HddsVolumes
           checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
 
