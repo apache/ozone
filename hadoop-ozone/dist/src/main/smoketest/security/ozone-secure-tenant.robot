@@ -120,7 +120,7 @@ Delete Bucket 2 Success with somesecret1 via S3 API
 
 Revoke User AccessId Success with Cluster Admin
     Run Keyword         Kinit test user     testuser     testuser.keytab
-    ${output} =         Execute          ozone tenant user revoke 'tenantone$testuser'
+    ${output} =         Execute          ozone tenant --verbose user revoke 'tenantone$testuser'
                         Should contain   ${output}         Revoked accessId 'tenantone$testuser'.
 
 Create Bucket 3 Failure with Revoked AccessId via S3 API
