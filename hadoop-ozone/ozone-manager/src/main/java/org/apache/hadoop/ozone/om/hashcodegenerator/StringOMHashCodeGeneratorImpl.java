@@ -18,9 +18,10 @@
 package org.apache.hadoop.ozone.om.hashcodegenerator;
 
 /**
- * Implementation of OMHashCodeGenerator interface.
+ * Implementation of OMHashCodeGenerator interface. This implementation uses the
+ * String hashCode function.
  */
-public class DefaultOMHashCodeGeneratorImpl implements OMHashCodeGenerator {
+public class StringOMHashCodeGeneratorImpl implements OMHashCodeGenerator {
 
   @Override
   public int getHashCode(String resourceName) {

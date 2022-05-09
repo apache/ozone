@@ -22,6 +22,12 @@ package org.apache.hadoop.ozone.om.hashcodegenerator;
  */
 public interface OMHashCodeGenerator {
 
+  /**
+   * Returns the hash code of the resourceName passed.
+   *
+   * @param resourceName
+   * @return hash code of resourceName
+   */
   int getHashCode(String resourceName);
 
 }
