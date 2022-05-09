@@ -99,12 +99,20 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
+        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist -Psrc
       - name: Store binaries for tests
         uses: actions/upload-artifact@v2
         with:
           name: ozone-bin
-          path: hadoop-ozone/dist/target/ozone*.tar.gz
+          path: |
+            hadoop-ozone/dist/target/ozone-*.tar.gz
+            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store source tarball for compilation
+        uses: actions/upload-artifact@v2
+        with:
+          name: ozone-src
+          path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
       - name: Delete temporary build artifacts before caching
         run: |
@@ -115,6 +123,7 @@ jobs:
   compile:
     needs:
       - build-info
+      - build
     runs-on: ubuntu-18.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-compile == 'true'
@@ -123,8 +132,13 @@ jobs:
         java: [ 11 ]
       fail-fast: false
     steps:
-      - name: Checkout project
-        uses: actions/checkout@v2
+      - name: Download Ozone source tarball
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-src
+      - name: Untar sources
+        run: |
+          tar --strip-components 1 -xzvf ozone*-src.tar.gz
       - name: Cache for maven dependencies
         uses: actions/cache@v2
         with:
