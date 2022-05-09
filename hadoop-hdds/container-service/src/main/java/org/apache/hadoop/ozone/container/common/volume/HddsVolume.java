@@ -29,9 +29,11 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,7 +125,10 @@ public class HddsVolume extends StorageVolume {
 
     // Create DB store for a newly added volume
     if (!isTest) {
-      createDbStore(dbVolumeSet);
+      if (VersionedDatanodeFeatures.isFinalized(
+          HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+        createDbStore(dbVolumeSet);
+      }
     }
   }
 
@@ -280,13 +285,13 @@ public class HddsVolume extends StorageVolume {
     String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
         .getAbsolutePath();
     try {
-       if (isTest) {
-         throw new IOException("Can't init db instance.");
-       }
-       HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf());
-       dbLoaded.set(true);
-       LOG.info("SchemaV3 db is created and loaded at {} for volume {}",
-           containerDBPath, getStorageID());
+      if (isTest) {
+        throw new IOException("Can't init db instance.");
+      }
+      HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf());
+      dbLoaded.set(true);
+      LOG.info("SchemaV3 db is created and loaded at {} for volume {}",
+          containerDBPath, getStorageID());
     } catch (IOException e) {
       String errMsg = "Can't create db instance under path "
           + containerDBPath + " for volume " + getStorageID();

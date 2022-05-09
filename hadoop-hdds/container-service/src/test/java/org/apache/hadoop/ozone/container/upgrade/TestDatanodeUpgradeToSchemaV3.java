@@ -86,7 +86,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
   private Random random;
 
-  @Parameterized.Parameters(name = "{index}: hdds.datanode.container.schema.v3.enabled={0}")
+  // hdds.datanode.container.schema.v3.enabled
+  @Parameterized.Parameters
   public static Collection<Object[]> getSchemaFiles() {
     Collection<Object[]> parameters = new ArrayList<>();
     parameters.add(new Boolean[]{false});
@@ -276,7 +277,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Add a new HddsVolume. It should have DB created after DN restart.
     addHddsVolume();
     restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
-    for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
+    for (StorageVolume vol:
+        dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
       if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
         Assert.assertTrue(hddsVolume.isDbLoaded());
@@ -342,7 +344,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
 
-    for(StorageVolume vol: dsm.getContainer().getVolumeSet().getVolumesList()) {
+    for (StorageVolume vol:
+        dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
       File dbFile;
       if (hddsVolume.getStorageDir().getAbsolutePath().startsWith(
@@ -382,7 +385,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     testWrite(true, OzoneConsts.SCHEMA_V3);
   }
 
-  public void testWrite(boolean schemaV3Enabled, String expectedVersion)
+  public void testWrite(boolean enable, String expectedVersion)
       throws Exception {
     // start DN and SCM
     startScmServer();
@@ -405,7 +408,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Set SchemaV3 enable status
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
-        schemaV3Enabled);
+        enable);
     restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
 
     // Write new data
