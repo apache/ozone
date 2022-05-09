@@ -320,6 +320,7 @@ message SCMCommandProto {
     setNodeOperationalStateCommand = 8;
     finalizeNewLayoutVersionCommand = 9;
     refreshVolumeUsageInfo = 10;
+    reconstructECContainersCommand = 11;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -334,6 +335,7 @@ message SCMCommandProto {
   optional FinalizeNewLayoutVersionCommandProto
   finalizeNewLayoutVersionCommandProto = 10;
   optional RefreshVolumeUsageCommandProto refreshVolumeUsageCommandProto = 11;
+  optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
 
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
@@ -406,6 +408,24 @@ message ReplicateContainerCommandProto {
   required int64 containerID = 1;
   repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
+}
+
+/**
+* This command asks the datanode to reconstruct the missing EC containers by
+* using remaining containers from sources.
+*/
+message ReconstructECContainersCommandProto {
+  required int64 containerID = 1;
+  repeated DatanodeDetailsAndReplicaIndexProto sources = 2;
+  repeated DatanodeDetailsProto targets = 3;
+  required bytes missingContainerIndexes = 4;
+  required ECReplicationConfig ecReplicationConfig = 5;
+  required int64 cmdId = 6;
+}
+
+message DatanodeDetailsAndReplicaIndexProto {
+    required DatanodeDetailsProto datanodeDetails = 1;
+    required int32 replicaIndex = 2;
 }
 
 /**

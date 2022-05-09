@@ -56,6 +56,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -82,7 +84,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
@@ -154,6 +156,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -274,6 +277,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SCMHANodeDetails scmHANodeDetails;
 
   private ContainerBalancer containerBalancer;
+  private StatefulServiceStateManager statefulServiceStateManager;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -552,6 +556,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private void initializeSystemManagers(OzoneConfiguration conf,
                                         SCMConfigurator configurator)
       throws IOException {
+    Clock clock = new MonotonicClock(ZoneOffset.UTC);
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
     } else {
@@ -610,7 +615,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              clock
+              );
     }
 
     if (configurator.getContainerManager() != null) {
@@ -642,7 +649,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmContext,
           serviceManager,
           scmNodeManager,
-          new MonotonicClock(ZoneOffset.UTC),
+          clock,
           scmHAManager,
           getScmMetadataStore().getMoveTable());
     }
@@ -655,6 +662,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         containerManager, scmContext, eventQueue, replicationManager);
+
+    statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
+        .setStatefulServiceConfig(
+            scmMetadataStore.getStatefulServiceConfigTable())
+        .setSCMDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+        .setRatisServer(scmHAManager.getRatisServer())
+        .build();
   }
 
   /**
@@ -1819,6 +1833,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public NetworkTopology getClusterMap() {
     return this.clusterMap;
+  }
+
+  public StatefulServiceStateManager getStatefulServiceStateManager() {
+    return statefulServiceStateManager;
   }
 
   /**

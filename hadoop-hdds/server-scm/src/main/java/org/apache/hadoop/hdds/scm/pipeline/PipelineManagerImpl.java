@@ -42,13 +42,13 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.ObjectName;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -89,14 +89,17 @@ public class PipelineManagerImpl implements PipelineManager {
   // This allows for freezing/resuming the new pipeline creation while the
   // SCM is already out of SafeMode.
   private AtomicBoolean freezePipelineCreation;
+  private final Clock clock;
 
+  @SuppressWarnings("checkstyle:parameterNumber")
   protected PipelineManagerImpl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
                                 NodeManager nodeManager,
                                 PipelineStateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher,
-                                SCMContext scmContext) {
+                                SCMContext scmContext,
+                                Clock clock) {
     this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
@@ -105,6 +108,7 @@ public class PipelineManagerImpl implements PipelineManager {
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
+    this.clock = clock;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
     this.metrics = SCMPipelineMetrics.create();
@@ -115,6 +119,7 @@ public class PipelineManagerImpl implements PipelineManager {
     this.freezePipelineCreation = new AtomicBoolean();
   }
 
+  @SuppressWarnings("checkstyle:parameterNumber")
   public static PipelineManagerImpl newPipelineManager(
       ConfigurationSource conf,
       SCMHAManager scmhaManager,
@@ -122,7 +127,9 @@ public class PipelineManagerImpl implements PipelineManager {
       Table<PipelineID, Pipeline> pipelineStore,
       EventPublisher eventPublisher,
       SCMContext scmContext,
-      SCMServiceManager serviceManager) throws IOException {
+      SCMServiceManager serviceManager,
+      Clock clock) throws IOException {
+
     // Create PipelineStateManagerImpl
     PipelineStateManager stateManager = PipelineStateManagerImpl
         .newBuilder().setPipelineStore(pipelineStore)
@@ -138,14 +145,15 @@ public class PipelineManagerImpl implements PipelineManager {
     // Create PipelineManager
     PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
         scmhaManager, nodeManager, stateManager, pipelineFactory,
-        eventPublisher, scmContext);
+        eventPublisher, scmContext, clock);
 
     // Create background thread.
     BackgroundPipelineCreator backgroundPipelineCreator =
-        new BackgroundPipelineCreator(pipelineManager, conf, scmContext);
+        new BackgroundPipelineCreator(pipelineManager, conf, scmContext, clock);
 
     BackgroundPipelineScrubber backgroundPipelineScrubber =
-        new BackgroundPipelineScrubber(pipelineManager, conf, scmContext);
+        new BackgroundPipelineScrubber(pipelineManager, conf, scmContext,
+            clock);
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
@@ -416,7 +424,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void scrubPipelines() throws IOException {
-    Instant currentTime = Instant.now();
+    Instant currentTime = clock.instant();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
@@ -522,7 +530,7 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
-    long st = Time.monotonicNow();
+    long st = clock.millis();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
     }
@@ -544,7 +552,7 @@ public class PipelineManagerImpl implements PipelineManager {
           Thread.currentThread().interrupt();
         }
       }
-    } while (!ready && Time.monotonicNow() - st < timeout);
+    } while (!ready && clock.millis() - st < timeout);
 
     if (!ready) {
       throw new IOException(String.format("Pipeline %s is not ready in %d ms",

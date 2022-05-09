@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc.read;
+package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -23,8 +23,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.apache.hadoop.ozone.client.io.ECBlockReconstructedInputStream;
-import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -40,7 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.apache.hadoop.ozone.client.rpc.read.ECStreamTestUtil.generateParity;
+import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
 
 /**
  * Test for the ECBlockReconstructedInputStream class.

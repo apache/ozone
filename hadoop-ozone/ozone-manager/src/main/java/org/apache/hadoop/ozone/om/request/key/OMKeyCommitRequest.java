@@ -196,24 +196,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      omKeyInfo =
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
-      if (omKeyInfo == null) {
-        throw new OMException("Failed to commit key, as " + dbOpenKey +
-            "entry is not found in the OpenKey table", KEY_NOT_FOUND);
-      }
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
-
-      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
-
-      // Update the block length for each block
-      List<OmKeyLocationInfo> allocatedLocationInfoList =
-          omKeyInfo.getLatestVersionLocations().getLocationList();
-      omKeyInfo.updateLocationInfoList(locationInfoList, false);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
@@ -226,6 +208,33 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
       }
+
+      omKeyInfo =
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+      if (omKeyInfo == null) {
+        throw new OMException("Failed to commit key, as " + dbOpenKey +
+            "entry is not found in the OpenKey table", KEY_NOT_FOUND);
+      }
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
+      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+      // Update the block length for each block
+      omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      // Set the UpdateID to current transactionLogIndex
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+
+      long correctedSpace = omKeyInfo.getReplicatedSize();
+      // Subtract the size of blocks to be overwritten.
+      if (keyToDelete != null) {
+        correctedSpace -= keyToDelete.getReplicatedSize();
+      } else {
+        // if keyToDelete isn't null, usedNamespace needn't check and
+        // increase.
+        checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        omBucketInfo.incrUsedNamespace(1L);
+      }
+      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenKey),
@@ -238,20 +247,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       if (oldKeyVersionsToDelete != null) {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
             oldKeyVersionsToDelete, trxnLogIndex);
-      }
-
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // Block was pre-requested and UsedBytes updated when createKey and
-      // AllocatedBlock. The space occupied by the Key shall be based on
-      // the actual Key size, and the total Block size applied before should
-      // be subtracted.
-      long correctedSpace = omKeyInfo.getReplicatedSize() -
-          allocatedLocationInfoList.size() * scmBlockSize * factor;
-      // Subtract the size of blocks to be overwritten.
-      if (keyToDelete != null) {
-        correctedSpace -= keyToDelete.getReplicatedSize();
       }
 
       omBucketInfo.incrUsedBytes(correctedSpace);

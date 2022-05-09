@@ -236,8 +236,14 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } catch (Exception ex) {
       auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
+          getAuditParameters(), ex));
+      if (copyHeader != null) {
+        getMetrics().incCopyObjectFailure();
+      } else {
+        getMetrics().incCreateKeyFailure();
+      }
+      LOG.error("Exception occurred in PutObject", ex.getMessage());
       throw ex;
     } finally {
       if (auditSuccess) {
@@ -516,6 +522,11 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      if (uploadId != null && !uploadId.equals("")) {
+        getMetrics().incAbortMultiPartUploadFailure();
+      } else {
+        getMetrics().incDeleteKeyFailure();
+      }
       throw ex;
     }
     getMetrics().incDeleteKeySuccess();
@@ -576,6 +587,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      getMetrics().incInitMultiPartUploadFailure();
       throw ex;
     }
   }
@@ -809,6 +821,7 @@ public class ObjectEndpoint extends EndpointBase {
       });
 
     } catch (OMException ex) {
+      getMetrics().incListPartsFailure();
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
@@ -970,7 +983,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     long currentDate = System.currentTimeMillis();
-    if  (ozoneDateInMs <= currentDate) {
+    if (ozoneDateInMs <= currentDate) {
       return OptionalLong.of(ozoneDateInMs);
     } else {
       // dates in the future are invalid, so return empty()
