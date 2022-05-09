@@ -48,6 +48,10 @@ Wait Til Date Past
     ${sleepSeconds} =   Subtract Date From Date  ${date}  ${latestDate}
     Run Keyword If      ${sleepSeconds} > 0      Sleep  ${sleepSeconds}
 
+Set bucket
+    ${var} =    Set Variable    legacy/source-bucket
+    [Return]    ${var}
+
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
@@ -103,14 +107,19 @@ Test Multipart Upload Complete
     ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 --body /tmp/part2 --upload-id ${uploadID}
     ${eTag2} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
                         Should contain          ${result}    ETag
-    ${result} =         Execute                 ozone sh bucket info ${PREFIX} | jq .usedNamespace
-                        Should Be Equal         ${result}       1
+
 #complete multipart upload
+    ${testBucket} =     Run Keyword if          '${BUCKET}' == 'link'    Set bucket
+    ...                 ELSE                    Set Variable    s3v/${BUCKET}
+    ${result} =         Execute                 ozone sh bucket info ${testBucket} | jq .usedNamespace
+    ${namespace1} =     Evaluate    ${result} + 1
     ${result} =         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
                         Should contain          ${result}    ${BUCKET}
                         Should contain          ${result}    ${PREFIX}/multipartKey1
                         Should contain          ${result}    ETag
-
+    ${result} =         Execute                 ozone sh bucket info ${testBucket} | jq .usedNamespace
+    ${namespace2} =	    Convert To Integer	    ${result}
+                        Should Be Equal         ${namespace2}       ${namespace1}
 
 #read file and check the key
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 /tmp/${PREFIX}-multipartKey1.result
