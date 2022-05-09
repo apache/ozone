@@ -25,15 +25,19 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
@@ -74,6 +78,26 @@ public class ECBlockOutputStream extends BlockOutputStream {
   public void write(byte[] b, int off, int len) throws IOException {
     this.currentChunkRspFuture =
         writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
+  }
+
+  public CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> executePutBlock(boolean close,
+      boolean force, long blockGroupLength) throws IOException {
+    updateBlockGroupLengthInPutBlockMeta(blockGroupLength);
+    return executePutBlock(close, force);
+  }
+
+  private void updateBlockGroupLengthInPutBlockMeta(final long blockGroupLen) {
+    ContainerProtos.KeyValue keyValue = ContainerProtos.KeyValue.newBuilder()
+        .setKey(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK)
+        .setValue(String.valueOf(blockGroupLen)).build();
+    List<ContainerProtos.KeyValue> metadataList =
+        getContainerBlockData().getMetadataList().stream().filter(kv -> !Objects
+            .equals(kv.getKey(), OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK))
+            .collect(Collectors.toList());
+    metadataList.add(keyValue);
+    getContainerBlockData().clearMetadata(); // Clears old meta.
+    getContainerBlockData().addAllMetadata(metadataList); // Add updated meta.
   }
 
   /**
