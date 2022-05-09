@@ -313,10 +313,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
-      // Update namespace quota
-      omBucketInfo.incrUsedNamespace(1L);
-
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),

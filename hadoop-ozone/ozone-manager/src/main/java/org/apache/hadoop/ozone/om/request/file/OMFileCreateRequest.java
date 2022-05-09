@@ -291,10 +291,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
           bucketName, Optional.absent(), Optional.of(missingParentInfos),
           trxnLogIndex);
 
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
-      // Update namespace quota
-      omBucketInfo.incrUsedNamespace(1L);
-
       numMissingParents = missingParentInfos.size();
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
