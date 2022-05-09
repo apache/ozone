@@ -226,7 +226,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       handleFailedStreams(false);
       return StripeWriteStatus.FAILED;
     }
-    currentStreamEntry.executePutBlock(close);
+    currentStreamEntry.executePutBlock(close,
+        blockOutputStreamEntryPool.getCurrentStreamEntry()
+            .getCurrentPosition());
 
     if (hasPutBlockFailure()) {
       handleFailedStreams(true);
@@ -284,8 +286,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // TODO: we should alter the put block calls to share CRC to each stream.
     ECBlockOutputStreamEntry streamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
-    streamEntry
-        .executePutBlock(isLastStripe);
+    streamEntry.executePutBlock(isLastStripe,
+        blockOutputStreamEntryPool.getCurrentStreamEntry()
+            .getCurrentPosition());
 
     if (hasPutBlockFailure()) {
       handleFailedStreams(true);
