@@ -195,14 +195,11 @@ public class TestBlockDeletingService {
       if (schemaVersion.equals(SCHEMA_V1)) {
         createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
             containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-      } else if (schemaVersion.equals(SCHEMA_V2)) {
-        createPendingDeleteBlocksSchema2(numOfBlocksPerContainer, txnID,
-            containerID, numOfChunksPerBlock, buffer, chunkManager, container,
-            data);
-      } else if (schemaVersion.equals(SCHEMA_V3)) {
-        createPendingDeleteBlocksSchema3(numOfBlocksPerContainer, txnID,
-            containerID, numOfChunksPerBlock, buffer, chunkManager, container,
-            data);
+      } else if (schemaVersion.equals(SCHEMA_V2)
+          || schemaVersion.equals(SCHEMA_V3)) {
+        createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
+            containerID, numOfChunksPerBlock, buffer, chunkManager,
+            container, data);
       } else {
         throw new UnsupportedOperationException(
             "Only schema version 1,2,3 are supported.");
@@ -234,26 +231,6 @@ public class TestBlockDeletingService {
       LOG.info("Exception " + exception);
       LOG.warn("Failed to put block: " + blockID + " in BlockDataTable.");
     }
-  }
-
-  @SuppressWarnings("checkstyle:parameternumber")
-  private void createPendingDeleteBlocksSchema2(int numOfBlocksPerContainer,
-      int txnID, long containerID, int numOfChunksPerBlock, ChunkBuffer buffer,
-      ChunkManager chunkManager, KeyValueContainer container,
-      KeyValueContainerData data) {
-    createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
-        containerID, numOfChunksPerBlock, buffer, chunkManager,
-        container, data);
-  }
-
-  @SuppressWarnings("checkstyle:parameternumber")
-  private void createPendingDeleteBlocksSchema3(int numOfBlocksPerContainer,
-      int txnID, long containerID, int numOfChunksPerBlock, ChunkBuffer buffer,
-      ChunkManager chunkManager, KeyValueContainer container,
-      KeyValueContainerData data) {
-    createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
-        containerID, numOfChunksPerBlock, buffer, chunkManager,
-        container, data);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
