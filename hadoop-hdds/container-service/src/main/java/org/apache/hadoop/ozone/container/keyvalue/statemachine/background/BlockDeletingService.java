@@ -550,7 +550,6 @@ public class BlockDeletingService extends BackgroundService {
 
   private interface Deleter {
     void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
-        BatchOperation batch, long txnID)
-        throws IOException;
+        BatchOperation batch, long txnID) throws IOException;
   }
 }
