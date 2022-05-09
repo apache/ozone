@@ -343,7 +343,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       requestType = Type.CommitMultiPartUpload
   )
   public static OMRequest disallowCommitMultiPartUploadWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx) throws OMException {
+      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
+      throws OMException {
     if (!ctx.versionManager().isAllowed(
         OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCommitMultiPartUploadRequest().getKeyArgs()

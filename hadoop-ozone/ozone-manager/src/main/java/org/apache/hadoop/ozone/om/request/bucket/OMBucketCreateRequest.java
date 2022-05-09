@@ -130,7 +130,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
-       .setCreateBucketRequest(newCreateBucketRequest.build()).build();
+        .setCreateBucketRequest(newCreateBucketRequest.build()).build();
   }
 
   @Override
@@ -271,6 +271,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   /**
    * Add default acls for bucket. These acls are inherited from volume
    * default acl list.
+   *
    * @param omBucketInfo
    * @param omVolumeArgs
    */
@@ -377,7 +378,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
       requestType = Type.CreateBucket
   )
   public static OMRequest disallowCreateBucketWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx) throws OMException {
+      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
+      throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCreateBucketRequest()

@@ -329,7 +329,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       requestType = Type.CommitKey
   )
   public static OMRequest disallowCommitKeyWithECReplicationConfig(
-      OMRequest req, ValidationContext ctx) throws OMException {
+      OMRequest req, ValidationContext ctx, OMMetadataManager metadataManager)
+      throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
       if (req.getCommitKeyRequest().getKeyArgs().hasEcReplicationConfig()) {

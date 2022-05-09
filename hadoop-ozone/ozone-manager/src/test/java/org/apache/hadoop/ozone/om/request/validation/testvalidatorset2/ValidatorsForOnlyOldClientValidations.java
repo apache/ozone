@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.request.validation.testvalidatorset2;
 
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -37,7 +38,8 @@ public final class ValidatorsForOnlyOldClientValidations {
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest oldClientPreProcessCreateKeyValidator2(
-      OMRequest req, ValidationContext ctx) {
+      OMRequest req, ValidationContext ctx,
+      OMMetadataManager omMetadataManager) {
     return req;
   }
 }

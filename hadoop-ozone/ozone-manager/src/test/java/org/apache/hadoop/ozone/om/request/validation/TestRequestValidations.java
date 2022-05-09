@@ -17,6 +17,8 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -55,8 +57,11 @@ public class TestRequestValidations {
   private final ValidationListenerImpl validationListener =
       new ValidationListenerImpl();
 
+  private OMMetadataManager metadataManager;
+
   @Before
   public void setup() {
+    metadataManager = mock(OmMetadataManagerImpl.class);
     startValidatorTest();
     validationListener.attach();
   }
@@ -233,6 +238,7 @@ public class TestRequestValidations {
     return new RequestValidations()
         .fromPackage(PACKAGE)
         .withinContext(ctx)
+        .withMetadataManager(metadataManager)
         .load();
   }
 
@@ -240,6 +246,7 @@ public class TestRequestValidations {
     return new RequestValidations()
         .fromPackage(PACKAGE_WO_VALIDATORS)
         .withinContext(ctx)
+        .withMetadataManager(metadataManager)
         .load();
   }
 

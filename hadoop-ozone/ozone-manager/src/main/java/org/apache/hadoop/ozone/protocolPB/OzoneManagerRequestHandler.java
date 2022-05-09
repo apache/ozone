@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatu
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -412,7 +413,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       requestType = Type.LookupKey
   )
   public static OMResponse disallowLookupKeyResponseWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
+      OMRequest req, OMResponse resp, ValidationContext ctx,
+      OMMetadataManager metadataManager)
       throws ServiceException {
     if (!resp.hasLookupKeyResponse()) {
       return resp;
@@ -474,7 +476,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       requestType = Type.ListKeys
   )
   public static OMResponse disallowListKeysResponseWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
+      OMRequest req, OMResponse resp, ValidationContext ctx,
+      OMMetadataManager metadataManager)
       throws ServiceException {
     if (!resp.hasListKeysResponse()) {
       return resp;
@@ -521,7 +524,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       requestType = Type.ListTrash
   )
   public static OMResponse disallowListTrashWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
+      OMRequest req, OMResponse resp, ValidationContext ctx,
+      OMMetadataManager metadataManager)
       throws ServiceException {
     if (!resp.hasListTrashResponse()) {
       return resp;
@@ -678,7 +682,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       requestType = Type.GetFileStatus
   )
   public static OMResponse disallowGetFileStatusWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
+      OMRequest req, OMResponse resp, ValidationContext ctx,
+      OMMetadataManager metadataManager)
       throws ServiceException {
     if (!resp.hasGetFileStatusResponse()) {
       return resp;
@@ -723,7 +728,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       requestType = Type.LookupFile
   )
   public static OMResponse disallowLookupFileWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
+      OMRequest req, OMResponse resp, ValidationContext ctx,
+      OMMetadataManager metadataManager)
       throws ServiceException {
     if (!resp.hasLookupFileResponse()) {
       return resp;
@@ -774,7 +780,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       requestType = Type.ListStatus
   )
   public static OMResponse disallowListStatusResponseWithECReplicationConfig(
-      OMRequest req, OMResponse resp, ValidationContext ctx)
+      OMRequest req, OMResponse resp, ValidationContext ctx,
+      OMMetadataManager metadataManager)
       throws ServiceException {
     if (!resp.hasListStatusResponse()) {
       return resp;

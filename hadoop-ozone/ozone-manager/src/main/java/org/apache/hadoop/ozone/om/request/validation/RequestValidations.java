@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -44,6 +45,7 @@ public class RequestValidations {
   private String validationsPackageName = DEFAULT_PACKAGE;
   private ValidationContext context = null;
   private ValidatorRegistry registry = null;
+  private OMMetadataManager omMetadataManager = null;
 
   public synchronized RequestValidations fromPackage(String packageName) {
     validationsPackageName = packageName;
@@ -52,6 +54,12 @@ public class RequestValidations {
 
   public RequestValidations withinContext(ValidationContext validationContext) {
     this.context = validationContext;
+    return this;
+  }
+
+  public RequestValidations withMetadataManager(
+      OMMetadataManager metadataManager) {
+    this.omMetadataManager = metadataManager;
     return this;
   }
 
@@ -72,7 +80,8 @@ public class RequestValidations {
             m.getName(), m.getDeclaringClass().getPackage().getName(),
             m.getDeclaringClass().getSimpleName());
         validatedRequest =
-            (OMRequest) m.invoke(null, validatedRequest, context);
+            (OMRequest) m.invoke(null, validatedRequest, context,
+                omMetadataManager);
       }
     } catch (InvocationTargetException e) {
       if (e.getCause() instanceof OMException) {
@@ -97,7 +106,8 @@ public class RequestValidations {
             m.getName(), m.getDeclaringClass().getPackage().getName(),
             m.getDeclaringClass().getSimpleName());
         validatedResponse =
-            (OMResponse) m.invoke(null, request, response, context);
+            (OMResponse) m.invoke(null, request, response, context,
+                omMetadataManager);
       }
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new ServiceException(e);
