@@ -69,19 +69,19 @@ Create Bucket 1 Success via S3 API
                         Should contain   ${output}         bucket-test1
 
 SetSecret Success with Cluster Admin
-    ${output} =         Execute          ozone tenant user setsecret 'tenantone$testuser' --secret=somesecret1 --export
+    ${output} =         Execute          ozone tenant user setsecret 'tenantone$testuser' --secret=somesecret1
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
 
 SetSecret Failure For Invalid Secret 1
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$testuser' --secret='' --export
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$testuser' --secret=''
                         Should contain   ${output}         secretKey cannot be null or empty.
 
 SetSecret Failure For Invalid Secret 2
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$testuser' --secret=short --export
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$testuser' --secret=short
                         Should contain   ${output}         Secret key length should be at least 8 characters
 
 GetSecret Success
-    ${output} =         Execute          ozone tenant user getsecret 'tenantone$testuser' --export
+    ${output} =         Execute          ozone tenant user getsecret 'tenantone$testuser'
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
 
 Delete Bucket 1 Failure With Old SecretKey via S3 API
@@ -102,7 +102,7 @@ Create Tenant Failure with Regular User
                         Should contain   ${output}         PERMISSION_DENIED User 'testuser2/scm@EXAMPLE.COM' is not an Ozone admin.
 
 SetSecret Failure with Regular User
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$testuser' --secret=somesecret2 --export
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$testuser' --secret=somesecret2
                         Should contain   ${output}         Permission denied. Requested accessId
 
 Create Bucket 2 Success with somesecret1 via S3 API

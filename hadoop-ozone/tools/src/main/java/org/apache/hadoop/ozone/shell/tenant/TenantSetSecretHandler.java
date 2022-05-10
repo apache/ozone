@@ -39,24 +39,17 @@ public class TenantSetSecretHandler extends TenantHandler {
           description = "Secret key", required = true)
   private String secretKey;
 
-  @CommandLine.Option(names = {"-e", "--export"},
-          description = "Print out variables together with 'export' prefix")
-  private boolean export;
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException {
 
     final S3SecretValue accessIdSecretKeyPair =
         client.getObjectStore().setS3Secret(accessId, secretKey);
-    if (export) {
-      out().println("export AWS_ACCESS_KEY_ID='" +
-              accessIdSecretKeyPair.getAwsAccessKey() + "'");
-      out().println("export AWS_SECRET_ACCESS_KEY='" +
-              accessIdSecretKeyPair.getAwsSecret() + "'");
-    } else {
-      out().println(accessIdSecretKeyPair);
-    }
+
+    out().println("export AWS_ACCESS_KEY_ID='" +
+            accessIdSecretKeyPair.getAwsAccessKey() + "'");
+    out().println("export AWS_SECRET_ACCESS_KEY='" +
+            accessIdSecretKeyPair.getAwsSecret() + "'");
 
   }
 }
