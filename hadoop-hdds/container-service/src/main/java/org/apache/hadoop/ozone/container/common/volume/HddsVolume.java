@@ -125,8 +125,7 @@ public class HddsVolume extends StorageVolume {
 
     // Create DB store for a newly added volume
     if (!isTest) {
-      if (VersionedDatanodeFeatures.isFinalized(
-          HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.SCM_HA)) {
         createDbStore(dbVolumeSet);
       }
     }
@@ -146,9 +145,7 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
-    if (SchemaV3.isFinalizedAndEnabled(getConf())) {
-      closeDbStore();
-    }
+    closeDbStore();
   }
 
   @Override
@@ -207,8 +204,8 @@ public class HddsVolume extends StorageVolume {
 
     // DB is already loaded
     if (dbLoaded.get()) {
-      LOG.info("Db is already loaded from {} for volume {}", getDbParentDir(),
-          getStorageID());
+      LOG.warn("Schema V3 db is already loaded from {} for volume {}",
+          getDbParentDir(), getStorageID());
       return;
     }
 
@@ -285,9 +282,6 @@ public class HddsVolume extends StorageVolume {
     String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
         .getAbsolutePath();
     try {
-      if (isTest) {
-        throw new IOException("Can't init db instance.");
-      }
       HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf());
       dbLoaded.set(true);
       LOG.info("SchemaV3 db is created and loaded at {} for volume {}",

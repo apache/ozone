@@ -53,19 +53,25 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.Mockito;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
+import static org.mockito.ArgumentMatchers.anyObject;
 
 /**
  * Tests upgrading a single datanode from container Schema V2 to Schema V3.
@@ -497,10 +503,14 @@ public class TestDatanodeUpgradeToSchemaV3 {
         container.getContainerData().getSchemaVersion());
 
 
-    dataVolume = (
-        HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
-    dataVolume.setTest(true);
-    // Finalize will fail because DB create failure
+    HddsVolume volume = Mockito.mock(HddsVolume.class);
+    Mockito.doThrow(new IOException("Failed to init DB")).when(volume).
+        createDbStore(anyObject());
+    Map volumeMap = new HashMap<String, StorageVolume>();
+    volumeMap.put(dataVolume.getStorageID(), volume);
+    dsm.getContainer().getVolumeSet().setVolumeMap(volumeMap);
+
+    // Finalize will fail because of DB creation failure
     try {
       dsm.finalizeUpgrade();
     } catch (Exception e) {

@@ -53,8 +53,9 @@ public class DatanodeSchemaV3FinalizeAction
     // HddsVolume and DbVolume if DbVolume is configured.
     MutableVolumeSet dataVolumeSet = dsm.getContainer().getVolumeSet();
     MutableVolumeSet dbVolumeSet = dsm.getContainer().getDbVolumeSet();
-    Preconditions.assertNotNull(dataVolumeSet, "Data Volume should be null");
-    Preconditions.assertNotNull(dataVolumeSet, "Data Volume should be null");
+    Preconditions.assertNotNull(dataVolumeSet,
+        "Data Volume should not be null");
+
     dataVolumeSet.writeLock();
     try {
       for (StorageVolume hddsVolume : dataVolumeSet.getVolumesList()) {
@@ -72,7 +73,7 @@ public class DatanodeSchemaV3FinalizeAction
     DatanodeConfiguration dcf =
         dsm.getConf().getObject(DatanodeConfiguration.class);
     if (!dcf.getContainerSchemaV3Enabled()) {
-      LOG.info("SchemaV3 is disabled. Don't load RocksDB in upgrade.");
+      LOG.info("Schema V3 is disabled. Won't load RocksDB in upgrade.");
       return;
     }
     HddsVolumeUtil.loadAllHddsVolumeDbStore(dataVolumeSet, dbVolumeSet, LOG);
