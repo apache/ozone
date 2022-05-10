@@ -137,6 +137,7 @@ public abstract class GenericTestUtils {
    *
    * @return a string to use in paths
    */
+  @SuppressWarnings("java:S2245") // no need for secure random
   public static String getRandomizedTempPath() {
     return getTempPath(RandomStringUtils.randomAlphanumeric(10));
   }
