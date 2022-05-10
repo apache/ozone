@@ -203,11 +203,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
-      if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
-        oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
-            keyToDelete, omMetadataManager,
-            trxnLogIndex, ozoneManager.isRatisEnabled());
-      }
 
       omKeyInfo =
           omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
@@ -224,9 +219,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
-      // Subtract the size of blocks to be overwritten.
-      if (keyToDelete != null) {
+      if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+        // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
+        oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
+            keyToDelete, omMetadataManager,
+            trxnLogIndex, ozoneManager.isRatisEnabled());
       } else {
         // if keyToDelete isn't null, usedNamespace needn't check and
         // increase.
