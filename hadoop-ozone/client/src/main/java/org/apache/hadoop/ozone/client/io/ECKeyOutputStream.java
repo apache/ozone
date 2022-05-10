@@ -220,7 +220,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // TODO: we should alter the put block calls to share CRC to each stream.
     final boolean isLastStripe = streamEntry.getRemaining() <= 0 ||
         !ecChunkBufferCache.isFull();
-    streamEntry.executePutBlock(isLastStripe);
+    streamEntry.executePutBlock(isLastStripe, streamEntry.getCurrentPosition());
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
     if (!failedStreams.isEmpty()) {
