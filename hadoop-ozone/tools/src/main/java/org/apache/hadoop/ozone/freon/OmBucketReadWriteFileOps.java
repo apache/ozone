@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -53,8 +52,7 @@ import java.util.concurrent.ExecutorCompletionService;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 
-public class OmBucketReadWriteFileOps extends BaseFreonGenerator
-    implements Callable<Void> {
+public class OmBucketReadWriteFileOps extends AbstractOmBucketReadWriteOps {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmBucketReadWriteFileOps.class);
@@ -164,7 +162,8 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
 
-  private int readOperations() throws Exception {
+  @Override
+  public int readOperations() throws Exception {
 
     // Create fileCountForRead (defaultValue = 1000) files under
     // rootPath/readPath directory
@@ -211,7 +210,8 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
     return readResult;
   }
 
-  private int writeOperations() throws Exception {
+  @Override
+  public int writeOperations() throws Exception {
 
     // Start writeThreadCount (defaultValue = 10) concurrent write threads
     // performing numOfWriteOperations (defaultValue = 10) iterations
@@ -255,7 +255,8 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
     return writeResult;
   }
 
-  private void createFile(String dir, long counter) throws Exception {
+  @Override
+  public void create(String dir) throws Exception {
     String fileName = dir.concat(OzoneConsts.OM_KEY_PREFIX)
         .concat(RandomStringUtils.randomAlphanumeric(length));
     Path file = new Path(fileName);
@@ -272,7 +273,7 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
 
   private void createFiles(String dir, int fileCount) throws Exception {
     for (int i = 0; i < fileCount; i++) {
-      createFile(dir, i);
+      create(dir);
     }
   }
 }
