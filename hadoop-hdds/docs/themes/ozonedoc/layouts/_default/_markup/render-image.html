@@ -15,5 +15,4 @@
   limitations under the License.
 -->
 
-<!-- shortcode to easily scale images according to page width-->
-<img src='{{ .Get "src" }}' alt='{{ .Get "alt" }}' class="img-responsive"/>
+<img src="{{ .Destination | safeURL }}" alt='{{ .Text }}' {{ with .Title}} title="{{ . }}"{{ end }} class="img-responsive" />
