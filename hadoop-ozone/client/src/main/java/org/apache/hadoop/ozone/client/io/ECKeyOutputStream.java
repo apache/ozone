@@ -265,22 +265,49 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     final ByteBuffer[] parityBuffers = ecChunkBufferCache.getParityBuffers();
 
     // parityCellSize = min(ecChunkSize, stripeSize)
-    //                = min(cellSize, sum(dataBuffer positions))
-    //                = min(dataBuffer[0].limit(), dataBuffer[0].position())
-    //                = dataBuffer[0].position()
+    //                = min(cellSize, sum(dataBuffers positions))
+    //                = min(dataBuffers[0].limit(), dataBuffers[0].position())
+    //                = dataBuffers[0].position()
     final int parityCellSize = dataBuffers[0].position();
+    int firstNonFullIndex = dataBuffers.length;
+    int firstNonFullLength = 0;
 
-    // Duplicate dataBuffers and add padding
-    final ByteBuffer[] buffers = Arrays.stream(dataBuffers)
-        .map(ByteBuffer::duplicate)
-        .peek(b -> padBufferToLimit(b, parityCellSize))
-        .peek(ByteBuffer::flip)
-        .toArray(ByteBuffer[]::new);
+    for (int i = 0; i < dataBuffers.length; i++) {
+      if (dataBuffers[i].position() != ecChunkSize) {
+        firstNonFullIndex = i;
+        firstNonFullLength = dataBuffers[i].position();
+        break;
+      }
+    }
+    for (int i = firstNonFullIndex + 1; i < dataBuffers.length; i++) {
+      Preconditions.checkState(dataBuffers[i].position() == 0,
+          "Illegal stripe state: cell {} is not full while cell {} has data",
+          firstNonFullIndex, i);
+    }
+
+    // Add padding to dataBuffers for encode if stripe not full.
+    for (int i = firstNonFullIndex; i < dataBuffers.length; i++) {
+      padBufferToLimit(dataBuffers[i], parityCellSize);
+    }
 
     for (ByteBuffer b : parityBuffers) {
       b.limit(parityCellSize);
     }
-    encoder.encode(buffers, parityBuffers);
+    for (ByteBuffer b : dataBuffers) {
+      b.flip();
+    }
+    encoder.encode(dataBuffers, parityBuffers);
+
+    // Restore position of dataBuffers.
+    for (int i = 0; i < firstNonFullIndex; i++) {
+      dataBuffers[i].position(ecChunkSize);
+    }
+    if (firstNonFullIndex < dataBuffers.length) {
+      dataBuffers[firstNonFullIndex].position(firstNonFullLength);
+    }
+    for (int i = firstNonFullIndex + 1; i < dataBuffers.length; i++) {
+      dataBuffers[i].position(0);
+    }
   }
 
   private void writeParityCells() {
