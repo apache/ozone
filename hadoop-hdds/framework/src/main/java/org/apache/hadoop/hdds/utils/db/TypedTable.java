@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -378,6 +379,18 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException {
     rawTable.deleteBatchWithPrefix(batch, codecRegistry.asRawData(prefix));
+  }
+
+  @Override
+  public void dumpToFileWithPrefix(File externalFile, KEY prefix)
+      throws IOException {
+    rawTable.dumpToFileWithPrefix(externalFile,
+        codecRegistry.asRawData(prefix));
+  }
+
+  @Override
+  public void loadFromFile(File externalFile) throws IOException {
+    rawTable.loadFromFile(externalFile);
   }
 
   @Override

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -135,6 +136,17 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException {
     table.deleteBatchWithPrefix(batch, prefix);
+  }
+
+  @Override
+  public void dumpToFileWithPrefix(File externalFile, KEY prefix)
+      throws IOException {
+    table.dumpToFileWithPrefix(externalFile, prefix);
+  }
+
+  @Override
+  public void loadFromFile(File externalFile) throws IOException {
+    table.loadFromFile(externalFile);
   }
 
   @Override
