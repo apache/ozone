@@ -166,7 +166,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private StripeWriteStatus rewriteStripeToNewBlockGroup() throws IOException {
     // Rollback the length/offset updated as part of this failed stripe write.
-    offset -= ecChunkBufferCache.getDataSize();
+    final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
+    offset -= Arrays.stream(dataBuffers).mapToInt(Buffer::limit).sum();
 
     final ECBlockOutputStreamEntry failedStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
@@ -186,10 +187,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     blockOutputStreamEntryPool.allocateBlockIfNeeded();
     final ECBlockOutputStreamEntry currentStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
-    final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
     for (int i = 0; i < numDataBlks; i++) {
-      if (dataBuffers[i].position() > 0) {
-        handleOutputStreamWrite(i, dataBuffers[i].position(), false);
+      if (dataBuffers[i].limit() > 0) {
+        handleOutputStreamWrite(i, dataBuffers[i].limit(), false);
       }
       currentStreamEntry.useNextBlockStream();
     }
@@ -219,7 +219,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // executePutBlock for all.
     // TODO: we should alter the put block calls to share CRC to each stream.
     final boolean isLastStripe = streamEntry.getRemaining() <= 0 ||
-        !ecChunkBufferCache.isFull();
+        ecChunkBufferCache.getLastDataCell().limit() < ecChunkSize;
     streamEntry.executePutBlock(isLastStripe, streamEntry.getCurrentPosition());
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
@@ -285,7 +285,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
           firstNonFullIndex, i);
     }
 
-    // Add padding to dataBuffers for encode if stripe not full.
+    // Add padding to dataBuffers for encode if stripe is not full.
     for (int i = firstNonFullIndex; i < dataBuffers.length; i++) {
       padBufferToLimit(dataBuffers[i], parityCellSize);
     }
@@ -298,15 +298,12 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     encoder.encode(dataBuffers, parityBuffers);
 
-    // Restore position of dataBuffers.
-    for (int i = 0; i < firstNonFullIndex; i++) {
-      dataBuffers[i].position(ecChunkSize);
-    }
+    // Remove padding from dataBuffers for (re)write data cells.
     if (firstNonFullIndex < dataBuffers.length) {
-      dataBuffers[firstNonFullIndex].position(firstNonFullLength);
+      dataBuffers[firstNonFullIndex].limit(firstNonFullLength);
     }
     for (int i = firstNonFullIndex + 1; i < dataBuffers.length; i++) {
-      dataBuffers[i].position(0);
+      dataBuffers[i].limit(0);
     }
   }
 
@@ -449,7 +446,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      if (!ecChunkBufferCache.isEmpty()) {
+      // If stripe buffer is not empty, encode and flush the stripe.
+      if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
         final int index = blockOutputStreamEntryPool.getCurrentStreamEntry()
             .getCurrentStreamIdx();
         ByteBuffer lastCell = ecChunkBufferCache.getDataBuffers()[index];
@@ -573,21 +571,12 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       return parityBuffers;
     }
 
-    private long getDataSize() {
-      return Arrays.stream(dataBuffers)
-          .mapToInt(Buffer::position)
-          .asLongStream()
-          .sum();
+    private ByteBuffer getFirstDataCell() {
+      return dataBuffers[0];
     }
 
-    private boolean isFull() {
-      return Arrays.stream(dataBuffers)
-          .allMatch(b -> b.remaining() == 0);
-    }
-
-    private boolean isEmpty() {
-      return Arrays.stream(dataBuffers)
-          .allMatch(b -> b.position() == 0);
+    private ByteBuffer getLastDataCell() {
+      return dataBuffers[dataBuffers.length - 1];
     }
 
     private int addToDataBuffer(int i, byte[] b, int off, int len) {
