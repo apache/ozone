@@ -25,7 +25,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
@@ -89,5 +91,48 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
       getDeleteTransactionTable().deleteBatchWithPrefix(batch, prefix);
       getBatchHandler().commitBatchOperation(batch);
     }
+  }
+
+  public void dumpKVContainerData(long containerID, File metaDir)
+      throws IOException {
+    String prefix = getContainerKeyPrefix(containerID);
+    getMetadataTable().dumpToFileWithPrefix(
+        getTableDumpFile(getMetadataTable(), metaDir), prefix);
+    getBlockDataTable().dumpToFileWithPrefix(
+        getTableDumpFile(getBlockDataTable(), metaDir), prefix);
+    getDeletedBlocksTable().dumpToFileWithPrefix(
+        getTableDumpFile(getDeletedBlocksTable(), metaDir), prefix);
+    getDeleteTransactionTable().dumpToFileWithPrefix(
+        getTableDumpFile(getDeleteTransactionTable(), metaDir),
+        prefix);
+  }
+
+  public void loadKVContainerData(File metaDir)
+      throws IOException {
+    getMetadataTable().loadFromFile(
+        getTableDumpFile(getMetadataTable(), metaDir));
+    getBlockDataTable().loadFromFile(
+        getTableDumpFile(getBlockDataTable(), metaDir));
+    getDeletedBlocksTable().loadFromFile(
+        getTableDumpFile(getDeletedBlocksTable(), metaDir));
+    getDeleteTransactionTable().loadFromFile(
+        getTableDumpFile(getDeleteTransactionTable(), metaDir));
+  }
+
+  public void cleanupAllDumpFiles(File metaDir)
+      throws IOException {
+    Files.deleteIfExists(getTableDumpFile(getMetadataTable(),
+        metaDir).toPath());
+    Files.deleteIfExists(getTableDumpFile(getBlockDataTable(),
+        metaDir).toPath());
+    Files.deleteIfExists(getTableDumpFile(getDeletedBlocksTable(),
+        metaDir).toPath());
+    Files.deleteIfExists(getTableDumpFile(getDeleteTransactionTable(),
+        metaDir).toPath());
+  }
+
+  private static File getTableDumpFile(Table<String, ?> table,
+      File metaDir) throws IOException {
+    return new File(metaDir, table.getName() + DUMP_FILE_SUFFIX);
   }
 }

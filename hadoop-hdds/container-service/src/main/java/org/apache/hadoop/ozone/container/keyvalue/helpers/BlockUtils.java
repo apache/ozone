@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
+import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -40,6 +41,8 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.EXPORT_CONTAINER_METADATA_FAILED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IMPORT_CONTAINER_METADATA_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
@@ -247,6 +250,66 @@ public final class BlockUtils {
 
       ((DatanodeStoreSchemaThreeImpl) db.getStore()).removeKVContainerData(
           containerData.getContainerID());
+    }
+  }
+
+  /**
+   * Dump container KV metadata to external files.
+   * @param containerData
+   * @param conf
+   * @throws StorageContainerException
+   */
+  public static void dumpKVContainerDataToFiles(
+      KeyValueContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    try (DBHandle db = getDB(containerData, conf)) {
+      Preconditions.checkState(db.getStore()
+          instanceof DatanodeStoreSchemaThreeImpl);
+
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          db.getStore();
+      File metaDir = new File(containerData.getMetadataPath());
+      try {
+        store.dumpKVContainerData(containerData.getContainerID(), metaDir);
+      } catch (IOException e) {
+        // cleanup partially dumped files
+        store.cleanupAllDumpFiles(metaDir);
+        throw new StorageContainerException("Failed to dump metadata" +
+            " for container " + containerData.getContainerID(), e,
+            EXPORT_CONTAINER_METADATA_FAILED);
+      }
+    }
+  }
+
+  /**
+   * Load container KV metadata from external files.
+   * @param containerData
+   * @param conf
+   * @throws StorageContainerException
+   */
+  public static void loadKVContainerDataFromFiles(
+      KeyValueContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    try (DBHandle db = getDB(containerData, conf)) {
+      Preconditions.checkState(db.getStore()
+          instanceof DatanodeStoreSchemaThreeImpl);
+
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          db.getStore();
+      File metaDir = new File(containerData.getMetadataPath());
+      try {
+        store.loadKVContainerData(metaDir);
+      } catch (IOException e) {
+        // Don't delete unloaded or partially loaded files on failure,
+        // but delete all partially loaded metadata.
+        store.removeKVContainerData(containerData.getContainerID());
+        throw new StorageContainerException("Failed to load metadata " +
+            "from files for container " + containerData.getContainerID(), e,
+            IMPORT_CONTAINER_METADATA_FAILED);
+      } finally {
+        // cleanup already loaded files all together
+        store.cleanupAllDumpFiles(metaDir);
+      }
     }
   }
 }
