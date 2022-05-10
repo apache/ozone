@@ -45,17 +45,17 @@ public class TenantDeleteHandler extends TenantHandler {
     final DeleteTenantState resp =
         client.getObjectStore().deleteTenant(tenantId);
 
-    out().println("Deleted tenant '" + tenantId + "'.");
+    err().println("Deleted tenant '" + tenantId + "'.");
     long volumeRefCount = resp.getVolRefCount();
     assert (volumeRefCount >= 0L);
     final String volumeName = resp.getVolumeName();
     final String extraPrompt =
         "But the associated volume '" + volumeName + "' is not removed. ";
     if (volumeRefCount == 0L) {
-      out().println(extraPrompt + "To delete it, run"
+      err().println(extraPrompt + "To delete it, run"
           + "\n    ozone sh volume delete " + volumeName + "\n");
     } else {
-      out().println(extraPrompt + "And it is still referenced by some "
+      err().println(extraPrompt + "And it is still referenced by some "
           + "other Ozone features (refCount is " + volumeRefCount + ").");
     }
 
@@ -66,7 +66,7 @@ public class TenantDeleteHandler extends TenantHandler {
       obj.addProperty("volumeRefCount", resp.getVolRefCount());
       final Gson gson = new GsonBuilder().setPrettyPrinting().create();
       // Print raw response to stderr if verbose
-      err().println(gson.toJson(obj));
+      out().println(gson.toJson(obj));
     }
 
   }

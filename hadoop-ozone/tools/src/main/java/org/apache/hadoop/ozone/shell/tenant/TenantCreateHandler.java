@@ -41,19 +41,15 @@ public class TenantCreateHandler extends TenantHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    try {
-      client.getObjectStore().createTenant(tenantId);
-      // RpcClient#createTenant prints INFO level log of tenant and volume name
+    client.getObjectStore().createTenant(tenantId);
+    // RpcClient#createTenant prints INFO level log of tenant and volume name
 
-      if (isVerbose()) {
-        final JsonObject obj = new JsonObject();
-        obj.addProperty("tenantId", tenantId);
-        final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        out().println(gson.toJson(obj));
-      }
-    } catch (IOException e) {
-      // Throw exception to make client exit code non-zero
-      throw new IOException("Failed to create tenant '" + tenantId + "'", e);
+    if (isVerbose()) {
+      final JsonObject obj = new JsonObject();
+      obj.addProperty("tenantId", tenantId);
+      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      out().println(gson.toJson(obj));
     }
+
   }
 }

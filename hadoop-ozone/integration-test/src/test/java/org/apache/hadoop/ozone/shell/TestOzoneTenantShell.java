@@ -393,8 +393,8 @@ public class TestOzoneTenantShell {
 
     // Clean up
     executeHA(tenantShell, new String[] {"delete", tenantName});
-    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
 
     // Sanity check: tenant list should be empty
@@ -439,7 +439,7 @@ public class TestOzoneTenantShell {
     // Creating the tenant with the same name again should fail
     executeHA(tenantShell, new String[] {"create", "finance"});
     checkOutput(out, "", true);
-    checkOutput(err, "Failed to create tenant 'finance'", false);
+    checkOutput(err, "Tenant 'finance' already exists\n", true);
 
     executeHA(tenantShell, new String[] {"create", "research"});
     checkOutput(out, "", true);
@@ -477,12 +477,6 @@ public class TestOzoneTenantShell {
     // Try user getsecret again after assignment, should succeed
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
-    checkOutput(out, "awsAccessKey=finance$bob\n", false);
-    checkOutput(err, "", true);
-
-    // Try user getsecret again with -e option
-    executeHA(tenantShell, new String[] {
-        "user", "getsecret", "-e", "finance$bob"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n",
             false);
     checkOutput(err, "", true);
@@ -598,8 +592,8 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", "research"});
-    checkOutput(out, "Deleted tenant 'research'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant 'research'.\n", false);
     deleteVolume("research");
 
     executeHA(tenantShell, new String[] {
@@ -612,8 +606,8 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", "finance"});
-    checkOutput(out, "Deleted tenant 'finance'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant 'finance'.\n", false);
     deleteVolume("finance");
 
     executeHA(tenantShell, new String[] {"list"});
@@ -647,9 +641,11 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     // Then delete tenant, should succeed
-    executeHA(tenantShell, new String[] {"delete", "dev"});
-    checkOutput(out, "Deleted tenant 'dev'.\n", false);
-    checkOutput(err, "", true);
+    executeHA(tenantShell, new String[] {"--verbose", "delete", "dev"});
+    checkOutput(out, "{\n" + "  \"tenantId\": \"dev\",\n"
+        + "  \"volumeName\": \"dev\",\n" + "  \"volumeRefCount\": 0\n" + "}\n",
+        true);
+    checkOutput(err, "Deleted tenant 'dev'.\n", false);
     deleteVolume("dev");
 
     // Sanity check: tenant list should be empty
@@ -721,8 +717,8 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Revoked accessId", false);
 
     executeHA(tenantShell, new String[] {"delete", "tenant1"});
-    checkOutput(out, "Deleted tenant 'tenant1'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant 'tenant1'.\n", false);
     deleteVolume("tenant1");
 
     // Sanity check: tenant list should be empty
@@ -853,8 +849,8 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", tenantName});
-    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
 
     // Sanity check: tenant list should be empty
@@ -1039,8 +1035,8 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"delete", tenantName});
-    checkOutput(out, "Deleted tenant '" + tenantName + "'.\n", false);
-    checkOutput(err, "", true);
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant '" + tenantName + "'.\n", false);
     deleteVolume(tenantName);
   }
 }
