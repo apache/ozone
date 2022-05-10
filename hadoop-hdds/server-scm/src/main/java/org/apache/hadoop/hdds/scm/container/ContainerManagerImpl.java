@@ -94,6 +94,8 @@ public class ContainerManagerImpl implements ContainerManager {
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
   private final int numContainerPerVolume;
+
+  @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
   /**
