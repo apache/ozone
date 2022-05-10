@@ -254,6 +254,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_AL
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -545,7 +546,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isS3MultiTenancyEnabled = conf.getBoolean(
         OZONE_OM_MULTITENANCY_ENABLED, OZONE_OM_MULTITENANCY_ENABLED_DEFAULT);
 
-    if (isS3MultiTenancyEnabled) {
+    boolean devSkipMTCheck = conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER,
+        false);
+
+    if (isS3MultiTenancyEnabled && !devSkipMTCheck) {
       // Validate required configs to enable S3 multi-tenancy
       if (!isSecurityEnabled()) {
         this.isS3MultiTenancyEnabled = false;
@@ -3199,6 +3203,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           multiTenantManager.getTenantForAccessID(accessId);
 
       if (optionalTenantId.isPresent()) {
+        // To block all S3 multi-tenancy requests if disabled
+        checkS3MultiTenancyEnabled();
         final String tenantId = optionalTenantId.get();
 
         OmDBTenantState tenantState =

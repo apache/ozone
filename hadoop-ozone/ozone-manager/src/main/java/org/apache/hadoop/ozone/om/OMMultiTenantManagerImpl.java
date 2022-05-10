@@ -85,7 +85,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       LoggerFactory.getLogger(OMMultiTenantManagerImpl.class);
 
   // TODO: Remove when proper testing infra is deployed.
-  // Internal dev flag to skip Ranger communication.
+  // Internal dev flag to skip Ranger communication and Ozone config check
   public static final String OZONE_OM_TENANT_DEV_SKIP_RANGER =
       "ozone.om.tenant.dev.skip.ranger";
 

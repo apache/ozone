@@ -230,7 +230,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       case GetS3VolumeContext:
-        impl.checkS3MultiTenancyEnabled();
+        // checkS3MultiTenancyEnabled() is placed inside
+        //  OzoneManager#getS3VolumeContext for multi-tenancy specific code path
+        //  so it doesn't break s3v access.
         GetS3VolumeContextResponse s3VolumeContextResponse =
             getS3VolumeContext();
         responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
