@@ -3151,12 +3151,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (s3Auth != null) {
       String accessId = s3Auth.getAccessId();
-      Optional<String> optionalTenantId = multiTenantManager != null ?
+      // If S3 Multi-Tenancy is not enabled, all S3 requests will be redirected
+      // to the default s3v for compatibility
+      final Optional<String> optionalTenantId = isS3MultiTenancyEnabled() ?
           multiTenantManager.getTenantForAccessID(accessId) : Optional.absent();
 
       if (optionalTenantId.isPresent()) {
-        // To block all S3 multi-tenancy requests if disabled
-        checkS3MultiTenancyEnabled();
+        // S3 Multi-Tenancy is enabled, and the accessId is assigned to a tenant
+
         final String tenantId = optionalTenantId.get();
 
         OmDBTenantState tenantState =
