@@ -753,7 +753,7 @@ public class TestOzoneTenantShell {
     // Set secret as OM admin should succeed
     executeHA(tenantShell, new String[] {
         "user", "setsecret", tenantName + "$alice",
-        "--secret=somesecret1", "--export"});
+        "--secret=somesecret1"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
         "export AWS_SECRET_ACCESS_KEY='somesecret1'\n", true);
     checkOutput(err, "", true);
@@ -761,7 +761,7 @@ public class TestOzoneTenantShell {
     // Set empty secret key should fail
     int exitCode = executeHA(tenantShell, new String[] {
         "user", "setsecret", tenantName + "$alice",
-        "--secret=short", "--export"});
+        "--secret=short"});
     Assert.assertTrue("Expected non-zero exit code", exitCode != 0);
     checkOutput(out, "", true);
     checkOutput(err, "Secret key length should be at least 8 characters\n",
@@ -780,7 +780,7 @@ public class TestOzoneTenantShell {
     ugiAlice.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
@@ -800,7 +800,7 @@ public class TestOzoneTenantShell {
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       int exitC = executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       Assert.assertTrue("Should return non-zero exit code!", exitC != 0);
       checkOutput(out, "", true);
       checkOutput(err, "Permission denied. Requested accessId "
@@ -825,7 +825,7 @@ public class TestOzoneTenantShell {
     ugiBob.doAs((PrivilegedExceptionAction<Void>) () -> {
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
@@ -921,7 +921,7 @@ public class TestOzoneTenantShell {
       // Set secret should work
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
@@ -977,7 +977,7 @@ public class TestOzoneTenantShell {
       // Set secret should work, even for a non-delegated admin
       executeHA(tenantShell, new String[] {
           "user", "setsecret", tenantName + "$alice",
-          "--secret=somesecret2", "--export"});
+          "--secret=somesecret2"});
       checkOutput(out, "export AWS_ACCESS_KEY_ID='" + tenantName + "$alice'\n" +
           "export AWS_SECRET_ACCESS_KEY='somesecret2'\n", true);
       checkOutput(err, "", true);
