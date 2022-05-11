@@ -210,10 +210,6 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               Optional.absent(), Optional.of(missingParentInfos),
               trxnLogIndex);
 
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
-      // Update namespace quota
-      omBucketInfo.incrUsedNamespace(1L);
-
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
       int clientVersion = getOmRequest().getVersion();

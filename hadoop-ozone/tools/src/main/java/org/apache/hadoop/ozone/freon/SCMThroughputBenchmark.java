@@ -107,6 +107,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public final class SCMThroughputBenchmark implements Callable<Void> {
 
   public static final Logger LOG =
