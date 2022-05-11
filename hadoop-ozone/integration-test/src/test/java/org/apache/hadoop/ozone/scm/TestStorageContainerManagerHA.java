@@ -45,7 +45,9 @@ import org.junit.Test;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -250,5 +252,17 @@ public class TestStorageContainerManagerHA {
     conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
         true);
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
+  }
+
+  @Test
+  public void testGetRatisRolesDetail() throws IOException {
+    Set<String> resultSet = new HashSet<>();
+    for (StorageContainerManager scm: cluster.getStorageContainerManagers()) {
+      resultSet.addAll(scm.getScmHAManager().getRatisServer().getRatisRoles());
+    }
+    System.out.println(resultSet);
+    Assert.assertEquals(3, resultSet.size());
+    Assert.assertEquals(1,
+        resultSet.stream().filter(x -> x.contains("LEADER")).count());
   }
 }
