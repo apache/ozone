@@ -1671,6 +1671,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return containerBalancer;
   }
 
+  public CertificateStore getCertificateStore() {
+    return certificateStore;
+  }
+
   /**
    * Check if the current scm is the leader and ready for accepting requests.
    * @return - if the current scm is the leader and is ready.

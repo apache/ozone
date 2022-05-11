@@ -170,7 +170,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
           .getTrxnInfoFromCheckpoint(OzoneConfiguration.of(conf),
               checkpointLocation, new SCMDBDefinition());
 
-      LOG.info("Installing checkpoint with SCMTransactionInfo {}",
+      LOG.info("Verify checkpoint with SCMTransactionInfo {}",
           checkpointTxnInfo);
 
       TermIndex termIndex =
@@ -378,6 +378,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getStatefulServiceStateManager().reinitialize(
         metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      if (scm.getCertificateStore() != null) {
+        scm.getCertificateStore().reinitialize(metadataStore);
+      }
       if (scm.getRootCertificateServer() != null) {
         scm.getRootCertificateServer().reinitialize(metadataStore);
       }

@@ -133,6 +133,15 @@ public class SCMStateMachine extends BaseStateMachine {
       final TransactionContext trx) {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
+    if (getLifeCycleState().isPausingOrPaused()) {
+      // Statemachine is installation snapshot. Discard any request.
+      try {
+        applyTransactionFuture.complete(SCMRatisResponse.encode(null));
+      } catch (Exception e) {
+        // DO nothing
+      }
+    }
+
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));

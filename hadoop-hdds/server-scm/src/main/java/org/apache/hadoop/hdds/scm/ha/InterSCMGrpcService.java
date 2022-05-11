@@ -53,8 +53,7 @@ public class InterSCMGrpcService extends
   public InterSCMGrpcService(final StorageContainerManager scm) {
     Preconditions.checkNotNull(scm);
     this.scm = scm;
-    provider =
-        new SCMDBCheckpointProvider(scm.getScmMetadataStore().getStore());
+    provider = new SCMDBCheckpointProvider();
   }
 
   @Override
@@ -73,7 +72,8 @@ public class InterSCMGrpcService extends
       SCMGrpcOutputStream outputStream =
           new SCMGrpcOutputStream(responseObserver, scm.getClusterId(),
               BUFFER_SIZE);
-      provider.writeDBCheckPointToSream(outputStream, request.getFlush());
+      provider.writeDBCheckPointToStream(scm.getScmMetadataStore().getStore(),
+          outputStream, request.getFlush());
 
     } catch (IOException e) {
       LOG.error("Error streaming SCM DB checkpoint", e);

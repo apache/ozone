@@ -37,14 +37,12 @@ public class SCMDBCheckpointProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMDBCheckpointProvider.class);
-  private transient DBStore scmDbStore;
 
-  public SCMDBCheckpointProvider(DBStore scmDbStore) {
-    this.scmDbStore = scmDbStore;
+  public SCMDBCheckpointProvider() {
   }
 
-  public void writeDBCheckPointToSream(OutputStream stream, boolean flush)
-      throws IOException {
+  public void writeDBCheckPointToStream(DBStore scmDbStore,
+      OutputStream stream, boolean flush) throws IOException {
     LOG.info("Received request to obtain SCM DB checkpoint snapshot");
     if (scmDbStore == null) {
       LOG.error("Unable to process checkpointing request. DB Store is null");
