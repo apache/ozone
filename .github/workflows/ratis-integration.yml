@@ -133,3 +133,36 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/hdds*
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
+  acceptance:
+    needs:
+      - build
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          sudo chmod -R a+rwX hadoop-ozone/dist/target
+      - name: Execute tests
+        run: |
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/acceptance.sh
+        env:
+          KEEP_IMAGE: false
+          OZONE_TEST_SELECTOR: ozone-ha # FIXME temporary
+          OZONE_VOLUME_OWNER: 1000
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: acceptance
+          path: target/acceptance
+        continue-on-error: true
