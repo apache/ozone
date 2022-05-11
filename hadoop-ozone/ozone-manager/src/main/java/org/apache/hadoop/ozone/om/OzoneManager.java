@@ -1024,6 +1024,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return omRpcServer;
     }
 
+    LOG.info("Creating RPC Server");
     InetSocketAddress omNodeRpcAddr = OmUtils.getOmAddress(conf);
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
@@ -1821,34 +1822,36 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException
    */
   private void startTrashEmptier(Configuration conf) throws IOException {
-    float hadoopTrashInterval =
-        conf.getFloat(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
-    // check whether user has configured ozone specific trash-interval
-    // if not fall back to hadoop configuration
-    long trashInterval =
-        (long)(conf.getFloat(
-            OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
-            * MSECS_PER_MINUTE);
-    if (trashInterval == 0) {
-      LOG.info("Trash Interval set to 0. Files deleted will not move to trash");
-      return;
-    } else if (trashInterval < 0) {
-      throw new IOException("Cannot start trash emptier with negative interval."
-              + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
-    }
+    if (emptier == null) {
+      float hadoopTrashInterval =
+          conf.getFloat(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+      // check whether user has configured ozone specific trash-interval
+      // if not fall back to hadoop configuration
+      long trashInterval =
+          (long) (conf.getFloat(
+              OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, hadoopTrashInterval)
+              * MSECS_PER_MINUTE);
+      if (trashInterval == 0) {
+        LOG.info("Trash Interval set to 0. Files deleted won't move to trash");
+        return;
+      } else if (trashInterval < 0) {
+        throw new IOException("Cannot start trash emptier with negative " +
+            "interval. Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
+      }
 
-    OzoneManager i = this;
-    FileSystem fs = SecurityUtil.doAsLoginUser(
-        new PrivilegedExceptionAction<FileSystem>() {
-          @Override
-          public FileSystem run() throws IOException {
-            return new TrashOzoneFileSystem(i);
-          }
-        });
-    this.emptier = new Thread(new OzoneTrash(fs, conf, this).
-      getEmptier(), "Trash Emptier");
-    this.emptier.setDaemon(true);
-    this.emptier.start();
+      OzoneManager i = this;
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          new PrivilegedExceptionAction<FileSystem>() {
+            @Override
+            public FileSystem run() throws IOException {
+              return new TrashOzoneFileSystem(i);
+            }
+          });
+      this.emptier = new Thread(new OzoneTrash(fs, conf, this).
+          getEmptier(), "Trash Emptier");
+      this.emptier.setDaemon(true);
+      this.emptier.start();
+    }
   }
 
   /**
@@ -3253,11 +3256,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
       TransactionInfo checkpointTrxnInfo) throws Exception {
-
+    long startTime = Time.monotonicNow();
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     try {
       // Stop Background services
-      stopServices();
+      keyManager.stop();
+      stopSecretManager();
+      stopTrashEmptier();
 
       // Pause the State Machine so that no new transactions can be applied.
       // This action also clears the OM Double Buffer so that if there are any
@@ -3266,9 +3271,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception e) {
       LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
           "installing the new checkpoint.");
-      // During stopServices, if KeyManager was stopped successfully and
-      // OMMetadataManager stop failed, we should restart the KeyManager.
+      // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
+      startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
       throw e;
     }
@@ -3285,14 +3290,39 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
         checkpointTrxnInfo, lastAppliedIndex, leaderId, checkpointLocation);
 
+    boolean oldOmMetadataManagerStopped = false;
+    boolean newMetadataManagerStarted = false;
+    boolean omRpcServerStopped = false;
+    long time = Time.monotonicNow();
     if (canProceed) {
+      // Stop RPC server before stop metadataManager
+      omRpcServer.stop();
+      isOmRpcServerRunning = false;
+      omRpcServerStopped = true;
+      LOG.info("RPC server is stopped. Spend " +
+          (Time.monotonicNow() - time) + " ms.");
       try {
+        // Stop old metadataManager before replacing DB Dir
+        time = Time.monotonicNow();
+        metadataManager.stop();
+        oldOmMetadataManagerStopped = true;
+        LOG.info("metadataManager is stopped. Spend " +
+            (Time.monotonicNow() - time) + " ms.");
+      } catch (Exception e) {
+        String errorMsg = "Failed to stop metadataManager. Cannot proceed " +
+            "with installing the new checkpoint.";
+        LOG.error(errorMsg);
+        exitManager.exitSystem(1, errorMsg, e, LOG);
+      }
+      try {
+        time = Time.monotonicNow();
         dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
             checkpointLocation);
         term = checkpointTrxnInfo.getTerm();
         lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
-        LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, index: {}",
-            leaderId, term, lastAppliedIndex);
+        LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, " +
+            "index: {}, time: {} ms", leaderId, term, lastAppliedIndex,
+            Time.monotonicNow() - time);
       } catch (Exception e) {
         LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
             " DB with downloaded checkpoint. Reloading old OM state.", e);
@@ -3307,13 +3337,41 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart (unpause) the state machine and update its last applied index
     // to the installed checkpoint's snapshot index.
     try {
-      reloadOMState(lastAppliedIndex, term);
-      omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
-      LOG.info("Reloaded OM state with Term: {} and Index: {}", term,
-          lastAppliedIndex);
+      if (oldOmMetadataManagerStopped) {
+        time = Time.monotonicNow();
+        reloadOMState(lastAppliedIndex, term);
+        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        newMetadataManagerStarted = true;
+        LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
+            term, lastAppliedIndex, Time.monotonicNow() - time);
+      } else {
+        // OM DB is not stopped. Start the services.
+        keyManager.start(configuration);
+        startSecretManagerIfNecessary();
+        startTrashEmptier(configuration);
+        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        LOG.info("OM DB is not stopped. Started services with Term: {} and " +
+            "Index: {}", term, lastAppliedIndex);
+      }
     } catch (Exception ex) {
+
       String errorMsg = "Failed to reload OM state and instantiate services.";
       exitManager.exitSystem(1, errorMsg, ex, LOG);
+    }
+
+    if (omRpcServerStopped && newMetadataManagerStarted) {
+      // Start the RPC server. RPC server start requires metadataManager
+      try {
+        time = Time.monotonicNow();
+        omRpcServer = getRpcServer(configuration);
+        omRpcServer.start();
+        isOmRpcServerRunning = true;
+        LOG.info("RPC server is re-started. Spend " +
+            (Time.monotonicNow() - time) + " ms.");
+      } catch (Exception e) {
+        String errorMsg = "Failed to start RPC Server.";
+        exitManager.exitSystem(1, errorMsg, e, LOG);
+      }
     }
 
     // Delete the backup DB
@@ -3334,6 +3392,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
     TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
+    LOG.info("Install Checkpoint is finished with Term: {} and Index: {}. " +
+        "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
+        (Time.monotonicNow() - startTime));
     return newTermIndex;
   }
 
@@ -3354,13 +3415,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to download checkpoint from OM leader {}", leaderId, e);
     }
     return null;
-  }
-
-  void stopServices() throws Exception {
-    keyManager.stop();
-    stopSecretManager();
-    metadataManager.stop();
-    stopTrashEmptier();
   }
 
   private void stopTrashEmptier() {
@@ -3436,6 +3490,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart required services
     metadataManager.start(configuration);
     keyManager.start(configuration);
+    startSecretManagerIfNecessary();
     startTrashEmptier(configuration);
 
     // Set metrics and start metrics back ground thread
@@ -3976,7 +4031,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.minMultipartUploadPartSize = partSizeForTest;
   }
 
-
+  @VisibleForTesting
+  public boolean isOmRpcServerRunning() {
+    return isOmRpcServerRunning;
+  }
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager

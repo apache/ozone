@@ -415,6 +415,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    * @param numRequired The number of parity chunks needed for reconstruction
    * @return A list of indexes indicating which parity locations to read.
    */
+  @SuppressWarnings("java:S2245") // no need for secure random
   private List<Integer> selectParityIndexes(
       DatanodeDetails[] locations, int numRequired) {
     List<Integer> indexes = new ArrayList<>();

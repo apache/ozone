@@ -226,15 +226,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheKey<>(openKey),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-      int factor = omKeyInfo.getReplicationConfig().getRequiredNodes();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // Block was pre-requested and UsedBytes updated when createKey and
-      // AllocatedBlock. The space occupied by the Key shall be based on
-      // the actual Key size, and the total Block size applied before should
-      // be subtracted.
-      long correctedSpace = omKeyInfo.getReplicatedSize() -
-          keyArgs.getKeyLocationsList().size() * scmBlockSize * factor;
+
+      long correctedSpace = omKeyInfo.getReplicatedSize();
+      // TODO: S3MultipartUpload did not check quota and did not add nameSpace,
+      //  we need to fix these issues in HDDS-6650.
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omResponse.setCommitMultiPartUploadResponse(

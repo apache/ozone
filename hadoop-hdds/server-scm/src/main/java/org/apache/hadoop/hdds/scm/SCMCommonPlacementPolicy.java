@@ -49,7 +49,9 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   static final Logger LOG =
       LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
   private final NodeManager nodeManager;
-  private final Random rand;
+
+  @SuppressWarnings("java:S2245") // no need for secure random
+  private final Random rand = new Random();
   private final ConfigurationSource conf;
   private final boolean shouldRemovePeers;
 
@@ -73,7 +75,6 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public SCMCommonPlacementPolicy(NodeManager nodeManager,
       ConfigurationSource conf) {
     this.nodeManager = nodeManager;
-    this.rand = new Random();
     this.conf = conf;
     this.shouldRemovePeers = ScmUtils.shouldRemovePeers(conf);
   }

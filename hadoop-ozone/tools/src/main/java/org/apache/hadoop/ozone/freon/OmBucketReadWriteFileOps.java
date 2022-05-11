@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -51,7 +52,7 @@ import java.util.concurrent.ExecutorCompletionService;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-
+@SuppressWarnings("java:S2245") // no need for secure random
 public class OmBucketReadWriteFileOps extends AbstractOmBucketReadWriteOps {
 
   private static final Logger LOG =

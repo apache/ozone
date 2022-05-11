@@ -17,12 +17,29 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+
 /**
- * JMX interface to monitor replication status.
- */
-public interface ReplicationActivityStatusMXBean {
+* InflightAction is a Wrapper class to hold the InflightAction
+* with its start time and the target datanode.
+*/
+public class InflightAction {
+  private final DatanodeDetails datanode;
+  private final long time;
 
-  boolean isReplicationEnabled();
+  public InflightAction(final DatanodeDetails datanode,
+                         final long time) {
+    this.datanode = datanode;
+    this.time = time;
+  }
 
-  void setReplicationEnabled(boolean enabled);
+  @VisibleForTesting
+  public DatanodeDetails getDatanode() {
+    return datanode;
+  }
+
+  public long getTime() {
+    return time;
+  }
 }

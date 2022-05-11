@@ -50,6 +50,8 @@ public final class SCMNodeMetrics implements MetricsSource {
   private @Metric MutableCounterLong numHBProcessingFailed;
   private @Metric MutableCounterLong numNodeReportProcessed;
   private @Metric MutableCounterLong numNodeReportProcessingFailed;
+  private @Metric MutableCounterLong numNodeCommandQueueReportProcessed;
+  private @Metric MutableCounterLong numNodeCommandQueueReportProcessingFailed;
   private @Metric String textMetric;
 
   private final MetricsRegistry registry;
@@ -109,6 +111,20 @@ public final class SCMNodeMetrics implements MetricsSource {
    */
   void incNumNodeReportProcessingFailed() {
     numNodeReportProcessingFailed.incr();
+  }
+
+  /**
+   * Increments number of Command Queue reports processed.
+   */
+  void incNumNodeCommandQueueReportProcessed() {
+    numNodeCommandQueueReportProcessed.incr();
+  }
+
+  /**
+   * Increments number of Command Queue reports where processing failed.
+   */
+  void incNumNodeCommandQueueReportProcessingFailed() {
+    numNodeCommandQueueReportProcessingFailed.incr();
   }
 
   /**

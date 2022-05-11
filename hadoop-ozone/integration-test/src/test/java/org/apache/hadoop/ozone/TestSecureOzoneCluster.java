@@ -94,7 +94,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
@@ -172,7 +171,6 @@ public final class TestSecureOzoneCluster {
     try {
       conf = new OzoneConfiguration();
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-      conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
           getPort(OZONE_SCM_CLIENT_PORT_DEFAULT, 100));

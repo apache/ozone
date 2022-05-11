@@ -31,6 +31,7 @@ import java.util.List;
 public class RandomPipelineChoosePolicy implements PipelineChoosePolicy {
 
   @Override
+  @SuppressWarnings("java:S2245") // no need for secure random
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
     return pipelineList.get((int) (Math.random() * pipelineList.size()));
