@@ -212,7 +212,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startScmServer();
     // add one HddsVolume
     addHddsVolume();
-    // Let HddsVolume be formatted to mimic the real cluster upgrade
+
     // Set layout version.
     DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
         UUID.randomUUID().toString(),
@@ -222,12 +222,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
         ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
-    dataVolume.setTest(true);
-    StorageVolumeUtil.checkVolume(dataVolume, CLUSTER_ID, CLUSTER_ID, conf,
-        null, null);
-    // Make sure no RocksDB exits
+    // Format HddsVolume to mimic the real cluster upgrade situation
+    dataVolume.format(CLUSTER_ID);
+    File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
+    idDir.mkdir();
     Assert.assertNull(dataVolume.getDbParentDir());
 
+    // Restart DN and finalize upgrade
     restartDatanode(
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
     dsm.finalizeUpgrade();
@@ -483,11 +484,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
         ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
-    dataVolume.setTest(true);
-    StorageVolumeUtil.checkVolume(dataVolume, CLUSTER_ID, CLUSTER_ID, conf,
-        null, null);
-    // Make sure no RocksDB exits
+    // Format HddsVolume to mimic the real cluster upgrade situation
+    dataVolume.format(CLUSTER_ID);
+    File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
+    idDir.mkdir();
     Assert.assertNull(dataVolume.getDbParentDir());
+
+    // Restart DN
     restartDatanode(
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
 
@@ -525,7 +528,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         container.getContainerData().getSchemaVersion());
     readChunk(writeChunk, pipeline);
 
-    // SchemaV3 is not finalized
+    // SchemaV3 is not finalized, so still ERASURE_CODED_STORAGE_SUPPORT
     restartDatanode(
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
 
@@ -746,42 +749,5 @@ public class TestDatanodeUpgradeToSchemaV3 {
         allVolumes.toArray(new String[0]));
 
     return vol;
-  }
-
-  /**
-   * Renames the specified volume directory so it will appear as failed to
-   * the datanode.
-   */
-  public void failVolume(File volume) {
-    File failedVolume = getFailedVolume(volume);
-    Assert.assertTrue(volume.renameTo(failedVolume));
-  }
-
-  /**
-   * Convert the specified volume from its failed name back to its original
-   * name. The File passed should be the original volume path, not the one it
-   * was renamed to to fail it.
-   */
-  public void restoreVolume(File volume) {
-    File failedVolume = getFailedVolume(volume);
-    Assert.assertTrue(failedVolume.renameTo(volume));
-  }
-
-  /**
-   * @return The file name that will be used to rename a volume to fail it.
-   */
-  public File getFailedVolume(File volume) {
-    return new File(volume.getParent(), volume.getName() + "-failed");
-  }
-
-  /**
-   * Checks whether the datanode thinks the volume has failed.
-   * This could be outdated information if the volume was restored already
-   * and the datanode has not been restarted since then.
-   */
-  public boolean dnThinksVolumeFailed(File volume) {
-    return dsm.getContainer().getVolumeSet().getFailedVolumesList().stream()
-        .anyMatch(v ->
-            getHddsRoot(v.getStorageDir()).equals(getHddsRoot(volume)));
   }
 }

@@ -76,9 +76,6 @@ public class HddsVolume extends StorageVolume {
   private File dbParentDir;
   private AtomicBoolean dbLoaded = new AtomicBoolean(false);
 
-  // For test
-  private boolean isTest = false;
-
   /**
    * Builder for HddsVolume.
    */
@@ -123,12 +120,8 @@ public class HddsVolume extends StorageVolume {
       MutableVolumeSet dbVolumeSet) throws IOException {
     super.createWorkingDir(workingDirName, dbVolumeSet);
 
-    // Create DB store for a newly added volume
-    if (!isTest) {
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.SCM_HA)) {
-        createDbStore(dbVolumeSet);
-      }
-    }
+    // Create DB store for a newly formatted volume
+    createDbStore(dbVolumeSet);
   }
 
   public File getHddsRootDir() {
@@ -190,11 +183,6 @@ public class HddsVolume extends StorageVolume {
     return dbLoaded.get();
   }
 
-  @VisibleForTesting
-  public void setTest(boolean test) {
-    this.isTest = test;
-  }
-
   public void loadDbStore() throws IOException {
     // DN startup for the first time, not registered yet,
     // so the DbVolume is not formatted.
@@ -251,17 +239,19 @@ public class HddsVolume extends StorageVolume {
   public void createDbStore(MutableVolumeSet dbVolumeSet) throws IOException {
     DbVolume chosenDbVolume = null;
     File clusterIdDir;
+    String workingDir = getWorkingDir() == null ? getClusterID() :
+        getWorkingDir();
 
     if (dbVolumeSet == null || dbVolumeSet.getVolumesList().isEmpty()) {
       // No extra db volumes specified, just create db under the HddsVolume.
-      clusterIdDir = new File(getStorageDir(), getClusterID());
+      clusterIdDir = new File(getStorageDir(), workingDir);
     } else {
       // Randomly choose a DbVolume for simplicity.
       List<DbVolume> dbVolumeList = StorageVolumeUtil.getDbVolumesList(
           dbVolumeSet.getVolumesList());
       chosenDbVolume = dbVolumeList.get(
           ThreadLocalRandom.current().nextInt(dbVolumeList.size()));
-      clusterIdDir = new File(chosenDbVolume.getStorageDir(), getClusterID());
+      clusterIdDir = new File(chosenDbVolume.getStorageDir(), workingDir);
     }
 
     if (!clusterIdDir.exists()) {

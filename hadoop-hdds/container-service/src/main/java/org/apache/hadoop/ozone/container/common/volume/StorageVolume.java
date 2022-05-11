@@ -109,6 +109,8 @@ public abstract class StorageVolume
 
   private final VolumeSet volumeSet;
 
+  private String workingDir;
+
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
       StorageLocation location = StorageLocation.parse(b.volumeRootStr);
@@ -188,6 +190,7 @@ public abstract class StorageVolume
       throw new IOException("Unable to create ID directory " + idDir +
           " for datanode.");
     }
+    this.workingDir = workingDirName;
   }
 
   private VolumeState analyzeVolumeState() {
@@ -379,6 +382,10 @@ public abstract class StorageVolume
 
   public File getStorageDir() {
     return this.storageDir;
+  }
+
+  public String getWorkingDir() {
+    return this.workingDir;
   }
 
   public void refreshVolumeInfo() {
