@@ -297,6 +297,7 @@ public interface MiniOzoneCluster {
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
     protected static final int DEFAULT_PIPELINE_LIMIT = 3;
+    protected static final int DEFAULT_EC_PIPELINE_MINIMUM = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected OzoneConfiguration conf;
@@ -340,6 +341,7 @@ public interface MiniOzoneCluster {
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
+    protected int ecPipelineMinimum = DEFAULT_EC_PIPELINE_MINIMUM;
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -462,6 +464,16 @@ public interface MiniOzoneCluster {
      */
     public Builder setTotalPipelineNumLimit(int val) {
       pipelineNumLimit = val;
+      return this;
+    }
+
+    /**
+     * Sets the minimum number of pipelines for each EC replication config.
+     * @param val number of pipelines
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setECPipelineMinimum(int val) {
+      ecPipelineMinimum = val;
       return this;
     }
 

@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
@@ -687,6 +688,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
           pipelineNumLimit >= DEFAULT_PIPELINE_LIMIT ?
               pipelineNumLimit : DEFAULT_PIPELINE_LIMIT);
+      WritableECContainerProviderConfig writableECContainerProviderConfig =
+          conf.getObject(WritableECContainerProviderConfig.class);
+      writableECContainerProviderConfig.setMinimumPipelines(ecPipelineMinimum);
+      conf.setFromObject(writableECContainerProviderConfig);
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
