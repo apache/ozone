@@ -16,8 +16,12 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -25,6 +29,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -231,6 +236,39 @@ public class TestRequestValidations {
         "preFinalizePostProcessCreateKeyValidator",
         "oldClientPostProcessCreateKeyValidator",
         "oldClientPostProcessCreateKeyValidator2");
+  }
+
+  /**
+   * Validates the getBucketLayout hook present in the Context object for use
+   * by the validators.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testValidationContextGetBucketLayout()
+      throws Exception {
+    ValidationContext ctx = of(anUnfinalizedVersionManager(), metadataManager);
+
+    String volName = "vol-1";
+    String buckName = "buck-1";
+
+    String buckKey = volName + OzoneConsts.OZONE_URI_DELIMITER + buckName;
+    when(metadataManager.getBucketKey(volName, buckName)).thenReturn(buckKey);
+
+    Table<String, OmBucketInfo> buckTable = mock(Table.class);
+    when(metadataManager.getBucketTable()).thenReturn(buckTable);
+
+    OmBucketInfo buckInfo = mock(OmBucketInfo.class);
+    when(buckTable.get(buckKey)).thenReturn(buckInfo);
+
+    // No need to simulate link bucket for this test.
+    when(buckInfo.isLink()).thenReturn(false);
+
+    when(buckInfo.getBucketLayout())
+        .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    BucketLayout buckLayout = ctx.getBucketLayout("vol-1", "buck-1");
+    Assert.assertTrue(buckLayout.isFileSystemOptimized());
   }
 
   private RequestValidations loadValidations(ValidationContext ctx) {
