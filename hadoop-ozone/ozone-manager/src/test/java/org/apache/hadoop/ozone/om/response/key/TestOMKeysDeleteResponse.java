@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -57,7 +57,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     String ozoneKey = "";
     for (int i = 0; i < 10; i++) {
       keyName = parent.concat(key + i);
-      TestOMRequestUtils.addKeyToTable(false, volumeName,
+      OMRequestTestUtils.addKeyToTable(false, volumeName,
           bucketName, keyName, 0L, RATIS, THREE, omMetadataManager);
       ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
       omKeyInfoList

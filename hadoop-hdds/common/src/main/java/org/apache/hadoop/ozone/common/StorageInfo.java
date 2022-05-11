@@ -109,7 +109,7 @@ public class StorageInfo {
 
   public Long  getCreationTime() {
     String creationTime = properties.getProperty(CREATION_TIME);
-    if(creationTime != null) {
+    if (creationTime != null) {
       return Long.parseLong(creationTime);
     }
     return null;
@@ -117,7 +117,7 @@ public class StorageInfo {
 
   public int getLayoutVersion() {
     String layout = properties.getProperty(LAYOUT_VERSION);
-    if(layout != null) {
+    if (layout != null) {
       return Integer.parseInt(layout);
     }
     return 0;
@@ -166,7 +166,7 @@ public class StorageInfo {
       throws InconsistentStorageStateException {
     NodeType nodeType = getNodeType();
     Preconditions.checkNotNull(nodeType);
-    if(type != nodeType) {
+    if (type != nodeType) {
       throw new InconsistentStorageStateException("Expected NodeType: " + type +
           ", but found: " + nodeType);
     }
@@ -176,7 +176,7 @@ public class StorageInfo {
       throws InconsistentStorageStateException {
     String clusterId = getClusterID();
     Preconditions.checkNotNull(clusterId);
-    if(clusterId.isEmpty()) {
+    if (clusterId.isEmpty()) {
       throw new InconsistentStorageStateException("Cluster ID not found");
     }
   }

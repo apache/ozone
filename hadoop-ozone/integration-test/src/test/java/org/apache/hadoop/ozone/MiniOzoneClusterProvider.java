@@ -189,7 +189,7 @@ public class MiniOzoneClusterProvider {
 
   private Thread reapClusters() {
     Thread t = new Thread(() -> {
-      while(!shutdown || !expiredClusters.isEmpty()) {
+      while (!shutdown || !expiredClusters.isEmpty()) {
         try {
           // Why not just call take and wait forever until interrupt is
           // thrown? Inside MiniCluster.shutdown, there are places where it
@@ -251,7 +251,7 @@ public class MiniOzoneClusterProvider {
   }
 
   private void destroyRemainingClusters() {
-    while(!clusters.isEmpty()) {
+    while (!clusters.isEmpty()) {
       try {
         MiniOzoneCluster cluster = clusters.poll();
         if (cluster != null) {

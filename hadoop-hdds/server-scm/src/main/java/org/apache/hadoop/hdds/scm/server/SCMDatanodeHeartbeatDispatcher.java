@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto
@@ -58,6 +59,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.COMMAND_QUEUE_REPORT;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
@@ -130,6 +132,13 @@ public final class SCMDatanodeHeartbeatDispatcher {
             new NodeReportFromDatanode(
                 datanodeDetails,
                 heartbeat.getNodeReport()));
+      }
+
+      if (heartbeat.hasCommandQueueReport()) {
+        LOG.debug("Dispatching Queued Command Report");
+        eventPublisher.fireEvent(COMMAND_QUEUE_REPORT,
+            new CommandQueueReportFromDatanode(datanodeDetails,
+                heartbeat.getCommandQueueReport()));
       }
 
       if (heartbeat.hasContainerReport()) {
@@ -234,6 +243,17 @@ public final class SCMDatanodeHeartbeatDispatcher {
   }
 
   /**
+   * Command Queue Report with origin.
+   */
+  public static class CommandQueueReportFromDatanode
+      extends ReportFromDatanode<CommandQueueReportProto> {
+    public CommandQueueReportFromDatanode(DatanodeDetails datanodeDetails,
+                                          CommandQueueReportProto report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
    * Layout report event payload with origin.
    */
   public static class LayoutReportFromDatanode
@@ -255,6 +275,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
         ContainerReportsProto report) {
       super(datanodeDetails, report);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return this.getDatanodeDetails().getUuid().hashCode();
+    }
   }
 
   /**
@@ -267,6 +297,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
         DatanodeDetails datanodeDetails,
         IncrementalContainerReportProto report) {
       super(datanodeDetails, report);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return this.getDatanodeDetails().getUuid().hashCode();
     }
   }
 

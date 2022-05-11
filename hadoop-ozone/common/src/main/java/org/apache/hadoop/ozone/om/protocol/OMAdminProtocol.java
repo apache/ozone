@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.protocol;
 import java.io.Closeable;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -33,4 +34,9 @@ public interface OMAdminProtocol extends Closeable {
    * Get the OM configuration.
    */
   OMConfiguration getOMConfiguration() throws IOException;
+
+  /**
+   * Remove OM from HA ring.
+   */
+  void decommission(OMNodeDetails removeOMNode) throws IOException;
 }

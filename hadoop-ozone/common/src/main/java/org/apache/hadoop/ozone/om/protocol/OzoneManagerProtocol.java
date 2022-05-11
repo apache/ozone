@@ -199,6 +199,18 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /**
+   * Changes the owner of a bucket.
+   * @param args  - OMBucketArgs
+   * @return true if operation succeeded, false if specified user is
+   *         already the owner.
+   * @throws IOException
+   */
+  default boolean setBucketOwner(OmBucketArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
 
   /**
    * Open the given key and return an open key session.

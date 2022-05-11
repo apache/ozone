@@ -81,7 +81,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
@@ -161,7 +161,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       OzoneManagerProtocolProtos.OMResponse.Builder omResp,
       IOException exception) {
     return new OMKeyAclResponseWithFSO(
-        createErrorOMResponse(omResp, exception));
+        createErrorOMResponse(omResp, exception), getBucketLayout());
   }
 
   abstract OMClientResponse onSuccess(

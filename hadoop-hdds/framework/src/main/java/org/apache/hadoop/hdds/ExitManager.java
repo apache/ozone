@@ -40,4 +40,8 @@ public class ExitManager {
   public void forceExit(int status, Exception ex, Logger log) {
     ExitUtils.terminate(status, ex.getLocalizedMessage(), ex, log);
   }
+
+  public void forceExit(int status, String exMsg, Logger log) {
+    ExitUtils.terminate(status, exMsg, log);
+  }
 }

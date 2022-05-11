@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,8 +52,7 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes)
-            .get(1L, TimeUnit.SECONDS);
+        downloader.getContainerDataFromReplicas(1L, datanodes);
 
     //THEN
     Assert.assertEquals(datanodes.get(0).getUuidString(), result.toString());
@@ -72,8 +70,7 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes)
-            .get(1L, TimeUnit.SECONDS);
+        downloader.getContainerDataFromReplicas(1L, datanodes);
 
     //THEN
     //first datanode is failed, second worked
@@ -91,8 +88,7 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes)
-            .get(1L, TimeUnit.SECONDS);
+        downloader.getContainerDataFromReplicas(1L, datanodes);
 
     //THEN
     //first datanode is failed, second worked
@@ -125,8 +121,7 @@ public class TestSimpleContainerDownloader {
     //WHEN executed, THEN at least once the second datanode should be
     //returned.
     for (int i = 0; i < 10000; i++) {
-      Path path =
-          downloader.getContainerDataFromReplicas(1L, datanodes).get();
+      Path path = downloader.getContainerDataFromReplicas(1L, datanodes);
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }

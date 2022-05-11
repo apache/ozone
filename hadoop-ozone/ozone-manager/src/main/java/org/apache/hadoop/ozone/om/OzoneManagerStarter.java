@@ -178,7 +178,7 @@ public class OzoneManagerStarter extends GenericCli {
    * to execute its tasks. This allows the dependency to be injected for unit
    * testing.
    */
-  static class OMStarterHelper implements OMStarterInterface{
+  static class OMStarterHelper implements OMStarterInterface {
 
     @Override
     public void start(OzoneConfiguration conf) throws IOException,

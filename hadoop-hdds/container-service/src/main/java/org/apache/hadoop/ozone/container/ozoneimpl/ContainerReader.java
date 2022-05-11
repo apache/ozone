@@ -190,9 +190,9 @@ public class ContainerReader implements Runnable {
   }
 
   /**
-   * verify ContainerData loaded from disk and fix-up stale members.
-   * Specifically blockCommitSequenceId, delete related metadata
-   * and bytesUsed
+   * Verify ContainerData loaded from disk and fix-up stale members.
+   * Specifically the in memory values of blockCommitSequenceId, delete related
+   * metadata, bytesUsed and block count.
    * @param containerData
    * @throws IOException
    */

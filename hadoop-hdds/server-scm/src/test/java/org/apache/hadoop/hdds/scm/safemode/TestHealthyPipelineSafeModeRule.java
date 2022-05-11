@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -33,7 +34,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.Assert;
@@ -80,12 +82,13 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
@@ -134,12 +137,13 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -149,15 +153,15 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Create 3 pipelines
       Pipeline pipeline1 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 
@@ -232,12 +236,13 @@ public class TestHealthyPipelineSafeModeRule {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -247,15 +252,15 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Create 3 pipelines
       Pipeline pipeline1 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.ONE));
       pipelineManager.openPipeline(pipeline1.getId());
       Pipeline pipeline2 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline2.getId());
       Pipeline pipeline3 =
-          pipelineManager.createPipeline(new RatisReplicationConfig(
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 

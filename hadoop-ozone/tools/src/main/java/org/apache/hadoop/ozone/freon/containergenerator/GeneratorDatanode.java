@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -81,6 +81,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class GeneratorDatanode extends BaseGenerator {
 
   @Option(names = {"--datanodes"},
@@ -316,8 +317,8 @@ public class GeneratorDatanode extends BaseGenerator {
 
   private KeyValueContainer createContainer(long containerId)
       throws IOException {
-    ChunkLayOutVersion layoutVersion =
-        ChunkLayOutVersion.getConfiguredVersion(config);
+    ContainerLayoutVersion layoutVersion =
+        ContainerLayoutVersion.getConfiguredVersion(config);
     KeyValueContainerData keyValueContainerData =
         new KeyValueContainerData(containerId, layoutVersion,
             getContainerSize(config),

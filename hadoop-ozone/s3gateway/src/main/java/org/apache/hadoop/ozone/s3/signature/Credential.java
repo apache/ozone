@@ -71,7 +71,7 @@ public class Credential {
     case 6:
       // Access id is kerberos principal.
       // Ex: testuser/om@EXAMPLE.COM/20190321/us-west-1/s3/aws4_request
-      accessKeyID = split[0] + "/" +split[1];
+      accessKeyID = split[0] + "/" + split[1];
       date = split[2].trim();
       awsRegion = split[3].trim();
       awsService = split[4].trim();

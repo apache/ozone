@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.apache.hadoop.ozone.MiniOzoneOMHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario with failover.
@@ -57,7 +57,7 @@ public class TestOzoneManagerHAWithFailover extends TestOzoneManagerHA {
 
     long numTimesTriedToSameNode = omFailoverProxyProvider.getWaitTime()
         / waitBetweenRetries;
-    omFailoverProxyProvider.performFailoverIfRequired(omFailoverProxyProvider.
+    omFailoverProxyProvider.setNextOmProxy(omFailoverProxyProvider.
         getCurrentProxyOMNodeId());
     Assert.assertEquals((numTimesTriedToSameNode + 1) * waitBetweenRetries,
         omFailoverProxyProvider.getWaitTime());

@@ -198,7 +198,7 @@ public class TestReportPublisher {
     GeneratedMessage report =
         ((CRLStatusReportPublisher) publisher).getReport();
     Assert.assertNotNull(report);
-    for(Descriptors.FieldDescriptor descriptor :
+    for (Descriptors.FieldDescriptor descriptor :
         report.getDescriptorForType().getFields()) {
       if (descriptor.getNumber() ==
           CRLStatusReport.RECEIVEDCRLID_FIELD_NUMBER) {

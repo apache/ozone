@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,7 +40,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.After;
@@ -259,12 +261,13 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -285,12 +288,13 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -310,12 +314,13 @@ public class TestSCMSafeModeManager {
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               mockNodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -342,23 +347,25 @@ public class TestSCMSafeModeManager {
     PipelineManagerImpl pipelineManager =
         PipelineManagerImpl.newPipelineManager(
             conf,
-            MockSCMHAManager.getInstance(true),
+            SCMHAManagerStub.getInstance(true),
             mockNodeManager,
             scmMetadataStore.getPipelineTable(),
             queue,
             scmContext,
-            serviceManager);
+            serviceManager,
+            new MonotonicClock(ZoneOffset.UTC));
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     pipelineManager.getBackgroundPipelineCreator().stop();
+    pipelineManager.getBackgroundPipelineScrubber().stop();
 
     for (int i = 0; i < pipelineCount; i++) {
       // Create pipeline
       Pipeline pipeline = pipelineManager.createPipeline(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
 
       pipelineManager.openPipeline(pipeline.getId());
@@ -435,7 +442,7 @@ public class TestSCMSafeModeManager {
     }, 100, 1000 * 5);
   }
 
-  private void checkHealthy(int expectedCount) throws Exception{
+  private void checkHealthy(int expectedCount) throws Exception {
     GenericTestUtils.waitFor(() -> scmSafeModeManager
             .getHealthyPipelineSafeModeRule()
             .getCurrentHealthyPipelineCount() == expectedCount,
@@ -548,14 +555,14 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     // Register all DataNodes except last one and assert SCM is in safe mode.
-    for (int i = 0; i < numOfDns-1; i++) {
+    for (int i = 0; i < numOfDns - 1; i++) {
       queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
           HddsTestUtils.createNodeRegistrationContainerReport(containers));
       assertTrue(scmSafeModeManager.getInSafeMode());
       assertTrue(scmSafeModeManager.getCurrentContainerThreshold() == 1);
     }
 
-    if(numOfDns == 0){
+    if (numOfDns == 0) {
       GenericTestUtils.waitFor(() -> {
         return scmSafeModeManager.getInSafeMode();
       }, 10, 1000 * 10);
@@ -586,7 +593,7 @@ public class TestSCMSafeModeManager {
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
     String storageDir = GenericTestUtils.getTempPath(
         TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
-    try{
+    try {
       MockNodeManager nodeManager = new MockNodeManager(true, 3);
       config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
       // enable pipeline check
@@ -596,12 +603,13 @@ public class TestSCMSafeModeManager {
       PipelineManagerImpl pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               config,
-              MockSCMHAManager.getInstance(true),
+              SCMHAManagerStub.getInstance(true),
               nodeManager,
               scmMetadataStore.getPipelineTable(),
               queue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              new MonotonicClock(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -610,7 +618,7 @@ public class TestSCMSafeModeManager {
           mockRatisProvider);
 
       Pipeline pipeline = pipelineManager.createPipeline(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
 
       pipeline = pipelineManager.getPipeline(pipeline.getId());
@@ -661,12 +669,13 @@ public class TestSCMSafeModeManager {
     PipelineManagerImpl pipelineManager =
         PipelineManagerImpl.newPipelineManager(
             config,
-            MockSCMHAManager.getInstance(true),
+            SCMHAManagerStub.getInstance(true),
             nodeManager,
             scmMetadataStore.getPipelineTable(),
             queue,
             scmContext,
-            serviceManager);
+            serviceManager,
+            new MonotonicClock(ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -710,11 +719,11 @@ public class TestSCMSafeModeManager {
     Pipeline pipeline;
     try {
       pipeline = pipelineManager.createPipeline(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE));
     } catch (SCMException ex) {
       pipeline = pipelineManager.getPipelines(
-          new RatisReplicationConfig(
+          RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE)).get(0);
     }
 

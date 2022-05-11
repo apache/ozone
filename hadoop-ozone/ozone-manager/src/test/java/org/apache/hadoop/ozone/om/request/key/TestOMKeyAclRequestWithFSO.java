@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestWithFSO;
@@ -40,15 +40,15 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
     keyName = key; // updated key name
 
     // Create parent dirs for the path
-    long parentId = TestOMRequestUtils
+    long parentId = OMRequestTestUtils
         .addParentsToDirTable(volumeName, bucketName, parentDir,
             omMetadataManager);
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils
+    OmKeyInfo omKeyInfo = OMRequestTestUtils
         .createOmKeyInfo(volumeName, bucketName, key,
             HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
             parentId + 1, parentId, 100, Time.now());
-    TestOMRequestUtils
+    OMRequestTestUtils
         .addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50,
             omMetadataManager);
     return omKeyInfo.getPath();

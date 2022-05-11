@@ -27,11 +27,10 @@ import:
     transformations:
     - type: Image
       image: "@docker.image@"
-  - path: pv-test
-    destination: pv-test
   - path: ozone-csi
     destination: csi
   - path: test-webserver
     destination: pv-test
 transformations:
   - type: Namespace
+  - type: kustomize

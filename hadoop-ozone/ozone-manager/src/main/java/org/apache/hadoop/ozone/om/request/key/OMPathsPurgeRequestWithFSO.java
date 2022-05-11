@@ -56,7 +56,7 @@ public class OMPathsPurgeRequestWithFSO extends OMKeyRequest {
 
     OMClientResponse omClientResponse = new OMPathsPurgeResponseWithFSO(
         omResponse.build(), markDeletedSubDirsList, deletedSubFilesList,
-        deletedDirsList, ozoneManager.isRatisEnabled());
+        deletedDirsList, ozoneManager.isRatisEnabled(), getBucketLayout());
     addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
         omDoubleBufferHelper);
 

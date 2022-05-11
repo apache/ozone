@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
@@ -46,7 +46,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   @Test
   public void testKeyAddAclRequest() throws Exception {
     // Manually add volume, bucket and key to DB
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
@@ -83,7 +83,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testKeyRemoveAclRequest() throws Exception {
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
@@ -147,7 +147,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testKeySetAclRequest() throws Exception {
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
@@ -248,7 +248,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
   }
 
   protected String addKeyToTable() throws Exception {
-    TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
         keyName, clientID, replicationType, replicationFactor, 1L,
         omMetadataManager);
 

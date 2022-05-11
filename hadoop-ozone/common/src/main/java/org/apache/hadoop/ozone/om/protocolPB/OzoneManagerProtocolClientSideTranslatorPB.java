@@ -25,12 +25,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -158,10 +160,18 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequestArgs;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -178,7 +188,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OmTransport transport;
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
-
+    
   private boolean s3AuthCheck;
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
@@ -211,10 +221,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @param cmdType type of the request
    */
   private OMRequest.Builder createOMRequest(Type cmdType) {
-
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(clientID);
   }
 
@@ -527,6 +536,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
+   * {@inheritDoc}
+   */
+  @Override
+  public boolean setBucketOwner(OmBucketArgs args)
+      throws IOException {
+    SetBucketPropertyRequest.Builder req =
+        SetBucketPropertyRequest.newBuilder();
+    BucketArgs bucketArgs = args.getProtobuf();
+    req.setBucketArgs(bucketArgs);
+
+    OMRequest omRequest = createOMRequest(Type.SetBucketProperty)
+        .setSetBucketPropertyRequest(req)
+        .build();
+
+    OMResponse omResponse = submitRequest(omRequest);
+    SetBucketPropertyResponse response =
+        handleError(omResponse).getSetBucketPropertyResponse();
+
+    return response.getResponse();
+  }
+
+  /**
    * List buckets in a volume.
    *
    * @param volumeName
@@ -581,14 +612,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName());
 
-    if(args.getAcls() != null) {
+    if (args.getAcls() != null) {
       keyArgs.addAllAcls(args.getAcls().stream().distinct().map(a ->
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -645,8 +681,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize());
 
     if (args.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -676,12 +717,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
-            .map(info -> info.getProtobuf(CURRENT_VERSION))
+            .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
             .collect(Collectors.toList()));
 
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(
-          ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgsBuilder.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgsBuilder.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
 
@@ -724,6 +770,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Deprecated
   public void renameKeys(OmRenameKeys omRenameKeys) throws IOException {
 
     List<RenameKeysMap> renameKeyList  = new ArrayList<>();
@@ -916,9 +963,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
 
     if (omKeyArgs.getReplicationConfig() != null) {
-      keyArgs.setFactor(
-              ReplicationConfig
-                      .getLegacyFactor(omKeyArgs.getReplicationConfig()));
+      if (omKeyArgs.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgs.setEcReplicationConfig(
+            ((ECReplicationConfig) omKeyArgs.getReplicationConfig()).toProto());
+      } else {
+        keyArgs.setFactor(ReplicationConfig
+            .getLegacyFactor(omKeyArgs.getReplicationConfig()));
+      }
       keyArgs.setType(omKeyArgs.getReplicationConfig().getReplicationType());
     }
 
@@ -957,7 +1008,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(omKeyArgs.getDataSize())
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
-            .map(info -> info.getProtobuf(CURRENT_VERSION))
+            .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
             .collect(Collectors.toList()));
     multipartCommitUploadPartRequest.setClientID(clientId);
     multipartCommitUploadPartRequest.setKeyArgs(keyArgs.build());
@@ -1053,8 +1104,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OmMultipartUploadListParts omMultipartUploadListParts =
         new OmMultipartUploadListParts(
-                ReplicationConfig.fromProtoTypeAndFactor(response.getType(),
-                response.getFactor()),
+            ReplicationConfig.fromProto(
+                response.getType(), response.getFactor(),
+                response.getEcReplicationConfig()),
             response.getNextPartNumberMarker(), response.getIsTruncated());
     omMultipartUploadListParts.addProtoPartList(response.getPartsListList());
 
@@ -1089,8 +1141,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 proto.getKeyName(),
                 proto.getUploadId(),
                 Instant.ofEpochMilli(proto.getCreationTime()),
-                ReplicationConfig.fromProtoTypeAndFactor(proto.getType(),
-                        proto.getFactor())
+                ReplicationConfig.fromProto(proto.getType(), proto.getFactor(),
+                    proto.getEcReplicationConfig())
             ))
             .collect(Collectors.toList());
 
@@ -1209,7 +1261,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OMPBHelper.convertToDelegationToken(resp.getResponse().getToken())
           : null;
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Get delegation token failed.", e,
@@ -1241,7 +1293,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           .getRenewDelegationTokenResponse();
       return resp.getResponse().getNewExpiryTime();
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Renew delegation token failed.", e,
@@ -1270,7 +1322,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     try {
       handleError(submitRequest(omRequest));
     } catch (IOException e) {
-      if(e instanceof OMException) {
+      if (e instanceof OMException) {
         throw (OMException)e;
       }
       throw new OMException("Cancel delegation token failed.", e,
@@ -1484,6 +1536,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     dbUpdatesWrapper.setCurrentSequenceNumber(
         dbUpdatesResponse.getSequenceNumber());
+    dbUpdatesWrapper.setLatestSequenceNumber(
+        dbUpdatesResponse.getLatestSequenceNumber());
     return dbUpdatesWrapper;
   }
 
@@ -1498,9 +1552,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .addAllAcls(args.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     if (args.getReplicationConfig() != null) {
-      keyArgsBuilder.setFactor(
-              ReplicationConfig
-                      .getLegacyFactor(args.getReplicationConfig()));
+      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
+        keyArgsBuilder.setEcReplicationConfig(
+            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
+      } else {
+        keyArgsBuilder.setFactor(
+            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
+      }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
     CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()

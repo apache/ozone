@@ -15,22 +15,15 @@
 
 *** Settings ***
 Documentation       Test freon data validation commands
-Resource            ../lib/os.robot
+Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
 
 *** Variables ***
 ${PREFIX}    ${EMPTY}
 
-*** Keywords ***
-DN Chunk Validator
-    Return From Keyword If    '${SECURITY_ENABLED}' == 'true'
-    ${result} =        Execute          ozone freon dcv -t1 -n100 -p dcg${PREFIX}
-                       Should contain   ${result}   Successful executions: 100
-
 *** Test Cases ***
 Ozone Client Key Validator
-    ${result} =        Execute          ozone freon ockv ${OM_HA_PARAM} -t=1 -n=1 -p ockg${PREFIX}
-                       Should contain   ${result}   Successful executions: 1
+    Freon OCKV    prefix=ockg${PREFIX}
 
 DN Chunk Validator
-    DN Chunk Validator
+    Freon DCV     prefix=dcg${PREFIX}    n=100

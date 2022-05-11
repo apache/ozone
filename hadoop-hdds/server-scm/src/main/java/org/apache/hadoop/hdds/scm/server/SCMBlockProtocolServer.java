@@ -204,7 +204,7 @@ public class SCMBlockProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.ALLOCATE_BLOCK, auditMap)
         );
@@ -274,7 +274,7 @@ public class SCMBlockProtocolServer implements
   @Override
   public ScmInfo getScmInfo() throws IOException {
     boolean auditSuccess = true;
-    try{
+    try {
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
@@ -287,7 +287,7 @@ public class SCMBlockProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
@@ -305,7 +305,7 @@ public class SCMBlockProtocolServer implements
     auditMap.put("cluster", String.valueOf(request.getClusterId()));
     auditMap.put("addr", String.valueOf(request.getRatisAddr()));
     boolean auditSuccess = true;
-    try{
+    try {
       return scm.getScmHAManager().addSCM(request);
     } catch (Exception ex) {
       auditSuccess = false;
@@ -314,7 +314,7 @@ public class SCMBlockProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.ADD_SCM, auditMap)
         );
@@ -326,12 +326,12 @@ public class SCMBlockProtocolServer implements
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException {
     boolean auditSuccess = true;
-    try{
+    try {
       NodeManager nodeManager = scm.getScmNodeManager();
       Node client = null;
       List<DatanodeDetails> possibleClients =
           nodeManager.getNodesByAddress(clientMachine);
-      if (possibleClients.size()>0){
+      if (possibleClients.size() > 0) {
         client = possibleClients.get(0);
       }
       List<Node> nodeList = new ArrayList();
@@ -353,7 +353,7 @@ public class SCMBlockProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, null)
         );

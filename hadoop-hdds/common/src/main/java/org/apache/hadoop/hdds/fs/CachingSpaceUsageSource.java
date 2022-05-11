@@ -127,7 +127,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   private void refresh() {
     //only one `refresh` can be running at a certain moment
-    if(isRefreshRunning.compareAndSet(false, true)) {
+    if (isRefreshRunning.compareAndSet(false, true)) {
       try {
         cachedValue.set(source.getUsedSpace());
       } catch (RuntimeException e) {

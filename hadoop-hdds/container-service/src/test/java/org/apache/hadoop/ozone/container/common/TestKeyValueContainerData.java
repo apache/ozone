@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.Test;
@@ -41,15 +41,15 @@ public class TestKeyValueContainerData {
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestKeyValueContainerData(ChunkLayOutVersion layout) {
+  public TestKeyValueContainerData(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Test
@@ -79,7 +79,7 @@ public class TestKeyValueContainerData {
     assertEquals(val.get(), kvData.getWriteBytes());
     assertEquals(val.get(), kvData.getReadCount());
     assertEquals(val.get(), kvData.getWriteCount());
-    assertEquals(val.get(), kvData.getKeyCount());
+    assertEquals(val.get(), kvData.getBlockCount());
     assertEquals(val.get(), kvData.getNumPendingDeletionBlocks());
     assertEquals(MAXSIZE, kvData.getMaxSize());
 
@@ -91,7 +91,7 @@ public class TestKeyValueContainerData {
     kvData.incrWriteBytes(10);
     kvData.incrReadCount();
     kvData.incrWriteCount();
-    kvData.incrKeyCount();
+    kvData.incrBlockCount();
     kvData.incrPendingDeletionBlocks(1);
     kvData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
@@ -105,7 +105,7 @@ public class TestKeyValueContainerData {
     assertEquals(10, kvData.getWriteBytes());
     assertEquals(1, kvData.getReadCount());
     assertEquals(1, kvData.getWriteCount());
-    assertEquals(1, kvData.getKeyCount());
+    assertEquals(1, kvData.getBlockCount());
     assertEquals(1, kvData.getNumPendingDeletionBlocks());
     assertEquals(pipelineId.toString(), kvData.getOriginPipelineId());
     assertEquals(datanodeId.toString(), kvData.getOriginNodeId());

@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -62,7 +63,7 @@ public interface MiniOzoneCluster {
    * @return MiniOzoneCluster builder
    */
   static Builder newOMHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneOMHAClusterImpl.Builder(conf);
+    return new MiniOzoneHAClusterImpl.Builder(conf);
   }
 
   static Builder newHABuilder(OzoneConfiguration conf) {
@@ -158,6 +159,8 @@ public interface MiniOzoneCluster {
    * @return List of {@link HddsDatanodeService}
    */
   List<HddsDatanodeService> getHddsDatanodes();
+
+  HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
    * Returns a {@link ReconServer} instance.
@@ -293,7 +296,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
-    protected static final int DEFAULT_PIPELIME_LIMIT = 3;
+    protected static final int DEFAULT_PIPELINE_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected OzoneConfiguration conf;
@@ -336,11 +339,12 @@ public interface MiniOzoneCluster {
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
-    protected int pipelineNumLimit = DEFAULT_PIPELIME_LIMIT;
+    protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId(UUID.randomUUID().toString());
+      ExitUtils.disableSystemExit();
     }
 
     public Builder setConf(OzoneConfiguration config) {

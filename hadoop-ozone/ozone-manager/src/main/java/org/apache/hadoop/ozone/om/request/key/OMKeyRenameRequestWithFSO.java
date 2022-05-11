@@ -113,7 +113,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       // old key and create operation on new key
 
       // check Acl fromKeyName
-      checkACLs(ozoneManager, volumeName, bucketName, fromKeyName,
+      checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
           IAccessAuthorizer.ACLType.DELETE);
 
       // check Acl toKeyName
@@ -149,7 +149,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                       volumeName, bucketName, toKeyName, 0);
 
       // Check if toKey exists.
-      if(toKeyFileStatus != null) {
+      if (toKeyFileStatus != null) {
         // Destination exists and following are different cases:
         OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
 
@@ -210,7 +210,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponseWithFSO(createErrorOMResponse(
-              omResponse, exception));
+              omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
@@ -289,7 +289,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
         omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-        dbFromKey, dbToKey, fromKeyValue, isRenameDirectory);
+        dbFromKey, dbToKey, fromKeyValue, isRenameDirectory,
+        getBucketLayout());
     return omClientResponse;
   }
 

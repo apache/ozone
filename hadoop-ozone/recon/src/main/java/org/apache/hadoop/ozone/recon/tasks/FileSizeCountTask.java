@@ -128,7 +128,7 @@ public class FileSizeCountTask implements ReconOmTask {
       String updatedKey = omdbUpdateEvent.getKey();
       OmKeyInfo omKeyInfo = omdbUpdateEvent.getValue();
 
-      try{
+      try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
           handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
@@ -258,7 +258,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
     @Override
     public boolean equals(Object obj) {
-      if(obj instanceof FileSizeCountKey) {
+      if (obj instanceof FileSizeCountKey) {
         FileSizeCountKey s = (FileSizeCountKey) obj;
         return volume.equals(s.volume) && bucket.equals(s.bucket) &&
             fileSizeUpperBound.equals(s.fileSizeUpperBound);

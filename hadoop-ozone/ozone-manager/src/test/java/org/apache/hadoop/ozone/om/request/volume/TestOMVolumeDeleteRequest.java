@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -62,8 +62,8 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     omVolumeDeleteRequest.preExecute(ozoneManager);
 
     // Add volume and user to DB
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
 
     String volumeKey = omMetadataManager.getVolumeKey(volumeName);
     String ownerKey = omMetadataManager.getUserKey(ownerName);
@@ -127,11 +127,11 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName).build();
-    TestOMRequestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
+    OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
 
     // Add user and volume to DB.
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     OMClientResponse omClientResponse =
         omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1L,

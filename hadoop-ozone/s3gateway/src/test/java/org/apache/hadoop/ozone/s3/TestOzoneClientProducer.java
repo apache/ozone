@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.s3;
 
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -30,6 +31,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
+
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 
 import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD5;
@@ -118,7 +122,10 @@ public class TestOzoneClientProducer {
         },
         {
             null, null, null, null, null, null
-        }
+        },
+        {
+            "", null, null, null, null, null
+        },
     });
   }
 
@@ -129,6 +136,69 @@ public class TestOzoneClientProducer {
       fail("testGetClientFailure");
     } catch (Exception ex) {
       Assert.assertTrue(ex instanceof IOException);
+    }
+  }
+
+  @Test
+  public void testGetSignature() {
+    try {
+      System.err.println("Testing: " + authHeader);
+      OzoneConfiguration configuration = new OzoneConfiguration();
+      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1");
+      configuration.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "ozone1addr:9399");
+      producer.setOzoneConfiguration(configuration);
+      producer.getSignature();
+      if ("".equals(authHeader)) {
+        fail("Empty AuthHeader must fail");
+      }
+    } catch (WebApplicationException ex) {
+      if (authHeader == null || authHeader.equals("")) {
+        // Empty auth header should be 403
+        Assert.assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
+        // TODO: Should return XML in body like this (bot not for now):
+        // <Error>
+        //   <Code>AccessDenied</Code><Message>Access Denied</Message>
+        //   <RequestId>...</RequestId><HostId>...</HostId>
+        // </Error>
+      } else {
+        // Other requests have stale timestamp and thus should fail
+        Assert.assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
+      }
+    } catch (Exception ex) {
+      fail("Unexpected exception: " + ex);
+    }
+  }
+
+  @Test
+  public void testGetClientFailureWithMultipleServiceIds() {
+    try {
+      OzoneConfiguration configuration = new OzoneConfiguration();
+      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
+      producer.setOzoneConfiguration(configuration);
+      producer.createClient();
+      fail("testGetClientFailureWithMultipleServiceIds");
+    } catch (Exception ex) {
+      Assert.assertTrue(ex instanceof IOException);
+      Assert.assertTrue(ex.getMessage().contains(
+          "More than 1 OzoneManager ServiceID"));
+    }
+  }
+
+  @Test
+  public void testGetClientFailureWithMultipleServiceIdsAndInternalServiceId() {
+    try {
+      OzoneConfiguration configuration = new OzoneConfiguration();
+      configuration.set(OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID, "ozone1");
+      configuration.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "ozone1,ozone2");
+      producer.setOzoneConfiguration(configuration);
+      producer.createClient();
+      fail("testGetClientFailureWithMultipleServiceIdsAndInternalServiceId");
+    } catch (Exception ex) {
+      Assert.assertTrue(ex instanceof IOException);
+      // Still test will fail, as config is not complete. But it should pass
+      // the service id check.
+      Assert.assertFalse(ex.getMessage().contains(
+          "More than 1 OzoneManager ServiceID"));
     }
   }
 

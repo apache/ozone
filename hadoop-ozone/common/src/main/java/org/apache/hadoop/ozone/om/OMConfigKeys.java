@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
@@ -49,13 +51,16 @@ public final class OMConfigKeys {
       "ozone.om.nodes";
   public static final String OZONE_OM_NODE_ID_KEY =
       "ozone.om.node.id";
+  public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
+      "ozone.om.decommissioned.nodes";
 
   public static final String OZONE_OM_ADDRESS_KEY =
       "ozone.om.address";
   public static final String OZONE_OM_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_OM_PORT_DEFAULT = 9862;
-
+  public static final String OZONE_OM_GRPC_PORT_KEY =
+      "ozone.om.grpc.port";
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
   public static final String OZONE_OM_HTTP_BIND_HOST_KEY =
@@ -70,11 +75,6 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
 
-  // LevelDB cache file uses an off-heap cache in LevelDB of 128 MB.
-  public static final String OZONE_OM_DB_CACHE_SIZE_MB =
-      "ozone.om.db.cache.size.mb";
-  public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
-
   public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
       "ozone.om.volume.listall.allowed";
   public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
@@ -85,6 +85,21 @@ public final class OMConfigKeys {
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.open.key.cleanup.service.interval";
+  public static final String
+      OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT = "24h";
+
+  public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD =
+      "ozone.om.open.key.expire.threshold";
+  public static final String OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT =
+      "7d";
+
+  public static final String OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.open.key.cleanup.limit.per.task";
+  public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      1000;
 
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
@@ -204,15 +219,15 @@ public final class OMConfigKeys {
   public static final String  DELEGATION_REMOVER_SCAN_INTERVAL_KEY =
       "ozone.manager.delegation.remover.scan.interval";
   public static final long    DELEGATION_REMOVER_SCAN_INTERVAL_DEFAULT =
-      60*60*1000;
+      60 * 60 * 1000;
   public static final String  DELEGATION_TOKEN_RENEW_INTERVAL_KEY =
       "ozone.manager.delegation.token.renew-interval";
   public static final long    DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT =
-      24*60*60*1000;  // 1 day = 86400000 ms
+      24 * 60 * 60 * 1000;  // 1 day = 86400000 ms
   public static final String  DELEGATION_TOKEN_MAX_LIFETIME_KEY =
       "ozone.manager.delegation.token.max-lifetime";
   public static final long    DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT =
-      7*24*60*60*1000; // 7 days
+      7 * 24 * 60 * 60 * 1000; // 7 days
 
   public static final String OZONE_DB_CHECKPOINT_TRANSFER_RATE_KEY =
       "ozone.manager.db.checkpoint.transfer.bandwidthPerSec";
@@ -245,6 +260,16 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
 
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_KEY =
+      "ozone.server.default.replication";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
+
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY =
+      "ozone.server.default.replication.type";
+  public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT =
+      ReplicationType.RATIS.toString();
+
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 
   public static final String OZONE_FS_TRASH_INTERVAL_KEY =
@@ -268,9 +293,11 @@ public final class OMConfigKeys {
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
       "ozone.default.bucket.layout";
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
-      BucketLayout.OBJECT_STORE.name();
+      BucketLayout.LEGACY.name();
   public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
       BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
+  public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
+      BucketLayout.OBJECT_STORE.name();
 
   /**
    * Configuration properties for Directory Deleting Service.
@@ -284,6 +311,16 @@ public final class OMConfigKeys {
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
+  public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
+      "ozone.om.grpc.maximum.response.length";
+  /** Default value for GRPC_MAXIMUM_RESPONSE_LENGTH. */
+  public static final int OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT =
+      128 * 1024 * 1024;
+
+  public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
+      "ozone.om.s3.grpc.server_enabled";
+  public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
+      false;
   /**
    * Configuration properties for OMAdminProtcol service.
    */
@@ -294,5 +331,21 @@ public final class OMConfigKeys {
       "ozone.om.admin.protocol.wait.between.retries";
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
+  public static final String OZONE_OM_TRANSPORT_CLASS =
+      "ozone.om.transport.class";
+  public static final String OZONE_OM_TRANSPORT_CLASS_DEFAULT =
+      "org.apache.hadoop.ozone.om.protocolPB"
+          + ".Hadoop3OmTransportFactory";
+  public static final String OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT =
+      "ozone.om.unflushed.transaction.max.count";
+  public static final int OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT
+      = 10000;
 
+  /**
+   * This configuration shall be enabled to utilize the functionality of the
+   * fine-grained KEY_PATH_LOCK.
+   */
+  public static final String OZONE_OM_KEY_PATH_LOCK_ENABLED =
+      "ozone.om.key.path.lock.enabled";
+  public static final boolean OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT = false;
 }

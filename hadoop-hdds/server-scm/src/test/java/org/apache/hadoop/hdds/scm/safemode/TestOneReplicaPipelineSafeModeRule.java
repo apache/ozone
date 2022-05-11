@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +36,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -49,6 +51,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
+import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -92,12 +95,13 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     pipelineManager = PipelineManagerImpl.newPipelineManager(
         ozoneConfiguration,
-        MockSCMHAManager.getInstance(true),
+        SCMHAManagerStub.getInstance(true),
         mockNodeManager,
         scmMetadataStore.getPipelineTable(),
         eventQueue,
         scmContext,
-        serviceManager);
+        serviceManager,
+        new TestClock(Instant.now(), ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
@@ -133,7 +137,7 @@ public class TestOneReplicaPipelineSafeModeRule {
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
-    firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount -1));
+    firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount - 1));
 
     // As 90% of 7 with ceil is 7, if we send 6 pipeline reports, rule
     // validate should be still false.
@@ -144,7 +148,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     Assert.assertFalse(rule.validate());
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.subList(pipelineFactorThreeCount -1,
+    firePipelineEvent(pipelines.subList(pipelineFactorThreeCount - 1,
             pipelineFactorThreeCount));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
@@ -168,7 +172,7 @@ public class TestOneReplicaPipelineSafeModeRule {
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines =
-        pipelineManager.getPipelines(new RatisReplicationConfig(
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE));
     firePipelineEvent(pipelines);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
@@ -179,15 +183,15 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     pipelines =
         pipelineManager.getPipelines(
-            new RatisReplicationConfig(ReplicationFactor.THREE));
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
-    firePipelineEvent(pipelines.subList(0, pipelineCountThree -1));
+    firePipelineEvent(pipelines.subList(0, pipelineCountThree - 1));
 
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 6"), 1000, 5000);
 
     //Fire last pipeline event from datanode.
-    firePipelineEvent(pipelines.subList(pipelineCountThree -1,
+    firePipelineEvent(pipelines.subList(pipelineCountThree - 1,
             pipelineCountThree));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
@@ -197,7 +201,7 @@ public class TestOneReplicaPipelineSafeModeRule {
       HddsProtos.ReplicationFactor factor) throws Exception {
     for (int i = 0; i < count; i++) {
       Pipeline pipeline = pipelineManager.createPipeline(
-              new RatisReplicationConfig(factor));
+              RatisReplicationConfig.getInstance(factor));
       pipelineManager.openPipeline(pipeline.getId());
 
     }

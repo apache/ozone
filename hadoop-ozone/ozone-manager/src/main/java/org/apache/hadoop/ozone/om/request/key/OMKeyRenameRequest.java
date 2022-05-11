@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
 
 import com.google.common.base.Optional;
@@ -40,7 +39,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -70,10 +68,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyRenameRequest.class);
 
-  public OMKeyRenameRequest(OMRequest omRequest) {
-    super(omRequest);
-  }
-
   public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
   }
@@ -88,18 +82,27 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if(checkKeyNameEnabled){
+    if (checkKeyNameEnabled) {
       OmUtils.validateKeyName(renameKeyRequest.getToKeyName());
     }
 
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
 
-    // Set modification time.
+    String srcKey = renameKeyArgs.getKeyName();
+    String dstKey = renameKeyRequest.getToKeyName();
+    if (getBucketLayout().isFileSystemOptimized()) {
+      srcKey = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+          srcKey, getBucketLayout());
+      dstKey = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+          dstKey, getBucketLayout());
+    }
+
+    // Set modification time & srcKeyName.
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
-            .setModificationTime(Time.now());
+        .setModificationTime(Time.now()).setKeyName(srcKey);
 
     return getOmRequest().toBuilder()
-        .setRenameKeyRequest(renameKeyRequest.toBuilder()
+        .setRenameKeyRequest(renameKeyRequest.toBuilder().setToKeyName(dstKey)
             .setKeyArgs(newKeyArgs))
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
 
@@ -200,14 +203,14 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-          fromKeyName, toKeyName, fromKeyValue);
+          fromKeyName, toKeyName, fromKeyValue, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);
@@ -246,18 +249,5 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
     auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
     return auditMap;
-  }
-
-  public static OMKeyRenameRequest getInstance(
-      OzoneManagerProtocolProtos.KeyArgs keyArgs, OMRequest omRequest,
-      OzoneManager ozoneManager) throws IOException {
-
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new OMKeyRenameRequestWithFSO(omRequest, bucketLayout);
-    }
-    return new OMKeyRenameRequest(omRequest, bucketLayout);
   }
 }

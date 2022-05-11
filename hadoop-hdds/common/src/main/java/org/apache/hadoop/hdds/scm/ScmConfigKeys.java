@@ -138,8 +138,8 @@ public final class ScmConfigKeys {
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT =
       "64KB";
 
-  public static final String OZONE_SCM_CHUNK_LAYOUT_KEY =
-      "ozone.scm.chunk.layout";
+  public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
+      "ozone.scm.container.layout";
 
   public static final String OZONE_SCM_CLIENT_PORT_KEY =
       "ozone.scm.client.port";
@@ -335,16 +335,14 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DATANODE_ID_DIR =
       "ozone.scm.datanode.id.dir";
 
-  public static final String OZONE_SCM_DB_CACHE_SIZE_MB =
-      "ozone.scm.db.cache.size.mb";
-  public static final int OZONE_SCM_DB_CACHE_SIZE_DEFAULT = 128;
-
   public static final String OZONE_SCM_CONTAINER_SIZE =
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";
 
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
+  public static final String OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY =
+      "ozone.scm.container.placement.ec.impl";
 
   public static final String OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT =
       "ozone.scm.pipeline.owner.container.count";
@@ -404,6 +402,12 @@ public final class ScmConfigKeys {
       "ozone.scm.pipeline.creation.interval";
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT =
       "120s";
+
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
+      "ozone.scm.pipeline.scrub.interval";
+  public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
+      "5m";
+
 
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
@@ -529,7 +533,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_LOG_PURGE_GAP =
           "ozone.scm.ha.ratis.log.purge.gap";
-  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT =1000000;
+  public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT = 1000000;
 
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD =
           "ozone.scm.ha.ratis.snapshot.threshold";
@@ -554,6 +558,8 @@ public final class ScmConfigKeys {
   public static final boolean
       OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
 
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
+      "ozone.audit.log.debug.cmd.list.scmaudit";
   /**
    * Never constructed.
    */

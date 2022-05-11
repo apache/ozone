@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
@@ -94,7 +94,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -113,7 +113,7 @@ public class TestBlockDeletingService {
   private static String datanodeUuid;
   private static MutableConfigurationSource conf;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
   private final String schemaVersion;
   private int blockLimitPerInterval;
   private static VolumeSet volumeSet;
@@ -134,16 +134,17 @@ public class TestBlockDeletingService {
    */
   public static class LayoutInfo {
     private final String schemaVersion;
-    private final ChunkLayOutVersion layout;
+    private final ContainerLayoutVersion layout;
 
-    public LayoutInfo(String schemaVersion, ChunkLayOutVersion layout) {
+    public LayoutInfo(String schemaVersion, ContainerLayoutVersion layout) {
       this.schemaVersion = schemaVersion;
       this.layout = layout;
     }
 
     private static List<LayoutInfo> layoutList = new ArrayList<>();
     static {
-      for (ChunkLayOutVersion ch : ChunkLayOutVersion.getAllVersions()) {
+      for (ContainerLayoutVersion ch :
+          ContainerLayoutVersion.getAllVersions()) {
         for (String sch : SCHEMA_VERSIONS) {
           layoutList.add(new LayoutInfo(sch, ch));
         }
@@ -344,7 +345,7 @@ public class TestBlockDeletingService {
       int numOfChunksPerBlock) {
     long chunkLength = 100;
     try (ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
-      container.getContainerData().setKeyCount(numOfBlocksPerContainer);
+      container.getContainerData().setBlockCount(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
           .put(OzoneConsts.BLOCK_COUNT, (long) numOfBlocksPerContainer);
@@ -355,7 +356,8 @@ public class TestBlockDeletingService {
           .put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
               (long) numOfBlocksPerContainer);
     } catch (IOException exception) {
-      LOG.warn("Meta Data update was not successful for container: "+container);
+      LOG.warn("Meta Data update was not successful for container: "
+          + container);
     }
   }
 
@@ -426,7 +428,7 @@ public class TestBlockDeletingService {
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
     Assert.assertEquals(1, containerData.size());
 
-    try(ReferenceCountedDB meta = BlockUtils.getDB(
+    try (ReferenceCountedDB meta = BlockUtils.getDB(
         (KeyValueContainerData) containerData.get(0), conf)) {
       Map<Long, Container<?>> containerMap = containerSet.getContainerMapCopy();
       // NOTE: this test assumes that all the container is KetValueContainer and
@@ -529,7 +531,7 @@ public class TestBlockDeletingService {
         mockDependencies(containerSet, keyValueHandler);
     BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.NANOSECONDS,
-        conf);
+        10, conf);
     svc.start();
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
@@ -551,7 +553,7 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        conf);
+        10, conf);
     svc.start();
 
     // get container meta data
@@ -733,7 +735,7 @@ public class TestBlockDeletingService {
       // in all the containers are deleted)).
       deleteAndWait(service, 2);
 
-      long totalContainerBlocks = blocksPerContainer*containerCount;
+      long totalContainerBlocks = blocksPerContainer * containerCount;
       GenericTestUtils.waitFor(() ->
               totalContainerBlocks * blockSpace ==
                       (totalContainerSpace -

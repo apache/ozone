@@ -357,7 +357,7 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void reinitialize() {
+  public void reinitialize() throws IOException {
     Preconditions.checkNotNull(installingDBCheckpoint);
     DBCheckpoint checkpoint = installingDBCheckpoint;
 
@@ -369,8 +369,8 @@ public class SCMStateMachine extends BaseStateMachine {
       termIndex =
           scm.getScmHAManager().installCheckpoint(checkpoint);
     } catch (Exception e) {
-      LOG.error("Failed to reinitialize SCMStateMachine.");
-      return;
+      LOG.error("Failed to reinitialize SCMStateMachine.", e);
+      throw new IOException(e);
     }
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
@@ -390,10 +390,17 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    super.close();
-    transactionBuffer.close();
-    HadoopExecutors.
-        shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    //if ratis server is stopped , it indicates this `close` originates
+    // from `scm.stop()`, otherwise, it indicates this `close` originates
+    // from ratis.
+    if (scm.getScmHAManager().getRatisServer().isStopped()) {
+      super.close();
+      transactionBuffer.close();
+      HadoopExecutors.
+          shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    } else {
+      scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
+    }
   }
 
   @VisibleForTesting

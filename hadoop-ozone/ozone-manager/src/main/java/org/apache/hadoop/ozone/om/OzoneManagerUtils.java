@@ -18,13 +18,19 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
@@ -49,42 +55,51 @@ public final class OzoneManagerUtils {
    * OzoneManagerStateMachine#runCommand ->
    * OzoneManagerRequestHandler#handleWriteRequest ->
    * OzoneManagerRatisUtils#createClientRequest ->
-   * OMKeyRequestFactory#createRequest ->
+   * BucketLayoutAwareOMKeyRequestFactory#createRequest ->
    * ...
    * OzoneManagerUtils#getBucketLayout ->
    * OzoneManagerUtils#getOmBucketInfo ->
    * omMetadataManager().getBucketTable().get(buckKey)
    */
 
-  private static OmBucketInfo getOmBucketInfo(OzoneManager ozoneManager,
-      String volName, String buckName) {
-    String buckKey =
-        ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
-    OmBucketInfo buckInfo = null;
-    try {
-      buckInfo =
-          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
-    } catch (IOException e) {
-      LOG.debug("Failed to get the value for the key: " + buckKey);
-    }
-    return buckInfo;
+  private static OmBucketInfo getOmBucketInfo(OMMetadataManager metaMgr,
+      String volName, String buckName) throws IOException {
+    String buckKey = metaMgr.getBucketKey(volName, buckName);
+    return metaMgr.getBucketTable().get(buckKey);
   }
 
   /**
    * Get bucket layout for the given volume and bucket name.
    *
-   * @param volName      volume name
-   * @param buckName     bucket name
-   * @param ozoneManager ozone manager
-   * @param visited      set contains visited bucket details
+   * @param metadataManager OMMetadataManager
+   * @param volName         volume name
+   * @param buckName        bucket name
    * @return bucket layout
    * @throws IOException
    */
-  public static BucketLayout getBucketLayout(String volName,
-      String buckName, OzoneManager ozoneManager,
-      Set<Pair<String, String>> visited) throws IOException {
+  public static BucketLayout getBucketLayout(OMMetadataManager metadataManager,
+                                             String volName,
+                                             String buckName)
+      throws IOException {
+    return getBucketLayout(metadataManager, volName, buckName, new HashSet<>());
+  }
 
-    OmBucketInfo buckInfo = getOmBucketInfo(ozoneManager, volName, buckName);
+  /**
+   * Get bucket layout for the given volume and bucket name.
+   *
+   * @param metadataManager metadata manager
+   * @param volName         volume name
+   * @param buckName        bucket name
+   * @return bucket layout
+   * @throws IOException
+   */
+  private static BucketLayout getBucketLayout(OMMetadataManager metadataManager,
+                                              String volName,
+                                              String buckName,
+                                              Set<Pair<String, String>> visited)
+      throws IOException {
+
+    OmBucketInfo buckInfo = getOmBucketInfo(metadataManager, volName, buckName);
 
     if (buckInfo != null) {
       // If this is a link bucket, we fetch the BucketLayout from the
@@ -97,7 +112,7 @@ public final class OzoneManagerUtils {
               DETECTED_LOOP_IN_BUCKET_LINKS);
         }
         OmBucketInfo sourceBuckInfo =
-            getOmBucketInfo(ozoneManager, buckInfo.getSourceVolume(),
+            getOmBucketInfo(metadataManager, buckInfo.getSourceVolume(),
                 buckInfo.getSourceBucket());
         if (sourceBuckInfo != null) {
           /** If the source bucket is again a link, we recursively resolve the
@@ -109,17 +124,95 @@ public final class OzoneManagerUtils {
            * links.
            */
           if (sourceBuckInfo.isLink()) {
-            return getBucketLayout(sourceBuckInfo.getVolumeName(),
-                sourceBuckInfo.getBucketName(), ozoneManager, visited);
+            return getBucketLayout(metadataManager,
+                sourceBuckInfo.getVolumeName(),
+                sourceBuckInfo.getBucketName(), visited);
           }
           return sourceBuckInfo.getBucketLayout();
         }
       }
       return buckInfo.getBucketLayout();
-    } else {
-      LOG.error("Bucket not found: {}/{} ", volName, buckName);
-      // TODO: Handle bucket validation
     }
-    return BucketLayout.DEFAULT;
+
+    if (!metadataManager.getVolumeTable()
+        .isExist(metadataManager.getVolumeKey(volName))) {
+      throw new OMException("Volume not found: " + volName,
+          OMException.ResultCodes.VOLUME_NOT_FOUND);
+    }
+
+    throw new OMException("Bucket not found: " + volName + "/" + buckName,
+        OMException.ResultCodes.BUCKET_NOT_FOUND);
   }
+
+  /**
+   * Resolve bucket layout for a given link bucket's OmBucketInfo.
+   *
+   * @param bucketInfo
+   * @return {@code OmBucketInfo} with
+   * @throws IOException
+   */
+  public static OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo,
+                                                     OMMetadataManager
+                                                         metadataManager,
+                                                     Set<Pair<String,
+                                                         String>> visited)
+      throws IOException {
+
+    if (bucketInfo.isLink()) {
+      if (!visited.add(Pair.of(bucketInfo.getVolumeName(),
+          bucketInfo.getBucketName()))) {
+        throw new OMException("Detected loop in bucket links. Bucket name: " +
+            bucketInfo.getBucketName() + ", Volume name: " +
+            bucketInfo.getVolumeName(),
+            DETECTED_LOOP_IN_BUCKET_LINKS);
+      }
+      String sourceBucketKey = metadataManager
+          .getBucketKey(bucketInfo.getSourceVolume(),
+              bucketInfo.getSourceBucket());
+      OmBucketInfo sourceBucketInfo =
+          metadataManager.getBucketTable().get(sourceBucketKey);
+
+      // If the Link Bucket's source bucket exists, we get its layout.
+      if (sourceBucketInfo != null) {
+
+        /** If the source bucket is again a link, we recursively resolve the
+         * link bucket.
+         *
+         * For example:
+         * buck-link1 -> buck-link2 -> buck-link3 -> buck-src
+         * buck-src has the actual BucketLayout that will be used by the links.
+         *
+         * Finally - we return buck-link1's OmBucketInfo, with buck-src's
+         * bucket layout.
+         */
+        if (sourceBucketInfo.isLink()) {
+          sourceBucketInfo =
+              resolveLinkBucketLayout(sourceBucketInfo, metadataManager,
+                  visited);
+        }
+
+        OmBucketInfo.Builder buckInfoBuilder = bucketInfo.toBuilder();
+        buckInfoBuilder.setBucketLayout(sourceBucketInfo.getBucketLayout());
+        bucketInfo = buckInfoBuilder.build();
+      }
+    }
+    return bucketInfo;
+  }
+
+  /**
+   * Builds an audit map based on the Delegation Token passed to the method.
+   * @param token Delegation Token
+   * @return AuditMap
+   */
+  public static Map<String, String> buildTokenAuditMap(
+      Token<OzoneTokenIdentifier> token) {
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.DELEGATION_TOKEN_KIND,
+        token.getKind() == null ? "" : token.getKind().toString());
+    auditMap.put(OzoneConsts.DELEGATION_TOKEN_SERVICE,
+        token.getService() == null ? "" : token.getService().toString());
+
+    return auditMap;
+  }
+
 }

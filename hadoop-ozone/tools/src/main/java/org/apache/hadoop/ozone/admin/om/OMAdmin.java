@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -57,7 +56,8 @@ import java.util.Collection;
         GetServiceRolesSubcommand.class,
         PrepareSubCommand.class,
         CancelPrepareSubCommand.class,
-        FinalizationStatusSubCommand.class
+        FinalizationStatusSubCommand.class,
+        DecommissionOMSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class OMAdmin extends GenericCli implements SubcommandWithParent {
@@ -110,13 +110,12 @@ public class OMAdmin extends GenericCli implements SubcommandWithParent {
     } else if (omServiceID == null || omServiceID.isEmpty()) {
       omServiceID = getTheOnlyConfiguredOmServiceIdOrThrow();
     }
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
     if (!forceHA || (forceHA && OmUtils.isOmHAServiceId(conf, omServiceID))) {
       OmTransport omTransport = new Hadoop3OmTransportFactory()
-          .createOmTransport(conf, ugi, omServiceID);
+          .createOmTransport(conf, parent.getUser(), omServiceID);
       return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
           clientId);
     } else {

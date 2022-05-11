@@ -258,7 +258,7 @@ public class TestOMUpgradeFinalizer {
   private Iterable<OMLayoutFeature> mockFeatures(
       int startFromLV, String... names
   ) {
-    int i=startFromLV;
+    int i = startFromLV;
     List<OMLayoutFeature> ret = new ArrayList<>();
     for (String name : names) {
       ret.add(mockFeature(name, i));

@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -189,11 +190,13 @@ public final class ContainerUtils {
             HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
             HddsConfigKeys.
                     HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
-    if(enabled) {
+    if (enabled) {
       String storedChecksum = containerData.getChecksum();
 
       Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-              containerData.getContainerType());
+          containerData.getContainerType(),
+          containerData instanceof KeyValueContainerData &&
+              ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
       containerData.computeAndSetChecksum(yaml);
       String computedChecksum = containerData.getChecksum();
 

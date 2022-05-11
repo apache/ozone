@@ -158,6 +158,7 @@ public class OMKeyRemoveAclRequestWithFSO extends OMKeyAclRequestWithFSO {
     omResponse.setRemoveAclResponse(
         OzoneManagerProtocolProtos.RemoveAclResponse.newBuilder()
             .setResponse(operationResult));
-    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir);
+    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir,
+        getBucketLayout());
   }
 }

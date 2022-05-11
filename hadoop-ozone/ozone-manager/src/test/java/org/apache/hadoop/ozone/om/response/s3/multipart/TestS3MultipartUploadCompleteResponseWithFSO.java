@@ -19,13 +19,14 @@
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
@@ -54,7 +55,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
 
     long txnId = 50;
@@ -81,19 +82,23 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             clientId);
     String dbKey = omMetadataManager.getOzonePathKey(parentID, fileName);
     OmKeyInfo omKeyInfoFSO =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
                     Time.now());
 
     // add key to openFileTable
     omKeyInfoFSO.setKeyName(fileName);
-    TestOMRequestUtils.addFileToKeyTable(true, false,
+    OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientId, omKeyInfoFSO.getObjectID(),
             omMetadataManager);
 
     addS3MultipartUploadCommitPartResponseFSO(volumeName, bucketName, keyName,
             multipartUploadID, dbOpenKey);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(bucketKey);
 
     Assert.assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
@@ -103,8 +108,9 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
             createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName, multipartUploadID, omKeyInfoFSO,
-                OzoneManagerProtocolProtos.Status.OK, unUsedParts);
+                keyName, multipartUploadID, omKeyInfoFSO,
+                OzoneManagerProtocolProtos.Status.OK, unUsedParts,
+                omBucketInfo, null);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -130,7 +136,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     createParentPath(volumeName, bucketName);
     runAddDBToBatchWithParts(volumeName, bucketName, keyName, 0);
@@ -148,12 +154,12 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     createParentPath(volumeName, bucketName);
 
     // Put an entry to delete table with the same key prior to multipart commit
-    OmKeyInfo prevKey = TestOMRequestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo prevKey = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName,
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE,
@@ -209,8 +215,12 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             keyName, multipartUploadID, fileName, dbMultipartKey,
             omMultipartKeyInfo, deleteEntryCount);
 
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
     OmKeyInfo omKeyInfo =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentID + 9,
@@ -220,7 +230,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
             createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
                     keyName, multipartUploadID, omKeyInfoFSO,
-                    OzoneManagerProtocolProtos.Status.OK, unUsedParts);
+                    OzoneManagerProtocolProtos.Status.OK, unUsedParts,
+                    omBucketInfo, null);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
             batchOperation);
@@ -310,7 +321,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
   private void createParentPath(String volumeName, String bucketName)
       throws Exception {
     // Create parent dirs for the path
-    parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
+    parentID = OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName,
             dirName, omMetadataManager);
   }
 

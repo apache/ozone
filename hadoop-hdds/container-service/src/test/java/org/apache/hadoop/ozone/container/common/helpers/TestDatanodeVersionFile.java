@@ -32,7 +32,9 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This class tests {@link DatanodeVersionFile}.
@@ -50,7 +52,7 @@ public class TestDatanodeVersionFile {
   private int lv;
 
   @Rule
-  public TemporaryFolder folder= new TemporaryFolder();
+  public TemporaryFolder folder = new TemporaryFolder();
 
   @Before
   public void setup() throws IOException {
@@ -70,7 +72,7 @@ public class TestDatanodeVersionFile {
   }
 
   @Test
-  public void testCreateAndReadVersionFile() throws IOException{
+  public void testCreateAndReadVersionFile() throws IOException {
 
     //Check VersionFile exists
     assertTrue(versionFile.exists());
@@ -88,7 +90,7 @@ public class TestDatanodeVersionFile {
   }
 
   @Test
-  public void testIncorrectClusterId() throws IOException{
+  public void testIncorrectClusterId() throws IOException {
     try {
       String randomClusterID = UUID.randomUUID().toString();
       HddsVolumeUtil.getClusterID(properties, versionFile,
@@ -100,7 +102,7 @@ public class TestDatanodeVersionFile {
   }
 
   @Test
-  public void testVerifyCTime() throws IOException{
+  public void testVerifyCTime() throws IOException {
     long invalidCTime = -10;
     dnVersionFile = new DatanodeVersionFile(
         storageID, clusterID, datanodeUUID, invalidCTime, lv);
@@ -117,7 +119,7 @@ public class TestDatanodeVersionFile {
   }
 
   @Test
-  public void testVerifyLayOut() throws IOException{
+  public void testVerifyLayOut() throws IOException {
     int invalidLayOutVersion = 100;
     dnVersionFile = new DatanodeVersionFile(
         storageID, clusterID, datanodeUUID, cTime, invalidLayOutVersion);

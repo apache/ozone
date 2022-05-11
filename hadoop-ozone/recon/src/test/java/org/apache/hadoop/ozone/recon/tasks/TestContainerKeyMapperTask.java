@@ -85,7 +85,7 @@ public class TestContainerKeyMapperTask {
   }
 
   @Test
-  public void testReprocessOMDB() throws Exception{
+  public void testReprocessOMDB() throws Exception {
 
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
@@ -275,8 +275,8 @@ public class TestContainerKeyMapperTask {
         .setBucketName(bucket)
         .setVolumeName(volume)
         .setKeyName(key)
-        .setReplicationConfig(
-            new StandaloneReplicationConfig(HddsProtos.ReplicationFactor.ONE))
+        .setReplicationConfig(StandaloneReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
             omKeyLocationInfoGroup))
         .build();

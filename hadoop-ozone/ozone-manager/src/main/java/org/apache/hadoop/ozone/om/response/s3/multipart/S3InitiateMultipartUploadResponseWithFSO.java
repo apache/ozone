@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -50,8 +51,9 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
       @Nonnull OmKeyInfo omKeyInfo, @Nonnull String mpuDBKey,
-      @Nonnull List<OmDirectoryInfo> parentDirInfos) {
-    super(omResponse, omMultipartKeyInfo, omKeyInfo);
+      @Nonnull List<OmDirectoryInfo> parentDirInfos,
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, omMultipartKeyInfo, omKeyInfo, bucketLayout);
     this.parentDirInfos = parentDirInfos;
     this.mpuDBKey = mpuDBKey;
   }
@@ -61,8 +63,8 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
    * For a successful request, the other constructor should be used.
    */
   public S3InitiateMultipartUploadResponseWithFSO(
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
+      @Nonnull OMResponse omResponse, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override

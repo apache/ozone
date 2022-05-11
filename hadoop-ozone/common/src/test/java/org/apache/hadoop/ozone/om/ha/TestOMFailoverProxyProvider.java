@@ -123,7 +123,7 @@ public class TestOMFailoverProxyProvider {
     allNodeIds.remove(provider.getCurrentProxyOMNodeId());
     Assert.assertTrue("This test needs at least 2 OMs",
         allNodeIds.size() > 0);
-    provider.performFailoverIfRequired(allNodeIds.iterator().next());
+    provider.setNextOmProxy(allNodeIds.iterator().next());
     Assert.assertEquals(0, provider.getWaitTime());
   }
 
@@ -149,8 +149,9 @@ public class TestOMFailoverProxyProvider {
   private void failoverToNextNode(int numNextNodeFailoverTimes,
       long waitTimeAfter) {
     for (int attempt = 0; attempt < numNextNodeFailoverTimes; attempt++) {
-      provider.performFailoverToNextProxy();
+      provider.selectNextOmProxy();
       Assert.assertEquals(waitTimeAfter, provider.getWaitTime());
+      provider.performFailover(null);
     }
   }
 
@@ -158,8 +159,9 @@ public class TestOMFailoverProxyProvider {
    * Failover to same node and wait time will be attempt*waitBetweenRetries.
    */
   private void failoverToSameNode(int numSameNodeFailoverTimes) {
+    provider.performFailover(null);
     for (int attempt = 1; attempt <= numSameNodeFailoverTimes; attempt++) {
-      provider.performFailoverIfRequired(provider.getCurrentProxyOMNodeId());
+      provider.setNextOmProxy(provider.getCurrentProxyOMNodeId());
       Assert.assertEquals(attempt * waitBetweenRetries,
           provider.getWaitTime());
     }
@@ -180,7 +182,7 @@ public class TestOMFailoverProxyProvider {
       String nodeId = NODE_ID_BASE_STR + i;
       ozoneConf.set(
           ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
-          nodeId), nodeAddrs.get(i-1));
+          nodeId), nodeAddrs.get(i - 1));
       allNodeIds.add(nodeId);
     }
     ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),

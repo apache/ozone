@@ -282,17 +282,27 @@ public final class ContainerProtocolCalls  {
    */
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data, Token<? extends TokenIdentifier> token)
+      ByteString data, Token<? extends TokenIdentifier> token,
+      int replicationIndex
+  )
       throws IOException, ExecutionException, InterruptedException {
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
-            .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-            .setChunkData(chunk).setData(data);
+            .setBlockID(DatanodeBlockID.newBuilder()
+                .setContainerID(blockID.getContainerID())
+                .setLocalID(blockID.getLocalID())
+                .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
+                .setReplicaIndex(replicationIndex)
+                .build())
+            .setChunkData(chunk)
+            .setData(data);
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto.newBuilder().setCmdType(Type.WriteChunk)
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.WriteChunk)
             .setContainerID(blockID.getContainerID())
-            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
+            .setDatanodeUuid(id)
+            .setWriteChunk(writeChunkRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
@@ -434,7 +444,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setCloseContainer(CloseContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
-    if(encodedToken != null) {
+    if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
     client.sendCommand(request.build(), getValidatorList());
@@ -458,7 +468,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
-    if(encodedToken != null) {
+    if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
     ContainerCommandResponseProto response =
@@ -560,8 +570,8 @@ public final class ContainerProtocolCalls  {
     ContainerCommandRequestProto request = builder.build();
     Map<DatanodeDetails, ContainerCommandResponseProto> responses =
             xceiverClient.sendCommandOnAllNodes(request);
-    for(Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
-           responses.entrySet()){
+    for (Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
+           responses.entrySet()) {
       datanodeToResponseMap.put(entry.getKey(), entry.getValue().getGetBlock());
     }
     return datanodeToResponseMap;

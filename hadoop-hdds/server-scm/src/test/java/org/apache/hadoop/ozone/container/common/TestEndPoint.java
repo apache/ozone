@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -275,14 +275,14 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndPoint = createEndpoint(
         SCMTestUtils.getConf(), serverAddress, 1000)) {
       SCMRegisteredResponseProto responseProto = rpcEndPoint.getEndPoint()
-          .register(nodeToRegister.getExtendedProtoBufMessage(), TestUtils
+          .register(nodeToRegister.getExtendedProtoBufMessage(), HddsTestUtils
                   .createNodeReport(
                       Arrays.asList(getStorageReports(
                           nodeToRegister.getUuid())),
                       Arrays.asList(getMetadataStorageReports(
                           nodeToRegister.getUuid()))),
-              TestUtils.getRandomContainerReports(10),
-              TestUtils.getRandomPipelineReports(),
+              HddsTestUtils.getRandomContainerReports(10),
+              HddsTestUtils.getRandomPipelineReports(),
               defaultLayoutVersionProto());
       Assert.assertNotNull(responseProto);
       Assert.assertEquals(nodeToRegister.getUuidString(),
@@ -296,12 +296,13 @@ public class TestEndPoint {
 
   private StorageReportProto getStorageReports(UUID id) {
     String storagePath = testDir.getAbsolutePath() + "/data-" + id;
-    return TestUtils.createStorageReport(id, storagePath, 100, 10, 90, null);
+    return HddsTestUtils.createStorageReport(id, storagePath, 100, 10, 90,
+        null);
   }
 
   private MetadataStorageReportProto getMetadataStorageReports(UUID id) {
     String storagePath = testDir.getAbsolutePath() + "/metadata-" + id;
-    return TestUtils.createMetadataStorageReport(storagePath, 100, 10, 90,
+    return HddsTestUtils.createMetadataStorageReport(storagePath, 100, 10, 90,
         null);
   }
 
@@ -315,15 +316,15 @@ public class TestEndPoint {
     rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     UUID datanodeID = UUID.randomUUID();
-    when(ozoneContainer.getNodeReport()).thenReturn(TestUtils
+    when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));
     ContainerController controller = Mockito.mock(ContainerController.class);
     when(controller.getContainerReport()).thenReturn(
-        TestUtils.getRandomContainerReports(10));
+        HddsTestUtils.getRandomContainerReports(10));
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
-        TestUtils.getRandomPipelineReports());
+        HddsTestUtils.getRandomPipelineReports());
     HDDSLayoutVersionManager versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
@@ -393,7 +394,7 @@ public class TestEndPoint {
             serverAddress, 1000)) {
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
-          .setNodeReport(TestUtils.createNodeReport(
+          .setNodeReport(HddsTestUtils.createNodeReport(
               Arrays.asList(getStorageReports(dataNode.getUuid())),
               Arrays.asList(getMetadataStorageReports(dataNode.getUuid()))))
           .build();
@@ -416,7 +417,7 @@ public class TestEndPoint {
 
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
-          .setNodeReport(TestUtils.createNodeReport(
+          .setNodeReport(HddsTestUtils.createNodeReport(
               Arrays.asList(getStorageReports(dataNode.getUuid())),
               Arrays.asList(getMetadataStorageReports(dataNode.getUuid()))))
           .build();

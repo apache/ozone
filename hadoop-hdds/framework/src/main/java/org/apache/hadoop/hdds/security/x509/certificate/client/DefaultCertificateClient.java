@@ -32,6 +32,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertStore;
@@ -41,6 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -82,6 +84,8 @@ import org.slf4j.Logger;
  * eco-system.
  */
 public abstract class DefaultCertificateClient implements CertificateClient {
+
+  private static final Random RANDOM = new SecureRandom();
 
   private static final String CERT_FILE_NAME_FORMAT = "%s.crt";
   private static final String CA_CERT_PREFIX = "CA-";
@@ -516,7 +520,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
           ip -> {
             builder.addIpAddress(ip.getHostAddress());
-            if(validator.isValid(ip.getCanonicalHostName())) {
+            if (validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
             } else {
               getLogger().error("Invalid domain {}", ip.getCanonicalHostName());
@@ -580,7 +584,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       String certName = String.format(CERT_FILE_NAME_FORMAT,
           cert.getSerialNumber().toString());
 
-      if(caCert) {
+      if (caCert) {
         certName = CA_CERT_PREFIX + certName;
         caCertId = cert.getSerialNumber().toString();
       }
@@ -688,17 +692,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public synchronized InitResponse init() throws CertificateException {
     int initCase = 0;
-    PrivateKey pvtKey= getPrivateKey();
+    PrivateKey pvtKey = getPrivateKey();
     PublicKey pubKey = getPublicKey();
     X509Certificate certificate = getCertificate();
 
-    if(pvtKey != null){
-      initCase = initCase | 1<<2;
+    if (pvtKey != null) {
+      initCase = initCase | 1 << 2;
     }
-    if(pubKey != null){
-      initCase = initCase | 1<<1;
+    if (pubKey != null) {
+      initCase = initCase | 1 << 1;
     }
-    if(certificate != null){
+    if (certificate != null) {
       initCase = initCase | 1;
     }
     getLogger().info("Certificate client init case: {}", initCase);
@@ -800,7 +804,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PublicKey pubKey = getCertificate().getPublicKey();
     try {
 
-      if(validateKeyPair(pubKey)){
+      if (validateKeyPair(pubKey)) {
         keyCodec.writePublicKey(pubKey);
         publicKey = pubKey;
       } else {
@@ -822,8 +826,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * */
   protected boolean validateKeyPair(PublicKey pubKey)
       throws CertificateException {
-    byte[] challenge = RandomStringUtils.random(1000).getBytes(
-        StandardCharsets.UTF_8);
+    byte[] challenge =
+        RandomStringUtils.random(1000, 0, 0, false, false, null, RANDOM)
+            .getBytes(StandardCharsets.UTF_8);
     byte[]  sign = signDataStream(new ByteArrayInputStream(challenge));
     return verifySignature(challenge, sign, pubKey);
   }
@@ -922,7 +927,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         updateCAList();
       }
       return pemEncodedCACerts;
-    }finally {
+    } finally {
       lock.unlock();
     }
   }
@@ -947,7 +952,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public boolean processCrl(CRLInfo crl){
+  public boolean processCrl(CRLInfo crl) {
     List<String> certIds2Remove = new ArrayList();
     crl.getX509CRL().getRevokedCertificates().forEach(
         cert -> certIds2Remove.add(cert.getSerialNumber().toString()));
@@ -957,15 +962,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
 
-  private boolean removeCertificates(List<String> certIds){
+  private boolean removeCertificates(List<String> certIds) {
     lock.lock();
     boolean reInitCert = false;
     try {
       // For now, remove self cert and ca cert is not implemented
       // both requires a restart of the service.
-      if ((certSerialId!=null && certIds.contains(certSerialId)) ||
-          (caCertId!=null && certIds.contains(caCertId)) ||
-          (rootCaCertId!=null && certIds.contains(rootCaCertId))) {
+      if ((certSerialId != null && certIds.contains(certSerialId)) ||
+          (caCertId != null && certIds.contains(caCertId)) ||
+          (rootCaCertId != null && certIds.contains(rootCaCertId))) {
         reInitCert = true;
       }
 
@@ -1004,7 +1009,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Set Local CRL id.
    * @param crlId
    */
-  public void setLocalCrlId(long crlId){
+  public void setLocalCrlId(long crlId) {
     this.localCrlId = crlId;
   }
 }

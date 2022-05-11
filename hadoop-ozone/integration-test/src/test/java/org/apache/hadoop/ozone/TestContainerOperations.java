@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -34,7 +35,13 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import java.io.IOException;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.REPLICATION;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests container operations (TODO currently only supports create)
@@ -64,7 +71,7 @@ public class TestContainerOperations {
 
   @AfterClass
   public static void cleanup() throws Exception {
-    if(cluster != null) {
+    if (cluster != null) {
       cluster.shutdown();
     }
   }
@@ -93,10 +100,36 @@ public class TestContainerOperations {
       storageClient.getPipeline(PipelineID.randomId().getProtobuf());
       Assert.fail("Get Pipeline should fail");
     } catch (Exception e) {
-      Assert.assertTrue(
+      assertTrue(
           SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException);
     }
 
     Assert.assertFalse(storageClient.listPipelines().isEmpty());
+  }
+
+  @Test
+  public void testDatanodeUsageInfoCompatibility() throws IOException {
+    DatanodeDetails dn = cluster.getStorageContainerManager()
+        .getScmNodeManager()
+        .getAllNodes()
+        .get(0);
+    dn.setCurrentVersion(0);
+
+    List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+        storageClient.getDatanodeUsageInfo(
+            dn.getIpAddress(), dn.getUuidString());
+
+    for (HddsProtos.DatanodeUsageInfoProto info : usageInfoList) {
+      assertTrue(info.getNode().getPortsList().stream()
+          .anyMatch(port -> REPLICATION.name().equals(port.getName())));
+    }
+
+    usageInfoList =
+        storageClient.getDatanodeUsageInfo(true, 3);
+
+    for (HddsProtos.DatanodeUsageInfoProto info : usageInfoList) {
+      assertTrue(info.getNode().getPortsList().stream()
+          .anyMatch(port -> REPLICATION.name().equals(port.getName())));
+    }
   }
 }

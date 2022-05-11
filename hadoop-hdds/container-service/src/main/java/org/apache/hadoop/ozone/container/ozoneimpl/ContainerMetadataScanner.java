@@ -90,7 +90,7 @@ public class ContainerMetadataScanner extends Thread {
         metrics.incNumContainersScanned();
       }
     }
-    long interval = System.nanoTime()-start;
+    long interval = System.nanoTime() - start;
     if (!stopping) {
       metrics.incNumScanIterations();
       LOG.info("Completed an iteration of container metadata scrubber in" +

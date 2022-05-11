@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -36,8 +37,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -66,6 +67,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -73,6 +75,7 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -103,7 +106,7 @@ public class TestBlockManager {
   public ExpectedException thrown = ExpectedException.none();
 
   @Rule
-  public TemporaryFolder folder= new TemporaryFolder();
+  public TemporaryFolder folder = new TemporaryFolder();
   private SCMMetadataStore scmMetadataStore;
   private ReplicationConfig replicationConfig;
 
@@ -123,7 +126,7 @@ public class TestBlockManager {
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
     nodeManager = new MockNodeManager(true, 10);
-    scmHAManager = MockSCMHAManager.getInstance(true);
+    scmHAManager = SCMHAManagerStub.getInstance(true);
 
     eventQueue = new EventQueue();
     scmContext = SCMContext.emptyContext();
@@ -143,7 +146,8 @@ public class TestBlockManager {
             scmMetadataStore.getPipelineTable(),
             eventQueue,
             scmContext,
-            serviceManager);
+            serviceManager,
+            new MonotonicClock(ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -172,7 +176,7 @@ public class TestBlockManager {
     configurator.setMetadataStore(scmMetadataStore);
     configurator.setSCMHAManager(scmHAManager);
     configurator.setScmContext(scmContext);
-    scm = TestUtils.getScm(conf, configurator);
+    scm = HddsTestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
     mapping = scm.getContainerManager();
@@ -182,7 +186,8 @@ public class TestBlockManager {
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, mapping, scmContext);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
-    replicationConfig = new RatisReplicationConfig(ReplicationFactor.THREE);
+    replicationConfig = RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE);
 
     scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
   }
@@ -198,7 +203,7 @@ public class TestBlockManager {
   @Test
   public void testAllocateBlock() throws Exception {
     pipelineManager.createPipeline(replicationConfig);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         replicationConfig, OzoneConsts.OZONE, new ExcludeList());
     Assert.assertNotNull(block);
@@ -212,7 +217,7 @@ public class TestBlockManager {
       }
     } catch (IOException e) {
     }
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
     ExcludeList excludeList = new ExcludeList();
     excludeList
         .addPipeline(pipelineManager.getPipelines(replicationConfig)
@@ -280,7 +285,7 @@ public class TestBlockManager {
       executors.add(Executors.newSingleThreadExecutor());
     }
     pipelineManager.createPipeline(replicationConfig);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
             new ConcurrentHashMap<>();
     List<CompletableFuture<AllocatedBlock>> futureList =
@@ -342,7 +347,7 @@ public class TestBlockManager {
       executors.add(Executors.newSingleThreadExecutor());
     }
     pipelineManager.createPipeline(replicationConfig);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
             new ConcurrentHashMap<>();
     List<CompletableFuture<AllocatedBlock>> futureList =
@@ -410,7 +415,7 @@ public class TestBlockManager {
       executors.add(Executors.newSingleThreadExecutor());
     }
     pipelineManager.createPipeline(replicationConfig);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
         new ConcurrentHashMap<>();
     List<CompletableFuture<AllocatedBlock>> futureList =
@@ -452,7 +457,7 @@ public class TestBlockManager {
       // the pipeline per raft log disk config is set to 1 by default
       int numContainers = (int)Math.ceil((double)
               (numContainerPerOwnerInPipeline *
-                  numContainerPerOwnerInPipeline)/numMetaDataVolumes);
+                  numContainerPerOwnerInPipeline) / numMetaDataVolumes);
       Assert.assertTrue(numContainers == pipelineManager.
           getNumberOfContainers(pipeline.getId()));
       Assert.assertTrue(
@@ -497,7 +502,7 @@ public class TestBlockManager {
 
     pipelineManager.createPipeline(replicationConfig);
     pipelineManager.createPipeline(replicationConfig);
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
 
     AllocatedBlock allocatedBlock = blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
@@ -544,7 +549,7 @@ public class TestBlockManager {
              / replicationConfig.getRequiredNodes(); i++) {
       pipelineManager.createPipeline(replicationConfig);
     }
-    TestUtils.openAllRatisPipelines(pipelineManager);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
 
     // wait till each pipeline has the configured number of containers.
     // After this each pipeline has numContainerPerOwnerInPipeline containers

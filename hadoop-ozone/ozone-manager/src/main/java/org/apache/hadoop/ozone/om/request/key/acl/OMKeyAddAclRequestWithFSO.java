@@ -147,6 +147,7 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
     omResponse.setAddAclResponse(
         OzoneManagerProtocolProtos.AddAclResponse.newBuilder()
             .setResponse(operationResult));
-    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir);
+    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir,
+        getBucketLayout());
   }
 }
