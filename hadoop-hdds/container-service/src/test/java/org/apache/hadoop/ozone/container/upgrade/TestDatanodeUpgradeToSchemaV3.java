@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -207,6 +206,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * This mimics the real cluster upgrade situation.
    */
   @Test
+  @SuppressWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
   public void testDBCreatedInFinalize() throws Exception {
     // start DN and SCM
     startScmServer();
@@ -470,6 +470,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * Test finalization failure.
    */
   @Test
+  @SuppressWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
   public void testFinalizeFailure() throws Exception {
     // start DN and SCM
     startScmServer();
@@ -625,7 +626,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     }
   }
 
-  public String startScmServer() throws Exception {
+  public String startScmServer() throws IOException {
     String scmID = UUID.randomUUID().toString();
     scmServerImpl = new ScmTestMock(CLUSTER_ID, scmID);
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
@@ -715,7 +716,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * Append a datanode volume to the existing volumes in the configuration.
    * @return The root directory for the new volume.
    */
-  public File addHddsVolume() throws Exception {
+  public File addHddsVolume() throws IOException {
     File vol = tempFolder.newFolder(UUID.randomUUID().toString());
     String[] existingVolumes =
         conf.getStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
