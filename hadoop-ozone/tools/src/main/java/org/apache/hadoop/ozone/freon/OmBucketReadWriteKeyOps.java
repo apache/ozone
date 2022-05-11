@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -25,8 +24,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -34,16 +31,8 @@ import picocli.CommandLine.Option;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutorCompletionService;
 
 /**
  * Synthetic read/write key operations workload generator tool.
@@ -56,10 +45,8 @@ import java.util.concurrent.ExecutorCompletionService;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 
+@SuppressWarnings("java:S2245") // no need for secure random
 public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmBucketReadWriteKeyOps.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the volume which contains the test data. Will be"
@@ -186,8 +173,10 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
 
   private void mainMethod(long counter) throws Exception {
 
-    int readResult = readOperations();
-    int writeResult = writeOperations();
+    int readResult = readOperations(readThreadCount, numOfReadOperations,
+        keyCountForRead, length);
+    int writeResult = writeOperations(writeThreadCount, numOfWriteOperations,
+        keyCountForWrite, length);
 
     print("Total Keys Read: " + readResult);
     print("Total Keys Written: " + writeResult * keyCountForWrite);
@@ -196,115 +185,35 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
   }
 
   @Override
-  public int readOperations() throws Exception {
-
-    // Create keyCountForRead (defaultValue = 100) keys under
-    // rootPath/readPath
-    String readPath = "".concat(OzoneConsts.OM_KEY_PREFIX).concat("readPath");
-    createKeys(readPath, keyCountForRead);
-
-    // Start readThreadCount (defaultValue = 90) concurrent read threads
-    // performing numOfReadOperations (defaultValue = 50) iterations
-    // of read operations (bucket.listKeys(readPath))
-    ExecutorService readService = Executors.newFixedThreadPool(readThreadCount);
-    CompletionService<Integer> readExecutorCompletionService =
-        new ExecutorCompletionService<>(readService);
-    List<Future<Integer>> readFutures = new ArrayList<>();
-    for (int i = 0; i < readThreadCount; i++) {
-      readFutures.add(readExecutorCompletionService.submit(() -> {
-        int readCount = 0;
-        try {
-          for (int j = 0; j < numOfReadOperations; j++) {
-            Iterator<? extends OzoneKey> ozoneKeyIterator =
-                bucket.listKeys("/readPath/");
-            while (ozoneKeyIterator.hasNext()) {
-              ozoneKeyIterator.next();
-              ++readCount;
-            }
-          }
-        } catch (IOException e) {
-          LOG.warn("Exception while listing keys ", e);
-        }
-        return readCount;
-      }));
-    }
-
-    int readResult = 0;
-    for (int i = 0; i < readFutures.size(); i++) {
-      try {
-        readResult += readExecutorCompletionService.take().get();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      } catch (ExecutionException e) {
-        e.printStackTrace();
-      }
-    }
-    readService.shutdown();
-
-    return readResult;
+  protected String createPath(String path) {
+    return "".concat(OzoneConsts.OM_KEY_PREFIX).concat(path);
   }
 
   @Override
-  public int writeOperations() throws Exception {
-
-    // Start writeThreadCount (defaultValue = 10) concurrent write threads
-    // performing numOfWriteOperations (defaultValue = 10) iterations
-    // of write operations (createKeys(writePath))
-    String writePath = "".concat(OzoneConsts.OM_KEY_PREFIX).concat("writePath");
-
-    ExecutorService writeService =
-        Executors.newFixedThreadPool(writeThreadCount);
-    CompletionService<Integer> writeExecutorCompletionService =
-        new ExecutorCompletionService<>(writeService);
-    List<Future<Integer>> writeFutures = new ArrayList<>();
-    for (int i = 0; i < writeThreadCount; i++) {
-      writeFutures.add(writeExecutorCompletionService.submit(() -> {
-        int writeCount = 0;
-        try {
-          for (int j = 0; j < numOfWriteOperations; j++) {
-            createKeys(writePath, keyCountForWrite);
-            writeCount++;
-          }
-        } catch (IOException e) {
-          LOG.warn("Exception while creating key ", e);
-        }
-        return writeCount;
-      }));
+  protected int getReadCount(int readCount, String readPath)
+      throws IOException {
+    Iterator<? extends OzoneKey> ozoneKeyIterator = bucket.listKeys(
+        OzoneConsts.OM_KEY_PREFIX + readPath + OzoneConsts.OM_KEY_PREFIX);
+    while (ozoneKeyIterator.hasNext()) {
+      ozoneKeyIterator.next();
+      ++readCount;
     }
-
-    int writeResult = 0;
-    for (int i = 0; i < writeFutures.size(); i++) {
-      try {
-        writeResult += writeExecutorCompletionService.take().get();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      } catch (ExecutionException e) {
-        e.printStackTrace();
-      }
-    }
-    writeService.shutdown();
-
-    return writeResult;
+    return readCount;
   }
 
   @Override
-  public void create(String path) throws Exception {
-    String keyName = path.concat(OzoneConsts.OM_KEY_PREFIX)
-        .concat(RandomStringUtils.randomAlphanumeric(length));
-
-    timer.time(() -> {
-      try (OutputStream stream = bucket.createKey(keyName, keySizeInBytes,
-          replicationConfig, metadata)) {
-        contentGenerator.write(stream);
-        stream.flush();
-      }
-      return null;
-    });
+  protected OutputStream create(String keyName) throws IOException {
+    return bucket.createKey(keyName, keySizeInBytes, replicationConfig,
+        metadata);
   }
 
-  private void createKeys(String path, int keyCount) throws Exception {
-    for (int i = 0; i < keyCount; i++) {
-      create(path);
-    }
+  @Override
+  protected Timer getTimer() {
+    return timer;
+  }
+
+  @Override
+  protected ContentGenerator getContentGenerator() {
+    return contentGenerator;
   }
 }
