@@ -90,7 +90,7 @@ public class TestOmBucketReadWriteKeyOps {
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
   }
 
-  protected OzoneConfiguration getOzoneConfiguration() {
+  private OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }
 
@@ -143,8 +143,7 @@ public class TestOmBucketReadWriteKeyOps {
     store.createVolume(parameterBuilder.volumeName);
     OzoneVolume volume = store.getVolume(parameterBuilder.volumeName);
     volume.createBucket(parameterBuilder.bucketName);
-    OzoneBucket bucket = store.getVolume(parameterBuilder.volumeName)
-        .getBucket(parameterBuilder.bucketName);
+    OzoneBucket bucket = volume.getBucket(parameterBuilder.bucketName);
     String confPath = new File(path, "conf").getAbsolutePath();
 
     long startTime = System.currentTimeMillis();
