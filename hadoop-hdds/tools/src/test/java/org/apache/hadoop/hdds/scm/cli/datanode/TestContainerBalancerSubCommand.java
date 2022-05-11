@@ -22,9 +22,10 @@ import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.ByteArrayOutputStream;
@@ -35,11 +36,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
- * Unit tests to validate the the ContainerBalancerSubCommand class includes the
+ * Unit tests to validate the ContainerBalancerSubCommand class includes the
  * correct output when executed against a mock client.
  */
 public class TestContainerBalancerSubCommand {
@@ -53,7 +53,7 @@ public class TestContainerBalancerSubCommand {
   private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  @Before
+  @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     stopCmd = new ContainerBalancerStopSubcommand();
     startCmd = new ContainerBalancerStartSubcommand();
@@ -62,7 +62,7 @@ public class TestContainerBalancerSubCommand {
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -82,7 +82,7 @@ public class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    Assertions.assertTrue(m.find());
   }
 
   @Test
@@ -98,7 +98,7 @@ public class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sNot\\sRunning.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    Assertions.assertTrue(m.find());
   }
 
   @Test
@@ -108,7 +108,7 @@ public class TestContainerBalancerSubCommand {
 
     Pattern p = Pattern.compile("^Stopping\\sContainerBalancer...");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    Assertions.assertTrue(m.find());
   }
 
   @Test
@@ -127,7 +127,7 @@ public class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
         "\\ssuccessfully.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    Assertions.assertTrue(m.find());
   }
 
   @Test
@@ -147,7 +147,7 @@ public class TestContainerBalancerSubCommand {
         "\\sBalancer.");
 
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    Assertions.assertTrue(m.find());
   }
 
 }
