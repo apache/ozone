@@ -224,7 +224,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Format HddsVolume to mimic the real cluster upgrade situation
     dataVolume.format(CLUSTER_ID);
     File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
-    if(!idDir.mkdir()) {
+    if (!idDir.mkdir()) {
       Assert.fail("Failed to create id directory");
     }
 
@@ -489,7 +489,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Format HddsVolume to mimic the real cluster upgrade situation
     dataVolume.format(CLUSTER_ID);
     File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
-    if(!idDir.mkdir()) {
+    if (!idDir.mkdir()) {
       Assert.fail("Failed to create id directory");
     }
     Assert.assertNull(dataVolume.getDbParentDir());
