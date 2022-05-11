@@ -61,9 +61,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
-      required = true,
       description = "List Key -> Value instead of just Value.",
-      defaultValue = "true",
+      defaultValue = "false",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private static boolean withKey;
 
