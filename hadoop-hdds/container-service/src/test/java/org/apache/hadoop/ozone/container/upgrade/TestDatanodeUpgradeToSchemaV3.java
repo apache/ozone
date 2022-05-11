@@ -206,7 +206,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * This mimics the real cluster upgrade situation.
    */
   @Test
-  @SuppressWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
   public void testDBCreatedInFinalize() throws Exception {
     // start DN and SCM
     startScmServer();
@@ -225,7 +224,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Format HddsVolume to mimic the real cluster upgrade situation
     dataVolume.format(CLUSTER_ID);
     File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
-    idDir.mkdir();
+    if(!idDir.mkdir()) {
+      Assert.fail("Failed to create id directory");
+    }
+
     Assert.assertNull(dataVolume.getDbParentDir());
 
     // Restart DN and finalize upgrade
@@ -470,7 +472,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * Test finalization failure.
    */
   @Test
-  @SuppressWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
   public void testFinalizeFailure() throws Exception {
     // start DN and SCM
     startScmServer();
@@ -488,7 +489,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Format HddsVolume to mimic the real cluster upgrade situation
     dataVolume.format(CLUSTER_ID);
     File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
-    idDir.mkdir();
+    if(!idDir.mkdir()) {
+      Assert.fail("Failed to create id directory");
+    }
     Assert.assertNull(dataVolume.getDbParentDir());
 
     // Restart DN
