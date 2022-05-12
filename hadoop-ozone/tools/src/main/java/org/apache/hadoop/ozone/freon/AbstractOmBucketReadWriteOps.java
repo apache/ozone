@@ -32,7 +32,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 
@@ -156,13 +155,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
 
     int readResult = 0;
     for (int i = 0; i < readFutures.size(); i++) {
-      try {
-        readResult += readExecutorCompletionService.take().get();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      } catch (ExecutionException e) {
-        e.printStackTrace();
-      }
+      readResult += readExecutorCompletionService.take().get();
     }
     readService.shutdown();
 
@@ -202,13 +195,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
 
     int writeResult = 0;
     for (int i = 0; i < writeFutures.size(); i++) {
-      try {
-        writeResult += writeExecutorCompletionService.take().get();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      } catch (ExecutionException e) {
-        e.printStackTrace();
-      }
+      writeResult += writeExecutorCompletionService.take().get();
     }
     writeService.shutdown();
 

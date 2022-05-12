@@ -48,6 +48,9 @@ import java.util.Iterator;
  */
 public class TestOmBucketReadWriteKeyOps {
 
+  // TODO: Remove code duplication of TestOmBucketReadWriteKeyOps with
+  //  TestOmBucketReadWriteFileOps.
+
   private String path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
