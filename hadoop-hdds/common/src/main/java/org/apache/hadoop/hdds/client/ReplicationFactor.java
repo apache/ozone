@@ -76,7 +76,7 @@ public enum ReplicationFactor {
     if (replicationFactor == null) {
       return null;
     }
-    return toProto(replicationFactor);
+    return replicationFactor.toProto();
   }
 
   public HddsProtos.ReplicationFactor toProto() {
