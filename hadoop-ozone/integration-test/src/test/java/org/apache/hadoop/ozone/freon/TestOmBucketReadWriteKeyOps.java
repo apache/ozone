@@ -17,15 +17,14 @@
 package org.apache.hadoop.ozone.freon;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConsts;
+
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
@@ -42,24 +41,27 @@ import org.slf4j.event.Level;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URI;
+import java.util.Iterator;
 
 /**
- * Test for OmBucketReadWriteFileOps.
+ * Test for OmBucketReadWriteKeyOps.
  */
-public class TestOmBucketReadWriteFileOps {
+public class TestOmBucketReadWriteKeyOps {
+
+  // TODO: Remove code duplication of TestOmBucketReadWriteKeyOps with
+  //  TestOmBucketReadWriteFileOps.
 
   private String path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestOmBucketReadWriteFileOps.class);
+      LoggerFactory.getLogger(TestOmBucketReadWriteKeyOps.class);
 
   @Before
   public void setup() {
     path = GenericTestUtils
-        .getTempPath(TestOmBucketReadWriteFileOps.class.getSimpleName());
+        .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
     File baseDir = new File(path);
@@ -69,10 +71,9 @@ public class TestOmBucketReadWriteFileOps {
   /**
    * Shutdown MiniDFSCluster.
    */
-  private void shutdown() throws IOException {
+  private void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
-      FileUtils.deleteDirectory(new File(path));
     }
   }
 
@@ -84,7 +85,7 @@ public class TestOmBucketReadWriteFileOps {
   private void startCluster() throws Exception {
     conf = getOzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
+        BucketLayout.OBJECT_STORE.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
@@ -92,12 +93,12 @@ public class TestOmBucketReadWriteFileOps {
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
   }
 
-  protected OzoneConfiguration getOzoneConfiguration() {
+  private OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }
 
   @Test
-  public void testOmBucketReadWriteFileOps() throws Exception {
+  public void testOmBucketReadWriteKeyOps() throws Exception {
     try {
       startCluster();
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
@@ -108,33 +109,33 @@ public class TestOmBucketReadWriteFileOps {
 
       verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
           .setNumOfReadOperations(10).setNumOfWriteOperations(5)
-          .setFileCountForRead(10).setFileCountForWrite(5));
+          .setKeyCountForRead(10).setKeyCountForWrite(5));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3").setTotalThreadCount(10)
-              .setNumOfReadOperations(10).setNumOfWriteOperations(5)
-              .setFileCountForRead(10).setFileCountForWrite(5));
+              .setTotalThreadCount(10).setNumOfReadOperations(10)
+              .setNumOfWriteOperations(5).setKeyCountForRead(10)
+              .setKeyCountForWrite(5));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
-              .setPrefixFilePath("/").setTotalThreadCount(15)
-              .setNumOfReadOperations(5).setNumOfWriteOperations(3)
-              .setFileCountForRead(5).setFileCountForWrite(3));
+              .setTotalThreadCount(15).setNumOfReadOperations(5)
+              .setNumOfWriteOperations(3).setKeyCountForRead(5)
+              .setKeyCountForWrite(3));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/").setTotalThreadCount(10)
-              .setNumOfReadOperations(5).setNumOfWriteOperations(3)
-              .setFileCountForRead(5).setFileCountForWrite(3).
-              setFileSizeInBytes(64).setBufferSize(16));
+              .setTotalThreadCount(10).setNumOfReadOperations(5)
+              .setNumOfWriteOperations(3).setKeyCountForRead(5)
+              .setKeyCountForWrite(3).setKeySizeInBytes(64)
+              .setBufferSize(16));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3").setTotalThreadCount(10)
-              .setNumOfReadOperations(5).setNumOfWriteOperations(0)
-              .setFileCountForRead(5));
+              .setTotalThreadCount(10).setNumOfReadOperations(5)
+              .setNumOfWriteOperations(0).setKeyCountForRead(5));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3/dir4").setTotalThreadCount(20)
-              .setNumOfReadOperations(0).setNumOfWriteOperations(5)
-              .setFileCountForRead(0).setFileCountForWrite(5));
+              .setTotalThreadCount(20).setNumOfReadOperations(0)
+              .setNumOfWriteOperations(5).setKeyCountForRead(0)
+              .setKeyCountForWrite(5));
+
     } finally {
       shutdown();
     }
@@ -145,14 +146,17 @@ public class TestOmBucketReadWriteFileOps {
     store.createVolume(parameterBuilder.volumeName);
     OzoneVolume volume = store.getVolume(parameterBuilder.volumeName);
     volume.createBucket(parameterBuilder.bucketName);
-    String rootPath = "o3fs://" + parameterBuilder.bucketName + "." +
-            parameterBuilder.volumeName + parameterBuilder.prefixFilePath;
+    OzoneBucket bucket = volume.getBucket(parameterBuilder.bucketName);
     String confPath = new File(path, "conf").getAbsolutePath();
+
+    long startTime = System.currentTimeMillis();
     new Freon().execute(
-        new String[]{"-conf", confPath, "obrwf", "-P", rootPath,
-            "-r", String.valueOf(parameterBuilder.fileCountForRead),
-            "-w", String.valueOf(parameterBuilder.fileCountForWrite),
-            "-g", String.valueOf(parameterBuilder.fileSizeInBytes),
+        new String[]{"-conf", confPath, "obrwk",
+            "-v", parameterBuilder.volumeName,
+            "-b", parameterBuilder.bucketName,
+            "-k", String.valueOf(parameterBuilder.keyCountForRead),
+            "-w", String.valueOf(parameterBuilder.keyCountForWrite),
+            "-g", String.valueOf(parameterBuilder.keySizeInBytes),
             "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
@@ -160,47 +164,29 @@ public class TestOmBucketReadWriteFileOps {
             "-R", String.valueOf(parameterBuilder.numOfReadOperations),
             "-W", String.valueOf(parameterBuilder.numOfWriteOperations),
             "-n", String.valueOf(1)});
+    long totalTime = System.currentTimeMillis() - startTime;
+    LOG.info("Total Execution Time: " + totalTime);
 
-    LOG.info("Started verifying OM bucket read/write ops file generation...");
-    FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
-        conf);
-    Path rootDir = new Path(rootPath.concat(OzoneConsts.OM_KEY_PREFIX));
-    FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
-    verifyFileCreation(2, fileStatuses, true);
-
-    Path readDir = new Path(rootPath.concat("/readPath"));
-    FileStatus[] readFileStatuses = fileSystem.listStatus(readDir);
-    verifyFileCreation(parameterBuilder.fileCountForRead, readFileStatuses,
-        false);
+    LOG.info("Started verifying OM bucket read/write ops key generation...");
+    verifyKeyCreation(parameterBuilder.keyCountForRead, bucket, "/readPath/");
 
     int readThreadCount = (parameterBuilder.readThreadPercentage *
         parameterBuilder.totalThreadCount) / 100;
     int writeThreadCount = parameterBuilder.totalThreadCount - readThreadCount;
-
-    Path writeDir = new Path(rootPath.concat("/writePath"));
-    FileStatus[] writeFileStatuses = fileSystem.listStatus(writeDir);
-    verifyFileCreation(writeThreadCount * parameterBuilder.fileCountForWrite *
-        parameterBuilder.numOfWriteOperations, writeFileStatuses, false);
+    verifyKeyCreation(writeThreadCount * parameterBuilder.keyCountForWrite *
+        parameterBuilder.numOfWriteOperations, bucket, "/writePath/");
 
     verifyOMLockMetrics(cluster.getOzoneManager().getMetadataManager().getLock()
         .getOMLockMetrics());
   }
 
-  private void verifyFileCreation(int expectedCount, FileStatus[] fileStatuses,
-                          boolean checkDirectoryCount) {
+  private void verifyKeyCreation(int expectedCount, OzoneBucket bucket,
+                                 String keyPrefix) throws IOException {
     int actual = 0;
-    if (checkDirectoryCount) {
-      for (FileStatus fileStatus : fileStatuses) {
-        if (fileStatus.isDirectory()) {
-          ++actual;
-        }
-      }
-    } else {
-      for (FileStatus fileStatus : fileStatuses) {
-        if (fileStatus.isFile()) {
-          ++actual;
-        }
-      }
+    Iterator<? extends OzoneKey> ozoneKeyIterator = bucket.listKeys(keyPrefix);
+    while (ozoneKeyIterator.hasNext()) {
+      ozoneKeyIterator.next();
+      ++actual;
     }
     Assert.assertEquals("Mismatch Count!", expectedCount, actual);
   }
@@ -249,10 +235,9 @@ public class TestOmBucketReadWriteFileOps {
 
     private String volumeName = "vol1";
     private String bucketName = "bucket1";
-    private String prefixFilePath = "/dir1/dir2";
-    private int fileCountForRead = 100;
-    private int fileCountForWrite = 10;
-    private long fileSizeInBytes = 256;
+    private int keyCountForRead = 100;
+    private int keyCountForWrite = 10;
+    private long keySizeInBytes = 256;
     private int bufferSize = 64;
     private int length = 10;
     private int totalThreadCount = 100;
@@ -270,23 +255,18 @@ public class TestOmBucketReadWriteFileOps {
       return this;
     }
 
-    private ParameterBuilder setPrefixFilePath(String prefixFilePathParam) {
-      prefixFilePath = prefixFilePathParam;
+    private ParameterBuilder setKeyCountForRead(int keyCountForReadParam) {
+      keyCountForRead = keyCountForReadParam;
       return this;
     }
 
-    private ParameterBuilder setFileCountForRead(int fileCountForReadParam) {
-      fileCountForRead = fileCountForReadParam;
+    private ParameterBuilder setKeyCountForWrite(int keyCountForWriteParam) {
+      keyCountForWrite = keyCountForWriteParam;
       return this;
     }
 
-    private ParameterBuilder setFileCountForWrite(int fileCountForWriteParam) {
-      fileCountForWrite = fileCountForWriteParam;
-      return this;
-    }
-
-    private ParameterBuilder setFileSizeInBytes(long fileSizeInBytesParam) {
-      fileSizeInBytes = fileSizeInBytesParam;
+    private ParameterBuilder setKeySizeInBytes(long keySizeInBytesParam) {
+      keySizeInBytes = keySizeInBytesParam;
       return this;
     }
 
