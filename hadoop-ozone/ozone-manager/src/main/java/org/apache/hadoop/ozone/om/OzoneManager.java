@@ -3015,12 +3015,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmMultipartUploadListParts omMultipartUploadListParts =
           keyManager.listParts(bucket.realVolume(), bucket.realBucket(),
               keyName, uploadID, partNumberMarker, maxParts);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap));
       return omMultipartUploadListParts;
     } catch (IOException ex) {
       metrics.incNumListMultipartUploadPartFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap, ex));
       throw ex;
     }
@@ -3040,13 +3040,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmMultipartUploadList omMultipartUploadList =
           keyManager.listMultipartUploads(bucket.realVolume(),
               bucket.realBucket(), prefix);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;
 
     } catch (IOException ex) {
       metrics.incNumListMultipartUploadFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
           .LIST_MULTIPART_UPLOADS, auditMap, ex));
       throw ex;
     }
@@ -3106,12 +3106,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       metrics.incNumLookupFileFails();
       auditSuccess = false;
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.LOOKUP_FILE,
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LOOKUP_FILE,
           auditMap, ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             OMAction.LOOKUP_FILE, auditMap));
       }
     }
@@ -3151,22 +3151,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private void auditAcl(OzoneObj ozoneObj, List<OzoneAcl> ozoneAcl,
-      OMAction omAction, Exception ex) {
-    Map<String, String> auditMap = ozoneObj.toAuditMap();
-    if (ozoneAcl != null) {
-      auditMap.put(OzoneConsts.ACL, ozoneAcl.toString());
-    }
-
-    if (ex == null) {
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(omAction, auditMap));
-    } else {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(omAction, auditMap, ex));
-    }
-  }
-
   /**
    * Returns list of ACLs for given Ozone object.
    *
@@ -3199,11 +3183,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     } catch (Exception ex) {
       auditSuccess = false;
-      auditAcl(obj, null, OMAction.GET_ACL, ex);
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(OMAction.GET_ACL, obj.toAuditMap(), ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        auditAcl(obj, null, OMAction.GET_ACL, null);
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(OMAction.GET_ACL, obj.toAuditMap()));
       }
     }
   }
