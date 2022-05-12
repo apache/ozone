@@ -80,7 +80,6 @@ public class SequenceIdGenerator {
   private final Lock lock;
   private final long batchSize;
   private StateManager stateManager;
-  private final SCMHAManager scmhaManager;
 
   /**
    * @param conf            : conf
@@ -95,7 +94,6 @@ public class SequenceIdGenerator {
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
     Preconditions.checkNotNull(scmhaManager);
-    this.scmhaManager = scmhaManager;
     this.stateManager = new StateManagerImpl.Builder()
         .setRatisServer(scmhaManager.getRatisServer())
         .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
