@@ -308,8 +308,11 @@ jobs:
       matrix:
         profile:
           - client
-          - filesystem-hdds
+          - filesystem
+          - hdds
+          - om
           - ozone
+          - scm
           - flaky
       fail-fast: false
     steps:
