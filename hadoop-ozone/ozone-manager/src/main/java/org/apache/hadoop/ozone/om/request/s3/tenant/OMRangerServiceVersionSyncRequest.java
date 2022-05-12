@@ -57,21 +57,6 @@ public class OMRangerServiceVersionSyncRequest extends OMClientRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-
-    final OMRequest.Builder omRequestBuilder = getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
-
-    if (getOmRequest().hasTraceID()) {
-      omRequestBuilder.setTraceID(getOmRequest().getTraceID());
-    }
-
-    return omRequestBuilder.build();
-  }
-
-  @Override
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
