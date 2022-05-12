@@ -3547,6 +3547,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   void stopServices() throws Exception {
     keyManager.stop();
     stopSecretManager();
+    if (multiTenantManager != null) {
+      multiTenantManager.stop();
+    }
     metadataManager.stop();
     stopTrashEmptier();
   }
