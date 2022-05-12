@@ -18,9 +18,11 @@ package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine.Option;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -41,14 +43,89 @@ import java.util.concurrent.ExecutorCompletionService;
 public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     implements Callable<Void> {
 
-  protected static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(AbstractOmBucketReadWriteOps.class);
+
+  @Option(names = {"-g", "--size"},
+      description = "Generated data size (in bytes) of each key/file to be " +
+          "written.",
+      defaultValue = "256")
+  private long sizeInBytes;
+
+  @Option(names = {"--buffer"},
+      description = "Size of buffer used for generating the key/file content.",
+      defaultValue = "64")
+  private int bufferSize;
+
+  @Option(names = {"-l", "--name-len"},
+      description = "Length of the random name of path you want to create.",
+      defaultValue = "10")
+  private int length;
+
+  @Option(names = {"-c", "--total-thread-count"},
+      description = "Total number of threads to be executed.",
+      defaultValue = "100")
+  private int totalThreadCount;
+
+  @Option(names = {"-T", "--read-thread-percentage"},
+      description = "Percentage of the total number of threads to be " +
+          "allocated for read operations. The remaining percentage of " +
+          "threads will be allocated for write operations.",
+      defaultValue = "90")
+  private int readThreadPercentage;
+
+  @Option(names = {"-R", "--num-of-read-operations"},
+      description = "Number of read operations to be performed by each thread.",
+      defaultValue = "50")
+  private int numOfReadOperations;
+
+  @Option(names = {"-W", "--num-of-write-operations"},
+      description = "Number of write operations to be performed by each " +
+          "thread.",
+      defaultValue = "10")
+  private int numOfWriteOperations;
+
+  private OzoneConfiguration ozoneConfiguration;
+  private Timer timer;
+  private ContentGenerator contentGenerator;
+  private int readThreadCount;
+  private int writeThreadCount;
+
+  protected abstract void display();
+
+  protected abstract void initialize(OzoneConfiguration ozoneConfiguration)
+      throws Exception;
+
+  @Override
+  public Void call() throws Exception {
+    init();
+
+    readThreadCount = (readThreadPercentage * totalThreadCount) / 100;
+    writeThreadCount = totalThreadCount - readThreadCount;
+
+    display();
+    print("SizeInBytes: " + sizeInBytes);
+    print("bufferSize: " + bufferSize);
+    print("totalThreadCount: " + totalThreadCount);
+    print("readThreadPercentage: " + readThreadPercentage);
+    print("writeThreadPercentage: " + (100 - readThreadPercentage));
+    print("readThreadCount: " + readThreadCount);
+    print("writeThreadCount: " + writeThreadCount);
+    print("numOfReadOperations: " + numOfReadOperations);
+    print("numOfWriteOperations: " + numOfWriteOperations);
+
+    ozoneConfiguration = createOzoneConfiguration();
+    contentGenerator = new ContentGenerator(sizeInBytes, bufferSize);
+    timer = getMetrics().timer("om-bucket-read-write-ops");
+
+    initialize(ozoneConfiguration);
+
+    return null;
+  }
 
   protected abstract String createPath(String path) throws IOException;
 
-  protected int readOperations(int readThreadCount, int numOfReadOperations,
-                               int keyCountForRead, int length)
-      throws Exception {
+  protected int readOperations(int keyCountForRead) throws Exception {
 
     // Create keyCountForRead/fileCountForRead (defaultValue = 1000) keys/files
     // under rootPath/readPath
@@ -95,9 +172,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
   protected abstract int getReadCount(int readCount, String readPath)
       throws IOException;
 
-  protected int writeOperations(int writeThreadCount, int numOfWriteOperations,
-                                int keyCountForWrite, int length)
-      throws Exception {
+  protected int writeOperations(int keyCountForWrite) throws Exception {
 
     // Start writeThreadCount (defaultValue = 10) concurrent write threads
     // performing numOfWriteOperations (defaultValue = 10) iterations
@@ -140,21 +215,17 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     return writeResult;
   }
 
-  protected abstract Timer getTimer();
-
-  protected abstract ContentGenerator getContentGenerator();
-
   protected void create(String path, int keyCount, int length)
       throws Exception {
     for (int i = 0; i < keyCount; i++) {
       String keyName = path.concat(OzoneConsts.OM_KEY_PREFIX)
           .concat(RandomStringUtils.randomAlphanumeric(length));
       if (LOG.isDebugEnabled()) {
-        LOG.debug("KeyName : {}", keyName);
+        LOG.debug("Key/FileName : {}", keyName);
       }
-      getTimer().time(() -> {
+      timer.time(() -> {
         try (OutputStream stream = create(keyName)) {
-          getContentGenerator().write(stream);
+          contentGenerator.write(stream);
           stream.flush();
         }
         return null;
@@ -163,4 +234,8 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
   }
 
   protected abstract OutputStream create(String pathName) throws IOException;
+
+  protected long getSizeInBytes() {
+    return sizeInBytes;
+  }
 }

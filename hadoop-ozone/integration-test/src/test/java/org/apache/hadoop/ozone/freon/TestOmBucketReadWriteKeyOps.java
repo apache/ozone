@@ -154,7 +154,7 @@ public class TestOmBucketReadWriteKeyOps {
             "-k", String.valueOf(parameterBuilder.keyCountForRead),
             "-w", String.valueOf(parameterBuilder.keyCountForWrite),
             "-g", String.valueOf(parameterBuilder.keySizeInBytes),
-            "-B", String.valueOf(parameterBuilder.bufferSize),
+            "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
             "-T", String.valueOf(parameterBuilder.readThreadPercentage),

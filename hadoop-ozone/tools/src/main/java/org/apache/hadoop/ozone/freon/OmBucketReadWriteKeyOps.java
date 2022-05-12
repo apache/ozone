@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -70,44 +69,6 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
       defaultValue = "10")
   private int keyCountForWrite;
 
-  @Option(names = {"-g", "--key-size"},
-      description = "Size of the generated key (in bytes).",
-      defaultValue = "256")
-  private long keySizeInBytes;
-
-  @Option(names = {"-B", "--buffer"},
-      description = "Size of buffer used to generated the key content.",
-      defaultValue = "64")
-  private int bufferSize;
-
-  @Option(names = {"-l", "--name-len"},
-      description = "Length of the random name of path you want to create.",
-      defaultValue = "10")
-  private int length;
-
-  @Option(names = {"-c", "--total-thread-count"},
-      description = "Total number of threads to be executed.",
-      defaultValue = "100")
-  private int totalThreadCount;
-
-  @Option(names = {"-T", "--read-thread-percentage"},
-      description = "Percentage of the total number of threads to be " +
-          "allocated for read operations. The remaining percentage of " +
-          "threads will be allocated for write operations.",
-      defaultValue = "90")
-  private int readThreadPercentage;
-
-  @Option(names = {"-R", "--num-of-read-operations"},
-      description = "Number of read operations to be performed by each thread.",
-      defaultValue = "50")
-  private int numOfReadOperations;
-
-  @Option(names = {"-W", "--num-of-write-operations"},
-      description = "Number of write operations to be performed by each " +
-          "thread.",
-      defaultValue = "10")
-  private int numOfWriteOperations;
-
   @Option(names = {"-o", "--om-service-id"},
       description = "OM Service ID"
   )
@@ -116,45 +77,26 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
   @CommandLine.Mixin
   private FreonReplicationOptions replication;
 
-  private Timer timer;
-
-  private ContentGenerator contentGenerator;
-
   private Map<String, String> metadata;
 
   private ReplicationConfig replicationConfig;
 
   private OzoneBucket bucket;
 
-  private int readThreadCount;
-  private int writeThreadCount;
-
   @Override
-  public Void call() throws Exception {
-    init();
-
-    readThreadCount = (readThreadPercentage * totalThreadCount) / 100;
-    writeThreadCount = totalThreadCount - readThreadCount;
-
+  protected void display() {
     print("volumeName: " + volumeName);
     print("bucketName: " + bucketName);
     print("keyCountForRead: " + keyCountForRead);
     print("keyCountForWrite: " + keyCountForWrite);
-    print("keySizeInBytes: " + keySizeInBytes);
-    print("bufferSize: " + bufferSize);
-    print("totalThreadCount: " + totalThreadCount);
-    print("readThreadPercentage: " + readThreadPercentage);
-    print("writeThreadPercentage: " + (100 - readThreadPercentage));
-    print("readThreadCount: " + readThreadCount);
-    print("writeThreadCount: " + writeThreadCount);
-    print("numOfReadOperations: " + numOfReadOperations);
-    print("numOfWriteOperations: " + numOfWriteOperations);
     print("omServiceID: " + omServiceID);
+  }
 
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+  @Override
+  protected void initialize(OzoneConfiguration ozoneConfiguration)
+      throws Exception {
+
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
-
-    contentGenerator = new ContentGenerator(keySizeInBytes, bufferSize);
     metadata = new HashMap<>();
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID,
@@ -163,20 +105,14 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
       bucket = rpcClient.getObjectStore().getVolume(volumeName)
           .getBucket(bucketName);
 
-      timer = getMetrics().timer("key-create");
-
       runTests(this::mainMethod);
     }
-
-    return null;
   }
 
   private void mainMethod(long counter) throws Exception {
 
-    int readResult = readOperations(readThreadCount, numOfReadOperations,
-        keyCountForRead, length);
-    int writeResult = writeOperations(writeThreadCount, numOfWriteOperations,
-        keyCountForWrite, length);
+    int readResult = readOperations(keyCountForRead);
+    int writeResult = writeOperations(keyCountForWrite);
 
     print("Total Keys Read: " + readResult);
     print("Total Keys Written: " + writeResult * keyCountForWrite);
@@ -203,17 +139,7 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
 
   @Override
   protected OutputStream create(String keyName) throws IOException {
-    return bucket.createKey(keyName, keySizeInBytes, replicationConfig,
+    return bucket.createKey(keyName, getSizeInBytes(), replicationConfig,
         metadata);
-  }
-
-  @Override
-  protected Timer getTimer() {
-    return timer;
-  }
-
-  @Override
-  protected ContentGenerator getContentGenerator() {
-    return contentGenerator;
   }
 }
