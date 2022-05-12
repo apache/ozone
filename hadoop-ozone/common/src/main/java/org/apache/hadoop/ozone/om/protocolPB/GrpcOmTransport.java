@@ -193,8 +193,6 @@ public class GrpcOmTransport implements OmTransport {
           resultCode = ResultCodes.TIMEOUT;
         }
         Exception exp = new Exception(e);
-        /*e.getStatus().getCode() == Status.Code.
-            RESOURCE_EXHAUSTED  ? e : new Exception(e); */
         tryOtherHost = shouldRetry(unwrapException(exp),
             expectedFailoverCount);
         if (!tryOtherHost) {
