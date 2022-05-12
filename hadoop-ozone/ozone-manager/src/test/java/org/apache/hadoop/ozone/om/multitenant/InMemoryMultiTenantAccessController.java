@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * In Memory version of MultiTenantAccessController.
+ */
 public class InMemoryMultiTenantAccessController
     implements MultiTenantAccessController {
 
@@ -28,7 +31,7 @@ public class InMemoryMultiTenantAccessController
     for (Policy existingPolicy: policies.values()) {
       if (existingPolicy.getVolumes().equals(policy.getVolumes()) &&
           existingPolicy.getBuckets().equals(policy.getBuckets()) &&
-      existingPolicy.getKeys().equals(policy.getKeys())) {
+          existingPolicy.getKeys().equals(policy.getKeys())) {
         throw new Exception("Policy for the same resource already defined.");
       }
     }

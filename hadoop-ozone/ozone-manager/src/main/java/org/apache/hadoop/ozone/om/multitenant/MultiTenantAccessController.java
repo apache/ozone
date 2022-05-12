@@ -73,15 +73,14 @@ public interface MultiTenantAccessController {
   static Map<IAccessAuthorizer.ACLType, String> getRangerAclStrings() {
     Map<IAccessAuthorizer.ACLType, String> rangerAclStrings =
         new EnumMap<>(IAccessAuthorizer.ACLType.class);
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.ALL, "All");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.LIST, "List");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ, "Read");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE, "Write");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.CREATE, "Create");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.DELETE, "Delete");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ_ACL, "Read_ACL");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE_ACL, "Write_ACL");
-    rangerAclStrings.put(IAccessAuthorizer.ACLType.NONE, "");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.ALL, "all");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.LIST, "list");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ, "read");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE, "write");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.CREATE, "create");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.DELETE, "delete");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.READ_ACL, "read_acl");
+    rangerAclStrings.put(IAccessAuthorizer.ACLType.WRITE_ACL, "write_acl");
 
     return rangerAclStrings;
   }
@@ -112,6 +111,11 @@ public interface MultiTenantAccessController {
 
     public boolean isAllowed() {
       return isAllowed;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(acl);
     }
 
     @Override
@@ -160,6 +164,11 @@ public interface MultiTenantAccessController {
     }
 
     @Override
+    public int hashCode() {
+      return Objects.hash(name);
+    }
+
+    @Override
     public boolean equals(Object other) {
       if (this == other) {
         return true;
@@ -198,8 +207,8 @@ public interface MultiTenantAccessController {
         other.getRoleID().ifPresent(id -> this.roleID = id);
       }
 
-      public Builder setName(String name) {
-        this.name = name;
+      public Builder setName(String roleName) {
+        this.name = roleName;
         return this;
       }
 
@@ -208,18 +217,18 @@ public interface MultiTenantAccessController {
         return this;
       }
 
-      public Builder addUsers(Collection<BasicUserPrincipal> users) {
-        this.users.addAll(users);
+      public Builder addUsers(Collection<BasicUserPrincipal> roleUsers) {
+        this.users.addAll(roleUsers);
         return this;
       }
 
-      public Builder setDescription(String description) {
-        this.description = description;
+      public Builder setDescription(String roleDescription) {
+        this.description = roleDescription;
         return this;
       }
 
-      public Builder setID(long roleID) {
-        this.roleID = roleID;
+      public Builder setID(long roleId) {
+        this.roleID = roleId;
         return this;
       }
 
@@ -280,6 +289,11 @@ public interface MultiTenantAccessController {
     }
 
     @Override
+    public int hashCode() {
+      return Objects.hash(name);
+    }
+
+    @Override
     public boolean equals(Object other) {
       if (this == other) {
         return true;
@@ -314,8 +328,8 @@ public interface MultiTenantAccessController {
         this.labels = new HashSet<>();
       }
 
-      public Builder setName(String name) {
-        this.name = name;
+      public Builder setName(String policyName) {
+        this.name = policyName;
         return this;
       }
 
@@ -334,23 +348,23 @@ public interface MultiTenantAccessController {
         return this;
       }
 
-      public Builder addVolumes(Collection<String> volumes) {
-        this.volumes.addAll(volumes);
+      public Builder addVolumes(Collection<String> volumeList) {
+        this.volumes.addAll(volumeList);
         return this;
       }
 
-      public Builder addBuckets(Collection<String> buckets) {
-        this.buckets.addAll(buckets);
+      public Builder addBuckets(Collection<String> bucketList) {
+        this.buckets.addAll(bucketList);
         return this;
       }
 
-      public Builder addKeys(Collection<String> keys) {
-        this.keys.addAll(keys);
+      public Builder addKeys(Collection<String> keyList) {
+        this.keys.addAll(keyList);
         return this;
       }
 
-      public Builder setDescription(String description) {
-        this.description = description;
+      public Builder setDescription(String policyDescription) {
+        this.description = policyDescription;
         return this;
       }
 
@@ -364,8 +378,8 @@ public interface MultiTenantAccessController {
         return this;
       }
 
-      public Builder addLabels(Collection<String> labels) {
-        this.labels.addAll(labels);
+      public Builder addLabels(Collection<String> labelsList) {
+        this.labels.addAll(labelsList);
         return this;
       }
 

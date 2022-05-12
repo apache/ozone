@@ -19,6 +19,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * To test MultiTenantAccessController with Ranger Client.
+ */
 public class TestMultiTenantAccessController {
   private MultiTenantAccessController controller;
   private List<BasicUserPrincipal> users;
@@ -34,10 +37,10 @@ public class TestMultiTenantAccessController {
   /**
    * Use this setup to test against a mock Ranger instance.
    */
-   @Before
-   public void setupUnitTest() {
-     controller = new InMemoryMultiTenantAccessController();
-   }
+  @Before
+  public void setupUnitTest() {
+    controller = new InMemoryMultiTenantAccessController();
+  }
 
   /**
    * Use this setup to test against a live Ranger instance.
@@ -54,133 +57,133 @@ public class TestMultiTenantAccessController {
     controller = new RangerClientMultiTenantAccessController(conf);
   }
 
-    @Test
-    public void testCreateGetDeletePolicies() throws Exception {
-      // load a policy with everything possible except roles.
-      final String policyName = "test-policy";
+  @Test
+  public void testCreateGetDeletePolicies() throws Exception {
+    // load a policy with everything possible except roles.
+    final String policyName = "test-policy";
 
-      MultiTenantAccessController.Policy originalPolicy =
-          new MultiTenantAccessController.Policy.Builder()
-              .setName(policyName)
-              .addVolume("vol1")
-              .addVolume("vol2")
-              .addBucket("vol1/bucket1")
-              .addBucket( "vol2/bucket2")
-              .addKey("vol1/bucket1/key1")
-              .addKey("vol2/bucket2/key2")
-              .setDescription("description")
-              .addLabel("label1")
-              .addLabel("label2")
-              .build();
+    MultiTenantAccessController.Policy originalPolicy =
+        new MultiTenantAccessController.Policy.Builder()
+            .setName(policyName)
+            .addVolume("vol1")
+            .addVolume("vol2")
+            .addBucket("vol1/bucket1")
+            .addBucket("vol2/bucket2")
+            .addKey("vol1/bucket1/key1")
+            .addKey("vol2/bucket2/key2")
+            .setDescription("description")
+            .addLabel("label1")
+            .addLabel("label2")
+            .build();
 
-     // create in ranger.
-     controller.createPolicy(originalPolicy);
-     // get to check it's there with all attributes.
-     MultiTenantAccessController.Policy retrievedPolicy =
-         controller.getPolicy(policyName);
-     Assert.assertEquals(originalPolicy, retrievedPolicy);
+    // create in ranger.
+    controller.createPolicy(originalPolicy);
+    // get to check it's there with all attributes.
+    MultiTenantAccessController.Policy retrievedPolicy =
+        controller.getPolicy(policyName);
+    Assert.assertEquals(originalPolicy, retrievedPolicy);
 
-     // delete policy.
-     controller.deletePolicy(policyName);
-     // get to check it is deleted.
-     try {
-       controller.getPolicy(policyName);
-       Assert.fail("Expected exception for missing policy.");
-     } catch(Exception ex) {
+    // delete policy.
+    controller.deletePolicy(policyName);
+    // get to check it is deleted.
+    try {
+      controller.getPolicy(policyName);
+      Assert.fail("Expected exception for missing policy.");
+    } catch (Exception ex) {
        // Expected since policy is not there.
-     }
-   }
+    }
+  }
 
-    @Test
-    public void testCreateDuplicatePolicy() throws Exception {
-      final String policyName = "test-policy";
-      final String volumeName = "vol1";
-      MultiTenantAccessController.Policy originalPolicy =
-          new MultiTenantAccessController.Policy.Builder()
-              .setName(policyName)
-              .addVolume(volumeName)
-              .build();
-      // create in ranger.
-      controller.createPolicy(originalPolicy);
-      Assert.assertEquals(originalPolicy, controller.getPolicy(policyName));
+  @Test
+  public void testCreateDuplicatePolicy() throws Exception {
+    final String policyName = "test-policy";
+    final String volumeName = "vol1";
+    MultiTenantAccessController.Policy originalPolicy =
+        new MultiTenantAccessController.Policy.Builder()
+            .setName(policyName)
+            .addVolume(volumeName)
+            .build();
+    // create in ranger.
+    controller.createPolicy(originalPolicy);
+    Assert.assertEquals(originalPolicy, controller.getPolicy(policyName));
 
-      // Create a policy with the same name but different resource.
-      // Check for error.
-      MultiTenantAccessController.Policy sameNamePolicy =
-          new MultiTenantAccessController.Policy.Builder()
-              .setName(policyName)
-              .addVolume(volumeName + "2")
-              .build();
-      try {
-        controller.createPolicy(sameNamePolicy);
-        Assert.fail("Expected exception for duplicate policy.");
-      } catch(Exception ex) {
-        // Expected since a policy with the same name should not be allowed.
-      }
-
-      // Create a policy with different name but same resource.
-      // Check for error.
-      MultiTenantAccessController.Policy sameResourcePolicy =
-          new MultiTenantAccessController.Policy.Builder()
-              .setName(policyName + "2")
-              .addVolume(volumeName)
-              .build();
-      try {
-        controller.createPolicy(sameResourcePolicy);
-        Assert.fail("Expected exception for duplicate policy.");
-      } catch(Exception ex) {
-        // Expected since a policy with the same resource should not be allowed.
-      }
-
-      // delete policy.
-      controller.deletePolicy(policyName);
+    // Create a policy with the same name but different resource.
+    // Check for error.
+    MultiTenantAccessController.Policy sameNamePolicy =
+        new MultiTenantAccessController.Policy.Builder()
+            .setName(policyName)
+            .addVolume(volumeName + "2")
+            .build();
+    try {
+      controller.createPolicy(sameNamePolicy);
+      Assert.fail("Expected exception for duplicate policy.");
+    } catch (Exception ex) {
+      // Expected since a policy with the same name should not be allowed.
     }
 
-    @Test
-    public void testGetLabeledPolicies() throws Exception  {
-      final String label = "label";
-      Policy labeledPolicy1 = new Policy.Builder()
-          .setName("policy1")
-          .addVolume(UUID.randomUUID().toString())
-          .addLabel(label)
-          .build();
-      Policy labeledPolicy2 = new Policy.Builder()
-          .setName("policy2")
-          .addVolume(UUID.randomUUID().toString())
-          .addLabel(label)
-          .build();
+    // Create a policy with different name but same resource.
+    // Check for error.
+    MultiTenantAccessController.Policy sameResourcePolicy =
+        new MultiTenantAccessController.Policy.Builder()
+            .setName(policyName + "2")
+            .addVolume(volumeName)
+            .build();
+    try {
+      controller.createPolicy(sameResourcePolicy);
+      Assert.fail("Expected exception for duplicate policy.");
+    } catch (Exception ex) {
+      // Expected since a policy with the same resource should not be allowed.
+    }
 
-      List<Policy> labeledPolicies = new ArrayList<>();
-      labeledPolicies.add(labeledPolicy1);
-      labeledPolicies.add(labeledPolicy2);
-      Policy unlabeledPolicy = new Policy.Builder()
-          .setName("policy3")
-          .addVolume(UUID.randomUUID().toString())
-          .build();
+    // delete policy.
+    controller.deletePolicy(policyName);
+  }
 
-      for (Policy policy: labeledPolicies) {
-        controller.createPolicy(policy);
-      }
-      controller.createPolicy(unlabeledPolicy);
+  @Test
+  public void testGetLabeledPolicies() throws Exception  {
+    final String label = "label";
+    Policy labeledPolicy1 = new Policy.Builder()
+        .setName("policy1")
+        .addVolume(UUID.randomUUID().toString())
+        .addLabel(label)
+        .build();
+    Policy labeledPolicy2 = new Policy.Builder()
+        .setName("policy2")
+        .addVolume(UUID.randomUUID().toString())
+        .addLabel(label)
+        .build();
 
-      // Get should only return policies with the specified label.
-      List<Policy> retrievedLabeledPolicies =
-          controller.getLabeledPolicies(label);
-      Assert.assertEquals(labeledPolicies.size(),
-          retrievedLabeledPolicies.size());
-      Assert.assertTrue(retrievedLabeledPolicies.containsAll(labeledPolicies));
+    List<Policy> labeledPolicies = new ArrayList<>();
+    labeledPolicies.add(labeledPolicy1);
+    labeledPolicies.add(labeledPolicy2);
+    Policy unlabeledPolicy = new Policy.Builder()
+        .setName("policy3")
+        .addVolume(UUID.randomUUID().toString())
+        .build();
 
-      // Get of a specific policy should also succeed.
-      Policy retrievedPolicy = controller.getPolicy(unlabeledPolicy.getName());
-      Assert.assertEquals(unlabeledPolicy, retrievedPolicy);
+    for (Policy policy: labeledPolicies) {
+      controller.createPolicy(policy);
+    }
+    controller.createPolicy(unlabeledPolicy);
 
-      // Get of policies with nonexistent label should give an empty list.
-      Assert.assertTrue(controller.getLabeledPolicies(label + "1").isEmpty());
+    // Get should only return policies with the specified label.
+    List<Policy> retrievedLabeledPolicies =
+        controller.getLabeledPolicies(label);
+    Assert.assertEquals(labeledPolicies.size(),
+        retrievedLabeledPolicies.size());
+    Assert.assertTrue(retrievedLabeledPolicies.containsAll(labeledPolicies));
+
+    // Get of a specific policy should also succeed.
+    Policy retrievedPolicy = controller.getPolicy(unlabeledPolicy.getName());
+    Assert.assertEquals(unlabeledPolicy, retrievedPolicy);
+
+    // Get of policies with nonexistent label should give an empty list.
+    Assert.assertTrue(controller.getLabeledPolicies(label + "1").isEmpty());
 
     // Cleanup
-      for (Policy policy: labeledPolicies) {
-        controller.deletePolicy(policy.getName());
-      }
+    for (Policy policy: labeledPolicies) {
+      controller.deletePolicy(policy.getName());
+    }
     controller.deletePolicy(unlabeledPolicy.getName());
   }
 
@@ -291,7 +294,7 @@ public class TestMultiTenantAccessController {
     try {
       controller.getPolicy(roleName);
       Assert.fail("Expected exception for missing policy.");
-    } catch(Exception ex) {
+    } catch (Exception ex) {
       // Expected since policy is not there.
     }
   }
@@ -313,7 +316,7 @@ public class TestMultiTenantAccessController {
     try {
       controller.createRole(sameNameRole);
       Assert.fail("Expected exception for duplicate role.");
-    } catch(Exception ex) {
+    } catch (Exception ex) {
       // Expected since a policy with the same name should not be allowed.
     }
 
@@ -361,6 +364,8 @@ public class TestMultiTenantAccessController {
     List<Acl> acls = Arrays.stream(ACLType.values())
         .map(Acl::allow)
         .collect(Collectors.toList());
+    Acl noneRemove = Acl.allow(ACLType.NONE);
+    acls.remove(noneRemove);
     Policy policy = new Policy.Builder()
         .setName("policy")
         .addVolume("volume")

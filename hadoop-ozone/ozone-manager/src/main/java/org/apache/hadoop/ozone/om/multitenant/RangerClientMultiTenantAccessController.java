@@ -97,7 +97,8 @@ public class RangerClientMultiTenantAccessController implements
     }
     // TODO: See if this actually gets policies by label.
     Map<String, String> filterMap = new HashMap<>();
-    filterMap.put("policyLabels", label);
+    filterMap.put("serviceName", rangerServiceName);
+    filterMap.put("policyLabelsPartial", label);
     return client.findPolicies(filterMap).stream()
         .map(this::fromRangerPolicy)
         .collect(Collectors.toList());
@@ -219,25 +220,24 @@ public class RangerClientMultiTenantAccessController implements
       String resourceType = resource.getKey();
       List<String> resourceNames = resource.getValue().getValues();
       switch (resourceType) {
-        case "volume":
-          policyBuilder.addVolumes(resourceNames);
-          break;
-        case "bucket":
-          policyBuilder.addBuckets(resourceNames);
-          break;
-        case "key":
-          policyBuilder.addKeys(resourceNames);
-          break;
-        default:
-          LOG.warn("Pulled Ranger policy with unknown resource type '{}' with" +
-              " names '{}'", resourceType,
-              String.join(",", resourceNames));
+      case "volume":
+        policyBuilder.addVolumes(resourceNames);
+        break;
+      case "bucket":
+        policyBuilder.addBuckets(resourceNames);
+        break;
+      case "key":
+        policyBuilder.addKeys(resourceNames);
+        break;
+      default:
+        LOG.warn("Pulled Ranger policy with unknown resource type '{}' with" +
+            " names '{}'", resourceType, String.join(",", resourceNames));
       }
     }
 
     policyBuilder.setName(rangerPolicy.getName())
        .setDescription(rangerPolicy.getDescription())
-       .addLabels(rangerPolicy.getPolicyLabels());
+        .addLabels(rangerPolicy.getPolicyLabels());
 
     return policyBuilder.build();
   }
@@ -251,23 +251,31 @@ public class RangerClientMultiTenantAccessController implements
     // Add resources.
     Map<String, RangerPolicy.RangerPolicyResource> resource = new HashMap<>();
     // Add volumes.
-    RangerPolicy.RangerPolicyResource volumeResources =
-        new RangerPolicy.RangerPolicyResource();
-    volumeResources.setValues(new ArrayList<>(policy.getVolumes()));
-    resource.put("volume", volumeResources);
+    if (!policy.getVolumes().isEmpty()) {
+      RangerPolicy.RangerPolicyResource volumeResources =
+          new RangerPolicy.RangerPolicyResource();
+      volumeResources.setValues(new ArrayList<>(policy.getVolumes()));
+      resource.put("volume", volumeResources);
+    }
     // Add buckets.
-    RangerPolicy.RangerPolicyResource bucketResources =
-        new RangerPolicy.RangerPolicyResource();
-    bucketResources.setValues(new ArrayList<>(policy.getBuckets()));
-    resource.put("bucket", bucketResources);
+    if (!policy.getBuckets().isEmpty()) {
+      RangerPolicy.RangerPolicyResource bucketResources =
+          new RangerPolicy.RangerPolicyResource();
+      bucketResources.setValues(new ArrayList<>(policy.getBuckets()));
+      resource.put("bucket", bucketResources);
+    }
     // Add keys.
-    RangerPolicy.RangerPolicyResource keyResources =
-        new RangerPolicy.RangerPolicyResource();
-    keyResources.setValues(new ArrayList<>(policy.getKeys()));
-    resource.put("key", keyResources);
-
+    if (!policy.getKeys().isEmpty()) {
+      RangerPolicy.RangerPolicyResource keyResources =
+          new RangerPolicy.RangerPolicyResource();
+      keyResources.setValues(new ArrayList<>(policy.getKeys()));
+      resource.put("key", keyResources);
+    }
     rangerPolicy.setService(rangerServiceName);
     rangerPolicy.setResources(resource);
+    if (policy.getDescription().isPresent()) {
+      rangerPolicy.setDescription(policy.getDescription().get());
+    }
 
     // Add roles to the policy.
     for (Map.Entry<String, Collection<Acl>> roleAcls:
