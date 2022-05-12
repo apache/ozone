@@ -60,6 +60,8 @@ import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
@@ -67,6 +69,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -94,6 +98,9 @@ import static org.mockito.Mockito.mock;
  */
 @RunWith(Parameterized.class)
 public class TestKeyValueContainer {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestKeyValueContainer.class);
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -595,5 +602,32 @@ public class TestKeyValueContainer {
     // DBOtions should be different
     Assert.assertNotEquals(outProfile1.getDBOptions().compactionReadaheadSize(),
         outProfile2.getDBOptions().compactionReadaheadSize());
+  }
+
+  @Test
+  public void testKeyValueDataProtoBufMsg() throws Exception {
+    createContainer();
+    populate(10);
+    closeContainer();
+    ContainerProtos.ContainerDataProto proto =
+        keyValueContainerData.getProtoBufMessage();
+    for (Method method : proto.getClass().getMethods()) {
+      if (Modifier.isPublic(method.getModifiers()) &&
+          method.getDeclaringClass() == proto.getClass() &&
+          method.getParameterCount() == 0 &&
+          method.getName().startsWith("get")) {
+        try {
+          assertEquals(method.invoke(proto),
+              keyValueContainerData.getClass()
+                  .getMethod(method.getName())
+                  .invoke(keyValueContainerData));
+          LOG.info("{}() OK", method.getName());
+        } catch (NoSuchMethodException ignored) {
+          LOG.info("{}() ignored", method.getName());
+        }
+      }
+    }
+    assertEquals(proto.getState(), keyValueContainerData.getState());
+    assertEquals(proto.getContainerID(), keyValueContainerData.getContainerID());
   }
 }
