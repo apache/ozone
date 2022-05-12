@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -95,7 +96,7 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
       }
 
       ReplicationConfig replicationConfig =
-          ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, factor);
+          RatisReplicationConfig.getInstance(factor.toProto());
       return Optional.of(
           p -> replicationConfig.equals(p.getReplicationConfig()));
     }
