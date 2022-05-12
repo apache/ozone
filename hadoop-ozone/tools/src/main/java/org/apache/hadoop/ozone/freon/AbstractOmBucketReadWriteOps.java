@@ -93,7 +93,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
 
   protected abstract void display();
 
-  protected abstract void initialize(OzoneConfiguration ozoneConfiguration)
+  protected abstract void initialize(OzoneConfiguration configuration)
       throws Exception;
 
   @Override
@@ -130,7 +130,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     // Create keyCountForRead/fileCountForRead (defaultValue = 1000) keys/files
     // under rootPath/readPath
     String readPath = createPath("readPath");
-    create(readPath, keyCountForRead, length);
+    create(readPath, keyCountForRead);
 
     // Start readThreadCount (defaultValue = 90) concurrent read threads
     // performing numOfReadOperations (defaultValue = 50) iterations
@@ -190,7 +190,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
         int writeCount = 0;
         try {
           for (int j = 0; j < numOfWriteOperations; j++) {
-            create(writePath, keyCountForWrite, length);
+            create(writePath, keyCountForWrite);
             writeCount++;
           }
         } catch (IOException e) {
@@ -215,7 +215,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     return writeResult;
   }
 
-  protected void create(String path, int keyCount, int length)
+  protected void create(String path, int keyCount)
       throws Exception {
     for (int i = 0; i < keyCount; i++) {
       String keyName = path.concat(OzoneConsts.OM_KEY_PREFIX)
