@@ -171,6 +171,19 @@ public class TestListPipelinesSubCommand {
     Assert.assertEquals(-1, output.indexOf("EC"));
   }
 
+  @Test
+  public void testLegacyFactorAndState() throws IOException {
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-ffc", "THREE", "-fst", "OPEN");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    Assert.assertEquals(1, output.split(
+        System.getProperty("line.separator")).length);
+    Assert.assertEquals(-1, output.indexOf("CLOSED"));
+    Assert.assertEquals(-1, output.indexOf("EC"));
+  }
+
   private List<Pipeline> createPipelines() {
     List<Pipeline> pipelines = new ArrayList<>();
     pipelines.add(createPipeline(StandaloneReplicationConfig.getInstance(ONE),
