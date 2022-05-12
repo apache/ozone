@@ -60,8 +60,6 @@ import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.RocksDBException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
@@ -69,8 +67,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -98,9 +94,6 @@ import static org.mockito.Mockito.mock;
  */
 @RunWith(Parameterized.class)
 public class TestKeyValueContainer {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestKeyValueContainer.class);
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -611,23 +604,23 @@ public class TestKeyValueContainer {
     closeContainer();
     ContainerProtos.ContainerDataProto proto =
         keyValueContainerData.getProtoBufMessage();
-    for (Method method : proto.getClass().getMethods()) {
-      if (Modifier.isPublic(method.getModifiers()) &&
-          method.getDeclaringClass() == proto.getClass() &&
-          method.getParameterCount() == 0 &&
-          method.getName().startsWith("get")) {
-        try {
-          assertEquals(method.invoke(proto),
-              keyValueContainerData.getClass()
-                  .getMethod(method.getName())
-                  .invoke(keyValueContainerData));
-          LOG.info("{}() OK", method.getName());
-        } catch (NoSuchMethodException ignored) {
-          LOG.info("{}() ignored", method.getName());
-        }
-      }
+
+    assertEquals(keyValueContainerData.getContainerID(),
+        proto.getContainerID());
+    assertEquals(keyValueContainerData.getContainerType(),
+        proto.getContainerType());
+    assertEquals(keyValueContainerData.getContainerPath(),
+        proto.getContainerPath());
+    assertEquals(keyValueContainerData.getBlockCount(),
+        proto.getBlockCount());
+    assertEquals(keyValueContainerData.getBytesUsed(),
+        proto.getBytesUsed());
+    assertEquals(keyValueContainerData.getState(),
+        proto.getState());
+
+    for (ContainerProtos.KeyValue kv : proto.getMetadataList()) {
+      assertEquals(keyValueContainerData.getMetadata().get(kv.getKey()),
+          kv.getValue());
     }
-    assertEquals(proto.getState(), keyValueContainerData.getState());
-    assertEquals(proto.getContainerID(), keyValueContainerData.getContainerID());
   }
 }
