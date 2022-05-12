@@ -49,13 +49,11 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Upgrade testing for Bucket Layout Feature.
@@ -77,12 +75,6 @@ public class TestOMBucketLayoutUpgrade {
   private MiniOzoneHAClusterImpl cluster;
   private OzoneManager ozoneManager;
   private ClientProtocol clientProtocol;
-  private static final BucketLayout[] BUCKET_LAYOUTS =
-      new BucketLayout[]{
-          BucketLayout.FILE_SYSTEM_OPTIMIZED,
-          BucketLayout.OBJECT_STORE,
-          BucketLayout.LEGACY
-      };
   private static final String VOLUME_NAME = "vol-" + UUID.randomUUID();
   private int fromLayoutVersion;
   private OzoneManagerProtocol omClient;
@@ -98,8 +90,7 @@ public class TestOMBucketLayoutUpgrade {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][]{
-        {INITIAL_VERSION},
-        {ERASURE_CODED_STORAGE_SUPPORT},
+        {INITIAL_VERSION}
     });
   }
 
@@ -160,56 +151,93 @@ public class TestOMBucketLayoutUpgrade {
    * @throws Exception
    */
   @Test
-  public void testCreateBucketWithNewLayoutsPreFinalize() throws Exception {
+  public void testCreateBucketWithBucketLayoutsDuringUpgrade()
+      throws Exception {
     // Assert OM layout version is 'fromLayoutVersion' on deploy.
     assertEquals(fromLayoutVersion,
         ozoneManager.getVersionManager().getMetadataLayoutVersion());
     assertNull(ozoneManager.getMetadataManager().getMetaTable()
         .get(LAYOUT_VERSION_KEY));
 
-    for (BucketLayout layout : BUCKET_LAYOUTS) {
-      if (layout.isLegacy()) {
-        // We only want to test out the newly introduced layouts in this test.
-        continue;
-      }
+    // Test bucket creation with new bucket layouts.
+    // FSO and OBS bucket creation should fail.
+    verifyBucketCreationBlockedWithNewLayouts();
+
+    // Bucket creation with LEGACY layout should succeed in Pre-Finalized state.
+    LOG.info("Creating legacy bucket during Pre-Finalize");
+    verifyBucketCreationWithLayout(new BucketLayout[]{BucketLayout.LEGACY});
+
+    // Finalize the cluster upgrade.
+    finalizeUpgrade();
+
+    // Cluster upgrade is now complete,
+    // Bucket creation should now succeed with all layouts.
+    verifyBucketCreationWithLayout(new BucketLayout[]{
+        BucketLayout.LEGACY,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        BucketLayout.OBJECT_STORE
+    });
+  }
+
+
+  /**
+   * Tests that OM allows bucket creation with given bucket layouts.
+   *
+   * @param bucketLayouts bucket layouts to test
+   * @throws Exception if any
+   */
+  private void verifyBucketCreationWithLayout(BucketLayout[] bucketLayouts)
+      throws Exception {
+    String bucketName;
+    for (BucketLayout layout : bucketLayouts) {
+      LOG.info("Creating bucket with layout {} after OM finalization", layout);
+
+      bucketName = createBucketWithLayout(layout);
+
+      // Make sure the bucket exists in the bucket table with the
+      // expected layout.
+      assertEquals(
+          omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketName(),
+          bucketName);
+      assertEquals(
+          omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketLayout(),
+          layout);
+    }
+  }
+
+  /**
+   * Tests that OM blocks all requests to create any buckets with a new bucket
+   * layout.
+   *
+   * @throws Exception if any
+   */
+  private void verifyBucketCreationBlockedWithNewLayouts() throws Exception {
+    BucketLayout[] bucketLayouts = new BucketLayout[]{
+        BucketLayout.OBJECT_STORE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    };
+
+    for (BucketLayout layout : bucketLayouts) {
       try {
         LOG.info("Creating bucket with layout {} during Pre-Finalize", layout);
         createBucketWithLayout(layout);
         fail("Expected to fail creating bucket with layout " + layout);
       } catch (OMException e) {
         // Expected exception.
-        assertTrue(e.getMessage().contains(
-            "Cluster does not have the Bucket Layout support feature " +
-                "finalized yet"));
-        LOG.info("Expected exception: " + e.getMessage());
-
+        assertEquals(
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+            e.getResult());
       }
     }
   }
 
   /**
-   * Tests that OM allows requests to create legacy buckets.
+   * Helper method to create a bucket with the given layout.
    *
-   * @throws Exception
+   * @param bucketLayout the layout to use for the bucket.
+   * @return the name of the bucket created.
+   * @throws Exception if there is an error creating the bucket.
    */
-  @Test
-  public void testCreateLegacyBucketPreFinalize() throws Exception {
-    // Assert OM layout version is 'fromLayoutVersion' on deploy.
-    assertEquals(fromLayoutVersion,
-        ozoneManager.getVersionManager().getMetadataLayoutVersion());
-    assertNull(ozoneManager.getMetadataManager().getMetaTable()
-        .get(LAYOUT_VERSION_KEY));
-
-    LOG.info("Creating legacy bucket during Pre-Finalize");
-    String bucketName = createBucketWithLayout(BucketLayout.LEGACY);
-    assertEquals(
-        omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketName(),
-        bucketName);
-    assertEquals(
-        omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketLayout(),
-        BucketLayout.LEGACY);
-  }
-
   private String createBucketWithLayout(BucketLayout bucketLayout)
       throws Exception {
     String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -224,18 +252,11 @@ public class TestOMBucketLayoutUpgrade {
   }
 
   /**
-   * Currently this is a No-Op finalization since there is only one layout
-   * version in OM. But this test is expected to remain consistent when a
-   * new version is added.
+   * Complete the cluster upgrade.
+   *
+   * @throws Exception if upgrade fails.
    */
-  @Test
-  public void testCreateBucketAfterOmFinalization() throws Exception {
-    // Assert OM Layout Version is 'fromLayoutVersion' on deploy.
-    assertEquals(fromLayoutVersion,
-        ozoneManager.getVersionManager().getMetadataLayoutVersion());
-    assertNull(ozoneManager.getMetadataManager()
-        .getMetaTable().get(LAYOUT_VERSION_KEY));
-
+  private void finalizeUpgrade() throws Exception {
     UpgradeFinalizer.StatusAndMessages response =
         omClient.finalizeUpgrade("finalize-test");
     System.out.println("Finalization Messages : " + response.msgs());
@@ -247,17 +268,5 @@ public class TestOMBucketLayoutUpgrade {
           .get(LAYOUT_VERSION_KEY);
       return maxLayoutVersion() == Integer.parseInt(lvString);
     });
-
-    // Bucket creation should now succeed with all layouts.
-    for (BucketLayout layout : BUCKET_LAYOUTS) {
-      LOG.info("Creating bucket with layout {} after OM finalization", layout);
-      String bucketName = createBucketWithLayout(layout);
-      assertEquals(
-          omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketName(),
-          bucketName);
-      assertEquals(
-          omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketLayout(),
-          layout);
-    }
   }
 }

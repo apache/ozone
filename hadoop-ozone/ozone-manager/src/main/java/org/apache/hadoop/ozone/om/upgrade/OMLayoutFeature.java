@@ -35,7 +35,8 @@ public enum OMLayoutFeature implements LayoutFeature {
       + " Erasure Coded block data storage."),
 
   BUCKET_LAYOUT_SUPPORT(2, "Ozone version supporting bucket " +
-      "layouts and introducing the FSO and OBS bucket layout types.");
+      "layouts and introducing the FILE_SYSTEM_OPTIMIZED and OBJECT_STORE " +
+      "bucket layout types.");
 
 
   ///////////////////////////////  /////////////////////////////
