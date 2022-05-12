@@ -60,6 +60,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 
 public class ECContainerReplicaCount {
 
+  private final ContainerInfo containerInfo;
   private final ECReplicationConfig repConfig;
   private final List<Integer> pendingAdd;
   private final int remainingMaintenanceRedundancy;
@@ -70,6 +71,7 @@ public class ECContainerReplicaCount {
   public ECContainerReplicaCount(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas, List<Integer> indexesPendingAdd,
       List<Integer> indexesPendingDelete, int remainingMaintenanceRedundancy) {
+    this.containerInfo = containerInfo;
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
     this.pendingAdd = indexesPendingAdd;
     this.remainingMaintenanceRedundancy
@@ -79,7 +81,7 @@ public class ECContainerReplicaCount {
       HddsProtos.NodeOperationalState state =
           replica.getDatanodeDetails().getPersistedOpState();
       int index = replica.getReplicaIndex();
-      ensureIndexWithinBounds(index);
+      ensureIndexWithinBounds(index, "replicaSet");
       if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
         int val = decommissionIndexes.getOrDefault(index, 0);
         decommissionIndexes.put(index, val + 1);
@@ -95,7 +97,7 @@ public class ECContainerReplicaCount {
     // will eventually be removed and reduce the count for this replica. If the
     // count goes to zero, remove it from the map.
     for (Integer i : indexesPendingDelete) {
-      ensureIndexWithinBounds(i);
+      ensureIndexWithinBounds(i, "pendingDelete");
       Integer count = healthyIndexes.get(i);
       if (count != null) {
         count = count - 1;
@@ -108,7 +110,7 @@ public class ECContainerReplicaCount {
     }
     // Ensure any pending adds are within bounds
     for (Integer i : pendingAdd) {
-      ensureIndexWithinBounds(i);
+      ensureIndexWithinBounds(i, "pendingAdd");
     }
   }
 
@@ -117,6 +119,7 @@ public class ECContainerReplicaCount {
    * are decommissioning. Note it is possible for an index to be
    * decommissioning, healthy and in maintenance, if there are multiple copies
    * of it.
+   * @return Set of indexes in decommission
    */
   public Set<Integer> decommissioningIndexes() {
     return decommissionIndexes.keySet();
@@ -127,7 +130,7 @@ public class ECContainerReplicaCount {
    * in maintenance. Note it is possible for an index to be
    * decommissioning, healthy and in maintenance, if there are multiple copies
    * of it.
-   * @return
+   * @return Set of indexes in maintenance
    */
   public Set<Integer> maintenanceIndexes() {
     return maintenanceIndexes.keySet();
@@ -138,7 +141,7 @@ public class ECContainerReplicaCount {
    * Ie, less than EC Datanum containers are present.
    * @return True if the container cannot be recovered, false otherwise.
    */
-  public boolean isMissing() {
+  public boolean unRecoverable() {
     Set<Integer> distinct = new HashSet<>();
     distinct.addAll(healthyIndexes.keySet());
     distinct.addAll(decommissionIndexes.keySet());
@@ -300,10 +303,11 @@ public class ECContainerReplicaCount {
    * @param index The replica index to check.
    * @Throws IllegalArgumentException if the index is out of bounds.
    */
-  private void ensureIndexWithinBounds(Integer index) {
+  private void ensureIndexWithinBounds(Integer index, String setName) {
     if (index < 1 || index > repConfig.getRequiredNodes()) {
-      throw new IllegalArgumentException("Replica Index must be between "
-          + " 1 and " + repConfig.getRequiredNodes());
+      throw new IllegalArgumentException("Replica Index in " + setName
+          + " for containerID " + containerInfo.getContainerID()
+          + "must be between 1 and " + repConfig.getRequiredNodes());
     }
   }
 }

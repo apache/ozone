@@ -66,7 +66,7 @@ public class TestECContainerReplicaCount {
     ECContainerReplicaCount rcnt = new ECContainerReplicaCount(container,
         replica, new ArrayList<>(), new ArrayList<>(), 1);
     Assert.assertTrue(rcnt.isSufficientlyReplicated());
-    Assert.assertFalse(rcnt.isMissing());
+    Assert.assertFalse(rcnt.unRecoverable());
   }
 
   @Test
@@ -360,17 +360,35 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
+  public void testMissingNonMaintenanceReplicasPendingAdd() {
+    Set<ContainerReplica> replica =
+        registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
+
+    // 5 is missing, but there is a pending add.
+    List<Integer> add = new ArrayList<>();
+    add.add(5);
+
+    ECContainerReplicaCount rcnt = new ECContainerReplicaCount(container,
+        replica, add, new ArrayList<>(), 1);
+    Assert.assertFalse(rcnt.isSufficientlyReplicated());
+    Assert.assertFalse(rcnt.isOverReplicated());
+
+    Assert.assertEquals(0, rcnt.missingNonMaintenanceIndexes().size());
+  }
+
+  @Test
   public void testMissing() {
     ECContainerReplicaCount rcnt = new ECContainerReplicaCount(container,
         new HashSet<>(), new ArrayList<>(), new ArrayList<>(), 1);
-    Assert.assertTrue(rcnt.isMissing());
+    Assert.assertTrue(rcnt.unRecoverable());
     Assert.assertEquals(5, rcnt.missingNonMaintenanceIndexes().size());
 
     Set<ContainerReplica> replica =
         registerNodes(Pair.of(IN_SERVICE, 1), Pair.of(IN_MAINTENANCE, 2));
     rcnt = new ECContainerReplicaCount(container, replica, new ArrayList<>(),
         new ArrayList<>(), 1);
-    Assert.assertTrue(rcnt.isMissing());
+    Assert.assertTrue(rcnt.unRecoverable());
     Assert.assertEquals(3, rcnt.missingNonMaintenanceIndexes().size());
     Assert.assertEquals(0, rcnt.additionalMaintenanceCopiesNeeded());
 
@@ -381,7 +399,7 @@ public class TestECContainerReplicaCount {
     rcnt = new ECContainerReplicaCount(container, replica, new ArrayList<>(),
         new ArrayList<>(), 1);
     // Not missing as the decommission replicas are still online
-    Assert.assertFalse(rcnt.isMissing());
+    Assert.assertFalse(rcnt.unRecoverable());
     Assert.assertEquals(5, rcnt.missingNonMaintenanceIndexes().size());
   }
 
