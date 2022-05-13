@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 
 import java.util.Set;
 
@@ -266,7 +267,7 @@ public class ContainerReplicaCount {
         || container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED)
         && replica.stream()
         .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
-        .allMatch(r -> ReplicationManager.compareState(
+        .allMatch(r -> LegacyReplicationManager.compareState(
             container.getState(), r.getState()));
   }
 

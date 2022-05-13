@@ -454,4 +454,7 @@ public final class OzoneConsts {
   public static final String DELEGATION_TOKEN_KIND = "kind";
   public static final String DELEGATION_TOKEN_SERVICE = "service";
   public static final String DELEGATION_TOKEN_RENEWER = "renewer";
+
+  // EC Constants
+  public static final String BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK = "blockGroupLen";
 }

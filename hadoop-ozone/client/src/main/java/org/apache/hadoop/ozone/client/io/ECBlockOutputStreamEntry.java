@@ -269,7 +269,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         .build();
   }
 
-  void executePutBlock(boolean isClose) {
+  void executePutBlock(boolean isClose, long blockGroupLength) {
     if (!isInitialized()) {
       return;
     }
@@ -278,7 +278,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         continue;
       }
       try {
-        stream.executePutBlock(isClose, true);
+        stream.executePutBlock(isClose, true, blockGroupLength);
       } catch (Exception e) {
         stream.setIoException(e);
       }
