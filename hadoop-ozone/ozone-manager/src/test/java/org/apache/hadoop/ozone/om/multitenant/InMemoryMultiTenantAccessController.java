@@ -44,7 +44,7 @@ public class InMemoryMultiTenantAccessController
     if (policies.containsKey(policy.getName())) {
       throw new Exception("Policy already exists.");
     }
-    // Multiple policies for the sare resource should not be allowed.
+    // Multiple policies for the same resource should not be allowed.
     for (Policy existingPolicy: policies.values()) {
       if (existingPolicy.getVolumes().equals(policy.getVolumes()) &&
           existingPolicy.getBuckets().equals(policy.getBuckets()) &&

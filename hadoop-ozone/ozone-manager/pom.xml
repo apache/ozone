@@ -149,8 +149,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>ranger-intg</artifactId>
       <version>3.0.0-SNAPSHOT</version>
       <scope>compile</scope>
-      <!-- Workaround since ranger-intg currently does not shade logging
-      dependencies. -->
+      <!-- Workaround to prevent slf4j binding conflicts until ranger-intg is
+       fixed to not introduce this to the classpath -->
       <exclusions>
         <exclusion>
           <groupId>ch.qos.logback</groupId>

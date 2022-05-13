@@ -52,7 +52,7 @@ public class TestMultiTenantAccessController {
   }
 
   /**
-   * Use this setup to test against a mock Ranger instance.
+   * Use this setup to test against a simulated Ranger instance.
    */
   @Before
   public void setupUnitTest() {
@@ -67,7 +67,6 @@ public class TestMultiTenantAccessController {
     // These config keys must be set when the test is run:
     // OZONE_RANGER_HTTPS_ADDRESS_KEY
     // OZONE_RANGER_SERVICE
-    // These config keys must be set in a secure cluster.
     // OZONE_OM_KERBEROS_PRINCIPAL_KEY
     // OZONE_OM_KERBEROS_KEYTAB_FILE_KEY
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -309,8 +308,8 @@ public class TestMultiTenantAccessController {
     controller.deleteRole(roleName);
     // get to check it is deleted.
     try {
-      controller.getPolicy(roleName);
-      Assert.fail("Expected exception for missing policy.");
+      controller.getRole(roleName);
+      Assert.fail("Expected exception for missing role.");
     } catch (Exception ex) {
       // Expected since policy is not there.
     }
@@ -381,6 +380,7 @@ public class TestMultiTenantAccessController {
     List<Acl> acls = Arrays.stream(ACLType.values())
         .map(Acl::allow)
         .collect(Collectors.toList());
+    // Ranger does not support the NONE acl type.
     Acl noneRemove = Acl.allow(ACLType.NONE);
     acls.remove(noneRemove);
     Policy policy = new Policy.Builder()

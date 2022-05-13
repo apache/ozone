@@ -61,7 +61,7 @@ public class RangerClientMultiTenantAccessController implements
     stringToAcl = new HashMap<>();
     aclToString.forEach((type, string) -> stringToAcl.put(string, type));
 
-    // TODO: Handle config setup in cluster without kerberos/tls/ranger.
+    // TODO: Double check this set up after HDDS-6612 is merged.
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
     rangerServiceName = conf.get(OZONE_RANGER_SERVICE);
     omPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
@@ -95,7 +95,6 @@ public class RangerClientMultiTenantAccessController implements
       LOG.debug("Sending get request for policies with label {} to Ranger.",
           label);
     }
-    // TODO: See if this actually gets policies by label.
     Map<String, String> filterMap = new HashMap<>();
     filterMap.put("serviceName", rangerServiceName);
     filterMap.put("policyLabelsPartial", label);
