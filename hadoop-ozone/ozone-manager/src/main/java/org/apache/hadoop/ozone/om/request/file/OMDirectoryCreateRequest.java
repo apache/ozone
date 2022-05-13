@@ -415,4 +415,46 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  /**
+   * Validates directory create requests.
+   * Handles the cases where an older client attempts to create a directory
+   * inside a bucket with a non LEGACY bucket layout.
+   * We do not want an older client modifying a bucket that it cannot
+   * understand.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateDirectory
+  )
+  public static OMRequest blockCreateDirectoryWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+
+      if (req.getCreateDirectoryRequest().hasKeyArgs()) {
+
+        KeyArgs keyArgs = req.getCreateDirectoryRequest().getKeyArgs();
+
+        if (keyArgs.hasVolumeName() && keyArgs.hasBucketName() &&
+            !ctx.getBucketLayout(
+                keyArgs.getVolumeName(), keyArgs.getBucketName()).isLegacy()) {
+
+          throw new OMException(
+              "Client is attempting to create a directory in a bucket which" +
+                  " uses non-LEGACY bucket layout features. Please upgrade" +
+                  " the client to a compatible version before trying to " +
+                  "modify this bucket.",
+              OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
+      }
+    }
+    return req;
+  }
 }

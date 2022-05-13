@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -735,6 +736,37 @@ public class OzoneManagerRequestHandler implements RequestHandler {
               + " client can not understand."
               + " Please upgrade the client before trying to read the key info"
               + " for "
+              + req.getLookupFileRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupFileResponse()
+          .build();
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupFile
+  )
+  public static OMResponse disallowLookupFileWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasLookupFileResponse()) {
+      return resp;
+    }
+    KeyInfo keyInfo = resp.getLookupFileResponse().getKeyInfo();
+    if (keyInfo.hasVolumeName() && keyInfo.hasBucketName() &&
+        !ctx.getBucketLayout(keyInfo.getVolumeName(), keyInfo.getBucketName())
+            .equals(BucketLayout.LEGACY)) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is present inside a bucket with bucket layout " +
+              "features, which the client can not understand. Please upgrade" +
+              " the client to a compatible version before trying to read the" +
+              " key info for "
               + req.getLookupFileRequest().getKeyArgs().getVolumeName()
               + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
               + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName()
