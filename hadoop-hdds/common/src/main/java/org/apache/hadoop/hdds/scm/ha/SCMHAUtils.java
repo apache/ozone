@@ -196,9 +196,9 @@ public final class SCMHAUtils {
   public static OzoneConfiguration removeSelfId(
       OzoneConfiguration configuration, String selfId) {
     final OzoneConfiguration conf = new OzoneConfiguration(configuration);
-    String scmNodes = conf.get(ConfUtils
-        .addKeySuffixes(ScmConfigKeys.OZONE_SCM_NODES_KEY,
-            getScmServiceId(conf)));
+    String scmNodesKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_NODES_KEY, getScmServiceId(conf));
+    String scmNodes = conf.get(scmNodesKey);
     if (scmNodes != null) {
       String[] parts = scmNodes.split(",");
       List<String> partsLeft = new ArrayList<>();
@@ -207,7 +207,7 @@ public final class SCMHAUtils {
           partsLeft.add(part);
         }
       }
-      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, String.join(",", partsLeft));
+      conf.set(scmNodesKey, String.join(",", partsLeft));
     }
     return conf;
   }
