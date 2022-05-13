@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
- *
+ * Command handler for reconstructing the lost EC containers.
  */
 public class ReconstructECContainersCommandHandler implements CommandHandler {
 
@@ -70,5 +70,9 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   @Override
   public long getAverageRunTime() {
     return 0;
+  }
+
+  public ConfigurationSource getConf() {
+    return conf;
   }
 }

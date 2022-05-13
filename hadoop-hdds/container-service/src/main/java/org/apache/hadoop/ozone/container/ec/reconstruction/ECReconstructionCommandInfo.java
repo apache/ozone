@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -41,7 +42,8 @@ public class ECReconstructionCommandInfo {
       List<DatanodeDetails> targetDatanodes) {
     this.containerID = containerID;
     this.ecReplicationConfig = ecReplicationConfig;
-    this.missingContainerIndexes = missingContainerIndexes;
+    this.missingContainerIndexes =
+        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
     this.sources = sources;
     this.targetDatanodes = targetDatanodes;
   }
@@ -51,7 +53,8 @@ public class ECReconstructionCommandInfo {
   }
 
   public byte[] getMissingContainerIndexes() {
-    return missingContainerIndexes;
+    return Arrays
+        .copyOf(missingContainerIndexes, missingContainerIndexes.length);
   }
 
   public ECReplicationConfig getEcReplicationConfig() {
@@ -64,5 +67,16 @@ public class ECReconstructionCommandInfo {
 
   public List<DatanodeDetails> getTargetDatanodes() {
     return targetDatanodes;
+  }
+
+  @Override
+  public String toString() {
+    return "ECReconstructionCommandInfo{"
+        + "containerID=" + containerID
+        + ", ecReplicationConfig=" + ecReplicationConfig
+        + ", missingContainerIndexes=" + Arrays
+        .toString(missingContainerIndexes)
+        + ", sources=" + sources
+        + ", targetDatanodes=" + targetDatanodes + '}';
   }
 }

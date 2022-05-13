@@ -43,4 +43,10 @@ public class ECReconstructionCoordinatorTask implements Runnable {
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
   }
+
+  @Override
+  public String toString() {
+    return "ECReconstructionCoordinatorTask{" + "reconstructionCommandInfo="
+        + reconstructionCommandInfo + '}';
+  }
 }
