@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -43,6 +42,8 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -80,7 +81,7 @@ public class TestListPipelinesSubCommand {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs();
     cmd.execute(scmClient);
-    Assertions.assertEquals(6, outContent.toString(DEFAULT_ENCODING)
+    assertEquals(6, outContent.toString(DEFAULT_ENCODING)
         .split(System.getProperty("line.separator")).length);
   }
 
@@ -90,17 +91,16 @@ public class TestListPipelinesSubCommand {
     c.parseArgs("-s", "OPEN");
     cmd.execute(scmClient);
     String output = outContent.toString(DEFAULT_ENCODING);
-    Assertions.assertEquals(3, output.split(
+    assertEquals(3, output.split(
         System.getProperty("line.separator")).length);
-    Assertions.assertEquals(-1, output.indexOf("CLOSED"));
+    assertEquals(-1, output.indexOf("CLOSED"));
   }
 
   @Test
   public void testExceptionIfReplicationWithoutType() {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("-r", "THREE");
-    Assertions.assertThrows(IllegalArgumentException.class,
-        () -> cmd.execute(scmClient));
+    assertThrows(IllegalArgumentException.class, () -> cmd.execute(scmClient));
   }
 
   @Test
@@ -110,9 +110,9 @@ public class TestListPipelinesSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    Assertions.assertEquals(1, output.split(
+    assertEquals(1, output.split(
         System.getProperty("line.separator")).length);
-    Assertions.assertEquals(-1, output.indexOf("EC"));
+    assertEquals(-1, output.indexOf("EC"));
   }
 
   @Test
@@ -122,9 +122,9 @@ public class TestListPipelinesSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    Assertions.assertEquals(2, output.split(
+    assertEquals(2, output.split(
         System.getProperty("line.separator")).length);
-    Assertions.assertEquals(-1, output.indexOf("EC"));
+    assertEquals(-1, output.indexOf("EC"));
   }
 
   @Test
@@ -134,16 +134,16 @@ public class TestListPipelinesSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    Assertions.assertEquals(2, output.split(
+    assertEquals(2, output.split(
         System.getProperty("line.separator")).length);
-    Assertions.assertEquals(-1, output.indexOf("EC"));
+    assertEquals(-1, output.indexOf("EC"));
   }
 
   @Test
   public void factorAndReplicationAreMutuallyExclusive() {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("-r", "THREE", "-ffc", "ONE");
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> cmd.execute(scmClient));
   }
 
@@ -154,9 +154,9 @@ public class TestListPipelinesSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    Assertions.assertEquals(1, output.split(
+    assertEquals(1, output.split(
         System.getProperty("line.separator")).length);
-    Assertions.assertEquals(-1,
+    assertEquals(-1,
         output.indexOf("ReplicationConfig: RATIS"));
   }
 
@@ -167,10 +167,10 @@ public class TestListPipelinesSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    Assertions.assertEquals(1, output.split(
+    assertEquals(1, output.split(
         System.getProperty("line.separator")).length);
-    Assertions.assertEquals(-1, output.indexOf("CLOSED"));
-    Assertions.assertEquals(-1, output.indexOf("EC"));
+    assertEquals(-1, output.indexOf("CLOSED"));
+    assertEquals(-1, output.indexOf("EC"));
   }
 
   @Test
@@ -180,10 +180,10 @@ public class TestListPipelinesSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    Assertions.assertEquals(1, output.split(
+    assertEquals(1, output.split(
         System.getProperty("line.separator")).length);
-    Assertions.assertEquals(-1, output.indexOf("CLOSED"));
-    Assertions.assertEquals(-1, output.indexOf("EC"));
+    assertEquals(-1, output.indexOf("CLOSED"));
+    assertEquals(-1, output.indexOf("EC"));
   }
 
   private List<Pipeline> createPipelines() {

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 
@@ -82,17 +82,17 @@ public class TestListInfoSubcommand {
     Pattern p = Pattern.compile(
         "^Operational State:\\s+IN_SERVICE$", Pattern.MULTILINE);
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
     // Should also have a node with the state DECOMMISSIONING
     p = Pattern.compile(
         "^Operational State:\\s+DECOMMISSIONING$", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
       p = Pattern.compile(
           "^Health State:\\s+" + state + "$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-      Assertions.assertTrue(m.find());
+      assertTrue(m.find());
     }
     // Ensure the nodes are ordered by health state HEALTHY,
     // HEALTHY_READONLY, STALE, DEAD
@@ -100,7 +100,7 @@ public class TestListInfoSubcommand {
         Pattern.DOTALL);
 
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
   private List<HddsProtos.Node> getNodeDetails() {

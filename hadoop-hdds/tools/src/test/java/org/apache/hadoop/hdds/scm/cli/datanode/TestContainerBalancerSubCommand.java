@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -36,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -82,7 +82,7 @@ public class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
   @Test
@@ -98,7 +98,7 @@ public class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sNot\\sRunning.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
   @Test
@@ -108,7 +108,7 @@ public class TestContainerBalancerSubCommand {
 
     Pattern p = Pattern.compile("^Stopping\\sContainerBalancer...");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
   @Test
@@ -127,7 +127,7 @@ public class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
         "\\ssuccessfully.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
   @Test
@@ -147,7 +147,7 @@ public class TestContainerBalancerSubCommand {
         "\\sBalancer.");
 
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
 }

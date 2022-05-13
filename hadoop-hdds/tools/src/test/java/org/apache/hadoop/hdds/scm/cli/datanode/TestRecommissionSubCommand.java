@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +35,8 @@ import java.util.regex.Pattern;
 import org.mockito.Mockito;
 import picocli.CommandLine;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Mockito.mock;
 
@@ -78,15 +79,15 @@ public class TestRecommissionSubCommand {
     Pattern p = Pattern.compile(
         "^Started\\srecommissioning\\sdatanode\\(s\\)", Pattern.MULTILINE);
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
 
     p = Pattern.compile("^host1$", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
 
     p = Pattern.compile("^host2$", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
   @Test
@@ -103,7 +104,7 @@ public class TestRecommissionSubCommand {
     c.parseArgs("host1", "host2");
     try {
       cmd.execute(scmClient);
-      Assertions.fail("Should not succeed without an exception");
+      fail("Should not succeed without an exception");
     } catch (IOException e) {
       // Expected
     }
@@ -111,19 +112,19 @@ public class TestRecommissionSubCommand {
     Pattern p = Pattern.compile(
         "^Started\\srecommissioning\\sdatanode\\(s\\)", Pattern.MULTILINE);
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
 
     p = Pattern.compile("^host1$", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
 
     p = Pattern.compile("^host2$", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
 
     p = Pattern.compile("^Error: host1: host1 error$", Pattern.MULTILINE);
     m = p.matcher(errContent.toString(DEFAULT_ENCODING));
-    Assertions.assertTrue(m.find());
+    assertTrue(m.find());
   }
 
 }

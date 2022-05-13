@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -38,6 +37,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -78,7 +79,7 @@ public class TestReportSubCommand {
       Pattern p = Pattern.compile(
           "^" + state.toString() + ": 0$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-      Assertions.assertTrue(m.find());
+      assertTrue(m.find());
     }
 
     for (ReplicationManagerReport.HealthState state :
@@ -86,7 +87,7 @@ public class TestReportSubCommand {
       Pattern p = Pattern.compile(
           "^" + state.toString() + ": 0$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-      Assertions.assertTrue(m.find());
+      assertTrue(m.find());
     }
   }
 
@@ -105,9 +106,9 @@ public class TestReportSubCommand {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
 
-    Assertions.assertNotNull(json.get("reportTimeStamp"));
-    Assertions.assertNotNull(json.get("stats"));
-    Assertions.assertNotNull(json.get("samples"));
+    assertNotNull(json.get("reportTimeStamp"));
+    assertNotNull(json.get("stats"));
+    assertNotNull(json.get("samples"));
   }
 
   @Test
@@ -123,7 +124,7 @@ public class TestReportSubCommand {
       Pattern p = Pattern.compile(
           "^" + state.toString() + ": " + counter + "$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-      Assertions.assertTrue(m.find());
+      assertTrue(m.find());
       counter++;
     }
 
@@ -133,14 +134,14 @@ public class TestReportSubCommand {
       Pattern p = Pattern.compile(
           "^" + state.toString() + ": " + counter + "$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-      Assertions.assertTrue(m.find());
+      assertTrue(m.find());
 
       // Check the correct samples are returned
       p = Pattern.compile(
           "^First 100 " + state + " containers:\n"
               + containerList(0, counter) + "$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-      Assertions.assertTrue(m.find());
+      assertTrue(m.find());
       counter++;
     }
   }
