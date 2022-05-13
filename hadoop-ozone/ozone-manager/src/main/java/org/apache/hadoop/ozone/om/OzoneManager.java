@@ -1033,7 +1033,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
     if (flexibleFqdnResolutionEnabled && omNodeRpcAddr.getAddress() == null) {
       omNodeRpcAddr =
-              OzoneNetUtils.getAddressWithHostName(omNodeRpcAddr);
+              OzoneNetUtils.getAddressWithHostNameLocal(omNodeRpcAddr);
     }
 
     final int handlerCount = conf.getInt(OZONE_OM_HANDLER_COUNT_KEY,
@@ -2050,7 +2050,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean addressResolved = omRpcAdd != null && omRpcAdd.getAddress() != null;
     if (flexibleFqdnResolutionEnabled && !addressResolved && omRpcAdd != null) {
       InetSocketAddress omRpcAddWithHostName =
-              OzoneNetUtils.getAddressWithHostName(omRpcAdd);
+              OzoneNetUtils.getAddressWithHostNameLocal(omRpcAdd);
       if (omRpcAddWithHostName != null
               && omRpcAddWithHostName.getAddress() != null) {
         addressResolved = true;

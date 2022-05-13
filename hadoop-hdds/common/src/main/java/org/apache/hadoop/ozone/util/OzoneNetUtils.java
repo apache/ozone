@@ -77,7 +77,7 @@ public final class OzoneNetUtils {
    * @param addr a FQDN address
    * @return The address of host name
    */
-  public static InetSocketAddress getAddressWithHostName(
+  public static InetSocketAddress getAddressWithHostNameLocal(
           final InetSocketAddress addr) {
     final String fqdn = addr.getHostName();
     final String hostName = getHostNameWithoutDomain(fqdn);
