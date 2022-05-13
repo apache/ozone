@@ -242,6 +242,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       if (nodeId != null) {
         removePeers(nodeId, healthyNodes);
         results.add(nodeId);
+        healthyNodes.remove(nodeId);
       }
     }
 
