@@ -554,8 +554,8 @@ public class RpcClient implements ClientProtocol {
     // If S3 auth exists, set owner name to the short user name derived from the
     //  accessId. Similar to RpcClient#getDEK
     if (getThreadLocalS3Auth() != null) {
-      UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
-          getThreadLocalS3Auth().getAccessID());
+      final UserGroupInformation s3gUGI = UserGroupInformation.createRemoteUser(
+          getThreadLocalS3Auth().getUserPrincipal());
       owner = s3gUGI.getShortUserName();
     } else {
       owner = bucketArgs.getOwner() == null ?
