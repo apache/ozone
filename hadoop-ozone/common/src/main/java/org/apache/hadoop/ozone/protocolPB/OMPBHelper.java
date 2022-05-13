@@ -216,32 +216,26 @@ public final class OMPBHelper {
     return builder.build();
   }
 
-  public static FileChecksum convert(FileChecksumProto proto) {
+  public static FileChecksum convert(FileChecksumProto proto)
+      throws IOException {
     if (proto == null) {
       return null;
     }
-    try {
-      switch (proto.getChecksumType()) {
-      case MD5CRC:
-        if (proto.hasMd5Crc()) {
-          return convertMD5MD5FileChecksum(proto.getMd5Crc());
-        } else {
-          LOG.warn("The field md5Crc is not set.");
-          return null;
-        }
-      case COMPOSITE_CRC:
-        if (proto.hasCompositeCrc()) {
-          return convertCompositeCrcChecksum(proto.getCompositeCrc());
-        } else {
-          LOG.warn("The field CompositeCrc is not set.");
-          return null;
-        }
-      default:
-        return null;
+
+    switch (proto.getChecksumType()) {
+    case MD5CRC:
+      if (proto.hasMd5Crc()) {
+        return convertMD5MD5FileChecksum(proto.getMd5Crc());
       }
-    } catch (IOException ioe) {
-      LOG.warn("Unable to convert FileChecksumProto.", ioe);
-      return null;
+      throw new IOException("The field md5Crc is not set.");
+    case COMPOSITE_CRC:
+      if (proto.hasCompositeCrc()) {
+        return convertCompositeCrcChecksum(proto.getCompositeCrc());
+      }
+      throw new IOException("The field CompositeCrc is not set.");
+    default:
+      throw new IOException("Unexpected checksum type" +
+          proto.getChecksumType());
     }
   }
 
@@ -266,7 +260,7 @@ public final class OMPBHelper {
   }
 
   public static CompositeCrcFileChecksum convertCompositeCrcChecksum(
-      CompositeCrcFileChecksumProto proto) {
+      CompositeCrcFileChecksumProto proto) throws IOException {
     ChecksumTypeProto checksumTypeProto = proto.getChecksumType();
     int bytesPerCRC = proto.getBytesPerCrc();
     int crc = proto.getCrc();
@@ -278,7 +272,7 @@ public final class OMPBHelper {
       return new CompositeCrcFileChecksum(
           crc, DataChecksum.Type.CRC32C, bytesPerCRC);
     default:
-      return null;
+      throw new IOException("Unexpected checksum type " + checksumTypeProto);
     }
   }
 

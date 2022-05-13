@@ -826,8 +826,8 @@ enum ChecksumTypeProto {
 }
 
 enum FileChecksumTypeProto {
-  COMPOSITE_CRC = 1;  // Chunk-independent CRC, optionally striped
-  MD5CRC = 2;  // BlockChecksum obtained by taking the MD5 digest of chunk CRCs
+  MD5CRC = 1;  // BlockChecksum obtained by taking the MD5 digest of chunk CRCs
+  COMPOSITE_CRC = 2;  // Chunk-independent CRC, optionally striped
 }
 
 message CompositeCrcFileChecksumProto {
@@ -844,7 +844,7 @@ message MD5MD5Crc32FileChecksumProto {
 }
 
 message FileChecksumProto {
-  required FileChecksumTypeProto checksumType = 1;
+  required FileChecksumTypeProto checksumType = 1  [default = COMPOSITE_CRC];
   optional CompositeCrcFileChecksumProto compositeCrc = 2;
   optional MD5MD5Crc32FileChecksumProto md5Crc = 3;
 }

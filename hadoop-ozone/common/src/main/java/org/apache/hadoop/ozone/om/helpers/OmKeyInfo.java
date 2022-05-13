@@ -608,7 +608,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) throws IOException {
     if (keyInfo == null) {
       return null;
     }

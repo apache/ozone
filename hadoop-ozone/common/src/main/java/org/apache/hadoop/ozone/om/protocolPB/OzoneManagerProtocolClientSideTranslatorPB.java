@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -910,10 +911,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     ListKeysResponse resp =
         handleError(submitRequest(omRequest)).getListKeysResponse();
-    keys.addAll(
-        resp.getKeyInfoList().stream()
-            .map(OmKeyInfo::getFromProtobuf)
-            .collect(Collectors.toList()));
+    List<OmKeyInfo> list = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.KeyInfo keyInfo : resp.getKeyInfoList()) {
+      OmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(keyInfo);
+      list.add(fromProtobuf);
+    }
+    keys.addAll(list);
     return keys;
 
   }
@@ -1637,10 +1640,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     List<RepeatedOmKeyInfo> deletedKeyList =
         new ArrayList<>(trashResponse.getDeletedKeysCount());
 
-    deletedKeyList.addAll(
-        trashResponse.getDeletedKeysList().stream()
-            .map(RepeatedOmKeyInfo::getFromProto)
-            .collect(Collectors.toList()));
+    List<RepeatedOmKeyInfo> list = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.RepeatedKeyInfo repeatedKeyInfo : trashResponse
+        .getDeletedKeysList()) {
+      RepeatedOmKeyInfo fromProto =
+          RepeatedOmKeyInfo.getFromProto(repeatedKeyInfo);
+      list.add(fromProto);
+    }
+    deletedKeyList.addAll(list);
 
     return deletedKeyList;
   }
