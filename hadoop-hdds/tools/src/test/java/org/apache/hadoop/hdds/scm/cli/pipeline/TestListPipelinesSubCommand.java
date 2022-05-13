@@ -95,11 +95,23 @@ public class TestListPipelinesSubCommand {
     Assert.assertEquals(-1, output.indexOf("CLOSED"));
   }
 
-  @Test(expected = IOException.class)
+  @Test(expected = IllegalArgumentException.class)
   public void testExceptionIfReplicationWithoutType() throws IOException {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("-r", "THREE");
     cmd.execute(scmClient);
+  }
+
+  @Test
+  public void testReplicationType() throws IOException {
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-t", "STANDALONE");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    Assert.assertEquals(1, output.split(
+        System.getProperty("line.separator")).length);
+    Assert.assertEquals(-1, output.indexOf("EC"));
   }
 
   @Test
@@ -112,6 +124,25 @@ public class TestListPipelinesSubCommand {
     Assert.assertEquals(2, output.split(
         System.getProperty("line.separator")).length);
     Assert.assertEquals(-1, output.indexOf("EC"));
+  }
+
+  @Test
+  public void testLegacyFactorWithoutType() throws IOException {
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-ffc", "THREE");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    Assert.assertEquals(2, output.split(
+        System.getProperty("line.separator")).length);
+    Assert.assertEquals(-1, output.indexOf("EC"));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void factorAndReplicationAreMutuallyExclusive() throws IOException {
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-r", "THREE", "-ffc", "ONE");
+    cmd.execute(scmClient);
   }
 
   @Test
@@ -131,6 +162,19 @@ public class TestListPipelinesSubCommand {
   public void testReplicationAndTypeAndState() throws IOException {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("-r", "THREE", "-t", "RATIS", "-s", "OPEN");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    Assert.assertEquals(1, output.split(
+        System.getProperty("line.separator")).length);
+    Assert.assertEquals(-1, output.indexOf("CLOSED"));
+    Assert.assertEquals(-1, output.indexOf("EC"));
+  }
+
+  @Test
+  public void testLegacyFactorAndState() throws IOException {
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-ffc", "THREE", "-fst", "OPEN");
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);

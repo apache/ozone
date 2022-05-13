@@ -18,14 +18,12 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -79,7 +77,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     final String volume2 = UUID.randomUUID().toString();
     final String bucket1 = UUID.randomUUID().toString();
     final String bucket2 = UUID.randomUUID().toString();
-    final long keySize = 100;
 
     OpenKeyBucket v1b1KeysToDelete = makeOpenKeys(volume1, bucket1, 3);
     OpenKeyBucket v1b1KeysToKeep = makeOpenKeys(volume1, bucket1, 3);
@@ -91,7 +88,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     OpenKeyBucket v2b2KeysToKeep = makeOpenKeys(volume2, bucket2, 3);
 
     addToOpenKeyTableDB(
-        keySize,
         v1b1KeysToKeep,
         v1b2KeysToKeep,
         v2b2KeysToKeep,
@@ -99,17 +95,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         v1b2KeysToDelete,
         v2b2KeysToDelete
     );
-
-    final int v1b1NumKeys =
-        v1b1KeysToDelete.getKeysCount() + v1b1KeysToKeep.getKeysCount();
-    final int v1b2NumKeys =
-        v1b2KeysToDelete.getKeysCount() + v1b2KeysToKeep.getKeysCount();
-    final int v2b2NumKeys =
-        v2b2KeysToDelete.getKeysCount() + v2b2KeysToKeep.getKeysCount();
-
-    assertBucketQuota(volume1, bucket1, v1b1NumKeys, v1b1NumKeys * keySize);
-    assertBucketQuota(volume1, bucket2, v1b2NumKeys, v1b2NumKeys * keySize);
-    assertBucketQuota(volume2, bucket2, v2b2NumKeys, v2b2NumKeys * keySize);
 
     deleteOpenKeysFromCache(
         v1b1KeysToDelete,
@@ -128,14 +113,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         v1b2KeysToKeep,
         v2b2KeysToKeep
     );
-
-    final int v1b1KeysLeft = v1b1KeysToKeep.getKeysCount();
-    final int v1b2KeysLeft = v1b2KeysToKeep.getKeysCount();
-    final int v2b2KeysLeft = v2b2KeysToKeep.getKeysCount();
-
-    assertBucketQuota(volume1, bucket1, v1b1KeysLeft, v1b1KeysLeft * keySize);
-    assertBucketQuota(volume1, bucket2, v1b2KeysLeft, v1b2KeysLeft * keySize);
-    assertBucketQuota(volume2, bucket2, v2b2KeysLeft, v2b2KeysLeft * keySize);
   }
 
   /**
@@ -147,25 +124,17 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   public void testDeleteSameKeyNameDifferentClient() throws Exception {
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
-    final long keySize = 100;
 
     OpenKeyBucket keysToKeep =
         makeOpenKeys(volume, bucket, 3, true);
     OpenKeyBucket keysToDelete =
         makeOpenKeys(volume, bucket, 3, true);
 
-    addToOpenKeyTableDB(keySize, keysToKeep, keysToDelete);
-
-    final int numKeys = keysToDelete.getKeysCount() + keysToKeep.getKeysCount();
-    assertBucketQuota(volume, bucket, numKeys, numKeys * keySize);
-
+    addToOpenKeyTableDB(keysToKeep, keysToDelete);
     deleteOpenKeysFromCache(keysToDelete);
 
     assertNotInOpenKeyTable(keysToDelete);
     assertInOpenKeyTable(keysToKeep);
-
-    final int keysLeft = keysToKeep.getKeysCount();
-    assertBucketQuota(volume, bucket, keysLeft, keysLeft * keySize);
   }
 
   /**
@@ -251,21 +220,12 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     for (OpenKeyBucket openKeyBucket: openKeys) {
       String volume = openKeyBucket.getVolumeName();
       String bucket = openKeyBucket.getBucketName();
-      OmBucketInfo omBucketInfo =
-          OMRequestTestUtils.getBucketFromDB(volume, bucket, omMetadataManager);
-      if (omBucketInfo == null) {
-        OMRequestTestUtils.addBucketToDB(volume, bucket, omMetadataManager);
-        omBucketInfo = OMRequestTestUtils
-            .getBucketFromDB(volume, bucket, omMetadataManager);
-      }
 
       for (OpenKey openKey: openKeyBucket.getKeysList()) {
-        omBucketInfo.incrUsedNamespace(1);
         OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket,
             openKey.getName(), replicationType, replicationFactor);
         if (keySize > 0) {
           OMRequestTestUtils.addKeyLocationInfo(keyInfo, 0, keySize);
-          omBucketInfo.incrUsedBytes(keySize);
         }
         OMRequestTestUtils.addKeyToTable(true, false,
             keyInfo, openKey.getClientID(), 0L, omMetadataManager);
@@ -288,7 +248,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * @return A list of new open keys with size {@code numKeys}.
    */
   private OpenKeyBucket makeOpenKeys(String volume, String bucket,
-      int numKeys) throws IOException {
+      int numKeys) {
     return makeOpenKeys(volume, bucket, numKeys, false);
   }
 
@@ -306,7 +266,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * @return A list of new open keys with size {@code numKeys}.
    */
   private OpenKeyBucket makeOpenKeys(String volume, String bucket,
-      int numKeys, boolean fixedKeyName) throws IOException {
+      int numKeys, boolean fixedKeyName) {
 
     OpenKeyBucket.Builder keysPerBucketBuilder =
         OpenKeyBucket.newBuilder()
@@ -342,15 +302,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       Assert.assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout())
           .isExist(keyName));
     }
-  }
-
-  private void assertBucketQuota(String volumeName, String bucketName,
-      int usedNamespace, long usedBytes) {
-    OmBucketInfo omBucketInfo = OMRequestTestUtils.getBucketFromDB(
-        volumeName, bucketName, omMetadataManager);
-    Assert.assertNotNull(omBucketInfo);
-    Assert.assertEquals(usedNamespace, omBucketInfo.getUsedNamespace());
-    Assert.assertEquals(usedBytes, omBucketInfo.getUsedBytes());
   }
 
   /**

@@ -86,6 +86,7 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public final class RandomKeyGenerator implements Callable<Void> {
 
   @ParentCommand

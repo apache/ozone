@@ -122,7 +122,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         new RequestValidations()
             .fromPackage(OM_REQUESTS_PACKAGE)
             .withinContext(
-                ValidationContext.of(ozoneManager.getVersionManager()))
+                ValidationContext.of(ozoneManager.getVersionManager(),
+                    ozoneManager.getMetadataManager()))
             .load();
   }
 
