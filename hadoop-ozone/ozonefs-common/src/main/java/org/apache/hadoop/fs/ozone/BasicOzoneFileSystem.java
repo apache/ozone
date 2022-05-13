@@ -328,7 +328,9 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     if (adapter.isFSOptimizedBucket()) {
-      return renameFSO(srcPath, dstPath);
+      String srcKey = pathToKey(src);
+      String dstKey = pathToKey(dst);
+      return renameFSO(srcKey, dstKey);
     }
 
     // Check if the source exists

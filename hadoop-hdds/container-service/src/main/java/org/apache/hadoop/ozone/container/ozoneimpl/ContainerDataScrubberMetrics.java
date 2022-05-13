@@ -108,6 +108,7 @@ public final class ContainerDataScrubberMetrics {
     this.ms = ms;
   }
 
+  @SuppressWarnings("java:S2245") // no need for secure random
   public static ContainerDataScrubberMetrics create(final String volumeName) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String name = "ContainerDataScrubberMetrics-" + (volumeName.isEmpty()

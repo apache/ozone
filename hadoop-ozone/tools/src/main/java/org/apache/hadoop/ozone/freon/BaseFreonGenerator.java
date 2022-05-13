@@ -66,6 +66,7 @@ import picocli.CommandLine.ParentCommand;
 /**
  * Base class for simplified performance tests.
  */
+@SuppressWarnings("java:S2245") // no need for secure random
 public class BaseFreonGenerator {
 
   private static final Logger LOG =

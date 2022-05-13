@@ -473,8 +473,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
         continue;
       }
       if (excludedScopes != null && excludedScopes.size() > 0) {
-        if (excludedScopes.stream().anyMatch(scope ->
-            node.getNetworkFullPath().startsWith(scope))) {
+        if (excludedScopes.stream().anyMatch(node::isDescendant)) {
           continue;
         }
       }
